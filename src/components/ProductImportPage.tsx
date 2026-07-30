@@ -1,7 +1,7 @@
 // Product Import Page Component - Full Featured
 
 import React, { useState, useCallback, useMemo } from 'react';
-import { FileSpreadsheet, ArrowLeft, Lock } from 'lucide-react';
+import { FileSpreadsheet, ArrowLeft, Lock, XCircle, Package } from 'lucide-react';
 import { ProductUploadArea } from './ProductUploadArea';
 import { ColumnMappingWizard } from './ColumnMappingWizard';
 import { ProductImportPreview } from './ProductImportPreview';
@@ -30,6 +30,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   const [isReading, setIsReading] = useState(false);
   const [products, setProducts] = useState<ProductValidated[]>([]);
   const [errors, setErrors] = useState<ImportError[]>([]);
+  const [dbErrors, setDbErrors] = useState<ImportError[]>([]);
   const [summary, setSummary] = useState<ImportSummary | null>(null);
   const [progress, setProgress] = useState<ImportProgress>({
     current: 0,
@@ -161,6 +162,8 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
     if (!summary || summary.validProducts === 0 || !columnMapping || !isAdmin) return;
 
     setStatus('importing');
+    setDbErrors([]);
+    const executionErrors: ImportError[] = [];
     const validProducts = products.filter(p => p.isValid);
     const total = validProducts.length;
 
@@ -223,6 +226,14 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
 
         if (insertError) {
           console.error('[handleConfirmImport] Erro ao inserir produtos:', insertError);
+          newProducts.forEach(p => {
+            executionErrors.push({
+              row: 0,
+              sku: p.sku || undefined,
+              name: p.name || undefined,
+              error: insertError.message || 'Erro ao salvar produto no banco de dados',
+            });
+          });
         }
 
         if (!insertError && insertedProducts) {
@@ -269,6 +280,12 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
 
           if (updateError) {
             console.error('[handleConfirmImport] Erro ao atualizar produto:', updateError);
+            executionErrors.push({
+              row: 0,
+              sku: product.sku || undefined,
+              name: product.name || undefined,
+              error: updateError.message || 'Erro ao atualizar produto no banco de dados',
+            });
           }
 
           if (!updateError) {
@@ -315,7 +332,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
             total_products: imported,
             new_products: newCount,
             updated_products: updateCount,
-            errors: errors.length,
+            errors: errors.length + executionErrors.length,
             status: 'completed',
           })
           .eq('id', importRecordId);
@@ -331,15 +348,27 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
       importedCount: imported,
     } : null);
 
-    setProgress({
-      current: total,
-      total,
-      percentage: 100,
-      status: 'completed',
-      message: 'Importacao concluida!',
-    });
+    setDbErrors(executionErrors);
 
-    setStatus('complete');
+    if (executionErrors.length > 0) {
+      setProgress({
+        current: total,
+        total,
+        percentage: 100,
+        status: 'error',
+        message: 'Importação concluída com falhas.',
+      });
+      setStatus('error');
+    } else {
+      setProgress({
+        current: total,
+        total,
+        percentage: 100,
+        status: 'completed',
+        message: 'Importacao concluida!',
+      });
+      setStatus('complete');
+    }
   }, [products, summary, columnMapping, isAdmin, existingProducts, errors.length]);
 
   // Create import history record
@@ -423,6 +452,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
     setIsReading(false);
     setProducts([]);
     setErrors([]);
+    setDbErrors([]);
     setSummary(null);
     setProgress({
       current: 0,
@@ -463,6 +493,66 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
     </div>
   );
 
+  // Import completed with database execution errors
+  const ImportErrorResult = () => (
+    <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-8">
+      <div className="text-center mb-8">
+        <div className="flex justify-center mb-4">
+          <div className="p-4 bg-red-100 rounded-full">
+            <XCircle size={64} className="text-red-600" />
+          </div>
+        </div>
+        <h2 className="text-2xl font-bold text-zinc-800 mb-2">
+          Importação concluída com falhas
+        </h2>
+        <p className="text-zinc-500">
+          Alguns produtos não foram salvos no banco de dados. Veja os detalhes abaixo.
+        </p>
+      </div>
+
+      <div className="grid grid-cols-2 gap-4 mb-8">
+        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-emerald-700">{summary?.importedCount ?? 0}</p>
+          <p className="text-sm text-emerald-700 font-medium">Salvos com sucesso</p>
+        </div>
+        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
+          <p className="text-3xl font-bold text-red-600">{dbErrors.length}</p>
+          <p className="text-sm text-red-600 font-medium">Falharam ao salvar</p>
+        </div>
+      </div>
+
+      <div className="bg-zinc-50 rounded-xl p-4 mb-8 max-h-64 overflow-y-auto">
+        <h4 className="font-semibold text-zinc-700 mb-3">Produtos não salvos</h4>
+        <ul className="space-y-2 text-sm">
+          {dbErrors.map((err, idx) => (
+            <li key={idx} className="border-b border-zinc-200 pb-2 last:border-0">
+              <span className="font-medium text-zinc-800">{err.sku || 'SKU não informado'}</span>
+              {err.name ? <span className="text-zinc-500"> — {err.name}</span> : null}
+              <p className="text-red-600">{err.error}</p>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
+        <button
+          onClick={onBack}
+          className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition"
+        >
+          <Package size={20} />
+          Ver Produtos
+        </button>
+        <button
+          onClick={handleReset}
+          className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition"
+        >
+          <FileSpreadsheet size={20} />
+          Nova Importação
+        </button>
+      </div>
+    </div>
+  );
+
   return (
     <div className="min-h-screen bg-zinc-50 p-6">
       {/* Header */}
@@ -498,10 +588,11 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
           };
 
           const statusOrder = ['upload', 'mapping', 'preview', 'importing', 'complete'];
-          const currentIdx = statusOrder.indexOf(status);
+          const effectiveStatus = status === 'error' ? 'complete' : status;
+          const currentIdx = statusOrder.indexOf(effectiveStatus);
 
           const isComplete = currentIdx > idx;
-          const isCurrent = status === step;
+          const isCurrent = effectiveStatus === step;
 
           return (
             <React.Fragment key={step}>
@@ -574,6 +665,10 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
                 onViewProducts={onBack}
                 onNewImport={handleReset}
               />
+            )}
+
+            {status === 'error' && (
+              <ImportErrorResult />
             )}
           </>
         )}

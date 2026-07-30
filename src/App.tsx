@@ -1155,7 +1155,8 @@ function AppContent() {
                 // Get audit records for this import
                 const { data: auditRecords, error: auditError } = await supabase
                   .from('import_products_audit')
-                  .select('id, import_id, product_id, sku, action, old_data, new_data, created_at, company_id');
+                  .select('id, import_id, product_id, sku, action, old_data, new_data, created_at, company_id')
+                  .eq('import_id', importId);
 
                 if (auditError) throw auditError;
 

@@ -218,10 +218,22 @@ export async function importNfeXml(xml: string): Promise<ImportResult> {
 
 // ── Read ───────────────────────────────────────────────────────────────────
 
+/**
+ * Fields consumed by the invoice list (NFeConferencePage) and by the views
+ * that reuse a list-fetched invoice without a refetch — NFePreparationView,
+ * NFeCountingView, and NFeReportView when opening an already-finalized note
+ * straight from the list. Intentionally excludes raw_xml (R5: unbounded
+ * payload — a single note's XML can be ~100KB, ballooning the list fetch)
+ * and write-only audit columns (company_id, created_by, started_by,
+ * finished_by, updated_at) that none of those views read from this object.
+ */
+export const INVOICE_LIST_FIELDS =
+  'id, invoice_key, invoice_number, invoice_series, issue_date, supplier_name, supplier_cnpj, status, total_items, started_at, finished_at, created_at' as const;
+
 export async function listInvoices(): Promise<NfeInvoice[]> {
   const { data, error } = await supabase
     .from('nfe_invoices')
-    .select('*')
+    .select(INVOICE_LIST_FIELDS)
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as NfeInvoice[];

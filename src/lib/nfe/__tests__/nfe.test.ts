@@ -9,6 +9,7 @@ import {
   normalizeNameTokens,
 } from '../nfeAssociation';
 import { computeItemStatus, computeReportStats } from '../nfeReportUtils';
+import { INVOICE_LIST_FIELDS } from '../nfeService';
 import type { CatalogProduct, NfeInvoiceItem } from '../nfeTypes';
 
 // ── EAN normalization ────────────────────────────────────────────────────────
@@ -298,5 +299,24 @@ describe('computeReportStats', () => {
     expect(s.conformityPct).toBe(50); // 1 OK of 2 conferred
     expect(s.totalNfQty).toBe(15);
     expect(s.totalPhysicalQty).toBe(7);
+  });
+});
+
+// ── Invoice list payload (R5: avoid selecting raw_xml) ───────────────────────
+
+describe('INVOICE_LIST_FIELDS', () => {
+  it('never selects raw_xml', () => {
+    expect(INVOICE_LIST_FIELDS).not.toMatch(/raw_xml/);
+  });
+
+  it('includes every field the list and reused-invoice views read', () => {
+    const required = [
+      'id', 'invoice_key', 'invoice_number', 'invoice_series', 'issue_date',
+      'supplier_name', 'supplier_cnpj', 'status', 'total_items',
+      'started_at', 'finished_at', 'created_at',
+    ];
+    for (const field of required) {
+      expect(INVOICE_LIST_FIELDS).toMatch(new RegExp(`\\b${field}\\b`));
+    }
   });
 });

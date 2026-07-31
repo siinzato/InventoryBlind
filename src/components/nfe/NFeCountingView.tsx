@@ -6,7 +6,7 @@ import {
 import type { NfeInvoice, NfeInvoiceItem, CatalogProduct } from '../../lib/nfe/nfeTypes';
 import { getInvoiceItems, registerCount, finalizeConference } from '../../lib/nfe/nfeService';
 import { supabase } from '../../lib/supabase';
-import { normalizeEan } from '../../lib/nfe/nfeEanUtils';
+import { normalizeEan, buildEanIndex } from '../../lib/nfe/nfeEanUtils';
 import { formatQty } from './nfeUi';
 
 interface Props {
@@ -29,6 +29,7 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
   const [copiedId, setCopiedId] = useState<string | null>(null);
   const [showFinalize, setShowFinalize] = useState(false);
   const [finalizing, setFinalizing] = useState(false);
+  const [duplicateCandidates, setDuplicateCandidates] = useState<NfeInvoiceItem[] | null>(null);
   const scanRef = useRef<HTMLInputElement>(null);
 
   const load = useCallback(async () => {
@@ -53,16 +54,7 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
 
   useEffect(() => { load(); }, [load]);
 
-  const eanIndex = useMemo(() => {
-    const idx = new Map<string, NfeInvoiceItem>();
-    for (const it of items) {
-      if (it.nfe_ean_normalized) idx.set(it.nfe_ean_normalized, it);
-      const prod = it.product_id ? products.get(it.product_id) : null;
-      const pen = normalizeEan(prod?.ean);
-      if (pen && !idx.has(pen)) idx.set(pen, it);
-    }
-    return idx;
-  }, [items, products]);
+  const eanIndex = useMemo(() => buildEanIndex(items, products), [items, products]);
 
   function displayEan(it: NfeInvoiceItem): string | null {
     if (it.nfe_ean) return it.nfe_ean;
@@ -98,11 +90,22 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
       setScanFeedback({ type: 'err', msg: 'Código inválido.' });
       return;
     }
-    const item = eanIndex.get(code);
-    if (!item) {
+    const candidates = eanIndex.get(code);
+    if (!candidates || candidates.length === 0) {
       setScanFeedback({ type: 'err', msg: `EAN ${code} não pertence a esta nota.` });
       return;
     }
+    if (candidates.length > 1) {
+      setDuplicateCandidates(candidates);
+      return;
+    }
+    const item = candidates[0];
+    const ok = await applyCount(item, 'increment', 1, 'scanner');
+    if (ok) setScanFeedback({ type: 'ok', msg: `+1 · ${item.description || item.nfe_code}` });
+  }
+
+  async function handleSelectDuplicate(item: NfeInvoiceItem) {
+    setDuplicateCandidates(null);
     const ok = await applyCount(item, 'increment', 1, 'scanner');
     if (ok) setScanFeedback({ type: 'ok', msg: `+1 · ${item.description || item.nfe_code}` });
   }
@@ -271,6 +274,39 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
           <Flag size={18} /> Finalizar Conferência
         </button>
       </div>
+
+      {duplicateCandidates && (
+        <div className="fixed inset-0 z-[950] bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5">
+            <h3 className="text-lg font-bold text-zinc-900">Este código aparece em mais de um item</h3>
+            <p className="mt-1 text-sm text-zinc-500">Selecione a linha da nota correspondente ao produto em mãos.</p>
+            <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
+              {duplicateCandidates.map((it) => {
+                const prod = it.product_id ? products.get(it.product_id) : null;
+                return (
+                  <button
+                    key={it.id}
+                    onClick={() => handleSelectDuplicate(it)}
+                    className="w-full text-left p-3 rounded-lg border border-zinc-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
+                  >
+                    <p className="font-semibold text-zinc-900 text-sm">{it.description || prod?.name || 'Sem descrição'}</p>
+                    <p className="text-xs text-zinc-500 mt-0.5">
+                      SKU <span className="font-mono">{prod?.sku ?? it.nfe_code ?? '—'}</span>
+                      {it.line_number != null && <> · Linha {it.line_number}</>}
+                    </p>
+                  </button>
+                );
+              })}
+            </div>
+            <button
+              onClick={() => setDuplicateCandidates(null)}
+              className="mt-4 w-full px-4 py-2.5 rounded-lg border border-zinc-200 text-zinc-700 font-semibold hover:bg-zinc-50"
+            >
+              Cancelar
+            </button>
+          </div>
+        </div>
+      )}
 
       {showFinalize && (
         <div className="fixed inset-0 z-[950] bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4">

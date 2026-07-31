@@ -1,5 +1,7 @@
 // NF-e EAN/GTIN normalization utilities (pure, unit-testable)
 
+import type { NfeInvoiceItem, CatalogProduct } from './nfeTypes';
+
 const INVALID_TOKENS = new Set([
   'SEM GTIN',
   'SEMGTIN',
@@ -54,4 +56,32 @@ export function resolveItemEan(
     return { original: String(cEANTrib).trim(), normalized: tribNorm };
   }
   return { original: null, normalized: null };
+}
+
+/**
+ * Indexes conference items by scannable EAN. Unlike a plain Map<string, item>,
+ * this groups every item that shares the same NF-e EAN (R3: duplicate EAN
+ * across lines) so none of them are shadowed/lost when scanning during the
+ * blind count. The linked product's catalog EAN is kept as a fallback key
+ * only when no NF-e line already claims it, matching prior single-item behavior.
+ */
+export function buildEanIndex(
+  items: NfeInvoiceItem[],
+  products: Map<string, CatalogProduct>,
+): Map<string, NfeInvoiceItem[]> {
+  const idx = new Map<string, NfeInvoiceItem[]>();
+
+  for (const it of items) {
+    if (it.nfe_ean_normalized) {
+      const list = idx.get(it.nfe_ean_normalized);
+      if (list) list.push(it);
+      else idx.set(it.nfe_ean_normalized, [it]);
+    }
+
+    const prod = it.product_id ? products.get(it.product_id) : null;
+    const pen = normalizeEan(prod?.ean);
+    if (pen && !idx.has(pen)) idx.set(pen, [it]);
+  }
+
+  return idx;
 }

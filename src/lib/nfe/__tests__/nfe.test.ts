@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { normalizeEan, resolveItemEan, isValidEan } from '../nfeEanUtils';
+import { normalizeEan, resolveItemEan, isValidEan, buildEanIndex } from '../nfeEanUtils';
 import { parseNfeXml, NfeParseError } from '../nfeXmlParser';
 import {
   resolveAssociation,
@@ -63,6 +63,60 @@ describe('resolveItemEan', () => {
     const r = resolveItemEan('SEM GTIN', 'SEM GTIN');
     expect(r.normalized).toBeNull();
     expect(r.original).toBeNull();
+  });
+});
+
+// ── EAN indexing (R3: duplicate EAN across NF-e lines) ───────────────────────
+
+describe('buildEanIndex', () => {
+  const mkItem = (over: Partial<NfeInvoiceItem>): NfeInvoiceItem => ({
+    id: 'i', invoice_id: 'v', company_id: 'c', line_number: 1, nfe_code: 'x',
+    description: 'd', unit: 'UN', expected_quantity: 10, unit_value: null, total_value: null,
+    nfe_ean: null, nfe_ean_normalized: null, product_id: null, link_method: 'none',
+    physical_quantity: null, result_status: null, snapshot_product_name: null,
+    snapshot_sku: null, snapshot_ean: null, created_at: '', updated_at: '', ...over,
+  });
+
+  it('indexes a unique EAN to a single-item list', () => {
+    const items = [mkItem({ id: 'a', nfe_ean_normalized: '7891234567895' })];
+    const idx = buildEanIndex(items, new Map());
+    expect(idx.get('7891234567895')).toHaveLength(1);
+    expect(idx.get('7891234567895')?.[0].id).toBe('a');
+  });
+
+  it('groups every line sharing the same EAN instead of overwriting (R3)', () => {
+    const items = [
+      mkItem({ id: 'a', line_number: 1, nfe_ean_normalized: '789123', description: 'Produto A' }),
+      mkItem({ id: 'b', line_number: 2, nfe_ean_normalized: '789123', description: 'Produto B' }),
+    ];
+    const idx = buildEanIndex(items, new Map());
+    const candidates = idx.get('789123');
+    expect(candidates).toHaveLength(2);
+    expect(candidates?.map((i) => i.id)).toEqual(['a', 'b']);
+  });
+
+  it('lets the caller pick the correct line out of the duplicate-EAN group', () => {
+    const items = [
+      mkItem({ id: 'a', line_number: 3, nfe_ean_normalized: '789123' }),
+      mkItem({ id: 'b', line_number: 7, nfe_ean_normalized: '789123' }),
+    ];
+    const idx = buildEanIndex(items, new Map());
+    const candidates = idx.get('789123') ?? [];
+    const chosen = candidates.find((i) => i.line_number === 7);
+    expect(chosen?.id).toBe('b');
+  });
+
+  it('returns undefined for a code that does not belong to the invoice', () => {
+    const items = [mkItem({ id: 'a', nfe_ean_normalized: '789123' })];
+    const idx = buildEanIndex(items, new Map());
+    expect(idx.get('000000')).toBeUndefined();
+  });
+
+  it('still resolves via the linked product catalog EAN when the NF-e line has none', () => {
+    const items = [mkItem({ id: 'a', nfe_ean_normalized: null, product_id: 'p' })];
+    const products = new Map([['p', { id: 'p', name: 'Produto', sku: 'S1', ean: '7891234567895', location: null }]]);
+    const idx = buildEanIndex(items, products);
+    expect(idx.get('7891234567895')?.[0].id).toBe('a');
   });
 });
 

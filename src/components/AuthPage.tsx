@@ -9,9 +9,11 @@
  */
 
 import React, { useState } from 'react';
-import { BarChart3, Eye, EyeOff, ArrowLeft, Check, Mail, AlertCircle, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, Check, Mail, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import { LogoMark } from './landing/landingUi';
+import { motion, MagneticButton } from './landing/landingMotion';
 
 // ── Shared input component ────────────────────────────────────────────────────
 
@@ -26,7 +28,7 @@ const Input: React.FC<{
   suffix?: React.ReactNode;
 }> = ({ label, type = 'text', value, onChange, placeholder, error, autoComplete, suffix }) => (
   <div>
-    <label className="block text-xs font-semibold text-zinc-400 uppercase tracking-wide mb-1.5">{label}</label>
+    <label className="block text-xs font-semibold text-mist-400 uppercase tracking-wide mb-1.5">{label}</label>
     <div className="relative">
       <input
         type={type}
@@ -34,8 +36,8 @@ const Input: React.FC<{
         onChange={e => onChange(e.target.value)}
         placeholder={placeholder}
         autoComplete={autoComplete}
-        className={`w-full px-4 py-3 bg-zinc-800 border rounded-xl text-white placeholder-zinc-600 text-sm focus:outline-none focus:ring-2 transition ${
-          error ? 'border-red-500/50 focus:ring-red-500/20' : 'border-zinc-700 focus:ring-emerald-500/30 focus:border-emerald-500/50'
+        className={`w-full px-4 py-3 bg-ink-800 border rounded-xl text-mist-100 placeholder-mist-400/40 text-sm focus:outline-none focus:ring-2 transition ${
+          error ? 'border-red-500/50 focus:ring-red-500/20' : 'border-ink-600 focus:ring-enterprise-400/30 focus:border-enterprise-400/50'
         } ${suffix ? 'pr-12' : ''}`}
       />
       {suffix && <div className="absolute right-3 top-1/2 -translate-y-1/2">{suffix}</div>}
@@ -80,11 +82,11 @@ const LoginView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-sm mb-6 transition">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-mist-400 hover:text-mist-100 text-sm mb-6 transition">
         <ArrowLeft size={14} /> Voltar
       </button>
-      <h2 className="text-2xl font-black text-white mb-1">Entrar</h2>
-      <p className="text-zinc-500 text-sm mb-7">Bem-vindo de volta ao InventoryBlind.</p>
+      <h2 className="text-2xl font-bold text-mist-100 mb-1">Entrar</h2>
+      <p className="text-mist-400 text-sm mb-7">Bem-vindo de volta ao InventoryBlind.</p>
 
       {error && (
         <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400 mb-5">
@@ -97,25 +99,28 @@ const LoginView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <Input label="Senha" type={showPw ? 'text' : 'password'} value={password} onChange={setPassword}
           placeholder="••••••••" autoComplete="current-password"
           suffix={
-            <button type="button" onClick={() => setShowPw(v => !v)} className="text-zinc-500 hover:text-zinc-300 transition">
+            <button type="button" onClick={() => setShowPw(v => !v)} className="text-mist-400 hover:text-mist-100 transition">
               {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           }
         />
         <div className="text-right">
-          <button type="button" onClick={() => setView('forgot')} className="text-xs text-zinc-500 hover:text-emerald-400 transition">
+          <button type="button" onClick={() => setView('forgot')} className="text-xs text-mist-400 hover:text-enterprise-400 transition">
             Esqueceu a senha?
           </button>
         </div>
-        <button type="submit" disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition">
+        <MagneticButton
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-3.5 disabled:opacity-60 rounded-xl font-bold text-sm"
+        >
           {loading ? <RefreshCw size={16} className="animate-spin" /> : 'Entrar'}
-        </button>
+        </MagneticButton>
       </form>
 
-      <p className="text-center text-sm text-zinc-500 mt-6">
+      <p className="text-center text-sm text-mist-400 mt-6">
         Não tem conta?{' '}
-        <button onClick={() => setView('signup')} className="text-emerald-400 hover:text-emerald-300 font-semibold transition">
+        <button onClick={() => setView('signup')} className="text-enterprise-400 hover:text-enterprise-300 font-semibold transition">
           Criar conta
         </button>
       </p>
@@ -202,11 +207,11 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-sm mb-6 transition">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-mist-400 hover:text-mist-100 text-sm mb-6 transition">
         <ArrowLeft size={14} /> Voltar
       </button>
-      <h2 className="text-2xl font-black text-white mb-1">Criar Conta</h2>
-      <p className="text-zinc-500 text-sm mb-7">Crie o ambiente da sua empresa no InventoryBlind.</p>
+      <h2 className="text-2xl font-bold text-mist-100 mb-1">Criar Conta</h2>
+      <p className="text-mist-400 text-sm mb-7">Crie o ambiente da sua empresa no InventoryBlind.</p>
 
       {globalError && (
         <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400 mb-5">
@@ -221,7 +226,7 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <Input label="Senha" type={showPw ? 'text' : 'password'} value={password} onChange={setPassword}
           placeholder="Mínimo 6 caracteres" autoComplete="new-password" error={errors.password}
           suffix={
-            <button type="button" onClick={() => setShowPw(v => !v)} className="text-zinc-500 hover:text-zinc-300 transition">
+            <button type="button" onClick={() => setShowPw(v => !v)} className="text-mist-400 hover:text-mist-100 transition">
               {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
             </button>
           }
@@ -229,20 +234,23 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         <Input label="Confirmar Senha" type={showPw ? 'text' : 'password'} value={confirm} onChange={setConfirm}
           placeholder="Repita a senha" error={errors.confirm} />
 
-        <button type="submit" disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition mt-2">
+        <MagneticButton
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-3.5 disabled:opacity-60 rounded-xl font-bold text-sm mt-2"
+        >
           {loading ? <RefreshCw size={16} className="animate-spin" /> : 'Criar Conta'}
-        </button>
+        </MagneticButton>
       </form>
 
-      <p className="text-xs text-zinc-600 text-center mt-4 leading-relaxed">
-        Ao criar uma conta você concorda com os <a href="#" className="underline hover:text-zinc-400">Termos de Uso</a> e a{' '}
-        <a href="#" className="underline hover:text-zinc-400">Política de Privacidade</a>.
+      <p className="text-xs text-mist-400/70 text-center mt-4 leading-relaxed">
+        Ao criar uma conta você concorda com os <a href="#" className="underline hover:text-mist-100">Termos de Uso</a> e a{' '}
+        <a href="#" className="underline hover:text-mist-100">Política de Privacidade</a>.
       </p>
 
-      <p className="text-center text-sm text-zinc-500 mt-4">
+      <p className="text-center text-sm text-mist-400 mt-4">
         Já tem conta?{' '}
-        <button onClick={() => setView('login')} className="text-emerald-400 hover:text-emerald-300 font-semibold transition">
+        <button onClick={() => setView('login')} className="text-enterprise-400 hover:text-enterprise-300 font-semibold transition">
           Entrar
         </button>
       </p>
@@ -275,9 +283,9 @@ const ForgotView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       <div className="w-16 h-16 bg-emerald-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
         <Mail size={28} className="text-emerald-400" />
       </div>
-      <h2 className="text-xl font-black text-white mb-2">E-mail enviado!</h2>
-      <p className="text-zinc-400 text-sm mb-6">Verifique sua caixa de entrada para redefinir sua senha.</p>
-      <button onClick={onBack} className="text-emerald-400 hover:text-emerald-300 text-sm font-semibold transition">
+      <h2 className="text-xl font-bold text-mist-100 mb-2">E-mail enviado!</h2>
+      <p className="text-mist-400 text-sm mb-6">Verifique sua caixa de entrada para redefinir sua senha.</p>
+      <button onClick={onBack} className="text-enterprise-400 hover:text-enterprise-300 text-sm font-semibold transition">
         Voltar ao login
       </button>
     </div>
@@ -285,11 +293,11 @@ const ForgotView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
   return (
     <div>
-      <button onClick={onBack} className="flex items-center gap-1.5 text-zinc-500 hover:text-zinc-300 text-sm mb-6 transition">
+      <button onClick={onBack} className="flex items-center gap-1.5 text-mist-400 hover:text-mist-100 text-sm mb-6 transition">
         <ArrowLeft size={14} /> Voltar
       </button>
-      <h2 className="text-2xl font-black text-white mb-1">Recuperar Senha</h2>
-      <p className="text-zinc-500 text-sm mb-7">Enviaremos um link para redefinir sua senha.</p>
+      <h2 className="text-2xl font-bold text-mist-100 mb-1">Recuperar Senha</h2>
+      <p className="text-mist-400 text-sm mb-7">Enviaremos um link para redefinir sua senha.</p>
       {error && (
         <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400 mb-5">
           <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />{error}
@@ -297,10 +305,13 @@ const ForgotView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       )}
       <form onSubmit={handleReset} className="space-y-4">
         <Input label="E-mail" type="email" value={email} onChange={setEmail} placeholder="seu@email.com" />
-        <button type="submit" disabled={loading}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition">
+        <MagneticButton
+          type="submit"
+          disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-3.5 disabled:opacity-60 rounded-xl font-bold text-sm"
+        >
           {loading ? <RefreshCw size={16} className="animate-spin" /> : 'Enviar Link'}
-        </button>
+        </MagneticButton>
       </form>
     </div>
   );
@@ -323,15 +334,15 @@ const ConfirmEmailView: React.FC = () => {
 
   return (
     <div className="text-center">
-      <div className="w-16 h-16 bg-blue-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
-        <Mail size={28} className="text-blue-400" />
+      <div className="w-16 h-16 bg-enterprise-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+        <Mail size={28} className="text-enterprise-400" />
       </div>
-      <h2 className="text-xl font-black text-white mb-2">Confirme seu e-mail</h2>
-      <p className="text-zinc-400 text-sm mb-2">
+      <h2 className="text-xl font-bold text-mist-100 mb-2">Confirme seu e-mail</h2>
+      <p className="text-mist-400 text-sm mb-2">
         Enviamos um link de confirmação para
       </p>
-      <p className="text-white font-semibold text-sm mb-6">{user?.email}</p>
-      <p className="text-zinc-500 text-xs mb-8">
+      <p className="text-mist-100 font-semibold text-sm mb-6">{user?.email}</p>
+      <p className="text-mist-400/80 text-xs mb-8">
         Clique no link no e-mail para ativar sua conta.<br />
         Verifique também a pasta de spam.
       </p>
@@ -341,12 +352,12 @@ const ConfirmEmailView: React.FC = () => {
         </div>
       ) : (
         <button onClick={resend} disabled={loading}
-          className="flex items-center justify-center gap-2 text-zinc-400 hover:text-white text-sm transition mb-4 mx-auto">
+          className="flex items-center justify-center gap-2 text-mist-400 hover:text-mist-100 text-sm transition mb-4 mx-auto">
           {loading ? <RefreshCw size={14} className="animate-spin" /> : null}
           Reenviar e-mail de confirmação
         </button>
       )}
-      <button onClick={signOut} className="text-xs text-zinc-600 hover:text-zinc-400 transition">
+      <button onClick={signOut} className="text-xs text-mist-400/60 hover:text-mist-400 transition">
         Sair e usar outra conta
       </button>
     </div>
@@ -361,30 +372,35 @@ const AuthPage: React.FC = () => {
   const isConfirm = view === 'confirm-email';
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
+    <div className="min-h-screen bg-ink-950 flex items-center justify-center px-4">
       {/* Background */}
       <div className="absolute inset-0 pointer-events-none overflow-hidden">
-        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-emerald-500/4 rounded-full blur-3xl" />
-        <div className="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] bg-blue-500/4 rounded-full blur-3xl" />
+        <div className="absolute top-1/4 left-1/3 w-[500px] h-[500px] bg-enterprise-700/10 rounded-full blur-3xl" />
+        <div className="absolute bottom-1/4 right-1/4 w-[350px] h-[350px] bg-enterprise-500/10 rounded-full blur-3xl" />
       </div>
 
-      <div className="relative w-full max-w-md">
+      <motion.div
+        initial={{ opacity: 0, scale: 0.97, y: 8 }}
+        animate={{ opacity: 1, scale: 1, y: 0 }}
+        transition={{ duration: 0.5, ease: [0.16, 1, 0.3, 1] }}
+        className="relative w-full max-w-md"
+      >
         {/* Logo */}
         <div className="flex items-center justify-center gap-2.5 mb-8">
-          <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center">
-            <BarChart3 size={20} className="text-white" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-enterprise-500 to-enterprise-700 flex items-center justify-center">
+            <LogoMark size={20} className="text-white" />
           </div>
-          <span className="font-black text-white text-xl tracking-tight">InventoryBlind</span>
+          <span className="font-bold text-mist-100 text-xl tracking-tight">InventoryBlind</span>
         </div>
 
         {/* Card */}
-        <div className="bg-zinc-900/80 backdrop-blur border border-zinc-800 rounded-2xl p-8 shadow-2xl">
+        <div className="bg-ink-800/80 backdrop-blur border border-ink-700 rounded-2xl p-8 shadow-2xl">
           {isConfirm && <ConfirmEmailView />}
           {!isConfirm && view === 'login' && <LoginView onBack={() => setView('landing')} />}
           {!isConfirm && view === 'signup' && <SignupView onBack={() => setView('landing')} />}
           {!isConfirm && view === 'forgot' && <ForgotView onBack={() => setView('login')} />}
         </div>
-      </div>
+      </motion.div>
     </div>
   );
 };

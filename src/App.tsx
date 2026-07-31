@@ -53,13 +53,13 @@ import {
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory } from './lib/supabase';
 import { SafeDropdown } from './components/SafeDropdown';
 import { DashboardRankingPreview } from './components/DashboardRankingPreview';
-import LandingPage from './components/LandingPage';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
 import { hasPermission, getRoleLabel } from './lib/permissionService';
 import { usePWAInstall } from './lib/usePWAInstall';
 
 // Code-split large page components for smaller initial bundle
+const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const HeatmapEstoque = React.lazy(() => import('./components/HeatmapEstoque').then(m => ({ default: m.HeatmapEstoque })));
 const ProductImportPage = React.lazy(() => import('./components/ProductImportPage').then(m => ({ default: m.ProductImportPage })));
 const ImportedProductsPage = React.lazy(() => import('./components/ImportedProductsPage').then(m => ({ default: m.ImportedProductsPage })));
@@ -76,6 +76,11 @@ const PageLoader = () => (
     <Loader2 size={32} className="animate-spin text-zinc-400" />
   </div>
 );
+
+// Suspense fallback for the lazy-loaded LandingPage — color-matched to its
+// own bg-zinc-950 root, no spinner/logo, to avoid a flash-of-white before
+// the chunk (which also carries Motion/GSAP) finishes loading.
+const LandingFallback = () => <div className="min-h-screen w-full bg-zinc-950" />;
 
 interface StatCardProps {
   title: string;
@@ -2455,7 +2460,13 @@ export default function App() {
   if (view === 'auth-error') return <AuthErrorScreen />;
 
   // Public routes — never block on auth
-  if (view === 'landing') return <LandingPage />;
+  if (view === 'landing') {
+    return (
+      <React.Suspense fallback={<LandingFallback />}>
+        <LandingPage />
+      </React.Suspense>
+    );
+  }
   if (view === 'login' || view === 'signup' || view === 'forgot' || view === 'confirm-email') return <AuthPage />;
 
   // Auth still initializing (session check in progress)
@@ -2471,5 +2482,9 @@ export default function App() {
   if (view === 'app') return <AppContent />;
 
   // Absolute fallback
-  return <LandingPage />;
+  return (
+    <React.Suspense fallback={<LandingFallback />}>
+      <LandingPage />
+    </React.Suspense>
+  );
 }

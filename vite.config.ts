@@ -8,7 +8,7 @@ export default defineConfig({
     react(),
     VitePWA({
       registerType: 'autoUpdate',
-      includeAssets: ['favicon.png', 'pwa-192.png', 'pwa-512.png'],
+      includeAssets: ['favicon.ico', 'favicon-16x16.png', 'favicon-32x32.png', 'apple-touch-icon.png'],
       manifest: {
         name: 'InventoryBlind',
         short_name: 'InventoryBlind',
@@ -17,12 +17,12 @@ export default defineConfig({
         start_url: '/',
         scope: '/',
         orientation: 'any',
-        theme_color: '#18181b',
-        background_color: '#09090b',
+        theme_color: '#0F3D68',
+        background_color: '#0F3D68',
         icons: [
-          { src: '/pwa-192.png', sizes: '192x192', type: 'image/png' },
-          { src: '/pwa-512.png', sizes: '512x512', type: 'image/png' },
-          { src: '/pwa-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/android-chrome-192x192.png', sizes: '192x192', type: 'image/png' },
+          { src: '/android-chrome-512x512.png', sizes: '512x512', type: 'image/png' },
+          { src: '/maskable-icon-512x512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
         ],
       },
       workbox: {
@@ -39,5 +39,9 @@ export default defineConfig({
   ],
   optimizeDeps: {
     exclude: ['lucide-react'],
+    include: ['gsap', 'gsap/ScrollTrigger', '@gsap/react', 'motion/react'],
+  },
+  build: {
+    chunkSizeWarningLimit: 700,
   },
 });

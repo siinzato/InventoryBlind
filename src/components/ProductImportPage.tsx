@@ -7,6 +7,7 @@ import { ColumnMappingWizard } from './ColumnMappingWizard';
 import { ProductImportPreview } from './ProductImportPreview';
 import { ProductImportProgress } from './ProductImportProgress';
 import { ProductImportSummary } from './ProductImportSummary';
+import { Panel, PanelSection, Button } from './ui';
 import type { ProductValidated, ImportSummary, ImportProgress, ImportError, ImportStatus, ColumnMapping, ProductFromDB } from '../lib/productImportTypes';
 import {
   parseCSV,
@@ -474,156 +475,151 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
 
   // Admin check overlay
   const AdminCheckOverlay = () => (
-    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-6 text-center">
+    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-8 text-center">
       <div className="flex justify-center mb-4">
-        <div className="p-4 bg-amber-100 rounded-full">
-          <Lock size={40} className="text-amber-600" />
+        <div className="p-4 bg-amber-500/10 rounded-full">
+          <Lock size={40} className="text-amber-600 dark:text-amber-400" />
         </div>
       </div>
-      <h3 className="text-xl font-bold text-amber-800 mb-2">Acesso Restrito</h3>
-      <p className="text-amber-700 mb-4">
+      <h3 className="text-title mb-2">Acesso Restrito</h3>
+      <p className="text-sm text-fg-muted mb-6">
         Somente administradores podem importar produtos.
       </p>
-      <button
-        onClick={onRequestAdmin}
-        className="px-6 py-3 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 transition"
-      >
+      <Button onClick={onRequestAdmin}>
         Fazer Login como Admin
-      </button>
+      </Button>
     </div>
   );
 
   // Import completed with database execution errors
   const ImportErrorResult = () => (
-    <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-8">
+    <div>
       <div className="text-center mb-8">
         <div className="flex justify-center mb-4">
-          <div className="p-4 bg-red-100 rounded-full">
-            <XCircle size={64} className="text-red-600" />
+          <div className="p-4 bg-red-500/10 rounded-full">
+            <XCircle size={64} className="text-red-600 dark:text-red-400" />
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-zinc-800 mb-2">
+        <h2 className="text-title mb-2">
           Importação concluída com falhas
         </h2>
-        <p className="text-zinc-500">
+        <p className="text-sm text-fg-muted">
           Alguns produtos não foram salvos no banco de dados. Veja os detalhes abaixo.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-emerald-700">{summary?.importedCount ?? 0}</p>
-          <p className="text-sm text-emerald-700 font-medium">Salvos com sucesso</p>
-        </div>
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-red-600">{dbErrors.length}</p>
-          <p className="text-sm text-red-600 font-medium">Falharam ao salvar</p>
-        </div>
-      </div>
+      <Panel className="mb-8">
+        <PanelSection>
+          <div className="grid grid-cols-2 divide-x divide-edge">
+            <div className="text-center px-4">
+              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{summary?.importedCount ?? 0}</p>
+              <p className="text-sm text-fg-muted mt-1">Salvos com sucesso</p>
+            </div>
+            <div className="text-center px-4">
+              <p className="text-3xl font-bold text-red-600 dark:text-red-400">{dbErrors.length}</p>
+              <p className="text-sm text-fg-muted mt-1">Falharam ao salvar</p>
+            </div>
+          </div>
+        </PanelSection>
 
-      <div className="bg-zinc-50 rounded-xl p-4 mb-8 max-h-64 overflow-y-auto">
-        <h4 className="font-semibold text-zinc-700 mb-3">Produtos não salvos</h4>
-        <ul className="space-y-2 text-sm">
-          {dbErrors.map((err, idx) => (
-            <li key={idx} className="border-b border-zinc-200 pb-2 last:border-0">
-              <span className="font-medium text-zinc-800">{err.sku || 'SKU não informado'}</span>
-              {err.name ? <span className="text-zinc-500"> — {err.name}</span> : null}
-              <p className="text-red-600">{err.error}</p>
-            </li>
-          ))}
-        </ul>
-      </div>
+        <PanelSection>
+          <p className="text-section mb-3">Produtos não salvos</p>
+          <ul className="divide-y divide-edge/60 max-h-64 overflow-y-auto">
+            {dbErrors.map((err, idx) => (
+              <li key={idx} className="py-2 text-sm">
+                <span className="font-medium text-fg">{err.sku || 'SKU não informado'}</span>
+                {err.name ? <span className="text-fg-subtle"> — {err.name}</span> : null}
+                <p className="text-red-600 dark:text-red-400">{err.error}</p>
+              </li>
+            ))}
+          </ul>
+        </PanelSection>
+      </Panel>
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition"
-        >
+        <Button onClick={onBack} variant="secondary">
           <Package size={20} />
           Ver Produtos
-        </button>
-        <button
-          onClick={handleReset}
-          className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition"
-        >
+        </Button>
+        <Button onClick={handleReset} variant="primary">
           <FileSpreadsheet size={20} />
           Nova Importação
-        </button>
+        </Button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-zinc-600 hover:text-zinc-800 transition mb-4"
-        >
-          <ArrowLeft size={20} />
-          Voltar
-        </button>
+    <div className="min-h-screen bg-surface p-6 sm:p-8">
+      <div className="max-w-5xl mx-auto">
+        {/* Header */}
+        <div className="mb-8">
+          <button
+            onClick={onBack}
+            className="inline-flex items-center gap-2 text-sm text-fg-muted hover:text-fg transition-colors mb-6"
+          >
+            <ArrowLeft size={18} />
+            Voltar
+          </button>
 
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-emerald-600 rounded-xl">
-            <FileSpreadsheet size={28} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-800">Importar Produtos</h1>
-            <p className="text-zinc-500">Importe sua planilha de produtos para o sistema</p>
+          <div className="flex items-center gap-4">
+            <div className="p-3 bg-accent rounded-xl">
+              <FileSpreadsheet size={28} className="text-white" />
+            </div>
+            <div>
+              <h1 className="text-title">Importar Produtos</h1>
+              <p className="text-sm text-fg-muted mt-1">Importe sua planilha de produtos para o sistema</p>
+            </div>
           </div>
         </div>
-      </div>
 
-      {/* Stepper */}
-      <div className="flex items-center justify-center mb-8">
-        {['upload', 'mapping', 'preview', 'importing', 'complete'].map((step, idx) => {
-          const stepLabels: Record<string, string> = {
-            upload: 'Enviar',
-            mapping: 'Mapear',
-            preview: 'Revisar',
-            importing: 'Importar',
-            complete: 'Concluido',
-          };
+        {/* Stepper */}
+        <div className="flex items-center justify-center mb-8">
+          {['upload', 'mapping', 'preview', 'importing', 'complete'].map((step, idx) => {
+            const stepLabels: Record<string, string> = {
+              upload: 'Enviar',
+              mapping: 'Mapear',
+              preview: 'Revisar',
+              importing: 'Importar',
+              complete: 'Concluido',
+            };
 
-          const statusOrder = ['upload', 'mapping', 'preview', 'importing', 'complete'];
-          const effectiveStatus = status === 'error' ? 'complete' : status;
-          const currentIdx = statusOrder.indexOf(effectiveStatus);
+            const statusOrder = ['upload', 'mapping', 'preview', 'importing', 'complete'];
+            const effectiveStatus = status === 'error' ? 'complete' : status;
+            const currentIdx = statusOrder.indexOf(effectiveStatus);
 
-          const isComplete = currentIdx > idx;
-          const isCurrent = effectiveStatus === step;
+            const isComplete = currentIdx > idx;
+            const isCurrent = effectiveStatus === step;
 
-          return (
-            <React.Fragment key={step}>
-              {idx > 0 && (
-                <div className={`w-16 h-1 mx-2 rounded ${
-                  isComplete || isCurrent ? 'bg-emerald-500' : 'bg-zinc-200'
-                }`} />
-              )}
-              <div className="flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                  isComplete
-                    ? 'bg-emerald-500 text-white'
-                    : isCurrent
-                      ? 'bg-zinc-900 text-white'
-                      : 'bg-zinc-200 text-zinc-500'
-                }`}>
-                  {isComplete ? '✓' : idx + 1}
+            return (
+              <React.Fragment key={step}>
+                {idx > 0 && (
+                  <div className={`w-16 h-1 mx-2 rounded ${
+                    isComplete || isCurrent ? 'bg-accent' : 'bg-surface-3'
+                  }`} />
+                )}
+                <div className="flex flex-col items-center">
+                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
+                    isComplete
+                      ? 'bg-accent text-white'
+                      : isCurrent
+                        ? 'bg-accent-strong text-white'
+                        : 'bg-surface-3 text-fg-subtle'
+                  }`}>
+                    {isComplete ? '✓' : idx + 1}
+                  </div>
+                  <p className={`text-xs mt-1 font-medium ${
+                    isComplete || isCurrent ? 'text-fg' : 'text-fg-subtle'
+                  }`}>
+                    {stepLabels[step]}
+                  </p>
                 </div>
-                <p className={`text-xs mt-1 font-medium ${
-                  isComplete || isCurrent ? 'text-zinc-800' : 'text-zinc-400'
-                }`}>
-                  {stepLabels[step]}
-                </p>
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </div>
+              </React.Fragment>
+            );
+          })}
+        </div>
 
-      {/* Content */}
-      <div className="max-w-5xl mx-auto">
+        {/* Content */}
         {!isAdmin ? (
           <AdminCheckOverlay />
         ) : (

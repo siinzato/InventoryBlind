@@ -1,21 +1,17 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  BarChart3,
   Package,
   AlertTriangle,
   Clock,
-  CheckCircle2,
-  TrendingUp,
   Activity,
   Award,
   X,
-  Save,
+  User,
   ShieldCheck,
   MinusCircle,
   Lock,
   LogOut,
   Edit,
-  Trophy,
   Target,
   Zap,
   Users,
@@ -33,7 +29,6 @@ import {
   Bot,
   MessageCircle,
   Send,
-  Sparkles,
   ChevronDown,
   ChevronUp,
   RefreshCw,
@@ -44,19 +39,36 @@ import {
   Tag,
   UserCog,
   Building2,
-  Menu,
   Download,
   Smartphone,
   ScanLine,
-  type LucideIcon
+  LayoutDashboard,
+  DollarSign,
+  Receipt,
+  PieChart,
+  Gauge,
+  Sparkles,
+  ShieldAlert,
+  Plug,
+  Boxes,
+  Server,
+  Database,
+  Code2,
+  Webhook,
+  Workflow,
+  FileText
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory } from './lib/supabase';
 import { SafeDropdown } from './components/SafeDropdown';
 import { DashboardRankingPreview } from './components/DashboardRankingPreview';
+import { CountManagementCenter } from './components/counting/CountManagementCenter';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
 import { hasPermission, getRoleLabel } from './lib/permissionService';
 import { usePWAInstall } from './lib/usePWAInstall';
+import { LogoMark } from './components/landing/landingUi';
+import { ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal } from './components/ui';
+import type { SidebarNavGroup } from './components/ui';
 
 // Code-split large page components for smaller initial bundle
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -70,10 +82,11 @@ const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'))
 const UserManagementPage = React.lazy(() => import('./components/UserManagementPage'));
 const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
+const ProductivityTab = React.lazy(() => import('./components/productivity/ProductivityTab').then(m => ({ default: m.ProductivityTab })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
-    <Loader2 size={32} className="animate-spin text-zinc-400" />
+    <Loader2 size={32} className="animate-spin text-accent" />
   </div>
 );
 
@@ -81,29 +94,6 @@ const PageLoader = () => (
 // own bg-zinc-950 root, no spinner/logo, to avoid a flash-of-white before
 // the chunk (which also carries Motion/GSAP) finishes loading.
 const LandingFallback = () => <div className="min-h-screen w-full bg-zinc-950" />;
-
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: LucideIcon;
-  colorClass: string;
-}
-
-const StatCard = ({ title, value, subtitle, icon: Icon, colorClass }: StatCardProps) => (
-  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5 flex flex-col">
-    <div className="flex justify-between items-start mb-2">
-      <h3 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">{title}</h3>
-      <div className={`p-2 rounded-lg ${colorClass}`}>
-        <Icon size={20} />
-      </div>
-    </div>
-    <div className="mt-2">
-      <span className="text-3xl font-bold text-zinc-900">{value}</span>
-    </div>
-    {subtitle && <p className="text-zinc-400 text-xs mt-2 font-medium">{subtitle}</p>}
-  </div>
-);
 
 interface OpCapa {
   nome: string;
@@ -144,27 +134,8 @@ interface GlobalData {
   piores: { nome: string; valor: string }[];
 }
 
-// ── Mobile nav helper ─────────────────────────────────────────────────────────
-
-function MobileNavItem({ label, onClick, active, highlight }: { label: string; onClick: () => void; active?: boolean; highlight?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-        highlight
-          ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-          : active
-          ? 'bg-zinc-800 text-white'
-          : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-      }`}
-    >
-      {label}
-    </button>
-  );
-}
-
 function AppContent() {
-  const { profile, company, companyId, signOut } = useAuth();
+  const { profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const [brandsData, setBrandsData] = useState<BrandData[]>([]);
@@ -188,11 +159,6 @@ function AppContent() {
 
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandTotalSku, setNewBrandTotalSku] = useState('');
-
-  const [countBrand, setCountBrand] = useState('');
-  const [countSkusContabilizados, setCountSkusContabilizados] = useState('');
-  const [countDivergences, setCountDivergences] = useState('');
-  const [countSuccess, setCountSuccess] = useState(false);
 
   const [newKPI, setNewKPI] = useState<Omit<CustomKPI, 'id' | 'order_index' | 'created_at' | 'updated_at'>>({
     titulo: '',
@@ -679,9 +645,9 @@ function AppContent() {
     }
 
     // Who are you / Help
-    if (q.includes('quem é você') || q.includes('quem e voce') || q.includes('seu nome') || q.includes('azbot')) {
-      return `🤖 **AZBot I.A**\n\n` +
-        `Olá! Sou o AZBot I.A, assistente virtual da AZ ByGocase!\n\n` +
+    if (q.includes('quem é você') || q.includes('quem e voce') || q.includes('seu nome') || q.includes('blindai')) {
+      return `🤖 **BlindAI**\n\n` +
+        `Olá! Sou o BlindAI, assistente virtual da AZ ByGocase!\n\n` +
         `Fui criado para ajudar você e a equipe a:\n` +
         `• 📊 Monitorar o progresso do inventário\n` +
         `• 🎯 Analisar acuracidade e divergências\n` +
@@ -693,7 +659,7 @@ function AppContent() {
 
     // Help / what can you do
     if (q.includes('ajuda') || q.includes('help') || q.includes('o que você faz') || q.includes('o que voce faz')) {
-      return `🤖 **AZBot I.A - Assistente da AZ ByGocase**\n\n` +
+      return `🤖 **BlindAI - Assistente da AZ ByGocase**\n\n` +
         `Posso ajudar com:\n` +
         `• 📊 Status do progresso\n` +
         `• 🎯 Análise de acuracidade\n` +
@@ -707,7 +673,7 @@ function AppContent() {
     }
 
     // Default response
-    return `🤖 **AZBot I.A**\n\n` +
+    return `🤖 **BlindAI**\n\n` +
       `Analisei sua pergunta sobre "${question}".\n\n` +
       `📊 **Status Atual do Inventário AZ ByGocase:**\n` +
       `• Progresso: ${globais.progresso.toFixed(1)}%\n` +
@@ -763,50 +729,6 @@ function AppContent() {
     setNewBrandName('');
     setNewBrandTotalSku('');
     setShowAddBrandModal(false);
-  };
-
-  const handleSaveCount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!countBrand || !countSkusContabilizados || countDivergences === '') return;
-
-    const brandToUpdate = brandsData.find(b => b.brand === countBrand);
-    if (!brandToUpdate) return;
-
-    const qtdContabilizada = parseInt(countSkusContabilizados);
-    const qtdDivergencias = parseInt(countDivergences);
-
-    const newDoneSku = Math.min(brandToUpdate.total_sku, brandToUpdate.done_sku + qtdContabilizada);
-    const newDivergences = brandToUpdate.divergences + qtdDivergencias;
-
-    const { error } = await supabase
-      .from('inventory_brands')
-      .update({
-        done_sku: newDoneSku,
-        divergences: newDivergences,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', brandToUpdate.id);
-
-    if (error) {
-      console.error('Error updating count:', error);
-      return;
-    }
-
-    setBrandsData(prevData => prevData.map(b => {
-      if (b.id === brandToUpdate.id) {
-        return {
-          ...b,
-          done_sku: newDoneSku,
-          divergences: newDivergences
-        };
-      }
-      return b;
-    }));
-
-    setCountSuccess(true);
-    setCountSkusContabilizados('');
-    setCountDivergences('');
-    setTimeout(() => setCountSuccess(false), 3000);
   };
 
   const handleUpdateTopVenda = useCallback(async (index: number, field: keyof TopVenda, value: string) => {
@@ -881,20 +803,20 @@ function AppContent() {
 
   const getIconColorClass = (cor: string) => {
     switch (cor) {
-      case 'blue': return 'bg-blue-100 text-blue-700';
-      case 'red': return 'bg-red-100 text-red-700';
-      case 'amber': return 'bg-amber-100 text-amber-700';
-      case 'emerald': return 'bg-emerald-100 text-emerald-700';
-      default: return 'bg-zinc-100 text-zinc-700';
+      case 'blue': return 'bg-accent/10 text-accent';
+      case 'red': return 'bg-red-500/10 text-red-600 dark:text-red-400';
+      case 'amber': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
+      case 'emerald': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
+      default: return 'bg-surface-3 text-fg-muted';
     }
   };
 
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-100 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="mx-auto animate-spin text-zinc-600" size={48} />
-          <p className="mt-4 text-zinc-600 font-medium">Carregando dados...</p>
+          <Loader2 className="mx-auto animate-spin text-fg-subtle" size={40} />
+          <p className="mt-4 text-fg-muted font-medium">Carregando dados...</p>
         </div>
       </div>
     );
@@ -902,14 +824,14 @@ function AppContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-sm border border-red-200 p-8 max-w-md text-center">
-          <AlertTriangle className="mx-auto text-red-500" size={48} />
-          <h2 className="mt-4 text-lg font-bold text-zinc-800">Erro ao carregar</h2>
-          <p className="mt-2 text-zinc-600">{error}</p>
+      <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+        <div className="bg-surface-2 rounded-2xl border border-edge p-8 max-w-md text-center">
+          <AlertTriangle className="mx-auto text-red-500" size={40} />
+          <h2 className="mt-4 text-lg font-semibold text-fg">Erro ao carregar</h2>
+          <p className="mt-2 text-fg-muted">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-6 px-6 py-2 bg-zinc-900 text-white rounded-lg hover:bg-black transition"
+            className="mt-6 px-6 py-2 bg-accent text-white rounded-lg hover:bg-accent-strong transition"
           >
             Tentar novamente
           </button>
@@ -918,195 +840,224 @@ function AppContent() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-zinc-100 font-sans text-zinc-900 flex flex-col">
+  const navGroups: SidebarNavGroup[] = [
+    {
+      id: 'dashboard-group',
+      label: 'Dashboard',
+      items: [
+        { id: 'dashboard', label: 'Dashboard',           icon: <LayoutDashboard />, onClick: () => { setActiveTab('dashboard'); setMobileOpen(false); }, active: activeTab === 'dashboard' },
+        { id: 'heatmap',   label: 'Heatmap',              icon: <Map />,             onClick: () => { setActiveTab('heatmap'); setMobileOpen(false); },   active: activeTab === 'heatmap' },
+        { id: 'kpis',      label: 'KPIs e Indicadores',   icon: <Target />,          onClick: () => { setActiveTab('kpis'); setMobileOpen(false); },      active: activeTab === 'kpis' },
+        { id: 'rankings',  label: 'Rankings',             icon: <Award />,           onClick: () => { setActiveTab('rankings'); setMobileOpen(false); },  active: activeTab === 'rankings' },
+      ],
+    },
+    {
+      id: 'account-group',
+      label: 'Minha Conta',
+      items: [
+        { id: 'conta', label: 'Produtividade', icon: <User />, onClick: () => { setActiveTab('conta'); setMobileOpen(false); }, active: activeTab === 'conta' },
+      ],
+    },
+    {
+      id: 'counting-group',
+      label: 'Contagens',
+      items: [
+        { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,     onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
+        { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />, onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
+      ],
+    },
+    {
+      id: 'products-group',
+      label: 'Produtos',
+      items: [
+        { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet />, onClick: () => { setActiveTab('import'); setMobileOpen(false); },          active: activeTab === 'import' },
+        { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
+        { id: 'products',        label: 'Produtos Importados',      icon: <Package />,         onClick: () => { setActiveTab('products'); setMobileOpen(false); },        active: activeTab === 'products' },
+      ],
+    },
+    {
+      id: 'tools-group',
+      label: 'Ferramentas',
+      items: [
+        { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
+        { id: 'full-manager',    label: 'Full Manager',         icon: <Zap />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
+      ],
+    },
+    {
+      id: 'admin-group',
+      label: 'Administração',
+      items: [
+        { id: 'admin', label: 'Acesso Administrativo', icon: <Lock />, onClick: () => { setActiveTab('admin'); setMobileOpen(false); }, active: activeTab === 'admin' },
+        ...(canManageUsers(profile?.role) ? [{ id: 'users', label: 'Usuários', icon: <UserCog />, onClick: () => { setActiveTab('users'); setMobileOpen(false); }, active: activeTab === 'users' }] : []),
+        ...(hasPermission(profile?.role, 'security.view') ? [{ id: 'security', label: 'Segurança', icon: <ShieldCheck />, onClick: () => { setActiveTab('security'); setMobileOpen(false); }, active: activeTab === 'security' }] : []),
+      ],
+    },
+    {
+      id: 'financeiro-group',
+      label: 'Financeiro',
+      sectionLabel: 'Em breve',
+      locked: true,
+      items: [
+        { id: 'financeiro-contas',      label: 'Contas a Pagar',         icon: <Receipt />,    onClick: () => {}, active: false, locked: true },
+        { id: 'financeiro-relatorios',  label: 'Relatórios Financeiros', icon: <PieChart />,   onClick: () => {}, active: false, locked: true },
+        { id: 'financeiro-custos',      label: 'Centro de Custos',       icon: <DollarSign />, onClick: () => {}, active: false, locked: true },
+      ],
+    },
+    {
+      id: 'analytics-group',
+      label: 'Analytics',
+      locked: true,
+      items: [
+        { id: 'analytics-blindscore', label: 'BlindScore',              icon: <Gauge />,       onClick: () => {}, active: false, locked: true },
+        { id: 'analytics-health',     label: 'Inventory Health Score',  icon: <Activity />,    onClick: () => {}, active: false, locked: true },
+        { id: 'analytics-ia',         label: 'IA Insights',              icon: <Sparkles />,    onClick: () => {}, active: false, locked: true },
+        { id: 'analytics-audit',      label: 'Auditorias',               icon: <ShieldAlert />, onClick: () => {}, active: false, locked: true },
+      ],
+    },
+    {
+      id: 'integracoes-group',
+      label: 'Integrações',
+      locked: true,
+      items: [
+        { id: 'integracoes-tiny',  label: 'Tiny ERP', icon: <Boxes />,    onClick: () => {}, active: false, locked: true },
+        { id: 'integracoes-bling', label: 'Bling',     icon: <Plug />,    onClick: () => {}, active: false, locked: true },
+        { id: 'integracoes-sap',   label: 'SAP',       icon: <Server />,  onClick: () => {}, active: false, locked: true },
+        { id: 'integracoes-totvs', label: 'TOTVS',     icon: <Database />, onClick: () => {}, active: false, locked: true },
+      ],
+    },
+    {
+      id: 'config-avancada-group',
+      label: 'Configurações Avançadas',
+      locked: true,
+      items: [
+        { id: 'config-api',         label: 'API',         icon: <Code2 />,    onClick: () => {}, active: false, locked: true },
+        { id: 'config-webhooks',    label: 'Webhooks',    icon: <Webhook />,  onClick: () => {}, active: false, locked: true },
+        { id: 'config-automacoes',  label: 'Automações',  icon: <Workflow />, onClick: () => {}, active: false, locked: true },
+        { id: 'config-logs',        label: 'Logs',        icon: <FileText />, onClick: () => {}, active: false, locked: true },
+      ],
+    },
+  ];
 
-      {/* ── TOP NAVIGATION ────────────────────────────────────────────────── */}
-      <header className="fixed top-0 left-0 right-0 z-[1000] bg-zinc-950 border-b border-zinc-800/70">
+  const sidebarHeader = (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        <div className="w-7 h-7 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
+          <LogoMark size={15} className="text-accent" />
+        </div>
+        <span className="text-sm font-bold text-fg tracking-tight whitespace-nowrap select-none">
+          Inventory<span className="text-fg-subtle font-normal">Blind</span>
+        </span>
+      </div>
+      {company && (
+        <SafeDropdown
+          className="w-full"
+          trigger={
+            <button
+              disabled={switchingCompany}
+              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-3/60 hover:bg-surface-3 border border-edge text-xs font-semibold text-fg-muted hover:text-fg transition-colors disabled:opacity-60"
+            >
+              <Building2 size={12} className="text-fg-subtle flex-shrink-0" />
+              <span className="truncate">{switchingCompany ? 'Trocando...' : company.name}</span>
+              {companies.length > 1 && <ChevronDown size={11} className="text-fg-subtle flex-shrink-0 ml-auto" />}
+            </button>
+          }
+          items={companies.map(c => ({
+            id: c.id,
+            label: c.name,
+            icon: <Building2 size={14} />,
+            active: c.id === company.id,
+            onClick: () => switchCompany(c.id),
+          }))}
+        />
+      )}
+      <button
+        onClick={() => { setActiveTab('input'); setMobileOpen(false); }}
+        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-accent hover:bg-accent-strong text-white text-sm font-semibold rounded-lg transition-colors"
+      >
+        <Plus size={14} /> Nova Contagem
+      </button>
+    </div>
+  );
 
-        {/* Main bar */}
-        <div className="h-14 max-w-screen-2xl mx-auto px-4 flex items-center">
-
-          {/* Brand + Company */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-7 h-7 bg-emerald-500/15 rounded-lg flex items-center justify-center">
-              <BarChart3 size={15} className="text-emerald-400" />
-            </div>
-            <span className="text-sm font-bold text-white tracking-tight whitespace-nowrap select-none">
-              Inventory<span className="text-zinc-500 font-normal">Blind</span>
-            </span>
+  const userMenu = (
+    <SafeDropdown
+      trigger={
+        <button className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-surface-3 transition-colors">
+          <div className="w-7 h-7 rounded-full bg-accent-strong flex items-center justify-center text-xs font-bold text-white flex-shrink-0 uppercase">
+            {(profile?.email ?? '?').slice(0, 1)}
           </div>
+          <div className="hidden xl:block text-left leading-tight">
+            <p className="text-xs font-medium text-fg">{profile?.email?.split('@')[0]}</p>
+            <p className="text-[10px] text-fg-subtle">{getRoleLabel(profile?.role ?? '')}</p>
+          </div>
+          <ChevronDown size={12} className="text-fg-subtle hidden xl:block" />
+        </button>
+      }
+      items={[
+        ...(canInstall ? [{ id: 'install', label: 'Instalar InventoryBlind', icon: <Download size={14} />, onClick: () => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } } }] : []),
+        { id: 'signout', label: 'Sair', icon: <LogOut size={14} />, onClick: signOut, divider: true },
+      ]}
+    />
+  );
 
-          {company && (
-            <div className="ml-2.5 flex-shrink-0">
-              <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-[11px] font-semibold text-zinc-300 hover:text-white transition-colors">
-                {company.name}
-                <ChevronDown size={10} className="text-zinc-500 mt-px" />
-              </button>
-            </div>
-          )}
+  return (
+    <div className="h-screen bg-surface font-sans text-fg flex overflow-hidden">
 
-          <div className="w-px h-5 bg-zinc-800 mx-3.5 flex-shrink-0 hidden md:block" />
+      {/* ── SIDEBAR (desktop) ─────────────────────────────────────────────── */}
+      <Sidebar groups={navGroups} header={sidebarHeader} className="hidden md:flex" />
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-0.5 flex-1 min-w-0">
-
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                activeTab === 'dashboard'
-                  ? 'text-white bg-zinc-800'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-              }`}
-            >
-              Dashboard
-            </button>
-
-            <SafeDropdown
-              active={['heatmap','import','products','import-history','label-generator','full-manager','nfe-conference'].includes(activeTab)}
-              trigger={
-                <button className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  ['heatmap','import','products','import-history','label-generator','full-manager','nfe-conference'].includes(activeTab)
-                    ? 'text-white bg-zinc-800'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-                }`}>
-                  Operações <ChevronDown size={12} className="text-zinc-600" />
-                </button>
-              }
-              items={[
-                { id: 'heatmap',         label: 'Ver Heatmap',              icon: <Map size={14}/>,             onClick: () => setActiveTab('heatmap'),         active: activeTab === 'heatmap' },
-                { id: 'products',        label: 'Produtos Importados',      icon: <Package size={14}/>,         onClick: () => setActiveTab('products'),         active: activeTab === 'products' },
-                { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet size={14}/>, onClick: () => setActiveTab('import'),           active: activeTab === 'import' },
-                { id: 'import-history',  label: 'Histórico de Importações', icon: <History size={14}/>,         onClick: () => setActiveTab('import-history'),   active: activeTab === 'import-history', divider: true },
-                { id: 'label-generator', label: 'Gerador de Etiquetas',     icon: <Tag size={14}/>,             onClick: () => setActiveTab('label-generator'), active: activeTab === 'label-generator', divider: true },
-                { id: 'full-manager',    label: 'Full Manager',             icon: <Zap size={14}/>,             onClick: () => setActiveTab('full-manager'),     active: activeTab === 'full-manager', divider: true },
-                { id: 'nfe-conference',  label: 'Conferência por NF-e',     icon: <ScanLine size={14}/>,        onClick: () => setActiveTab('nfe-conference'),   active: activeTab === 'nfe-conference' },
-              ]}
-            />
-
-            <SafeDropdown
-              active={['kpis','rankings'].includes(activeTab)}
-              trigger={
-                <button className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  ['kpis','rankings'].includes(activeTab)
-                    ? 'text-white bg-zinc-800'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-                }`}>
-                  Análises <ChevronDown size={12} className="text-zinc-600" />
-                </button>
-              }
-              items={[
-                { id: 'kpis',     label: 'KPIs e Indicadores', icon: <Target size={14}/>, onClick: () => setActiveTab('kpis'),     active: activeTab === 'kpis' },
-                { id: 'rankings', label: 'Rankings',            icon: <Award size={14}/>,  onClick: () => setActiveTab('rankings'), active: activeTab === 'rankings' },
-              ]}
-            />
-
-            <SafeDropdown
-              active={['admin','users','security'].includes(activeTab)}
-              trigger={
-                <button className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  ['admin','users','security'].includes(activeTab)
-                    ? 'text-white bg-zinc-800'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-                }`}>
-                  Administração <ChevronDown size={12} className="text-zinc-600" />
-                </button>
-              }
-              items={[
-                { id: 'admin', label: 'Acesso Administrativo', icon: <Lock size={14}/>, onClick: () => setActiveTab('admin'), active: activeTab === 'admin' },
-                ...(canManageUsers(profile?.role) ? [{ id: 'users', label: 'Usuários', icon: <UserCog size={14}/>, onClick: () => setActiveTab('users'), active: activeTab === 'users' }] : []),
-                ...(hasPermission(profile?.role, 'security.view') ? [{ id: 'security', label: 'Segurança', icon: <ShieldCheck size={14}/>, onClick: () => setActiveTab('security'), active: activeTab === 'security' }] : []),
-              ]}
-            />
-          </nav>
-
-          {/* Right side */}
-          <div className="ml-auto flex items-center gap-1.5 pl-3">
-
-            {/* + Nova Contagem CTA */}
-            <button
-              onClick={() => { setActiveTab('input'); setMobileOpen(false); }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0"
-            >
-              <Plus size={14} />
-              <span className="hidden lg:inline">Nova Contagem</span>
-              <span className="lg:hidden">Contar</span>
-            </button>
-
-            {/* User menu */}
-            <SafeDropdown
-              trigger={
-                <button className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors">
-                  <div className="w-7 h-7 rounded-full bg-emerald-700 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 uppercase">
-                    {(profile?.email ?? '?').slice(0, 1)}
+      {/* ── SIDEBAR (mobile drawer) ──────────────────────────────────────── */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-[1000] flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <div className="relative z-10 flex h-full">
+            <Sidebar
+              groups={navGroups}
+              header={sidebarHeader}
+              footer={
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1 pb-1">
+                    <span className="text-xs text-fg-muted">Tema</span>
+                    <ThemeToggle />
                   </div>
-                  <div className="hidden xl:block text-left leading-tight">
-                    <p className="text-xs font-medium text-zinc-200">{profile?.email?.split('@')[0]}</p>
-                    <p className="text-[10px] text-zinc-500">{getRoleLabel(profile?.role ?? '')}</p>
-                  </div>
-                  <ChevronDown size={12} className="text-zinc-600 hidden xl:block" />
-                </button>
+                  {canInstall && (
+                    <button
+                      onClick={() => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } setMobileOpen(false); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors text-sm"
+                    >
+                      <Download size={15} /> Instalar InventoryBlind
+                    </button>
+                  )}
+                  <button onClick={signOut} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors text-sm">
+                    <LogOut size={15} /> Sair
+                  </button>
+                </div>
               }
-              items={[
-                { id: 'company', label: `Empresa: ${company?.name ?? '—'}`, icon: <Building2 size={14} />, onClick: () => {} },
-                ...(canInstall ? [{ id: 'install', label: 'Instalar InventoryBlind', icon: <Download size={14} />, onClick: () => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } } }] : []),
-                { id: 'signout', label: 'Sair',                             icon: <LogOut size={14} />,    onClick: signOut, divider: true },
-              ]}
             />
-
-            {/* Hamburger */}
             <button
-              onClick={() => setMobileOpen(o => !o)}
-              className="md:hidden p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              onClick={() => setMobileOpen(false)}
+              className="absolute top-3 left-full ml-2 p-2 rounded-lg bg-surface-2 border border-edge text-fg-muted"
             >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+              <X size={18} />
             </button>
           </div>
         </div>
+      )}
 
-        {/* Mobile drawer */}
-        {mobileOpen && (
-          <div className="md:hidden border-t border-zinc-800 bg-zinc-950 px-3 py-3 space-y-0.5">
-            <MobileNavItem label="Dashboard" onClick={() => { setActiveTab('dashboard'); setMobileOpen(false); }} active={activeTab === 'dashboard'} />
-            <MobileNavItem label="+ Nova Contagem" onClick={() => { setActiveTab('input'); setMobileOpen(false); }} active={activeTab === 'input'} highlight />
-            <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest px-3 pt-3 pb-1">Operações</p>
-            <MobileNavItem label="Ver Heatmap"              onClick={() => { setActiveTab('heatmap');         setMobileOpen(false); }} active={activeTab === 'heatmap'} />
-            <MobileNavItem label="Produtos Importados"      onClick={() => { setActiveTab('products');        setMobileOpen(false); }} active={activeTab === 'products'} />
-            <MobileNavItem label="Importar Produtos"        onClick={() => { setActiveTab('import');          setMobileOpen(false); }} active={activeTab === 'import'} />
-            <MobileNavItem label="Histórico de Importações" onClick={() => { setActiveTab('import-history');  setMobileOpen(false); }} active={activeTab === 'import-history'} />
-            <MobileNavItem label="Gerador de Etiquetas"     onClick={() => { setActiveTab('label-generator'); setMobileOpen(false); }} active={activeTab === 'label-generator'} />
-            <MobileNavItem label="Full Manager"             onClick={() => { setActiveTab('full-manager');    setMobileOpen(false); }} active={activeTab === 'full-manager'} />
-            <MobileNavItem label="Conferência por NF-e"     onClick={() => { setActiveTab('nfe-conference');   setMobileOpen(false); }} active={activeTab === 'nfe-conference'} />
-            <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest px-3 pt-3 pb-1">Análises</p>
-            <MobileNavItem label="KPIs e Indicadores" onClick={() => { setActiveTab('kpis');     setMobileOpen(false); }} active={activeTab === 'kpis'} />
-            <MobileNavItem label="Rankings"           onClick={() => { setActiveTab('rankings'); setMobileOpen(false); }} active={activeTab === 'rankings'} />
-            <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest px-3 pt-3 pb-1">Administração</p>
-            <MobileNavItem label="Acesso Administrativo" onClick={() => { setActiveTab('admin');    setMobileOpen(false); }} active={activeTab === 'admin'} />
-            {canManageUsers(profile?.role) && (
-              <MobileNavItem label="Usuários" onClick={() => { setActiveTab('users'); setMobileOpen(false); }} active={activeTab === 'users'} />
-            )}
-            {hasPermission(profile?.role, 'security.view') && (
-              <MobileNavItem label="Segurança" onClick={() => { setActiveTab('security'); setMobileOpen(false); }} active={activeTab === 'security'} />
-            )}
-            <div className="border-t border-zinc-800 mt-3 pt-3">
-              {canInstall && (
-                <button
-                  onClick={() => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } setMobileOpen(false); }}
-                  className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm mb-2"
-                >
-                  <Download size={15} /> Instalar InventoryBlind
-                </button>
-              )}
-              <button onClick={signOut} className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm">
-                <LogOut size={15} /> Sair
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
+      {/* ── CONTENT COLUMN ────────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 flex flex-col">
+        <AppHeader
+          onOpenMobileNav={() => setMobileOpen(true)}
+          right={
+            <>
+              <ThemeToggle className="hidden md:flex" />
+              {userMenu}
+            </>
+          }
+        />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 mt-14 overflow-y-auto overflow-x-hidden">
+      <main className="flex-1 overflow-y-auto overflow-x-hidden">
 
         {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' && activeTab !== 'users' && (
           <>
@@ -1206,258 +1157,210 @@ function AppContent() {
 
         {/* ABA DASHBOARD */}
         {activeTab === 'dashboard' && (
-          <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+          <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
 
-            {/* TOPO: INDICADORES PRINCIPAIS */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Progresso Geral"
-                value={`${globais.progresso.toFixed(1)}%`}
-                subtitle={`${globais.totalDone} de ${globais.totalSku} SKUs`}
-                icon={TrendingUp}
-                colorClass="bg-zinc-200 text-zinc-800"
-              />
-              <StatCard
-                title="Acuracidade Geral (IRA)"
-                value={`${globais.acuracidade.toFixed(1)}%`}
-                subtitle="Calculado via divergências"
-                icon={Activity}
-                colorClass={globais.acuracidade >= 80 ? "bg-emerald-100 text-emerald-700" : globais.acuracidade >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}
-              />
-              <StatCard
-                title="Tempo de Inventário"
-                value="44 Dias"
-                subtitle="Projeção: 27 dias"
-                icon={Clock}
-                colorClass="bg-zinc-200 text-zinc-800"
-              />
-              <StatCard
-                title="Total Divergências"
-                value={globais.totalDiv}
-                subtitle="Unidades p/ recontagem"
-                icon={CheckCircle2}
-                colorClass="bg-zinc-200 text-zinc-800"
-              />
-            </div>
+            {/* VISÃO GERAL: indicadores + BlindAI em um único painel */}
+            <Panel>
+              <PanelSection padding="lg">
+                <div className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-edge lg:divide-y-0 lg:divide-x">
+                  {[
+                    { label: 'Progresso Geral', value: `${globais.progresso.toFixed(1)}%`, subtitle: `${globais.totalDone} de ${globais.totalSku} SKUs` },
+                    { label: 'Acuracidade (IRA)', value: `${globais.acuracidade.toFixed(1)}%`, subtitle: 'Via divergências', valueClassName: globais.acuracidade >= 80 ? 'text-emerald-600 dark:text-emerald-400' : globais.acuracidade >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400' },
+                    { label: 'Tempo de Inventário', value: '44 dias', subtitle: 'Projeção: 27 dias' },
+                    { label: 'Divergências', value: globais.totalDiv, subtitle: 'Unidades p/ recontagem' },
+                  ].map((kpi, i) => (
+                    <div key={i} className={`px-0 lg:px-6 py-3 lg:py-0 ${i === 0 ? 'lg:pl-0' : ''}`}>
+                      <p className="text-section">{kpi.label}</p>
+                      <p className={`text-display mt-1.5 ${kpi.valueClassName ?? ''}`}>{kpi.value}</p>
+                      <p className="text-caption mt-1">{kpi.subtitle}</p>
+                    </div>
+                  ))}
+                </div>
+              </PanelSection>
 
-            {/* ASSISTENTE IA - INSIGHTS AUTOMÁTICOS */}
-            <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl shadow-lg p-5 text-white">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-600 p-2 rounded-lg">
-                    <Bot size={24} />
-                  </div>
+              <PanelSection padding="lg">
+                <div className="flex items-start justify-between gap-4">
                   <div>
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                      AZBot I.A
-                      <Sparkles size={16} className="text-amber-400" />
+                    <h3 className="text-title flex items-center gap-2">
+                      <Bot size={18} className="text-accent" />
+                      BlindAI
                     </h3>
-                    <p className="text-zinc-400 text-sm">Assistente inteligente AZ ByGocase</p>
+                    <p className="text-caption mt-0.5">Insights automáticos sobre a operação</p>
                   </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={generateInsights}
-                    className="p-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 transition text-zinc-300 hover:text-white"
-                    title="Atualizar insights"
-                  >
-                    <RefreshCw size={18} />
-                  </button>
-                  <button
-                    onClick={() => setShowAIChat(!showAIChat)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition font-medium text-sm"
-                  >
-                    <MessageCircle size={18} />
-                    Conversar
-                    {showAIChat ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                </div>
-              </div>
-
-              {/* Insights Automáticos */}
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {aiInsights.slice(0, 3).map((insight, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-zinc-800/50 backdrop-blur rounded-lg p-3 text-sm text-zinc-300 border border-zinc-700"
-                  >
-                    {insight}
-                  </div>
-                ))}
-              </div>
-
-              {/* Chat Interface */}
-              {showAIChat && (
-                <div className="mt-4 bg-zinc-800 rounded-lg border border-zinc-700 overflow-hidden">
-                  {/* Chat Messages */}
-                  <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: '300px' }}>
-                    {aiMessages.length === 0 && (
-                      <div className="text-center py-4">
-                        <Bot size={32} className="mx-auto text-zinc-600 mb-2" />
-                        <p className="text-zinc-500 text-sm">
-                          Olá! Sou o AZBot I.A, assistente da AZ ByGocase. Pergunte sobre o inventário, produtos, ou a empresa!
-                        </p>
-                        <div className="flex flex-wrap gap-2 justify-center mt-3">
-                          {[
-                            'Qual o progresso?',
-                            'Me fale sobre a GoCase',
-                            'Quais linhas precisam de atenção?',
-                            'O que é a AZ ByGocase?'
-                          ].map((q) => (
-                            <button
-                              key={q}
-                              onClick={() => {
-                                setAiInput(q);
-                              }}
-                              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded-full text-xs text-zinc-300 transition"
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {aiMessages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap ${
-                            msg.role === 'user'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-zinc-700 text-zinc-200'
-                          }`}
-                        >
-                          {msg.content}
-                        </div>
-                      </div>
-                    ))}
-                    {aiLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-zinc-700 rounded-lg px-4 py-2 flex items-center gap-2">
-                          <Loader2 size={16} className="animate-spin text-zinc-400" />
-                          <span className="text-zinc-400 text-sm">Analisando...</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Chat Input */}
-                  <form onSubmit={handleSendAIMessage} className="border-t border-zinc-700 p-3 flex gap-2">
-                    <input
-                      type="text"
-                      value={aiInput}
-                      onChange={(e) => setAiInput(e.target.value)}
-                      placeholder="Pergunte sobre o inventário..."
-                      className="flex-1 bg-zinc-700 text-white placeholder-zinc-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      disabled={aiLoading}
-                    />
+                  <div className="flex gap-1.5 flex-shrink-0">
                     <button
-                      type="submit"
-                      disabled={aiLoading || !aiInput.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      onClick={generateInsights}
+                      className="p-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors"
+                      title="Atualizar insights"
                     >
-                      <Send size={18} />
+                      <RefreshCw size={16} />
                     </button>
-                  </form>
+                    <button
+                      onClick={() => setShowAIChat(!showAIChat)}
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-accent hover:bg-accent/10 transition-colors font-medium text-sm"
+                    >
+                      <MessageCircle size={15} />
+                      Conversar
+                      {showAIChat ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                    </button>
+                  </div>
                 </div>
-              )}
-            </div>
 
-            {/* SEÇÃO DO MEIO: SAÚDE E RANKINGS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {/* Insights Automáticos */}
+                {aiInsights.length > 0 && (
+                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
+                    {aiInsights.slice(0, 3).map((insight, idx) => (
+                      <p key={idx} className="text-sm text-fg-muted leading-relaxed">
+                        {insight}
+                      </p>
+                    ))}
+                  </div>
+                )}
 
-              {/* COLUNA ESQUERDA: Saúde e Rankings */}
-              <div className="lg:col-span-1 space-y-6">
+                {/* Chat Interface */}
+                {showAIChat && (
+                  <div className="mt-4 bg-surface rounded-lg border border-edge overflow-hidden">
+                    {/* Chat Messages */}
+                    <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: '300px' }}>
+                      {aiMessages.length === 0 && (
+                        <div className="text-center py-4">
+                          <Bot size={28} className="mx-auto text-fg-subtle mb-2" />
+                          <p className="text-fg-subtle text-sm">
+                            Olá! Sou o BlindAI, assistente da AZ ByGocase. Pergunte sobre o inventário, produtos, ou a empresa!
+                          </p>
+                          <div className="flex flex-wrap gap-2 justify-center mt-3">
+                            {[
+                              'Qual o progresso?',
+                              'Me fale sobre a GoCase',
+                              'Quais linhas precisam de atenção?',
+                              'O que é a AZ ByGocase?'
+                            ].map((q) => (
+                              <button
+                                key={q}
+                                onClick={() => {
+                                  setAiInput(q);
+                                }}
+                                className="px-3 py-1.5 bg-surface-2 hover:bg-edge rounded-full text-xs text-fg-muted transition"
+                              >
+                                {q}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+                      )}
+                      {aiMessages.map((msg, idx) => (
+                        <div
+                          key={idx}
+                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                        >
+                          <div
+                            className={`max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap ${
+                              msg.role === 'user'
+                                ? 'bg-accent text-white'
+                                : 'bg-surface-2 text-fg'
+                            }`}
+                          >
+                            {msg.content}
+                          </div>
+                        </div>
+                      ))}
+                      {aiLoading && (
+                        <div className="flex justify-start">
+                          <div className="bg-surface-2 rounded-lg px-4 py-2 flex items-center gap-2">
+                            <Loader2 size={16} className="animate-spin text-fg-subtle" />
+                            <span className="text-fg-subtle text-sm">Analisando...</span>
+                          </div>
+                        </div>
+                      )}
+                    </div>
 
-                {/* Saúde do Estoque Limpo */}
-                <div className={`bg-white rounded-xl shadow-sm border border-zinc-200 p-5 border-l-4 ${healthStatus.border}`}>
-                  <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-2">
-                    Índice de Saúde do Estoque
-                  </h3>
-                  <div className="flex items-center gap-3 mt-4">
-                    <healthStatus.icon size={28} className={healthStatus.iconColor} />
-                    <span className={`text-2xl font-extrabold uppercase ${healthStatus.color}`}>
+                    {/* Chat Input */}
+                    <form onSubmit={handleSendAIMessage} className="border-t border-edge p-3 flex gap-2">
+                      <input
+                        type="text"
+                        value={aiInput}
+                        onChange={(e) => setAiInput(e.target.value)}
+                        placeholder="Pergunte sobre o inventário..."
+                        className="flex-1 bg-surface-2 text-fg placeholder-fg-subtle rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                        disabled={aiLoading}
+                      />
+                      <button
+                        type="submit"
+                        disabled={aiLoading || !aiInput.trim()}
+                        className="bg-accent hover:bg-accent-strong text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                      >
+                        <Send size={18} />
+                      </button>
+                    </form>
+                  </div>
+                )}
+              </PanelSection>
+            </Panel>
+
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+
+              {/* COLUNA ESQUERDA: Saúde + Rankings, painel único */}
+              <Panel className="lg:col-span-1">
+                <PanelSection>
+                  <p className="text-section">Índice de Saúde do Estoque</p>
+                  <div className="flex items-center gap-2 mt-2">
+                    <healthStatus.icon size={20} className={healthStatus.iconColor} />
+                    <span className={`text-title ${healthStatus.color}`}>
                       {healthStatus.label}
                     </span>
                   </div>
-                </div>
+                </PanelSection>
 
-                <button
-                  onClick={() => setActiveTab('rankings')}
-                  className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-                >
-                  <Trophy size={18} className="text-amber-400" />
-                  Ver Rankings Completos
-                </button>
-
-                {/* Mini Rankings - Top 5 Preview */}
                 <DashboardRankingPreview
                   melhores={globais.melhores}
                   piores={globais.piores}
                   inProgress={globais.tabela.filter(b => b.status === 'ANDAMENTO')}
                   onViewAll={() => setActiveTab('rankings')}
                 />
-              </div>
+              </Panel>
 
-              {/* COLUNA DIREITA: Tabela de Controle */}
-              <div className="lg:col-span-2">
-                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col">
-                  <div className="bg-zinc-50 p-4 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sticky top-0 z-10">
-                    <h3 className="text-sm font-bold text-zinc-800 flex items-center gap-2">
-                      <BarChart3 size={18} className="text-zinc-600" />
-                      Controle e Desempenho por Linha
-                    </h3>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-zinc-700 bg-white px-2 py-1.5 rounded border border-zinc-300">
-                        Total Geral: {globais.totalSku.toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                  </div>
+              {/* COLUNA DIREITA: Tabela de Controle — protagonista */}
+              <Panel className="lg:col-span-2 flex flex-col">
+                <PanelSection padding="sm" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                  <h3 className="text-title">Controle e Desempenho por Linha</h3>
+                  <span className="text-caption">Total: {globais.totalSku.toLocaleString('pt-BR')} SKUs</span>
+                </PanelSection>
 
-                  <div className="overflow-x-auto flex-1">
-                    <table className="w-full text-sm text-left whitespace-nowrap">
-                      <thead className="text-[10px] text-zinc-500 uppercase bg-zinc-50 border-b border-zinc-200 sticky top-0 z-10 shadow-sm">
-                        <tr>
-                          <th className="px-3 py-3 font-semibold">Linha / Marca</th>
-                          <th className="px-3 py-3 font-semibold text-center">Total SKU</th>
-                          <th className="px-3 py-3 font-semibold text-center">Concluídos</th>
-                          <th className="px-3 py-3 font-semibold text-center">Progresso</th>
-                          <th className="px-3 py-3 font-semibold text-center">Acuracidade</th>
-                          <th className="px-3 py-3 font-semibold text-center">Status</th>
+                <div className="overflow-x-auto flex-1">
+                  <table className="w-full text-sm text-left whitespace-nowrap">
+                    <thead>
+                      <tr className="border-b border-edge">
+                        <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide">Linha / Marca</th>
+                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Total</th>
+                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Concluídos</th>
+                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Progresso</th>
+                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Acuracidade</th>
+                        <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {globais.tabela.map((row) => (
+                        <tr key={row.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                          <td className="px-6 py-3.5 font-medium text-fg">{row.brand}</td>
+                          <td className="px-3 py-3.5 text-center text-fg-muted">{row.totalSku}</td>
+                          <td className="px-3 py-3.5 text-center font-semibold text-fg">{row.doneSku}</td>
+                          <td className="px-3 py-3.5 text-center text-fg-muted font-mono text-xs">{row.progress.toFixed(1)}%</td>
+                          <td className="px-3 py-3.5 text-center font-semibold text-fg">
+                            {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : '—'}
+                          </td>
+                          <td className="px-6 py-3.5 text-center">
+                            <span className={`text-xs font-medium ${
+                              row.status === 'CONCLUÍDO' ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'
+                            }`}>
+                              {row.status === 'CONCLUÍDO' ? 'Concluído' : 'Em andamento'}
+                            </span>
+                          </td>
                         </tr>
-                      </thead>
-                      <tbody>
-                        {globais.tabela.map((row) => (
-                          <tr key={row.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-                            <td className="px-3 py-2 font-medium text-zinc-800">{row.brand}</td>
-                            <td className="px-3 py-2 text-center text-zinc-600">{row.totalSku}</td>
-                            <td className="px-3 py-2 text-center font-semibold">{row.doneSku}</td>
-                            <td className="px-3 py-2 text-center">
-                              <div className="flex items-center justify-center gap-2">
-                                <span className="text-xs text-zinc-600 font-mono w-10 text-right">{row.progress.toFixed(1)}%</span>
-                              </div>
-                            </td>
-                            <td className="px-3 py-2 text-center font-bold text-zinc-800">
-                              {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : ''}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-md ${
-                                row.status === 'CONCLUÍDO'
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
-                              }`}>
-                                {row.status}
-                              </span>
-                            </td>
-                          </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                  </div>
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
-              </div>
+              </Panel>
 
             </div>
           </div>
@@ -1465,121 +1368,130 @@ function AppContent() {
 
         {/* ABA ADMIN */}
         {activeTab === 'admin' && (
-          <div className="max-w-4xl mx-auto">
+          <div className="max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
             {!isLoggedIn ? (
-              <div className="bg-white rounded-xl shadow-md border border-zinc-200 overflow-hidden mt-6 max-w-md mx-auto">
-                <div className="bg-amber-600 p-6 text-center text-white">
-                  <Lock size={40} className="mx-auto mb-2 opacity-80" />
-                  <h2 className="text-xl font-bold tracking-wide">Acesso Restrito</h2>
-                  <p className="text-amber-100 text-sm mt-1">Esta área é restrita a administradores e proprietários.</p>
-                </div>
-                <div className="p-6 text-center">
-                  <p className="text-sm text-zinc-600">Você não tem permissão para acessar este painel.</p>
-                  <p className="text-xs text-zinc-400 mt-1">Perfil atual: {profile?.role ?? '—'}</p>
-                </div>
-              </div>
+              <Panel className="max-w-md mx-auto mt-6">
+                <PanelSection padding="lg" className="text-center">
+                  <Lock size={32} className="mx-auto mb-3 text-fg-subtle" />
+                  <h2 className="text-title">Acesso Restrito</h2>
+                  <p className="text-fg-muted text-sm mt-2">Esta área é restrita a administradores e proprietários.</p>
+                  <p className="text-caption mt-3">Perfil atual: {profile?.role ?? '—'}</p>
+                </PanelSection>
+              </Panel>
             ) : (
               // PAINEL ADMINISTRATIVO
-              <div className="space-y-6">
-                <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-zinc-200">
-                  <div>
-                    <h2 className="text-lg font-bold text-zinc-800 flex items-center gap-2">
-                      <Edit size={20} className="text-amber-600"/> Painel Administrativo
-                    </h2>
-                    <p className="text-sm text-zinc-500">Altere parâmetros do sistema e dados gerenciais.</p>
-                  </div>
+              <div className="space-y-8">
+                <div>
+                  <h2 className="text-title flex items-center gap-2">
+                    <Edit size={18} className="text-fg-subtle" /> Painel Administrativo
+                  </h2>
+                  <p className="text-caption mt-1">Altere parâmetros do sistema e dados gerenciais.</p>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Edição Top Vendas */}
-                  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                    <div className="bg-zinc-900 p-3 text-white font-bold text-sm">Editar Top 10 Vendas</div>
-                    <div className="p-4 overflow-x-auto">
+                  <Panel>
+                    <PanelSection padding="sm">
+                      <h3 className="text-title">Editar Top 10 Vendas</h3>
+                    </PanelSection>
+                    <PanelSection className="overflow-x-auto">
                        <table className="w-full text-xs text-left">
-                         <thead><tr className="border-b"><th className="pb-2">Produto</th><th className="pb-2">SKU</th><th className="pb-2 text-right">Vendas</th></tr></thead>
+                         <thead>
+                           <tr className="border-b border-edge">
+                             <th className="pb-2 font-medium text-fg-subtle uppercase tracking-wide">Produto</th>
+                             <th className="pb-2 font-medium text-fg-subtle uppercase tracking-wide">SKU</th>
+                             <th className="pb-2 text-right font-medium text-fg-subtle uppercase tracking-wide">Vendas</th>
+                           </tr>
+                         </thead>
                          <tbody>
                            {topVendas.map((item, idx) => (
-                             <tr key={item.id} className="border-b border-zinc-100">
-                               <td className="py-2 pr-2"><input type="text" className="w-full border rounded px-2 py-1 text-xs" value={item.produto} onChange={(e) => handleUpdateTopVenda(idx, 'produto', e.target.value)} /></td>
-                               <td className="py-2 pr-2"><input type="text" className="w-full border rounded px-2 py-1 text-xs font-mono" value={item.sku} onChange={(e) => handleUpdateTopVenda(idx, 'sku', e.target.value)} /></td>
-                               <td className="py-2"><input type="text" className="w-full border rounded px-2 py-1 text-xs text-right font-bold" value={item.vendas} onChange={(e) => handleUpdateTopVenda(idx, 'vendas', e.target.value)} /></td>
+                             <tr key={item.id} className="border-b border-edge/60 last:border-0">
+                               <td className="py-2 pr-2"><input type="text" className="w-full border border-edge rounded px-2 py-1 text-xs bg-surface focus:outline-none focus:ring-2 focus:ring-accent/40" value={item.produto} onChange={(e) => handleUpdateTopVenda(idx, 'produto', e.target.value)} /></td>
+                               <td className="py-2 pr-2"><input type="text" className="w-full border border-edge rounded px-2 py-1 text-xs font-mono bg-surface focus:outline-none focus:ring-2 focus:ring-accent/40" value={item.sku} onChange={(e) => handleUpdateTopVenda(idx, 'sku', e.target.value)} /></td>
+                               <td className="py-2"><input type="text" className="w-full border border-edge rounded px-2 py-1 text-xs text-right font-semibold bg-surface focus:outline-none focus:ring-2 focus:ring-accent/40" value={item.vendas} onChange={(e) => handleUpdateTopVenda(idx, 'vendas', e.target.value)} /></td>
                              </tr>
                            ))}
                          </tbody>
                        </table>
-                    </div>
-                  </div>
+                    </PanelSection>
+                  </Panel>
 
                   {/* Edição Linhas */}
-                  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col">
-                     <div className="bg-zinc-900 p-3 text-white font-bold text-sm">Gerenciamento de Marcas / Linhas</div>
-                     <div className="p-6 flex-1 flex flex-col justify-center items-center text-center">
-                        <Package size={40} className="text-zinc-300 mb-3"/>
-                        <p className="text-sm text-zinc-600 mb-4">Para adicionar uma nova linha ao controle do inventário principal, clique no botão abaixo.</p>
+                  <Panel className="flex flex-col">
+                     <PanelSection padding="sm">
+                       <h3 className="text-title">Gerenciamento de Marcas / Linhas</h3>
+                     </PanelSection>
+                     <PanelSection className="flex-1 flex flex-col justify-center items-center text-center">
+                        <Package size={32} className="text-fg-subtle mb-3"/>
+                        <p className="text-sm text-fg-muted mb-4">Para adicionar uma nova linha ao controle do inventário principal, clique no botão abaixo.</p>
                         <button
                           onClick={() => setShowAddBrandModal(true)}
-                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-md w-full"
+                          className="bg-accent hover:bg-accent-strong text-white font-semibold py-3 px-6 rounded-lg transition w-full"
                         >
                           + Cadastrar Nova Linha no Estoque
                         </button>
-                     </div>
-                  </div>
+                     </PanelSection>
+                  </Panel>
                 </div>
 
                 {/* Gerenciamento de KPIs */}
-                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                  <div className="bg-blue-600 p-4 text-white font-bold text-sm flex items-center gap-2">
-                    <Target size={18} />
-                    Gerenciamento de KPIs e Indicadores
-                  </div>
-                  <div className="p-4">
+                <Panel>
+                  <PanelSection padding="sm">
+                    <h3 className="text-title flex items-center gap-2">
+                      <Target size={16} className="text-fg-subtle" />
+                      Gerenciamento de KPIs e Indicadores
+                    </h3>
+                  </PanelSection>
+                  <PanelSection>
                     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
                       {customKPIs.map((kpi) => (
-                        <div key={kpi.id} className="bg-zinc-50 rounded-lg p-3 border border-zinc-200 relative group">
+                        <div key={kpi.id} className="bg-surface-3 rounded-lg p-3 relative group">
                           <button
                             onClick={() => handleDeleteKPI(kpi.id)}
-                            className="absolute top-2 right-2 text-zinc-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="absolute top-2 right-2 text-fg-subtle hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
                           >
                             <Trash2 size={16} />
                           </button>
-                          <p className="text-xs text-zinc-500 uppercase font-semibold">{kpi.titulo}</p>
-                          <p className="text-xl font-bold text-zinc-900 mt-1">{kpi.valor} <span className="text-sm font-normal">{kpi.unidade}</span></p>
-                          <p className="text-xs text-zinc-400 mt-1 truncate">{kpi.variacao}</p>
+                          <p className="text-caption uppercase">{kpi.titulo}</p>
+                          <p className="text-lg font-semibold text-fg mt-1">{kpi.valor} <span className="text-sm font-normal text-fg-muted">{kpi.unidade}</span></p>
+                          <p className="text-caption mt-1 truncate">{kpi.variacao}</p>
                         </div>
                       ))}
                     </div>
                     <button
                       onClick={() => setShowAddKPIModal(true)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
+                      className="w-full bg-accent hover:bg-accent-strong text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
                     >
                       <Plus size={18} />
                       Adicionar Novo KPI
                     </button>
-                  </div>
-                </div>
+                  </PanelSection>
+                </Panel>
 
                 {/* Reset e Histórico de Inventários */}
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                   {/* Reset de Inventário */}
-                  <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
-                    <div className="bg-red-600 p-4 text-white font-bold text-sm flex items-center gap-2">
-                      <RotateCcw size={18} />
-                      Reset de Inventário
-                    </div>
-                    <div className="p-6">
-                      <p className="text-sm text-zinc-600 mb-4">
+                  <Panel>
+                    <PanelSection padding="sm">
+                      <h3 className="text-title flex items-center gap-2">
+                        <RotateCcw size={16} className="text-fg-subtle" />
+                        Reset de Inventário
+                      </h3>
+                    </PanelSection>
+                    <PanelSection>
+                      <p className="text-sm text-fg-muted mb-4">
                         Ao resetar, o inventário atual será arquivado com todos os dados de progresso, acuracidade e divergências.
                         As contagens serão zeradas para iniciar um novo ciclo.
                       </p>
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                        <p className="text-xs text-amber-800 font-medium">
+                      <div className="bg-amber-500/10 rounded-lg p-3 mb-4">
+                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
                           Os dados serão salvos permanentemente no histórico e poderão ser consultados a qualquer momento.
                         </p>
                       </div>
                       <button
                         onClick={() => setShowResetModal(true)}
                         disabled={resetProgress}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
+                        className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
                       >
                         {resetProgress ? (
                           <>
@@ -1593,18 +1505,20 @@ function AppContent() {
                           </>
                         )}
                       </button>
-                    </div>
-                  </div>
+                    </PanelSection>
+                  </Panel>
 
                   {/* Histórico de Inventários */}
-                  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                    <div className="bg-emerald-600 p-4 text-white font-bold text-sm flex items-center gap-2">
-                      <History size={18} />
-                      Histórico de Inventários
-                    </div>
-                    <div className="p-4 overflow-y-auto" style={{ maxHeight: '400px' }}>
+                  <Panel>
+                    <PanelSection padding="sm">
+                      <h3 className="text-title flex items-center gap-2">
+                        <History size={16} className="text-fg-subtle" />
+                        Histórico de Inventários
+                      </h3>
+                    </PanelSection>
+                    <PanelSection className="overflow-y-auto" style={{ maxHeight: '400px' }}>
                       {snapshots.length === 0 ? (
-                        <p className="text-sm text-zinc-500 text-center py-4">
+                        <p className="text-sm text-fg-subtle text-center py-4">
                           Nenhum inventário arquivado ainda.
                         </p>
                       ) : (
@@ -1612,13 +1526,13 @@ function AppContent() {
                           {snapshots.map((snapshot) => (
                             <div
                               key={snapshot.id}
-                              className="bg-zinc-50 rounded-lg p-3 border border-zinc-200 hover:border-zinc-300 transition cursor-pointer"
+                              className="bg-surface-3 rounded-lg p-3 hover:bg-edge/60 transition cursor-pointer"
                               onClick={() => handleViewSnapshot(snapshot)}
                             >
                               <div className="flex justify-between items-start">
                                 <div>
-                                  <p className="font-bold text-zinc-800 text-sm">{snapshot.name}</p>
-                                  <p className="text-xs text-zinc-500 mt-1">
+                                  <p className="font-semibold text-fg text-sm">{snapshot.name}</p>
+                                  <p className="text-caption mt-1">
                                     {new Date(snapshot.end_date).toLocaleDateString('pt-BR', {
                                       day: '2-digit',
                                       month: 'long',
@@ -1632,26 +1546,26 @@ function AppContent() {
                                     handleViewSnapshot(snapshot);
                                     setShowHistoryModal(true);
                                   }}
-                                  className="text-emerald-600 hover:text-emerald-700 text-xs font-medium flex items-center gap-1"
+                                  className="text-accent hover:text-accent-strong text-xs font-medium flex items-center gap-1"
                                 >
                                   <Eye size={14} />
                                   Ver
                                 </button>
                               </div>
-                              <div className="flex gap-4 mt-2 text-xs">
-                                <span className="text-zinc-600">
-                                  Progresso: <span className="font-bold">{snapshot.progress.toFixed(1)}%</span>
+                              <div className="flex gap-4 mt-2 text-xs text-fg-muted">
+                                <span>
+                                  Progresso: <span className="font-semibold text-fg">{snapshot.progress.toFixed(1)}%</span>
                                 </span>
-                                <span className="text-zinc-600">
-                                  Acuracidade: <span className="font-bold">{snapshot.accuracy.toFixed(1)}%</span>
+                                <span>
+                                  Acuracidade: <span className="font-semibold text-fg">{snapshot.accuracy.toFixed(1)}%</span>
                                 </span>
                               </div>
                             </div>
                           ))}
                         </div>
                       )}
-                    </div>
-                  </div>
+                    </PanelSection>
+                  </Panel>
                 </div>
               </div>
             )}
@@ -1660,55 +1574,60 @@ function AppContent() {
 
         {/* ABA KPIs E INDICADORES */}
         {activeTab === 'kpis' && (
-          <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-            {/* KPI Cards - Dinâmicos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {customKPIs.map((kpi) => (
-                <div key={kpi.id} className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">{kpi.titulo}</h3>
-                    <div className={`p-2 rounded-lg ${getIconColorClass(kpi.cor_icone)}`}>
-                      {kpi.cor_icone === 'blue' && <Zap size={20} />}
-                      {kpi.cor_icone === 'red' && <AlertTriangle size={20} />}
-                      {kpi.cor_icone === 'amber' && <Clock size={20} />}
-                      {kpi.cor_icone === 'emerald' && <Users size={20} />}
-                    </div>
+          <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+            {/* KPI Cards - Dinâmicos, uma única faixa */}
+            {customKPIs.length > 0 && (
+              <Panel>
+                <PanelSection padding="lg">
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 divide-y divide-edge lg:divide-y-0 lg:divide-x">
+                    {customKPIs.map((kpi, i) => (
+                      <div key={kpi.id} className={`px-0 lg:px-6 py-3 lg:py-0 ${i === 0 ? 'lg:pl-0' : ''}`}>
+                        <div className="flex items-center justify-between">
+                          <p className="text-section">{kpi.titulo}</p>
+                          <div className={`p-1.5 rounded-md ${getIconColorClass(kpi.cor_icone)}`}>
+                            {kpi.cor_icone === 'blue' && <Zap size={14} />}
+                            {kpi.cor_icone === 'red' && <AlertTriangle size={14} />}
+                            {kpi.cor_icone === 'amber' && <Clock size={14} />}
+                            {kpi.cor_icone === 'emerald' && <Users size={14} />}
+                          </div>
+                        </div>
+                        <p className="text-display mt-1.5">
+                          {kpi.valor} <span className="text-base font-normal text-fg-muted">{kpi.unidade}</span>
+                        </p>
+                        <div className={`flex items-center gap-1 mt-1 text-xs font-medium ${
+                          kpi.tipo_variacao === 'up' ? 'text-emerald-600 dark:text-emerald-400' :
+                          kpi.tipo_variacao === 'down' ? 'text-red-600 dark:text-red-400' :
+                          'text-fg-subtle'
+                        }`}>
+                          {kpi.tipo_variacao === 'up' && <ArrowUpRight size={13} />}
+                          {kpi.tipo_variacao === 'down' && <ArrowDownRight size={13} />}
+                          {kpi.tipo_variacao === 'neutral' && <Calendar size={13} />}
+                          <span>{kpi.variacao}</span>
+                        </div>
+                      </div>
+                    ))}
                   </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-bold text-zinc-900">{kpi.valor}</span>
-                    <span className="text-zinc-500 ml-1">{kpi.unidade}</span>
-                  </div>
-                  <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${
-                    kpi.tipo_variacao === 'up' ? 'text-emerald-600' :
-                    kpi.tipo_variacao === 'down' ? 'text-emerald-600' :
-                    'text-zinc-500'
-                  }`}>
-                    {kpi.tipo_variacao === 'up' && <ArrowUpRight size={14} />}
-                    {kpi.tipo_variacao === 'down' && <ArrowDownRight size={14} />}
-                    {kpi.tipo_variacao === 'neutral' && <Calendar size={14} />}
-                    <span>{kpi.variacao}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+                </PanelSection>
+              </Panel>
+            )}
 
-            {/* Desempenho por Operador */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <div className="bg-zinc-900 p-4 border-b border-zinc-800">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Users size={18} className="text-zinc-400" />
+            {/* Desempenho por Operador + Indicadores de Processo */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
+              <Panel>
+                <PanelSection padding="sm">
+                  <h3 className="text-title flex items-center gap-2">
+                    <Users size={16} className="text-fg-subtle" />
                     Desempenho por Operador
                   </h3>
-                </div>
+                </PanelSection>
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-zinc-50 text-xs text-zinc-500 uppercase font-bold border-b border-zinc-200">
-                      <tr>
-                        <th className="p-3 text-left">Operador</th>
-                        <th className="p-3 text-center">SKUs Dia</th>
-                        <th className="p-3 text-center">Acuracidade</th>
-                        <th className="p-3 text-center">Tendência</th>
+                    <thead>
+                      <tr className="border-b border-edge">
+                        <th className="p-3 text-left font-medium text-fg-subtle text-xs uppercase tracking-wide">Operador</th>
+                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">SKUs Dia</th>
+                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">Acuracidade</th>
+                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">Tendência</th>
                       </tr>
                     </thead>
                     <tbody>
@@ -1720,19 +1639,19 @@ function AppContent() {
                         { nome: 'Leo', skus: 42, acuracidade: 29.2, tendencia: 'down' },
                         { nome: 'Giovani', skus: 38, acuracidade: null, tendencia: 'up' },
                       ].map((op, idx) => (
-                        <tr key={idx} className="border-b border-zinc-100 hover:bg-zinc-50">
-                          <td className="p-3 font-medium text-zinc-800">{op.nome}</td>
-                          <td className="p-3 text-center font-semibold">{op.skus}</td>
+                        <tr key={idx} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                          <td className="p-3 font-medium text-fg">{op.nome}</td>
+                          <td className="p-3 text-center font-semibold text-fg">{op.skus}</td>
                           <td className="p-3 text-center">
-                            <span className={`font-bold ${op.acuracidade !== null ? (op.acuracidade >= 80 ? 'text-emerald-600' : op.acuracidade >= 50 ? 'text-amber-600' : 'text-red-600') : 'text-zinc-400'}`}>
+                            <span className={`font-semibold ${op.acuracidade !== null ? (op.acuracidade >= 80 ? 'text-emerald-600 dark:text-emerald-400' : op.acuracidade >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') : 'text-fg-subtle'}`}>
                               {op.acuracidade !== null ? `${op.acuracidade.toFixed(1)}%` : 'Em andamento'}
                             </span>
                           </td>
                           <td className="p-3 text-center">
                             {op.tendencia === 'up' ? (
-                              <ArrowUpRight size={18} className="mx-auto text-emerald-600" />
+                              <ArrowUpRight size={16} className="mx-auto text-emerald-600 dark:text-emerald-400" />
                             ) : (
-                              <ArrowDownRight size={18} className="mx-auto text-red-600" />
+                              <ArrowDownRight size={16} className="mx-auto text-red-600 dark:text-red-400" />
                             )}
                           </td>
                         </tr>
@@ -1740,191 +1659,143 @@ function AppContent() {
                     </tbody>
                   </table>
                 </div>
-              </div>
+              </Panel>
 
               {/* Indicadores de Processo */}
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <div className="bg-zinc-900 p-4 border-b border-zinc-800">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <BarChart2 size={18} className="text-zinc-400" />
+              <Panel>
+                <PanelSection padding="sm">
+                  <h3 className="text-title flex items-center gap-2">
+                    <BarChart2 size={16} className="text-fg-subtle" />
                     Indicadores de Processo
                   </h3>
-                </div>
-                <div className="p-6 space-y-5">
+                </PanelSection>
+                <PanelSection className="space-y-5">
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Taxa de Conclusão Diária</span>
-                      <span className="text-sm font-bold text-zinc-900">85.4%</span>
+                      <span className="text-sm text-fg-muted">Taxa de Conclusão Diária</span>
+                      <span className="text-sm font-semibold text-fg">85.4%</span>
                     </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-600 rounded-full" style={{ width: '85.4%' }}></div>
+                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
+                      <div className="h-full bg-accent rounded-full" style={{ width: '85.4%' }}></div>
                     </div>
                   </div>
 
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Meta de Acuracidade</span>
-                      <span className="text-sm font-bold text-zinc-900">{globais.acuracidade.toFixed(1)}% / 95%</span>
+                      <span className="text-sm text-fg-muted">Meta de Acuracidade</span>
+                      <span className="text-sm font-semibold text-fg">{globais.acuracidade.toFixed(1)}% / 95%</span>
                     </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${globais.acuracidade >= 95 ? 'bg-emerald-600' : globais.acuracidade >= 80 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, (globais.acuracidade / 95) * 100)}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Cobertura de Estoque</span>
-                      <span className="text-sm font-bold text-zinc-900">{globais.progresso.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${globais.progresso}%` }}></div>
+                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
+                      <div className={`h-full rounded-full ${globais.acuracidade >= 95 ? 'bg-emerald-500' : globais.acuracidade >= 80 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, (globais.acuracidade / 95) * 100)}%` }}></div>
                     </div>
                   </div>
 
                   <div>
                     <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Divergências Recontadas</span>
-                      <span className="text-sm font-bold text-zinc-900">72.3%</span>
+                      <span className="text-sm text-fg-muted">Cobertura de Estoque</span>
+                      <span className="text-sm font-semibold text-fg">{globais.progresso.toFixed(1)}%</span>
                     </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: '72.3%' }}></div>
+                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
+                      <div className="h-full bg-accent rounded-full" style={{ width: `${globais.progresso}%` }}></div>
                     </div>
                   </div>
-                </div>
-              </div>
+
+                  <div>
+                    <div className="flex justify-between items-center mb-2">
+                      <span className="text-sm text-fg-muted">Divergências Recontadas</span>
+                      <span className="text-sm font-semibold text-fg">72.3%</span>
+                    </div>
+                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
+                      <div className="h-full bg-accent rounded-full" style={{ width: '72.3%' }}></div>
+                    </div>
+                  </div>
+                </PanelSection>
+              </Panel>
             </div>
 
             {/* Resumo Executivo */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-zinc-200 p-6">
-                <h3 className="text-sm font-bold text-zinc-800 mb-4 flex items-center gap-2">
-                  <Target size={18} className="text-blue-600" />
-                  Resumo Executivo
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-zinc-50 rounded-lg">
-                    <p className="text-2xl font-bold text-zinc-900">{globais.totalSku.toLocaleString('pt-BR')}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Total SKUs</p>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
+              <Panel className="lg:col-span-2">
+                <PanelSection padding="sm">
+                  <h3 className="text-title flex items-center gap-2">
+                    <Target size={16} className="text-fg-subtle" />
+                    Resumo Executivo
+                  </h3>
+                </PanelSection>
+                <PanelSection>
+                  <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-edge">
+                    <div className="text-center px-2">
+                      <p className="text-display">{globais.totalSku.toLocaleString('pt-BR')}</p>
+                      <p className="text-caption mt-1">Total SKUs</p>
+                    </div>
+                    <div className="text-center px-2">
+                      <p className="text-display text-emerald-600 dark:text-emerald-400">{globais.totalDone.toLocaleString('pt-BR')}</p>
+                      <p className="text-caption mt-1">Contabilizados</p>
+                    </div>
+                    <div className="text-center px-2">
+                      <p className="text-display text-fg">{(globais.totalSku - globais.totalDone).toLocaleString('pt-BR')}</p>
+                      <p className="text-caption mt-1">Pendentes</p>
+                    </div>
+                    <div className="text-center px-2">
+                      <p className="text-display text-red-600 dark:text-red-400">{globais.totalDiv}</p>
+                      <p className="text-caption mt-1">Divergências</p>
+                    </div>
                   </div>
-                  <div className="text-center p-4 bg-emerald-50 rounded-lg">
-                    <p className="text-2xl font-bold text-emerald-700">{globais.totalDone.toLocaleString('pt-BR')}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Contabilizados</p>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <p className="text-2xl font-bold text-amber-700">{(globais.totalSku - globais.totalDone).toLocaleString('pt-BR')}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Pendentes</p>
-                  </div>
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <p className="text-2xl font-bold text-red-700">{globais.totalDiv}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Divergências</p>
-                  </div>
-                </div>
 
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-bold text-blue-900 text-sm mb-2">Projeção de Conclusão</h4>
-                  <p className="text-sm text-blue-800">
-                    Com base na produtividade média de <strong>48 SKUs/dia</strong>, o inventário será concluído em aproximadamente <strong>{Math.ceil((globais.totalSku - globais.totalDone) / 48)} dias úteis</strong>.
-                  </p>
-                </div>
-              </div>
+                  <div className="mt-6 p-4 bg-accent/10 rounded-lg">
+                    <h4 className="font-semibold text-accent text-sm mb-1.5">Projeção de Conclusão</h4>
+                    <p className="text-sm text-fg-muted">
+                      Com base na produtividade média de <strong className="text-fg">48 SKUs/dia</strong>, o inventário será concluído em aproximadamente <strong className="text-fg">{Math.ceil((globais.totalSku - globais.totalDone) / 48)} dias úteis</strong>.
+                    </p>
+                  </div>
+                </PanelSection>
+              </Panel>
 
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-6">
-                <h3 className="text-sm font-bold text-zinc-800 mb-4 flex items-center gap-2">
-                  <Activity size={18} className="text-emerald-600" />
-                  Status Atual
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <span className="text-sm font-medium text-emerald-800">Linhas Concluídas</span>
-                    <span className="text-lg font-bold text-emerald-700">{globais.tabela.filter(b => b.status === 'CONCLUÍDO').length}</span>
+              <Panel>
+                <PanelSection padding="sm">
+                  <h3 className="text-title flex items-center gap-2">
+                    <Activity size={16} className="text-fg-subtle" />
+                    Status Atual
+                  </h3>
+                </PanelSection>
+                <PanelSection className="space-y-1">
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-sm text-fg-muted">Linhas Concluídas</span>
+                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{globais.tabela.filter(b => b.status === 'CONCLUÍDO').length}</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
-                    <span className="text-sm font-medium text-amber-800">Em Andamento</span>
-                    <span className="text-lg font-bold text-amber-700">{globais.tabela.filter(b => b.status === 'ANDAMENTO').length}</span>
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-sm text-fg-muted">Em Andamento</span>
+                    <span className="text-sm font-semibold text-fg-subtle">{globais.tabela.filter(b => b.status === 'ANDAMENTO').length}</span>
                   </div>
-                  <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg border border-zinc-200">
-                    <span className="text-sm font-medium text-zinc-600">Próx. Meta</span>
-                    <span className="text-sm font-bold text-zinc-800">95% Acuracidade</span>
+                  <div className="flex items-center justify-between py-1.5">
+                    <span className="text-sm text-fg-muted">Próx. Meta</span>
+                    <span className="text-sm font-semibold text-fg">95% Acuracidade</span>
                   </div>
-                </div>
-              </div>
+                </PanelSection>
+              </Panel>
             </div>
           </div>
         )}
 
         {/* ABA NOVA CONTAGEM */}
         {activeTab === 'input' && (
-          <div className="max-w-xl mx-auto bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden mt-6">
-            <div className="bg-zinc-950 p-6 text-center text-white border-b-4 border-zinc-700">
-              <Package size={48} className="mx-auto text-zinc-400 mb-2" />
-              <h2 className="text-2xl font-bold tracking-wide">Contagem de SKUs</h2>
-              <p className="text-zinc-400 text-sm mt-1 font-medium">
-                Insira a quantidade de SKUs contabilizados e as divergências encontradas.
-              </p>
-            </div>
+          <CountManagementCenter
+            brandsData={brandsData}
+            companyId={companyId}
+            onBrandsUpdated={setBrandsData}
+          />
+        )}
 
-            <div className="p-6">
-              {countSuccess && (
-                <div className="mb-6 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg flex items-center gap-2 text-sm font-bold">
-                  <CheckCircle2 size={18} />
-                  Contagem e Divergências registradas com sucesso!
-                </div>
-              )}
-
-              <form onSubmit={handleSaveCount} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Linha / Marca</label>
-                  <select
-                    required
-                    value={countBrand}
-                    onChange={(e) => setCountBrand(e.target.value)}
-                    className="w-full p-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 focus:border-zinc-800 outline-none transition-all font-medium text-zinc-700 bg-zinc-50"
-                  >
-                    <option value="">Selecione a linha ou marca...</option>
-                    {brandsData.map((b) => (
-                      <option key={b.id} value={b.brand}>{b.brand} (Pendentes: {b.total_sku - b.done_sku})</option>
-                    ))}
-                  </select>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-800 mb-1">Qtd. SKUs Contabilizados</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      placeholder="Ex: 50"
-                      value={countSkusContabilizados}
-                      onChange={(e) => setCountSkusContabilizados(e.target.value)}
-                      className="w-full p-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 focus:border-zinc-800 outline-none transition-all font-mono bg-zinc-50"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-bold text-red-600 mb-1">Qtd. Divergências</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      placeholder="Ex: 5"
-                      value={countDivergences}
-                      onChange={(e) => setCountDivergences(e.target.value)}
-                      className="w-full p-3 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all font-mono bg-red-50"
-                    />
-                  </div>
-                </div>
-
-                <button
-                  type="submit"
-                  className="w-full bg-zinc-900 hover:bg-black text-white font-bold py-4 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 mt-4 shadow-md"
-                >
-                  <Save size={20} />
-                  Salvar e Processar
-                </button>
-              </form>
-            </div>
-          </div>
+        {/* ABA PRODUTIVIDADE */}
+        {activeTab === 'conta' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ProductivityTab
+              userId={profile.id}
+              userEmail={profile.email ?? ''}
+              companyId={companyId}
+              role={profile.role}
+            />
+          </React.Suspense>
         )}
 
           </> /* end activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' */
@@ -1934,7 +1805,7 @@ function AppContent() {
 
       {/* ABA RANKINGS COMPLETOS - rendered as full page, outside overflow container */}
       {activeTab === 'rankings' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <RankingsPage
             onBack={() => setActiveTab('dashboard')}
@@ -1951,7 +1822,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: GERADOR DE ETIQUETAS */}
       {activeTab === 'label-generator' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <LabelGeneratorPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1960,7 +1831,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: FULL MANAGER */}
       {activeTab === 'full-manager' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <FullManagerPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1969,7 +1840,7 @@ function AppContent() {
 
       {/* CONFERÊNCIA CEGA POR NF-E */}
       {activeTab === 'nfe-conference' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <NFeConferencePage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1978,7 +1849,7 @@ function AppContent() {
 
       {/* GERENCIAMENTO DE USUÁRIOS */}
       {activeTab === 'users' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <UserManagementPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1987,7 +1858,7 @@ function AppContent() {
 
       {/* CENTRAL DE SEGURANÇA */}
       {activeTab === 'security' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-950 overflow-y-auto">
+        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <SecurityPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1995,349 +1866,310 @@ function AppContent() {
       )}
 
       {/* MODAL ADICIONAR MARCA/LINHA */}
-      {showAddBrandModal && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-zinc-50">
-              <h3 className="font-bold text-zinc-900">Nova Linha/Marca</h3>
-              <button onClick={() => setShowAddBrandModal(false)} className="text-zinc-500 hover:text-zinc-800">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleAddBrand} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Nome da Linha / Marca</label>
-                <input
-                  type="text" required value={newBrandName} onChange={e => setNewBrandName(e.target.value)}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 outline-none bg-zinc-50"
-                  placeholder="Ex: Linha Premium AZ"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Total de SKUs Esperados</label>
-                <input
-                  type="number" required min="1" value={newBrandTotalSku} onChange={e => setNewBrandTotalSku(e.target.value)}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 outline-none bg-zinc-50"
-                  placeholder="Ex: 150"
-                />
-              </div>
-              <button type="submit" className="w-full bg-zinc-900 text-white font-bold py-3 rounded-lg hover:bg-black transition mt-2">
-                Cadastrar Linha
-              </button>
-            </form>
+      <Modal open={showAddBrandModal} onClose={() => setShowAddBrandModal(false)} title="Nova Linha/Marca" maxWidth="max-w-md">
+        <form onSubmit={handleAddBrand} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Nome da Linha / Marca</label>
+            <input
+              type="text" required value={newBrandName} onChange={e => setNewBrandName(e.target.value)}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              placeholder="Ex: Linha Premium AZ"
+            />
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Total de SKUs Esperados</label>
+            <input
+              type="number" required min="1" value={newBrandTotalSku} onChange={e => setNewBrandTotalSku(e.target.value)}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              placeholder="Ex: 150"
+            />
+          </div>
+          <button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent-strong transition mt-2">
+            Cadastrar Linha
+          </button>
+        </form>
+      </Modal>
 
       {/* MODAL ADICIONAR KPI */}
-      {showAddKPIModal && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-blue-50">
-              <h3 className="font-bold text-zinc-900 flex items-center gap-2">
-                <Target size={18} className="text-blue-600" />
-                Novo KPI / Indicador
-              </h3>
-              <button onClick={() => setShowAddKPIModal(false)} className="text-zinc-500 hover:text-zinc-800">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleAddKPI} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Título do KPI</label>
-                <input
-                  type="text" required value={newKPI.titulo} onChange={e => setNewKPI({...newKPI, titulo: e.target.value})}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  placeholder="Ex: Taxa de Aprovação"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Valor</label>
-                  <input
-                    type="text" required value={newKPI.valor} onChange={e => setNewKPI({...newKPI, valor: e.target.value})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                    placeholder="Ex: 95.5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Unidade</label>
-                  <input
-                    type="text" value={newKPI.unidade} onChange={e => setNewKPI({...newKPI, unidade: e.target.value})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                    placeholder="Ex: %"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Variação / Descrição</label>
-                <input
-                  type="text" value={newKPI.variacao} onChange={e => setNewKPI({...newKPI, variacao: e.target.value})}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  placeholder="Ex: +5% vs mês anterior"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Tipo de Variação</label>
-                  <select
-                    value={newKPI.tipo_variacao}
-                    onChange={e => setNewKPI({...newKPI, tipo_variacao: e.target.value as 'up' | 'down' | 'neutral'})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  >
-                    <option value="up">Subiu (↑)</option>
-                    <option value="down">Caiu (↓)</option>
-                    <option value="neutral">Neutro</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Cor do Ícone</label>
-                  <select
-                    value={newKPI.cor_icone}
-                    onChange={e => setNewKPI({...newKPI, cor_icone: e.target.value as 'blue' | 'red' | 'amber' | 'emerald'})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  >
-                    <option value="blue">Azul</option>
-                    <option value="red">Vermelho</option>
-                    <option value="amber">Âmbar</option>
-                    <option value="emerald">Verde</option>
-                  </select>
-                </div>
-              </div>
-              <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition mt-2 flex items-center justify-center gap-2">
-                <Plus size={18} />
-                Cadastrar KPI
-              </button>
-            </form>
+      <Modal open={showAddKPIModal} onClose={() => setShowAddKPIModal(false)} title="Novo KPI / Indicador" maxWidth="max-w-md">
+        <form onSubmit={handleAddKPI} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Título do KPI</label>
+            <input
+              type="text" required value={newKPI.titulo} onChange={e => setNewKPI({...newKPI, titulo: e.target.value})}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              placeholder="Ex: Taxa de Aprovação"
+            />
           </div>
-        </div>
-      )}
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">Valor</label>
+              <input
+                type="text" required value={newKPI.valor} onChange={e => setNewKPI({...newKPI, valor: e.target.value})}
+                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+                placeholder="Ex: 95.5"
+              />
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">Unidade</label>
+              <input
+                type="text" value={newKPI.unidade} onChange={e => setNewKPI({...newKPI, unidade: e.target.value})}
+                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+                placeholder="Ex: %"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Variação / Descrição</label>
+            <input
+              type="text" value={newKPI.variacao} onChange={e => setNewKPI({...newKPI, variacao: e.target.value})}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              placeholder="Ex: +5% vs mês anterior"
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">Tipo de Variação</label>
+              <select
+                value={newKPI.tipo_variacao}
+                onChange={e => setNewKPI({...newKPI, tipo_variacao: e.target.value as 'up' | 'down' | 'neutral'})}
+                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              >
+                <option value="up">Subiu (↑)</option>
+                <option value="down">Caiu (↓)</option>
+                <option value="neutral">Neutro</option>
+              </select>
+            </div>
+            <div>
+              <label className="block text-sm font-medium text-fg mb-1">Cor do Ícone</label>
+              <select
+                value={newKPI.cor_icone}
+                onChange={e => setNewKPI({...newKPI, cor_icone: e.target.value as 'blue' | 'red' | 'amber' | 'emerald'})}
+                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              >
+                <option value="blue">Azul</option>
+                <option value="red">Vermelho</option>
+                <option value="amber">Âmbar</option>
+                <option value="emerald">Verde</option>
+              </select>
+            </div>
+          </div>
+          <button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent-strong transition mt-2 flex items-center justify-center gap-2">
+            <Plus size={18} />
+            Cadastrar KPI
+          </button>
+        </form>
+      </Modal>
 
       {/* MODAL RESET DE INVENTÁRIO */}
-      {showResetModal && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-red-50">
-              <h3 className="font-bold text-zinc-900 flex items-center gap-2">
-                <Archive size={18} className="text-red-600" />
-                Arquivar e Resetar Inventário
-              </h3>
-              <button onClick={() => setShowResetModal(false)} className="text-zinc-500 hover:text-zinc-800">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const form = e.target as HTMLFormElement;
-              const formData = new FormData(form);
-              handleResetInventory(
-                formData.get('name') as string,
-                formData.get('notes') as string
-              );
-            }} className="p-5 space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-sm text-red-800">
-                  Esta ação irá arquivar o inventário atual com todos os dados e iniciar um novo ciclo.
-                  <strong> Os dados das marcas serão mantidos, mas as contagens serão zeradas.</strong>
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Nome do Inventário Arquivado</label>
-                <input
-                  type="text"
-                  name="name"
-                  required
-                  defaultValue={`Inventário ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-zinc-50"
-                  placeholder="Ex: Inventário Junho 2026"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Observações (opcional)</label>
-                <textarea
-                  name="notes"
-                  rows={3}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-zinc-50 resize-none"
-                  placeholder="Ex: Inventário finalizado com sucesso..."
-                />
-              </div>
-              <div className="bg-zinc-50 rounded-lg p-3 border border-zinc-200">
-                <p className="text-xs text-zinc-600 mb-2 font-semibold">Resumo do Inventário Atual:</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span>Total SKUs: <strong>{globais.totalSku}</strong></span>
-                  <span>Contabilizados: <strong>{globais.totalDone}</strong></span>
-                  <span>Divergências: <strong>{globais.totalDiv}</strong></span>
-                  <span>Acuracidade: <strong>{globais.acuracidade.toFixed(1)}%</strong></span>
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={resetProgress}
-                className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {resetProgress ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <Archive size={18} />
-                    Confirmar Arquivamento e Reset
-                  </>
-                )}
-              </button>
-            </form>
+      <Modal open={showResetModal} onClose={() => setShowResetModal(false)} title="Arquivar e Resetar Inventário" maxWidth="max-w-md">
+        <form onSubmit={(e) => {
+          e.preventDefault();
+          const form = e.target as HTMLFormElement;
+          const formData = new FormData(form);
+          handleResetInventory(
+            formData.get('name') as string,
+            formData.get('notes') as string
+          );
+        }} className="space-y-4">
+          <div className="bg-red-500/10 rounded-lg p-3">
+            <p className="text-sm text-red-700 dark:text-red-400">
+              Esta ação irá arquivar o inventário atual com todos os dados e iniciar um novo ciclo.
+              <strong> Os dados das marcas serão mantidos, mas as contagens serão zeradas.</strong>
+            </p>
           </div>
-        </div>
-      )}
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Nome do Inventário Arquivado</label>
+            <input
+              type="text"
+              name="name"
+              required
+              defaultValue={`Inventário ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 bg-surface text-fg"
+              placeholder="Ex: Inventário Junho 2026"
+            />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Observações (opcional)</label>
+            <textarea
+              name="notes"
+              rows={3}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 bg-surface text-fg resize-none"
+              placeholder="Ex: Inventário finalizado com sucesso..."
+            />
+          </div>
+          <div className="bg-surface-3 rounded-lg p-3">
+            <p className="text-xs text-fg-muted mb-2 font-medium">Resumo do Inventário Atual:</p>
+            <div className="grid grid-cols-2 gap-2 text-xs text-fg-muted">
+              <span>Total SKUs: <strong className="text-fg">{globais.totalSku}</strong></span>
+              <span>Contabilizados: <strong className="text-fg">{globais.totalDone}</strong></span>
+              <span>Divergências: <strong className="text-fg">{globais.totalDiv}</strong></span>
+              <span>Acuracidade: <strong className="text-fg">{globais.acuracidade.toFixed(1)}%</strong></span>
+            </div>
+          </div>
+          <button
+            type="submit"
+            disabled={resetProgress}
+            className="w-full bg-red-600 text-white font-semibold py-3 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
+          >
+            {resetProgress ? (
+              <>
+                <Loader2 size={18} className="animate-spin" />
+                Processando...
+              </>
+            ) : (
+              <>
+                <Archive size={18} />
+                Confirmar Arquivamento e Reset
+              </>
+            )}
+          </button>
+        </form>
+      </Modal>
 
       {/* MODAL HISTÓRICO DE INVENTÁRIO */}
-      {showHistoryModal && selectedSnapshot && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-zinc-950 text-white">
-              <h3 className="font-bold text-lg flex items-center gap-2 tracking-wide">
-                <History className="text-emerald-400" /> {selectedSnapshot.name}
-              </h3>
-              <button onClick={() => {
-                setShowHistoryModal(false);
-                setSelectedSnapshot(null);
-                setSnapshotBrands([]);
-              }} className="text-zinc-400 hover:text-white p-1 rounded-md transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-6 overflow-y-auto bg-zinc-100">
-              {/* Resumo do Inventório Arquivado */}
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 mb-6">
-                <h4 className="font-bold text-zinc-800 mb-4 flex items-center gap-2">
-                  <Calendar size={18} className="text-zinc-600" />
+      <Modal
+        open={showHistoryModal && !!selectedSnapshot}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setSelectedSnapshot(null);
+          setSnapshotBrands([]);
+        }}
+        title={selectedSnapshot?.name}
+        maxWidth="max-w-5xl"
+      >
+        {selectedSnapshot && (
+          <div className="space-y-6">
+            {/* Resumo do Inventório Arquivado */}
+            <Panel>
+              <PanelSection padding="sm">
+                <h4 className="text-title flex items-center gap-2">
+                  <Calendar size={16} className="text-fg-subtle" />
                   Informações do Inventário
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-zinc-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-zinc-500 uppercase font-semibold">Início</p>
-                    <p className="text-sm font-bold text-zinc-800 mt-1">
+              </PanelSection>
+              <PanelSection>
+                <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-edge">
+                  <div className="text-center px-2">
+                    <p className="text-caption">Início</p>
+                    <p className="text-sm font-semibold text-fg mt-1">
                       {new Date(selectedSnapshot.start_date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <div className="bg-zinc-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-zinc-500 uppercase font-semibold">Término</p>
-                    <p className="text-sm font-bold text-zinc-800 mt-1">
+                  <div className="text-center px-2">
+                    <p className="text-caption">Término</p>
+                    <p className="text-sm font-semibold text-fg mt-1">
                       {new Date(selectedSnapshot.end_date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-emerald-600 uppercase font-semibold">Progresso</p>
-                    <p className="text-xl font-bold text-emerald-700 mt-1">{selectedSnapshot.progress.toFixed(1)}%</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Progresso</p>
+                    <p className="text-title text-emerald-600 dark:text-emerald-400 mt-1">{selectedSnapshot.progress.toFixed(1)}%</p>
                   </div>
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-blue-600 uppercase font-semibold">Acuracidade</p>
-                    <p className="text-xl font-bold text-blue-700 mt-1">{selectedSnapshot.accuracy.toFixed(1)}%</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Acuracidade</p>
+                    <p className="text-title text-accent mt-1">{selectedSnapshot.accuracy.toFixed(1)}%</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div className="bg-zinc-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-zinc-500 uppercase font-semibold">Total SKUs</p>
-                    <p className="text-lg font-bold text-zinc-800 mt-1">{selectedSnapshot.total_sku}</p>
+                <div className="grid grid-cols-3 divide-x divide-edge mt-4 pt-4 border-t border-edge">
+                  <div className="text-center px-2">
+                    <p className="text-caption">Total SKUs</p>
+                    <p className="text-sm font-semibold text-fg mt-1">{selectedSnapshot.total_sku}</p>
                   </div>
-                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-emerald-600 uppercase font-semibold">Contabilizados</p>
-                    <p className="text-lg font-bold text-emerald-700 mt-1">{selectedSnapshot.total_done}</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Contabilizados</p>
+                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1">{selectedSnapshot.total_done}</p>
                   </div>
-                  <div className="bg-red-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-red-600 uppercase font-semibold">Divergências</p>
-                    <p className="text-lg font-bold text-red-700 mt-1">{selectedSnapshot.total_divergences}</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Divergências</p>
+                    <p className="text-sm font-semibold text-red-600 dark:text-red-400 mt-1">{selectedSnapshot.total_divergences}</p>
                   </div>
                 </div>
                 {selectedSnapshot.notes && (
-                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="text-xs text-amber-800 font-semibold">Observações:</p>
-                    <p className="text-sm text-amber-700 mt-1">{selectedSnapshot.notes}</p>
+                  <div className="mt-4 bg-amber-500/10 rounded-lg p-3">
+                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Observações:</p>
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">{selectedSnapshot.notes}</p>
                   </div>
                 )}
-              </div>
+              </PanelSection>
+            </Panel>
 
-              {/* Tabela de Marcas do Histórico */}
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <div className="bg-zinc-900 p-4 border-b border-zinc-800 text-white font-bold text-sm">
-                  Desempenho por Linha/Marca
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead className="text-[10px] text-zinc-500 uppercase bg-zinc-50 border-b border-zinc-200 sticky top-0">
-                      <tr>
-                        <th className="px-3 py-3 font-semibold">Linha / Marca</th>
-                        <th className="px-3 py-3 font-semibold text-center">Total SKU</th>
-                        <th className="px-3 py-3 font-semibold text-center">Concluídos</th>
-                        <th className="px-3 py-3 font-semibold text-center">Divergências</th>
-                        <th className="px-3 py-3 font-semibold text-center">Progresso</th>
-                        <th className="px-3 py-3 font-semibold text-center">Acuracidade</th>
-                        <th className="px-3 py-3 font-semibold text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {snapshotBrands.map((brand, idx) => (
-                        <tr key={idx} className="border-b border-zinc-100 hover:bg-zinc-50">
-                          <td className="px-3 py-2 font-medium text-zinc-800">{brand.brand}</td>
-                          <td className="px-3 py-2 text-center text-zinc-600">{brand.total_sku}</td>
-                          <td className="px-3 py-2 text-center font-semibold">{brand.done_sku}</td>
-                          <td className="px-3 py-2 text-center text-red-600 font-semibold">{brand.divergences}</td>
-                          <td className="px-3 py-2 text-center">
-                            <span className="text-xs font-mono">{brand.progress.toFixed(1)}%</span>
-                          </td>
-                          <td className="px-3 py-2 text-center font-bold">
-                            {brand.accuracy !== null ? (
-                              <span className={brand.accuracy >= 80 ? 'text-emerald-600' : brand.accuracy >= 50 ? 'text-amber-600' : 'text-red-600'}>
-                                {brand.accuracy.toFixed(1)}%
-                              </span>
-                            ) : '-'}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-md ${
-                              brand.status === 'CONCLUÍDO'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {brand.status}
+            {/* Tabela de Marcas do Histórico */}
+            <Panel>
+              <PanelSection padding="sm">
+                <h4 className="text-title">Desempenho por Linha/Marca</h4>
+              </PanelSection>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b border-edge">
+                      <th className="px-4 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide">Linha / Marca</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Total SKU</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Concluídos</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Divergências</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Progresso</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Acuracidade</th>
+                      <th className="px-4 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {snapshotBrands.map((brand, idx) => (
+                      <tr key={idx} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                        <td className="px-4 py-2.5 font-medium text-fg">{brand.brand}</td>
+                        <td className="px-3 py-2.5 text-center text-fg-muted">{brand.total_sku}</td>
+                        <td className="px-3 py-2.5 text-center font-semibold text-fg">{brand.done_sku}</td>
+                        <td className="px-3 py-2.5 text-center text-red-600 dark:text-red-400 font-semibold">{brand.divergences}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className="text-xs text-fg-muted font-mono">{brand.progress.toFixed(1)}%</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-semibold">
+                          {brand.accuracy !== null ? (
+                            <span className={brand.accuracy >= 80 ? 'text-emerald-600 dark:text-emerald-400' : brand.accuracy >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}>
+                              {brand.accuracy.toFixed(1)}%
                             </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          ) : '-'}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`text-xs font-medium ${
+                            brand.status === 'CONCLUÍDO' ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'
+                          }`}>
+                            {brand.status === 'CONCLUÍDO' ? 'Concluído' : 'Em andamento'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            </Panel>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* PWA Install Instructions Modal (iOS) */}
       {showInstallModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowInstallModal(false)}>
-          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface-2 border border-edge rounded-2xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-                <Smartphone size={20} className="text-emerald-400" />
+              <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
+                <Smartphone size={20} className="text-accent" />
               </div>
-              <h3 className="text-lg font-bold text-white">Instalar InventoryBlind</h3>
+              <h3 className="text-lg font-bold text-fg">Instalar InventoryBlind</h3>
             </div>
-            <p className="text-zinc-400 text-sm mb-4">Para instalar no iPhone ou iPad:</p>
-            <ol className="space-y-3 text-sm text-zinc-300">
-              <li className="flex gap-2"><span className="font-bold text-emerald-400">1.</span> Abra esta página no Safari</li>
-              <li className="flex gap-2"><span className="font-bold text-emerald-400">2.</span> Toque no botão <strong>Compartilhar</strong></li>
-              <li className="flex gap-2"><span className="font-bold text-emerald-400">3.</span> Selecione <strong>"Adicionar à Tela de Início"</strong></li>
+            <p className="text-fg-muted text-sm mb-4">Para instalar no iPhone ou iPad:</p>
+            <ol className="space-y-3 text-sm text-fg-muted">
+              <li className="flex gap-2"><span className="font-bold text-accent">1.</span> Abra esta página no Safari</li>
+              <li className="flex gap-2"><span className="font-bold text-accent">2.</span> Toque no botão <strong>Compartilhar</strong></li>
+              <li className="flex gap-2"><span className="font-bold text-accent">3.</span> Selecione <strong>"Adicionar à Tela de Início"</strong></li>
             </ol>
-            <button onClick={() => setShowInstallModal(false)} className="w-full mt-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-semibold text-sm transition">
+            <button onClick={() => setShowInstallModal(false)} className="w-full mt-5 py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-semibold text-sm transition">
               Entendi
             </button>
           </div>
         </div>
       )}
 
+      </div>
     </div>
   );
 }
@@ -2363,15 +2195,15 @@ function LinkCompanyScreen() {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center shadow-2xl">
-        <div className="w-14 h-14 bg-emerald-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
-          <BarChart3 size={28} className="text-emerald-400" />
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-surface-2 border border-edge rounded-2xl p-8 text-center shadow-2xl">
+        <div className="w-14 h-14 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
+          <LogoMark size={28} className="text-accent" />
         </div>
-        <h2 className="text-xl font-black text-white mb-2">Vincular Empresa</h2>
-        <p className="text-zinc-500 text-sm mb-1">Logado como</p>
-        <p className="text-white text-sm font-semibold mb-6">{user?.email}</p>
-        <p className="text-zinc-400 text-sm mb-6">
+        <h2 className="text-xl font-bold text-fg mb-2">Vincular Empresa</h2>
+        <p className="text-fg-subtle text-sm mb-1">Logado como</p>
+        <p className="text-fg text-sm font-semibold mb-6">{user?.email}</p>
+        <p className="text-fg-muted text-sm mb-6">
           Sua conta está ativa mas ainda não está vinculada a uma empresa.
         </p>
         {error && (
@@ -2382,11 +2214,11 @@ function LinkCompanyScreen() {
         <button
           onClick={handleLink}
           disabled={linking}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition mb-3"
+          className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-xl font-bold text-sm transition mb-3"
         >
           {linking ? <Loader2 size={16} className="animate-spin" /> : 'Vincular à empresa AZ'}
         </button>
-        <button onClick={signOut} className="text-xs text-zinc-500 hover:text-zinc-300 transition">
+        <button onClick={signOut} className="text-xs text-fg-subtle hover:text-fg-muted transition">
           Sair
         </button>
       </div>
@@ -2400,28 +2232,28 @@ function AuthErrorScreen() {
   const { authError, retryAuth, signOut } = useAuth();
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-red-500/20 rounded-2xl p-8 text-center shadow-2xl">
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-surface-2 border border-red-500/20 rounded-2xl p-8 text-center shadow-2xl">
         <div className="w-14 h-14 bg-red-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
           <AlertTriangle size={28} className="text-red-400" />
         </div>
-        <h2 className="text-xl font-black text-white mb-2">Erro ao carregar</h2>
-        <p className="text-zinc-400 text-sm mb-6">{authError ?? 'Ocorreu um erro inesperado.'}</p>
+        <h2 className="text-xl font-bold text-fg mb-2">Erro ao carregar</h2>
+        <p className="text-fg-muted text-sm mb-6">{authError ?? 'Ocorreu um erro inesperado.'}</p>
         <button
           onClick={retryAuth}
-          className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold text-sm transition mb-3"
+          className="w-full py-3 bg-accent hover:bg-accent-strong text-white rounded-xl font-bold text-sm transition mb-3"
         >
           Tentar novamente
         </button>
         <button
           onClick={signOut}
-          className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-bold text-sm transition mb-3"
+          className="w-full py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-bold text-sm transition mb-3"
         >
           Sair da conta
         </button>
         <button
           onClick={() => window.location.href = '/'}
-          className="text-xs text-zinc-500 hover:text-zinc-300 transition"
+          className="text-xs text-fg-subtle hover:text-fg-muted transition"
         >
           Voltar para homepage
         </button>
@@ -2434,18 +2266,18 @@ function AuthErrorScreen() {
 
 function ProfileLoadingOverlay() {
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+    <div className="min-h-screen bg-surface flex items-center justify-center">
       <div className="text-center">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center">
-            <BarChart3 size={20} className="text-white" />
+          <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center">
+            <LogoMark size={20} className="text-white" />
           </div>
-          <span className="text-xl font-bold text-white tracking-wide">
-            Inventory<span className="text-emerald-400 font-light">Blind</span>
+          <span className="text-xl font-bold text-fg tracking-wide">
+            Inventory<span className="text-accent font-light">Blind</span>
           </span>
         </div>
-        <Loader2 className="mx-auto animate-spin text-emerald-500" size={32} />
-        <p className="text-zinc-500 text-sm mt-3">Carregando seu perfil...</p>
+        <Loader2 className="mx-auto animate-spin text-accent" size={32} />
+        <p className="text-fg-subtle text-sm mt-3">Carregando seu perfil...</p>
       </div>
     </div>
   );
@@ -2453,11 +2285,29 @@ function ProfileLoadingOverlay() {
 
 // ── App shell ─────────────────────────────────────────────────────────────────
 
+// Supabase persists the session under a `sb-<ref>-auth-token` localStorage key.
+// Checking for it synchronously (before the async onAuthStateChange/getSession
+// resolves) lets us hold off rendering the public Homepage for a returning
+// authenticated user — eliminating the Homepage→Dashboard flash on tab refocus —
+// while leaving genuinely anonymous visitors (no key present) on the instant,
+// non-blocked landing path described in auth.tsx's rule #2.
+function hasPersistedSession(): boolean {
+  try {
+    return Object.keys(localStorage).some(k => k.includes('-auth-token'));
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
   const { view, authLoading, profileLoading } = useAuth();
+  const [hadStoredSession] = useState(hasPersistedSession);
 
   // Auth error
   if (view === 'auth-error') return <AuthErrorScreen />;
+
+  // A session was persisted — validate it before ever showing the public Homepage.
+  if (hadStoredSession && authLoading) return <ProfileLoadingOverlay />;
 
   // Public routes — never block on auth
   if (view === 'landing') {

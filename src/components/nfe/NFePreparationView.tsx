@@ -10,6 +10,7 @@ import {
 } from '../../lib/nfe/nfeService';
 import { suggestByName, type NameSuggestion } from '../../lib/nfe/nfeAssociation';
 import { formatDate } from './nfeUi';
+import { Card, Badge, Button } from '../ui';
 
 interface Props {
   invoice: NfeInvoice;
@@ -75,45 +76,45 @@ export function NFePreparationView({ invoice, onStarted, onBack }: Props) {
   }
 
   return (
-    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-5">
-      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors">
+    <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-6">
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-fg-subtle hover:text-fg transition-colors">
         <ArrowLeft size={16} /> Voltar
       </button>
 
-      <div className="bg-white rounded-2xl border border-zinc-200 p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
+      <Card>
+        <div className="flex flex-wrap items-start justify-between gap-6">
           <div>
-            <h2 className="text-lg font-bold text-zinc-900">Preparação da conferência</h2>
-            <p className="text-sm text-zinc-500 mt-0.5">
+            <h2 className="text-title">Preparação da conferência</h2>
+            <p className="text-sm text-fg-muted mt-1">
               NF {invoice.invoice_number ?? '—'} · Série {invoice.invoice_series ?? '—'} · {invoice.supplier_name ?? 'Fornecedor não informado'}
             </p>
-            <p className="text-xs text-zinc-400 mt-0.5">Emissão {formatDate(invoice.issue_date)} · Chave {invoice.invoice_key}</p>
+            <p className="text-caption mt-1">Emissão {formatDate(invoice.issue_date)} · Chave {invoice.invoice_key}</p>
           </div>
-          <div className="flex gap-2 text-center">
+          <div className="flex divide-x divide-edge">
             <Stat label="Itens" value={items.length} />
-            <Stat label="Vinculados" value={linked} tone="emerald" />
-            <Stat label="Pendentes" value={pending.length} tone={pending.length > 0 ? 'red' : 'zinc'} />
+            <Stat label="Vinculados" value={linked} tone="success" />
+            <Stat label="Pendentes" value={pending.length} tone={pending.length > 0 ? 'danger' : 'neutral'} />
           </div>
         </div>
-      </div>
+      </Card>
 
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
           <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
           <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-zinc-400"><Loader2 size={28} className="animate-spin" /></div>
+        <div className="flex items-center justify-center py-16 text-fg-subtle"><Loader2 size={28} className="animate-spin" /></div>
       ) : (
         <>
           {allLinked ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-50 border border-emerald-200 text-emerald-800">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
               <Check size={20} /> <p className="text-sm font-semibold">Todos os itens estão vinculados. Você já pode iniciar a conferência.</p>
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-50 border border-amber-200 text-amber-800">
+            <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
               <AlertCircle size={20} />
               <p className="text-sm font-medium">
                 Existem {pending.length} item(ns) não vinculados. Vincule todos os itens a um produto antes de iniciar.
@@ -121,7 +122,7 @@ export function NFePreparationView({ invoice, onStarted, onBack }: Props) {
             </div>
           )}
 
-          <div className="space-y-3">
+          <div className="space-y-4">
             {pending.map((item) => (
               <PendingItemRow
                 key={item.id}
@@ -133,15 +134,15 @@ export function NFePreparationView({ invoice, onStarted, onBack }: Props) {
           </div>
 
           {items.length > 0 && (
-            <div className="sticky bottom-0 bg-gradient-to-t from-zinc-50 via-zinc-50 to-transparent pt-4 pb-2">
-              <button
+            <div className="sticky bottom-0 bg-gradient-to-t from-surface via-surface to-transparent pt-4 pb-2">
+              <Button
                 disabled={!allLinked || starting}
                 onClick={handleStart}
-                className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-emerald-600 hover:bg-emerald-500 text-white font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+                className="w-full"
               >
                 {starting ? <Loader2 size={18} className="animate-spin" /> : <Play size={18} />}
                 Iniciar Conferência
-              </button>
+              </Button>
             </div>
           )}
         </>
@@ -150,12 +151,12 @@ export function NFePreparationView({ invoice, onStarted, onBack }: Props) {
   );
 }
 
-function Stat({ label, value, tone = 'zinc' }: { label: string; value: number; tone?: 'zinc' | 'emerald' | 'red' }) {
-  const color = tone === 'emerald' ? 'text-emerald-600' : tone === 'red' ? 'text-red-600' : 'text-zinc-800';
+function Stat({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'neutral' | 'success' | 'danger' }) {
+  const color = tone === 'success' ? 'text-emerald-700 dark:text-emerald-400' : tone === 'danger' ? 'text-red-700 dark:text-red-400' : '';
   return (
-    <div className="px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-100 min-w-[72px]">
-      <p className={`text-xl font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold">{label}</p>
+    <div className="px-4 first:pl-0 last:pr-0 text-center">
+      <p className={`text-display ${color}`}>{value}</p>
+      <p className="text-caption mt-0.5">{label}</p>
     </div>
   );
 }
@@ -215,93 +216,82 @@ function PendingItemRow({ item, catalog, onLink }: RowProps) {
   const exactEanMatch = (p: CatalogProduct) => item.nfe_ean_normalized && p.ean && p.ean.replace(/\D/g, '') === item.nfe_ean_normalized;
 
   return (
-    <div className="bg-white rounded-xl border border-zinc-200 p-4">
-      <div className="flex flex-wrap items-start justify-between gap-2 mb-3">
-        <div className="min-w-0">
-          <p className="font-semibold text-zinc-900 text-sm">{item.description || 'Sem descrição'}</p>
-          <p className="text-xs text-zinc-500 mt-0.5">
-            Código NF: <span className="font-mono">{item.nfe_code || '—'}</span>
-            {item.nfe_ean && <> · EAN: <span className="font-mono">{item.nfe_ean}</span></>}
-          </p>
-        </div>
-        <span className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-semibold bg-red-50 text-red-600 border border-red-200">
-          Não vinculado
-        </span>
+    <Card>
+      <div className="mb-4">
+        <p className="font-semibold text-fg text-sm">{item.description || 'Sem descrição'}</p>
+        <p className="text-xs text-fg-muted mt-0.5">
+          Código NF: <span className="font-mono">{item.nfe_code || '—'}</span>
+          {item.nfe_ean && <> · EAN: <span className="font-mono">{item.nfe_ean}</span></>}
+        </p>
       </div>
 
       {suggestion && (
-        <div className="flex flex-wrap items-center gap-2 mb-3 p-3 rounded-lg bg-blue-50 border border-blue-200">
-          <Sparkles size={16} className="text-blue-600 flex-shrink-0" />
-          <p className="text-xs text-blue-800 flex-1 min-w-[160px]">
+        <div className="flex flex-wrap items-center gap-2 mb-4 p-4 rounded-lg bg-accent/10 border border-accent/20">
+          <Sparkles size={16} className="text-accent flex-shrink-0" />
+          <p className="text-sm text-fg flex-1 min-w-[160px]">
             Esse produto é <span className="font-semibold">{suggestion.product.name}</span>?
-            <span className="text-blue-500"> (SKU {suggestion.product.sku})</span>
+            <span className="text-fg-muted"> (SKU {suggestion.product.sku})</span>
           </p>
-          <button
-            disabled={linking}
-            onClick={() => doLink(suggestion.product)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold disabled:opacity-50"
-          >
+          <Button size="sm" disabled={linking} onClick={() => doLink(suggestion.product)}>
             <Check size={13} /> Sim, vincular
-          </button>
-          <button
-            onClick={() => setRejectedSuggestion(true)}
-            className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-white border border-blue-200 text-blue-700 hover:bg-blue-100 text-xs font-semibold"
-          >
+          </Button>
+          <Button size="sm" variant="secondary" onClick={() => setRejectedSuggestion(true)}>
             <X size={13} /> Não, buscar manualmente
-          </button>
+          </Button>
         </div>
       )}
 
       <div className="relative">
-        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+        <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
         <input
           value={term}
           onChange={(e) => setTerm(e.target.value)}
           placeholder="Buscar produto por nome, SKU ou EAN..."
-          className="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full pl-9 pr-3 py-2 rounded-lg border border-edge bg-surface text-fg text-sm placeholder:text-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
       </div>
 
       <div className="mt-2">
         {state === 'searching' && (
-          <p className="flex items-center gap-2 text-xs text-zinc-400 py-2"><Loader2 size={13} className="animate-spin" /> Buscando...</p>
+          <p className="flex items-center gap-2 text-xs text-fg-subtle py-2"><Loader2 size={13} className="animate-spin" /> Buscando...</p>
         )}
-        {state === 'empty' && <p className="text-xs text-zinc-400 py-2">Nenhum resultado encontrado.</p>}
+        {state === 'empty' && <p className="text-xs text-fg-subtle py-2">Nenhum resultado encontrado.</p>}
         {state === 'error' && (
-          <button onClick={() => setTerm((t) => t + ' ')} className="inline-flex items-center gap-1.5 text-xs text-red-600 py-2">
+          <button onClick={() => setTerm((t) => t + ' ')} className="inline-flex items-center gap-1.5 text-xs text-red-600 dark:text-red-400 py-2">
             <RefreshCw size={13} /> Erro na busca. Tentar novamente
           </button>
         )}
         {state === 'idle' && results.length > 0 && (
-          <div className="divide-y divide-zinc-100 border border-zinc-100 rounded-lg overflow-hidden">
+          <div className="divide-y divide-edge/60 border border-edge rounded-lg overflow-hidden">
             {results.map((p) => (
-              <div key={p.id} className="flex items-center gap-2 p-2.5 hover:bg-zinc-50">
-                <Package size={16} className="text-zinc-400 flex-shrink-0" />
+              <div key={p.id} className="flex items-center gap-2 p-3 hover:bg-surface-3/40 transition-colors">
+                <Package size={16} className="text-fg-subtle flex-shrink-0" />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium text-zinc-800 truncate">{p.name}</p>
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-sm font-medium text-fg truncate">{p.name}</p>
+                  <p className="text-xs text-fg-muted">
                     SKU {p.sku}{p.ean ? ` · EAN ${p.ean}` : ''}
                   </p>
                 </div>
-                {exactSkuMatch(p) && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">SKU exato</span>}
-                {!exactSkuMatch(p) && exactEanMatch(p) && <span className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 rounded px-1.5 py-0.5">EAN exato</span>}
-                <button
+                {exactSkuMatch(p) && <Badge variant="success" className="text-[10px] px-1.5 py-0.5 flex-shrink-0">SKU exato</Badge>}
+                {!exactSkuMatch(p) && exactEanMatch(p) && <Badge variant="success" className="text-[10px] px-1.5 py-0.5 flex-shrink-0">EAN exato</Badge>}
+                <Button
+                  size="sm"
                   disabled={linking}
                   onClick={() => doLink(p)}
-                  className="inline-flex items-center gap-1 px-2.5 py-1 rounded-md bg-emerald-600 hover:bg-emerald-500 text-white text-xs font-semibold flex-shrink-0 disabled:opacity-50"
+                  className="flex-shrink-0"
                 >
                   <Link2 size={12} /> Vincular
-                </button>
+                </Button>
               </div>
             ))}
           </div>
         )}
       </div>
 
-      <label className="flex items-center gap-2 mt-3 text-xs text-zinc-600 cursor-pointer select-none">
-        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded border-zinc-300 text-emerald-600 focus:ring-emerald-500" />
+      <label className="flex items-center gap-2 mt-4 text-xs text-fg-muted cursor-pointer select-none">
+        <input type="checkbox" checked={remember} onChange={(e) => setRemember(e.target.checked)} className="rounded border-edge text-accent focus:ring-accent/40" />
         Memorizar associação para as próximas notas
       </label>
-    </div>
+    </Card>
   );
 }

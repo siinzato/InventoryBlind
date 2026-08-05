@@ -18,7 +18,10 @@ export type AuditAction =
   | 'erp.token_change'
   | 'erp.connect'
   | 'settings.change'
-  | 'access.denied';
+  | 'access.denied'
+  | 'productivity.view_team'
+  | 'productivity.report_export'
+  | 'productivity.incentive_sent';
 
 interface LogParams {
   companyId: string;

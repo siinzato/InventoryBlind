@@ -9,6 +9,7 @@ import { NFePreparationView } from './NFePreparationView';
 import { NFeCountingView } from './NFeCountingView';
 import { NFeReportView } from './NFeReportView';
 import { InvoiceStatusBadge, formatDate } from './nfeUi';
+import { Button } from '../ui';
 
 type View = 'list' | 'import' | 'prep' | 'counting' | 'report';
 
@@ -92,37 +93,34 @@ export default function NFeConferencePage({ onBack }: { onBack: () => void }) {
       <TopBar onBack={onBack} title="Conferência Cega por NF-e" />
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-sm text-zinc-500">Importe uma NF-e e realize a contagem cega dos itens recebidos.</p>
-          <button
-            onClick={() => setView('import')}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white text-sm font-semibold transition-colors"
-          >
+          <p className="text-sm text-fg-muted">Importe uma NF-e e realize a contagem cega dos itens recebidos.</p>
+          <Button onClick={() => setView('import')}>
             <Plus size={16} /> Nova conferência
-          </button>
+          </Button>
         </div>
 
         <div className="relative">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
           <input
             value={search}
             onChange={(e) => setSearch(e.target.value)}
             placeholder="Buscar por número, fornecedor ou chave..."
-            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="w-full pl-9 pr-3 py-2.5 rounded-lg border border-edge bg-surface text-fg placeholder-fg-subtle text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
           />
         </div>
 
         {error && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 text-red-700 dark:text-red-400">
             <AlertCircle size={20} className="flex-shrink-0 mt-0.5" /><p className="text-sm font-medium">{error}</p>
           </div>
         )}
 
         {loading ? (
-          <div className="flex items-center justify-center py-16 text-zinc-400"><Loader2 size={28} className="animate-spin" /></div>
+          <div className="flex items-center justify-center py-16 text-fg-subtle"><Loader2 size={28} className="animate-spin" /></div>
         ) : filtered.length === 0 ? (
           <div className="text-center py-16">
-            <FileText size={40} className="mx-auto text-zinc-300" />
-            <p className="mt-3 text-sm text-zinc-500">Nenhuma conferência ainda. Clique em "Nova conferência" para começar.</p>
+            <FileText size={36} className="mx-auto text-fg-subtle" />
+            <p className="mt-3 text-sm text-fg-muted">Nenhuma conferência ainda. Clique em "Nova conferência" para começar.</p>
           </div>
         ) : (
           <div className="space-y-2">
@@ -130,20 +128,20 @@ export default function NFeConferencePage({ onBack }: { onBack: () => void }) {
               <button
                 key={inv.id}
                 onClick={() => open(inv)}
-                className="w-full flex items-center gap-3 bg-white rounded-xl border border-zinc-200 p-4 text-left hover:border-emerald-300 hover:shadow-sm transition-all"
+                className="w-full flex items-center gap-3 bg-surface-2 rounded-xl border border-edge p-4 text-left hover:bg-surface-3/40 transition-colors"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-zinc-900 text-sm">NF {inv.invoice_number ?? '—'}</span>
-                    <span className="text-zinc-300">·</span>
-                    <span className="text-sm text-zinc-600 truncate">{inv.supplier_name ?? 'Fornecedor não informado'}</span>
+                    <span className="font-semibold text-fg text-sm">NF {inv.invoice_number ?? '—'}</span>
+                    <span className="text-fg-subtle">·</span>
+                    <span className="text-sm text-fg-muted truncate">{inv.supplier_name ?? 'Fornecedor não informado'}</span>
                   </div>
-                  <p className="text-xs text-zinc-400 mt-0.5">
+                  <p className="text-caption mt-0.5">
                     {inv.total_items} item(ns) · Emissão {formatDate(inv.issue_date)} · Importada {formatDate(inv.created_at)}
                   </p>
                 </div>
                 <InvoiceStatusBadge status={inv.status} />
-                <ChevronRight size={18} className="text-zinc-300 flex-shrink-0" />
+                <ChevronRight size={18} className="text-fg-subtle flex-shrink-0" />
               </button>
             ))}
           </div>
@@ -160,11 +158,11 @@ async function refresh(id: string): Promise<NfeInvoice | null> {
 
 function TopBar({ onBack, title }: { onBack: () => void; title: string }) {
   return (
-    <div className="sticky top-0 z-10 bg-white border-b border-zinc-200 px-4 sm:px-6 py-3 flex items-center gap-3">
-      <button onClick={onBack} className="p-1.5 rounded-lg text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100 transition-colors">
+    <div className="sticky top-0 z-10 bg-surface border-b border-edge px-4 sm:px-6 py-3 flex items-center gap-3">
+      <button onClick={onBack} className="p-1.5 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors">
         <ArrowLeft size={18} />
       </button>
-      <h1 className="font-bold text-zinc-900">{title}</h1>
+      <h1 className="text-title">{title}</h1>
     </div>
   );
 }

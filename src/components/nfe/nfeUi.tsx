@@ -20,10 +20,10 @@ export function formatQty(value: number | null): string {
 }
 
 const INVOICE_BADGE: Record<InvoiceStatus, string> = {
-  not_started: 'bg-zinc-100 text-zinc-600 border-zinc-200',
-  in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
-  completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  with_divergences: 'bg-amber-50 text-amber-700 border-amber-200',
+  not_started: 'bg-surface-3 text-fg-muted border-edge',
+  in_progress: 'bg-accent/10 text-accent border-accent/20',
+  completed: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+  with_divergences: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
 };
 
 const INVOICE_LABEL: Record<InvoiceStatus, string> = {
@@ -42,11 +42,11 @@ export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
 }
 
 const ITEM_BADGE: Record<ItemResultStatus, string> = {
-  unlinked: 'bg-zinc-100 text-zinc-500 border-zinc-200',
-  pending: 'bg-zinc-100 text-zinc-600 border-zinc-200',
-  ok: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  missing: 'bg-red-50 text-red-700 border-red-200',
-  surplus: 'bg-amber-50 text-amber-700 border-amber-200',
+  unlinked: 'bg-surface-3 text-fg-subtle border-edge',
+  pending: 'bg-surface-3 text-fg-muted border-edge',
+  ok: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+  missing: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
+  surplus: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
 };
 
 const ITEM_LABEL: Record<ItemResultStatus, string> = {

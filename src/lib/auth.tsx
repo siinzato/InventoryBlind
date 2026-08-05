@@ -31,7 +31,7 @@ export interface Profile {
   name: string | null;
   email: string | null;
   company_id: string | null;
-  role: 'owner' | 'admin' | 'manager' | 'counter' | 'viewer';
+  role: 'owner' | 'admin' | 'manager' | 'lead' | 'counter' | 'viewer';
   must_change_password: boolean;
 }
 
@@ -52,6 +52,8 @@ interface AuthContextValue {
   profile: Profile | null;
   company: Company | null;
   companyId: string;
+  companies: Company[];
+  switchingCompany: boolean;
   authLoading: boolean;
   profileLoading: boolean;
   authError: string | null;
@@ -61,6 +63,7 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>;
   retryAuth: () => void;
   linkToAZ: () => Promise<void>;
+  switchCompany: (companyId: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -75,6 +78,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession]                 = useState<Session | null>(null);
   const [profile, setProfile]                 = useState<Profile | null>(null);
   const [company, setCompany]                 = useState<Company | null>(null);
+  const [companies, setCompanies]             = useState<Company[]>([]);
+  const [switchingCompany, setSwitchingCompany] = useState(false);
   const [authLoading, setAuthLoading]         = useState(true);
   const [profileLoading, setProfileLoading]   = useState(false);
   const [authError, setAuthError]             = useState<string | null>(null);
@@ -123,6 +128,18 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (data ?? null) as Company | null;
   }, []);
 
+  const doLoadMemberships = useCallback(async (userId: string): Promise<Company[]> => {
+    const { data, error } = await supabase
+      .from('company_members')
+      .select('companies(id, name, slug, plan, settings)')
+      .eq('user_id', userId);
+
+    if (import.meta.env.DEV && error) console.warn('[Auth] Memberships error:', error.message);
+
+    const rows = (data ?? []) as unknown as { companies: Company | null }[];
+    return rows.map(r => r.companies).filter((c): c is Company => !!c);
+  }, []);
+
   // ── Resolve which view to show ─────────────────────────────────────────────
   const resolveView = useCallback((u: User, prof: Profile | null) => {
     if (import.meta.env.DEV) console.log('[Auth] Resolving view — user:', u.email, 'profile:', prof, 'email_confirmed:', u.email_confirmed_at);
@@ -168,6 +185,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mountedRef.current) setCompany(comp);
       }
 
+      const memberships = await doLoadMemberships(u.id);
+      if (mountedRef.current) setCompanies(memberships);
+
       if (mountedRef.current) {
         resolveView(u, prof);
       }
@@ -185,7 +205,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
       }
     }
-  }, [doLoadProfile, doLoadCompany, resolveView]);
+  }, [doLoadProfile, doLoadCompany, doLoadMemberships, resolveView]);
 
   // ── onAuthStateChange — sets state, defers DB work via setTimeout(0) ──────
   useEffect(() => {
@@ -212,6 +232,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         // Signed out or no session
         setProfile(null);
         setCompany(null);
+        setCompanies([]);
         loadingRef.current = false;
         setProfileLoading(false);
         setAuthLoading(false);
@@ -246,6 +267,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!mountedRef.current) return;
     setProfile(null);
     setCompany(null);
+    setCompanies([]);
     setAuthError(null);
     setAuthLoading(false);
     setView('landing');
@@ -315,6 +337,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await runAuthSequence(user);
   }, [user, runAuthSequence]);
 
+  // ── switchCompany ─────────────────────────────────────────────────────────
+  const switchCompany = useCallback(async (targetCompanyId: string) => {
+    if (!user) return;
+    if (profile?.company_id === targetCompanyId) return;
+
+    setSwitchingCompany(true);
+    try {
+      const { error } = await supabase.rpc('switch_active_company', { target_company_id: targetCompanyId });
+      if (error) {
+        if (import.meta.env.DEV) console.error('[Auth] switchCompany error:', error.message);
+        return;
+      }
+      loadingRef.current = false;
+      await runAuthSequence(user);
+    } finally {
+      if (mountedRef.current) setSwitchingCompany(false);
+    }
+  }, [user, profile?.company_id, runAuthSequence]);
+
   // ── Value ──────────────────────────────────────────────────────────────────
   const value: AuthContextValue = {
     user,
@@ -322,6 +363,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     company,
     companyId: profile?.company_id ?? '',
+    companies,
+    switchingCompany,
     authLoading,
     profileLoading,
     authError,
@@ -331,6 +374,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshProfile,
     retryAuth,
     linkToAZ,
+    switchCompany,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

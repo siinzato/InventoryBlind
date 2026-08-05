@@ -19,6 +19,7 @@ import {
   Activity,
 } from 'lucide-react';
 import { downloadFile } from '../lib/productImportUtils';
+import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button } from './ui';
 
 interface BrandRow {
   id: string;
@@ -75,6 +76,32 @@ interface SortState {
 
 const PAGE_SIZE = 20;
 
+/** Rank medal chip (1st/2nd/3rd + default). Shared so every tab that shows a
+ *  position renders it identically. Gold uses dark text — white-on-amber-400
+ *  fails contrast. */
+function RankBadge({ rank }: { rank: number }) {
+  const cls =
+    rank === 1 ? 'bg-amber-400 text-amber-950' :
+    rank === 2 ? 'bg-surface-3 text-fg-muted' :
+    rank === 3 ? 'bg-amber-700 text-white' :
+    'bg-surface-2 text-fg-subtle';
+  return (
+    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${cls}`}>
+      {rank}
+    </span>
+  );
+}
+
+/** Status pill. CONCLUÍDO is a real completion state, so it keeps semantic color;
+ *  every other status is the default/majority "still working on it" state and
+ *  stays plain muted text — no loud badge for the common case. */
+function StatusPill({ status }: { status: string }) {
+  if (status === 'CONCLUÍDO') {
+    return <Badge variant="success" className="uppercase">{status}</Badge>;
+  }
+  return <span className="text-xs font-medium text-fg-subtle uppercase">{status}</span>;
+}
+
 export const RankingsPage: React.FC<RankingsPageProps> = ({
   onBack,
   brandsData,
@@ -112,10 +139,10 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
   };
 
   const SortIcon = ({ field }: { field: string }) => {
-    if (sort.field !== field) return <ChevronUp size={14} className="text-zinc-300" />;
+    if (sort.field !== field) return <ChevronUp size={14} className="text-fg-subtle" />;
     return sort.dir === 'asc'
-      ? <ChevronUp size={14} className="text-blue-500" />
-      : <ChevronDown size={14} className="text-blue-500" />;
+      ? <ChevronUp size={14} className="text-accent" />
+      : <ChevronDown size={14} className="text-accent" />;
   };
 
   // ---- ACURACIDADE DATA ----
@@ -252,37 +279,31 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
   const melhorOp = opCapas.find(o => o.valor !== 'Andamento' && o.valor !== '');
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-surface">
       {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-zinc-950 text-white shadow-xl">
+      <div className="sticky top-0 z-50 bg-surface text-fg border-b border-edge">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button
-              onClick={onBack}
-              className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition text-sm font-medium"
-            >
+            <Button variant="secondary" onClick={onBack}>
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Voltar ao Dashboard</span>
-            </button>
+            </Button>
             <div className="flex items-center gap-2">
-              <Trophy size={22} className="text-amber-400" />
+              <Trophy size={22} className="text-amber-500" />
               <div>
                 <h1 className="font-bold text-base leading-tight">Rankings Completos</h1>
-                <p className="text-xs text-zinc-400 hidden sm:block">Analise completa de desempenho</p>
+                <p className="text-xs text-fg-subtle hidden sm:block">Analise completa de desempenho</p>
               </div>
             </div>
           </div>
           <div className="flex items-center gap-2">
-            <button
-              onClick={handleExport}
-              className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition text-sm font-medium"
-            >
+            <Button variant="secondary" onClick={handleExport}>
               <Download size={16} />
               <span className="hidden sm:inline">Exportar CSV</span>
-            </button>
+            </Button>
             <button
               onClick={onBack}
-              className="p-2 hover:bg-zinc-800 rounded-lg transition"
+              className="p-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition-colors"
               title="Fechar"
             >
               <X size={20} />
@@ -293,57 +314,61 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
 
       <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
 
-        {/* Summary Cards */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-emerald-100 rounded-lg"><Trophy size={16} className="text-emerald-600" /></div>
-              <span className="text-xs font-semibold text-zinc-500 uppercase">Melhor Linha</span>
-            </div>
-            <p className="font-bold text-zinc-800 text-sm truncate">{melhorLinha?.nome ?? '—'}</p>
-            <p className="text-emerald-600 font-mono text-lg font-bold">{melhorLinha?.valor ?? '—'}</p>
-          </div>
+        {/* Summary Cards — one Panel, grouped, not four separately bordered boxes */}
+        <Panel>
+          <PanelSection padding="lg">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg"><Trophy size={16} className="text-emerald-600 dark:text-emerald-400" /></div>
+                  <span className="text-xs font-semibold text-fg-subtle uppercase">Melhor Linha</span>
+                </div>
+                <p className="font-bold text-fg text-sm truncate">{melhorLinha?.nome ?? '—'}</p>
+                <p className="text-emerald-600 dark:text-emerald-400 font-mono text-lg font-bold">{melhorLinha?.valor ?? '—'}</p>
+              </div>
 
-          <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-red-100 rounded-lg"><AlertTriangle size={16} className="text-red-600" /></div>
-              <span className="text-xs font-semibold text-zinc-500 uppercase">Linha Critica</span>
-            </div>
-            <p className="font-bold text-zinc-800 text-sm truncate">{piorLinha?.nome ?? '—'}</p>
-            <p className="text-red-600 font-mono text-lg font-bold">{piorLinha?.valor ?? '—'}</p>
-          </div>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-2 bg-red-500/10 rounded-lg"><AlertTriangle size={16} className="text-red-600 dark:text-red-400" /></div>
+                  <span className="text-xs font-semibold text-fg-subtle uppercase">Linha Critica</span>
+                </div>
+                <p className="font-bold text-fg text-sm truncate">{piorLinha?.nome ?? '—'}</p>
+                <p className="text-red-600 dark:text-red-400 font-mono text-lg font-bold">{piorLinha?.valor ?? '—'}</p>
+              </div>
 
-          <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-amber-100 rounded-lg"><Activity size={16} className="text-amber-600" /></div>
-              <span className="text-xs font-semibold text-zinc-500 uppercase">Maior Divergencia</span>
-            </div>
-            <p className="font-bold text-zinc-800 text-sm truncate">{maiorDiv?.brand ?? '—'}</p>
-            <p className="text-amber-600 font-mono text-lg font-bold">{maiorDiv?.divergences ?? 0} unid.</p>
-          </div>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-2 bg-amber-500/10 rounded-lg"><Activity size={16} className="text-amber-600 dark:text-amber-400" /></div>
+                  <span className="text-xs font-semibold text-fg-subtle uppercase">Maior Divergencia</span>
+                </div>
+                <p className="font-bold text-fg text-sm truncate">{maiorDiv?.brand ?? '—'}</p>
+                <p className="text-amber-600 dark:text-amber-400 font-mono text-lg font-bold">{maiorDiv?.divergences ?? 0} unid.</p>
+              </div>
 
-          <div className="bg-white rounded-xl border border-zinc-200 p-4 shadow-sm">
-            <div className="flex items-center gap-2 mb-2">
-              <div className="p-2 bg-blue-100 rounded-lg"><Users size={16} className="text-blue-600" /></div>
-              <span className="text-xs font-semibold text-zinc-500 uppercase">Melhor Operador</span>
+              <div>
+                <div className="flex items-center gap-2 mb-2">
+                  <div className="p-2 bg-emerald-500/10 rounded-lg"><Users size={16} className="text-emerald-600 dark:text-emerald-400" /></div>
+                  <span className="text-xs font-semibold text-fg-subtle uppercase">Melhor Operador</span>
+                </div>
+                <p className="font-bold text-fg text-sm truncate">{melhorOp?.resp ?? '—'}</p>
+                <p className="text-emerald-600 dark:text-emerald-400 font-mono text-lg font-bold">{melhorOp?.valor ?? '—'}</p>
+              </div>
             </div>
-            <p className="font-bold text-zinc-800 text-sm truncate">{melhorOp?.resp ?? '—'}</p>
-            <p className="text-blue-600 font-mono text-lg font-bold">{melhorOp?.valor ?? '—'}</p>
-          </div>
-        </div>
+          </PanelSection>
+        </Panel>
 
         {/* Tabs */}
-        <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
+        <Panel>
           {/* Tab bar */}
-          <div className="flex overflow-x-auto border-b border-zinc-200 bg-zinc-50">
+          <div className="flex overflow-x-auto border-b border-edge bg-surface-3">
             {TABS.map(tab => (
               <button
                 key={tab.id}
                 onClick={() => handleTabChange(tab.id)}
                 className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
                   activeTab === tab.id
-                    ? 'border-zinc-900 text-zinc-900 bg-white'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-800 hover:bg-zinc-100'
+                    ? 'border-accent text-fg bg-surface-2'
+                    : 'border-transparent text-fg-subtle hover:text-fg hover:bg-surface-2'
                 }`}
               >
                 {tab.icon}
@@ -353,18 +378,18 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
           </div>
 
           {/* Search bar */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-zinc-200">
+          <div className="flex items-center gap-3 px-4 py-3 border-b border-edge">
             <div className="relative flex-1 max-w-sm">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
               <input
                 type="text"
                 placeholder="Buscar..."
                 value={search}
                 onChange={e => handleSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                className="w-full pl-9 pr-4 py-2 bg-surface-3 border border-edge rounded-lg text-sm placeholder:text-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40"
               />
             </div>
-            <span className="text-xs text-zinc-400 font-medium">
+            <span className="text-xs text-fg-subtle font-medium">
               {currentData.length} registro{currentData.length !== 1 ? 's' : ''}
             </span>
           </div>
@@ -372,279 +397,267 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
           {/* Table */}
           <div className="overflow-x-auto">
             {activeTab === 'acuracidade' && (
-              <table className="w-full text-sm">
-                <thead className="bg-zinc-50 border-b border-zinc-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase w-12">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('nome')}>
+              <Table>
+                <Thead>
+                  <Tr>
+                    <Th className="w-12">#</Th>
+                    <Th className="cursor-pointer select-none" onClick={() => handleSort('nome')}>
                       <span className="flex items-center gap-1">Linha / Marca <SortIcon field="nome" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('valor')}>
+                    </Th>
+                    <Th className="text-right cursor-pointer select-none" onClick={() => handleSort('valor')}>
                       <span className="flex items-center justify-end gap-1">Acuracidade <SortIcon field="valor" /></span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+                    </Th>
+                  </Tr>
+                </Thead>
+                <tbody>
                   {(pagedData as typeof acuracidadeData).map((row, i) => (
-                    <tr key={i} className="hover:bg-zinc-50">
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                          row.rank === 1 ? 'bg-amber-400 text-white' :
-                          row.rank === 2 ? 'bg-zinc-300 text-zinc-700' :
-                          row.rank === 3 ? 'bg-amber-700 text-white' :
-                          'bg-zinc-100 text-zinc-500'
-                        }`}>{row.rank}</span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-zinc-800">{row.nome}</td>
-                      <td className="px-4 py-3 text-right">
-                        <span className={`font-bold text-base ${row.rawVal >= 80 ? 'text-emerald-600' : row.rawVal >= 50 ? 'text-amber-600' : 'text-red-600'}`}>
+                    <Tr key={i}>
+                      <Td><RankBadge rank={row.rank} /></Td>
+                      <Td className="font-medium">{row.nome}</Td>
+                      <Td className="text-right">
+                        <span className={`font-bold text-base ${
+                          row.rawVal >= 80 ? 'text-emerald-600 dark:text-emerald-400' :
+                          row.rawVal >= 50 ? 'text-amber-600 dark:text-amber-400' :
+                          'text-red-600 dark:text-red-400'
+                        }`}>
                           {row.valor}
                         </span>
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
 
             {activeTab === 'divergencias' && (
-              <table className="w-full text-sm whitespace-nowrap">
-                <thead className="bg-zinc-50 border-b border-zinc-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('brand')}>
+              <Table className="whitespace-nowrap">
+                <Thead>
+                  <Tr>
+                    <Th className="cursor-pointer select-none" onClick={() => handleSort('brand')}>
                       <span className="flex items-center gap-1">Linha / Marca <SortIcon field="brand" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('divergences')}>
+                    </Th>
+                    <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('divergences')}>
                       <span className="flex items-center justify-center gap-1">Divergencias <SortIcon field="divergences" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Contados</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Total SKU</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+                    </Th>
+                    <Th className="text-center">Contados</Th>
+                    <Th className="text-center">Total SKU</Th>
+                    <Th className="text-center">Status</Th>
+                  </Tr>
+                </Thead>
+                <tbody>
                   {(pagedData as typeof divergenciasData).map((row, i) => (
-                    <tr key={i} className="hover:bg-zinc-50">
-                      <td className="px-4 py-3 font-medium text-zinc-800">{row.brand}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`font-bold text-base ${row.divergences === 0 ? 'text-emerald-600' : row.divergences > 20 ? 'text-red-600' : 'text-amber-600'}`}>
+                    <Tr key={i}>
+                      <Td className="font-medium">{row.brand}</Td>
+                      <Td className="text-center">
+                        <span className={`font-bold text-base ${
+                          row.divergences === 0 ? 'text-emerald-600 dark:text-emerald-400' :
+                          row.divergences > 20 ? 'text-red-600 dark:text-red-400' :
+                          'text-amber-600 dark:text-amber-400'
+                        }`}>
                           {row.divergences}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-center text-zinc-600">{row.doneSku}</td>
-                      <td className="px-4 py-3 text-center text-zinc-600">{row.totalSku}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 text-[11px] font-bold rounded-md uppercase ${
-                          row.status === 'CONCLUÍDO' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>{row.status}</span>
-                      </td>
-                    </tr>
+                      </Td>
+                      <Td className="text-center text-fg-muted">{row.doneSku}</Td>
+                      <Td className="text-center text-fg-muted">{row.totalSku}</Td>
+                      <Td className="text-center"><StatusPill status={row.status} /></Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
 
             {activeTab === 'progresso' && (
-              <table className="w-full text-sm whitespace-nowrap">
-                <thead className="bg-zinc-50 border-b border-zinc-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('brand')}>
+              <Table className="whitespace-nowrap">
+                <Thead>
+                  <Tr>
+                    <Th className="cursor-pointer select-none" onClick={() => handleSort('brand')}>
                       <span className="flex items-center gap-1">Linha / Marca <SortIcon field="brand" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('progress')}>
+                    </Th>
+                    <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('progress')}>
                       <span className="flex items-center justify-center gap-1">Progresso <SortIcon field="progress" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Concluidos</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Total SKU</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Acuracidade</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Status</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+                    </Th>
+                    <Th className="text-center">Concluidos</Th>
+                    <Th className="text-center">Total SKU</Th>
+                    <Th className="text-center">Acuracidade</Th>
+                    <Th className="text-center">Status</Th>
+                  </Tr>
+                </Thead>
+                <tbody>
                   {(pagedData as typeof progressoData).map((row, i) => (
-                    <tr key={i} className="hover:bg-zinc-50">
-                      <td className="px-4 py-3 font-medium text-zinc-800">{row.brand}</td>
-                      <td className="px-4 py-3">
+                    <Tr key={i}>
+                      <Td className="font-medium">{row.brand}</Td>
+                      <Td>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-zinc-200 rounded-full h-2 min-w-[80px]">
+                          <div className="flex-1 bg-edge rounded-full h-2 min-w-[80px]">
                             <div
-                              className={`h-2 rounded-full ${row.progress >= 100 ? 'bg-emerald-500' : row.progress >= 50 ? 'bg-amber-500' : 'bg-red-400'}`}
+                              className={`h-2 rounded-full ${row.progress >= 100 ? 'bg-emerald-500' : row.progress >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
                               style={{ width: `${Math.min(100, row.progress)}%` }}
                             />
                           </div>
                           <span className="text-xs font-mono font-semibold w-12 text-right">{row.progress.toFixed(1)}%</span>
                         </div>
-                      </td>
-                      <td className="px-4 py-3 text-center text-zinc-600">{row.doneSku}</td>
-                      <td className="px-4 py-3 text-center text-zinc-600">{row.totalSku}</td>
-                      <td className="px-4 py-3 text-center font-bold">
+                      </Td>
+                      <Td className="text-center text-fg-muted">{row.doneSku}</Td>
+                      <Td className="text-center text-fg-muted">{row.totalSku}</Td>
+                      <Td className="text-center font-bold">
                         {row.accuracy !== null
-                          ? <span className={row.accuracy >= 80 ? 'text-emerald-600' : row.accuracy >= 50 ? 'text-amber-600' : 'text-red-600'}>{row.accuracy.toFixed(1)}%</span>
-                          : <span className="text-zinc-300">—</span>
+                          ? <span className={row.accuracy >= 80 ? 'text-emerald-600 dark:text-emerald-400' : row.accuracy >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}>{row.accuracy.toFixed(1)}%</span>
+                          : <span className="text-fg-subtle">—</span>
                         }
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`px-2 py-1 text-[11px] font-bold rounded-md uppercase ${
-                          row.status === 'CONCLUÍDO' ? 'bg-emerald-100 text-emerald-800' : 'bg-amber-100 text-amber-800'
-                        }`}>{row.status}</span>
-                      </td>
-                    </tr>
+                      </Td>
+                      <Td className="text-center"><StatusPill status={row.status} /></Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
 
             {activeTab === 'andamento' && (
-              <table className="w-full text-sm whitespace-nowrap">
-                <thead className="bg-zinc-50 border-b border-zinc-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('brand')}>
+              <Table className="whitespace-nowrap">
+                <Thead>
+                  <Tr>
+                    <Th className="cursor-pointer select-none" onClick={() => handleSort('brand')}>
                       <span className="flex items-center gap-1">Linha / Marca <SortIcon field="brand" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('progress')}>
+                    </Th>
+                    <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('progress')}>
                       <span className="flex items-center justify-center gap-1">Progresso <SortIcon field="progress" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Concluidos / Total</th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">Divergencias</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+                    </Th>
+                    <Th className="text-center">Concluidos / Total</Th>
+                    <Th className="text-center">Divergencias</Th>
+                  </Tr>
+                </Thead>
+                <tbody>
                   {(pagedData as typeof andamentoData).length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-zinc-400">
-                      <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-400" />
+                    <tr><td colSpan={4} className="px-4 py-8 text-center text-fg-subtle">
+                      <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-600 dark:text-emerald-400" />
                       Todas as linhas foram concluidas!
                     </td></tr>
                   ) : (
                     (pagedData as typeof andamentoData).map((row, i) => (
-                      <tr key={i} className="hover:bg-zinc-50">
-                        <td className="px-4 py-3 font-medium text-zinc-800">{row.brand}</td>
-                        <td className="px-4 py-3">
+                      <Tr key={i}>
+                        <Td className="font-medium">{row.brand}</Td>
+                        <Td>
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 bg-zinc-200 rounded-full h-2 min-w-[80px]">
+                            <div className="flex-1 bg-edge rounded-full h-2 min-w-[80px]">
                               <div
                                 className="h-2 rounded-full bg-amber-500"
                                 style={{ width: `${Math.min(100, row.progress)}%` }}
                               />
                             </div>
-                            <span className="text-xs font-mono font-bold text-amber-600 w-12 text-right">{row.progress.toFixed(1)}%</span>
+                            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 w-12 text-right">{row.progress.toFixed(1)}%</span>
                           </div>
-                        </td>
-                        <td className="px-4 py-3 text-center text-zinc-600">{row.doneSku} / {row.totalSku}</td>
-                        <td className="px-4 py-3 text-center font-bold">
-                          <span className={row.divergences > 0 ? 'text-red-600' : 'text-emerald-600'}>{row.divergences}</span>
-                        </td>
-                      </tr>
+                        </Td>
+                        <Td className="text-center text-fg-muted">{row.doneSku} / {row.totalSku}</Td>
+                        <Td className="text-center font-bold">
+                          <span className={row.divergences > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>{row.divergences}</span>
+                        </Td>
+                      </Tr>
                     ))
                   )}
                 </tbody>
-              </table>
+              </Table>
             )}
 
             {activeTab === 'operadores' && (
-              <table className="w-full text-sm whitespace-nowrap">
-                <thead className="bg-zinc-50 border-b border-zinc-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('nome')}>
+              <Table className="whitespace-nowrap">
+                <Thead>
+                  <Tr>
+                    <Th className="cursor-pointer select-none" onClick={() => handleSort('nome')}>
                       <span className="flex items-center gap-1">Linha / Marca <SortIcon field="nome" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('resp')}>
+                    </Th>
+                    <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('resp')}>
                       <span className="flex items-center justify-center gap-1">Operador <SortIcon field="resp" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-500 uppercase">Acuracidade</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+                    </Th>
+                    <Th className="text-right">Acuracidade</Th>
+                  </Tr>
+                </Thead>
+                <tbody>
                   {(pagedData as typeof operadoresData).map((row, i) => (
-                    <tr key={i} className="hover:bg-zinc-50">
-                      <td className="px-4 py-3 font-medium text-zinc-800">{row.nome}</td>
-                      <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center gap-1.5 px-2 py-1 bg-blue-50 text-blue-700 rounded-md text-xs font-semibold">
-                          <Users size={12} />
+                    <Tr key={i}>
+                      <Td className="font-medium">{row.nome}</Td>
+                      <Td className="text-center">
+                        <span className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-fg-muted">
+                          <Users size={12} className="text-fg-subtle" />
                           {row.resp}
                         </span>
-                      </td>
-                      <td className="px-4 py-3 text-right font-bold">
+                      </Td>
+                      <Td className="text-right font-bold">
                         {row.valor === 'Andamento'
-                          ? <span className="px-2 py-1 bg-amber-100 text-amber-800 text-xs rounded-md font-bold">Em Andamento</span>
-                          : <span className="text-zinc-800">{row.valor}</span>
+                          ? <span className="text-xs font-medium text-fg-subtle uppercase">Em Andamento</span>
+                          : <span className="text-fg">{row.valor}</span>
                         }
-                      </td>
-                    </tr>
+                      </Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
 
             {activeTab === 'vendas' && (
-              <table className="w-full text-sm whitespace-nowrap">
-                <thead className="bg-zinc-50 border-b border-zinc-200">
-                  <tr>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase w-12">#</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('produto')}>
+              <Table className="whitespace-nowrap">
+                <Thead>
+                  <Tr>
+                    <Th className="w-12">#</Th>
+                    <Th className="cursor-pointer select-none" onClick={() => handleSort('produto')}>
                       <span className="flex items-center gap-1">Produto <SortIcon field="produto" /></span>
-                    </th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">SKU</th>
-                    <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-500 uppercase cursor-pointer select-none" onClick={() => handleSort('vendas')}>
+                    </Th>
+                    <Th>SKU</Th>
+                    <Th className="text-right cursor-pointer select-none" onClick={() => handleSort('vendas')}>
                       <span className="flex items-center justify-end gap-1">Vendas <SortIcon field="vendas" /></span>
-                    </th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-zinc-100">
+                    </Th>
+                  </Tr>
+                </Thead>
+                <tbody>
                   {(pagedData as typeof vendasData).map((row, i) => (
-                    <tr key={i} className="hover:bg-zinc-50">
-                      <td className="px-4 py-3">
-                        <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                          i + 1 === 1 ? 'bg-amber-400 text-white' :
-                          i + 1 === 2 ? 'bg-zinc-300 text-zinc-700' :
-                          i + 1 === 3 ? 'bg-amber-700 text-white' :
-                          'bg-zinc-100 text-zinc-500'
-                        }`}>{(page - 1) * PAGE_SIZE + i + 1}</span>
-                      </td>
-                      <td className="px-4 py-3 font-medium text-zinc-800 max-w-[280px] truncate">{row.produto}</td>
-                      <td className="px-4 py-3 font-mono text-zinc-500">{row.sku}</td>
-                      <td className="px-4 py-3 text-right font-bold text-zinc-900">{row.vendas}</td>
-                    </tr>
+                    <Tr key={i}>
+                      <Td><RankBadge rank={(page - 1) * PAGE_SIZE + i + 1} /></Td>
+                      <Td className="font-medium max-w-[280px] truncate">{row.produto}</Td>
+                      <Td className="font-mono text-fg-subtle">{row.sku}</Td>
+                      <Td className="text-right font-bold">{row.vendas}</Td>
+                    </Tr>
                   ))}
                 </tbody>
-              </table>
+              </Table>
             )}
           </div>
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-200 bg-zinc-50">
-              <p className="text-xs text-zinc-500">
+            <div className="flex items-center justify-between px-4 py-3 border-t border-edge bg-surface-3">
+              <p className="text-xs text-fg-subtle">
                 Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, currentData.length)} de {currentData.length}
               </p>
               <div className="flex items-center gap-1">
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setPage(p => Math.max(1, p - 1))}
                   disabled={page === 1}
-                  className="px-3 py-1.5 text-sm bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
                   Anterior
-                </button>
-                <span className="px-3 py-1.5 text-sm font-medium">
+                </Button>
+                <span className="px-3 py-1.5 text-sm font-medium text-fg-muted">
                   {page} / {totalPages}
                 </span>
-                <button
+                <Button
+                  variant="secondary"
+                  size="sm"
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
-                  className="px-3 py-1.5 text-sm bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 disabled:opacity-40 disabled:cursor-not-allowed transition"
                 >
                   Proximo
-                </button>
+                </Button>
               </div>
             </div>
           )}
 
-        </div>
+        </Panel>
 
         {/* Back button at bottom */}
         <div className="flex justify-center pb-4">
           <button
             onClick={onBack}
-            className="flex items-center gap-2 px-6 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-semibold transition shadow-sm"
+            className="flex items-center gap-2 px-6 py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-semibold transition shadow-sm"
           >
             <ArrowLeft size={18} />
             Voltar ao Dashboard

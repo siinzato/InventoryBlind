@@ -28,6 +28,43 @@ html, body {
   --z-popover: 2000;
   --z-tooltip: 4000;
   --z-toast: 5000;
+
+  /* Authenticated-app theme tokens (light default). Landing/AuthPage don't
+     reference these — untouched by the .dark class below. */
+  --surface: 255 255 255;
+  --surface-2: 246 247 249;
+  --surface-3: 237 239 242;
+  --edge: 226 229 233;
+  --fg: 15 23 42;
+  --fg-muted: 71 85 105;
+  --fg-subtle: 148 163 184;
+  --accent: 30 95 191;
+  --accent-strong: 18 60 130;
+}
+
+.dark {
+  /* Matches the Homepage's ink/mist/enterprise values exactly — dark mode
+     here IS the Homepage identity. */
+  --surface: 11 13 18;
+  --surface-2: 18 21 28;
+  --surface-3: 27 31 41;
+  --edge: 42 47 59;
+  --fg: 231 234 240;
+  --fg-muted: 138 147 166;
+  --fg-subtle: 100 108 122;
+  --accent: 62 123 224;
+  --accent-strong: 127 179 245;
+}
+
+/* Authenticated-app typography scale — one shared set of sizes/weights
+   instead of ad-hoc text-2xl/font-black per screen. Landing/AuthPage keep
+   their own typography and never reference these classes. */
+@layer components {
+  .text-display { @apply text-3xl font-semibold tracking-tight text-fg; }
+  .text-title   { @apply text-xl font-semibold tracking-tight text-fg; }
+  .text-section { @apply text-xs font-semibold uppercase tracking-wide text-fg-subtle; }
+  .text-body    { @apply text-sm text-fg; }
+  .text-caption { @apply text-xs text-fg-subtle; }
 }
 
 /* Proper scroll containers */

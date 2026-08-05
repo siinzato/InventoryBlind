@@ -1,10 +1,11 @@
 /** @type {import('tailwindcss').Config} */
 export default {
+  darkMode: 'class',
   content: ['./index.html', './src/**/*.{js,ts,jsx,tsx}'],
   theme: {
     extend: {
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Inter', 'Segoe UI', 'sans-serif'],
+        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
       },
       colors: {
         ink: {
@@ -25,6 +26,19 @@ export default {
           400: '#3E7BE0',
           300: '#7FB3F5',
         },
+        // Semantic, theme-reactive tokens for the authenticated app only.
+        // Resolve via CSS custom properties (src/index.css :root / .dark) so
+        // the same class works in both themes — landing/AuthPage never
+        // reference these and stay on the fixed ink/mist/enterprise scale.
+        surface: 'rgb(var(--surface) / <alpha-value>)',
+        'surface-2': 'rgb(var(--surface-2) / <alpha-value>)',
+        'surface-3': 'rgb(var(--surface-3) / <alpha-value>)',
+        edge: 'rgb(var(--edge) / <alpha-value>)',
+        fg: 'rgb(var(--fg) / <alpha-value>)',
+        'fg-muted': 'rgb(var(--fg-muted) / <alpha-value>)',
+        'fg-subtle': 'rgb(var(--fg-subtle) / <alpha-value>)',
+        accent: 'rgb(var(--accent) / <alpha-value>)',
+        'accent-strong': 'rgb(var(--accent-strong) / <alpha-value>)',
       },
     },
   },

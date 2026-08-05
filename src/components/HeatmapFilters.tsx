@@ -3,6 +3,7 @@
 import React from 'react';
 import { Filter, SortAsc, SortDesc, Search, X } from 'lucide-react';
 import type { HeatmapFilters as HeatmapFiltersType, StatusFilter, SortOption, CriticalityLevel, ViewMode } from '../lib/heatmapTypes';
+import { Card } from './ui';
 
 interface HeatmapFiltersProps {
   filters: HeatmapFiltersType;
@@ -29,7 +30,7 @@ const sortOptions: { value: SortOption; label: string }[] = [
 ];
 
 const criticalityOptions: { value: CriticalityLevel | 'all'; label: string; color: string }[] = [
-  { value: 'all', label: 'Todas', color: 'bg-zinc-500' },
+  { value: 'all', label: 'Todas', color: 'bg-fg-subtle' },
   { value: 'success', label: 'Saudável', color: 'bg-emerald-500' },
   { value: 'warning', label: 'Atenção', color: 'bg-amber-500' },
   { value: 'danger', label: 'Risco', color: 'bg-orange-500' },
@@ -58,22 +59,22 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
     filters.ordenacao !== 'nome';
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5 mb-6">
+    <Card className="mb-6">
       {/* Search Bar */}
       <div className="flex flex-col lg:flex-row gap-4 mb-4">
         <div className="flex-1 relative">
-          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
+          <Search size={18} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
           <input
             type="text"
             placeholder="Buscar por nome, marca ou responsável..."
             value={filters.busca}
             onChange={(e) => onFilterChange({ busca: e.target.value })}
-            className="w-full pl-10 pr-4 py-2.5 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 bg-surface-3 border border-edge rounded-lg text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-transparent"
           />
           {filters.busca && (
             <button
               onClick={() => onFilterChange({ busca: '' })}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-zinc-400 hover:text-zinc-600"
+              className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg-muted"
             >
               <X size={16} />
             </button>
@@ -81,15 +82,15 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex gap-1 bg-zinc-100 p-1 rounded-lg">
+        <div className="flex gap-1 bg-surface-3 p-1 rounded-lg">
           {viewModeOptions.map((option) => (
             <button
               key={option.value}
               onClick={() => onViewModeChange(option.value)}
               className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
                 viewMode === option.value
-                  ? 'bg-white text-zinc-900 shadow-sm'
-                  : 'text-zinc-500 hover:text-zinc-700'
+                  ? 'bg-surface-2 text-fg shadow-sm'
+                  : 'text-fg-subtle hover:text-fg-muted'
               }`}
             >
               {option.label}
@@ -102,11 +103,11 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
       <div className="flex flex-wrap gap-3 items-center">
         {/* Status Filter */}
         <div className="flex items-center gap-2">
-          <Filter size={16} className="text-zinc-500" />
+          <Filter size={16} className="text-fg-muted" />
           <select
             value={filters.status}
             onChange={(e) => onFilterChange({ status: e.target.value as StatusFilter })}
-            className="px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
           >
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -120,7 +121,7 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
         <select
           value={filters.marca}
           onChange={(e) => onFilterChange({ marca: e.target.value })}
-          className="px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          className="px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
         >
           <option value="">Todas as marcas</option>
           {marcas.map((marca) => (
@@ -132,11 +133,11 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
 
         {/* Sort */}
         <div className="flex items-center gap-2">
-          {filters.ordenacao === 'nome' ? <SortAsc size={16} className="text-zinc-500" /> : <SortDesc size={16} className="text-zinc-500" />}
+          {filters.ordenacao === 'nome' ? <SortAsc size={16} className="text-fg-muted" /> : <SortDesc size={16} className="text-fg-muted" />}
           <select
             value={filters.ordenacao}
             onChange={(e) => onFilterChange({ ordenacao: e.target.value as SortOption })}
-            className="px-3 py-2 bg-zinc-50 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            className="px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
           >
             {sortOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
@@ -148,15 +149,15 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
 
         {/* Criticality Pills */}
         <div className="flex items-center gap-1 ml-auto">
-          <span className="text-xs text-zinc-500 mr-2">Criticidade:</span>
+          <span className="text-xs text-fg-subtle mr-2">Criticidade:</span>
           {criticalityOptions.map((opt) => (
             <button
               key={opt.value}
               onClick={() => onFilterChange({ criticidade: opt.value })}
               className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-full transition ${
                 filters.criticidade === opt.value
-                  ? 'bg-zinc-900 text-white'
-                  : 'bg-zinc-100 text-zinc-600 hover:bg-zinc-200'
+                  ? 'bg-accent text-white'
+                  : 'bg-surface-3 text-fg-muted hover:bg-edge'
               }`}
             >
               <span className={`w-2 h-2 rounded-full ${opt.color}`} />
@@ -169,13 +170,13 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
         {hasActiveFilters && (
           <button
             onClick={onReset}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 hover:text-red-700 hover:bg-red-50 rounded-lg transition"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-lg transition"
           >
             <X size={14} />
             Limpar filtros
           </button>
         )}
       </div>
-    </div>
+    </Card>
   );
 };

@@ -15,6 +15,7 @@ import { HeatmapLegend } from './HeatmapLegend';
 import { HeatmapCard } from './HeatmapCard';
 import { HeatmapDetailsModal } from './HeatmapDetailsModal';
 import { HeatmapStatsComponent } from './HeatmapStats';
+import { Badge, Button, Card } from './ui';
 
 interface HeatmapEstoqueProps {
   brandsData: Array<{
@@ -199,51 +200,36 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
   }, [heatmapAreas]);
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-6">
+    <div className="min-h-screen bg-surface p-6">
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <div className="p-3 bg-blue-600 rounded-xl">
-            <Map size={28} className="text-white" />
-          </div>
+          <Map size={24} className="text-accent flex-shrink-0" />
           <div>
-            <h1 className="text-2xl font-bold text-zinc-800">Heatmap do Estoque</h1>
-            <p className="text-zinc-500">Visualize a saúde do seu estoque com score de risco inteligente</p>
+            <h1 className="text-display">Heatmap do Estoque</h1>
+            <p className="text-sm text-fg-muted mt-1">Visualize a saúde do seu estoque com score de risco inteligente</p>
           </div>
         </div>
         <div className="flex items-center gap-3">
-          {isAdmin && (
-            <span className="text-sm text-emerald-600 font-medium bg-emerald-100 px-3 py-1 rounded-full">
-              Admin
-            </span>
-          )}
+          {isAdmin && <Badge variant="success">Admin</Badge>}
           {areasParaRecontagem.length > 0 && (
-            <span className="text-sm text-blue-600 font-medium bg-blue-100 px-3 py-1 rounded-full flex items-center gap-1">
+            <Badge variant="accent">
               <RefreshCw size={14} />
               {areasParaRecontagem.length} para recontagem
-            </span>
+            </Badge>
           )}
-          <button
-            onClick={handleRefresh}
-            className="flex items-center gap-2 px-4 py-2 bg-white border border-zinc-200 rounded-lg hover:bg-zinc-50 transition text-sm font-medium text-zinc-700"
-          >
+          <Button variant="secondary" onClick={handleRefresh}>
             <RefreshCw size={16} />
             Atualizar
-          </button>
+          </Button>
           {isAdmin ? (
-            <button
-              onClick={onLogout}
-              className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition text-sm font-medium"
-            >
+            <Button variant="secondary" onClick={onLogout}>
               Sair do Admin
-            </button>
+            </Button>
           ) : (
-            <button
-              onClick={onRequestAdminAccess}
-              className="px-4 py-2 bg-zinc-900 text-white rounded-lg hover:bg-zinc-800 transition text-sm font-medium"
-            >
+            <Button variant="secondary" onClick={onRequestAdminAccess}>
               Acesso Admin
-            </button>
+            </Button>
           )}
         </div>
       </div>
@@ -253,14 +239,14 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
 
       {/* Top Critical Areas Alert */}
       {topCriticalAreas.length > 0 && topCriticalAreas[0] && calculateRiskScore(topCriticalAreas[0]) >= 60 && (
-        <div className="bg-gradient-to-r from-red-50 to-orange-50 border-2 border-red-200 rounded-xl p-4 mb-6">
+        <div className="bg-gradient-to-r from-red-500/5 to-orange-500/5 border-2 border-red-500/20 rounded-xl p-4 mb-6">
           <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-red-100 rounded-lg">
-              <AlertTriangle size={20} className="text-red-600" />
+            <div className="p-2 bg-red-500/10 rounded-lg">
+              <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
             </div>
             <div>
-              <h4 className="font-bold text-red-800">Top 5 Áreas Mais Críticas</h4>
-              <p className="text-sm text-red-600">Requerem atenção imediata</p>
+              <h4 className="font-bold text-red-700 dark:text-red-400">Top 5 Áreas Mais Críticas</h4>
+              <p className="text-sm text-red-600 dark:text-red-400">Requerem atenção imediata</p>
             </div>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
@@ -270,10 +256,10 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
                 <button
                   key={area.id}
                   onClick={() => handleAreaClick(area)}
-                  className="bg-white rounded-lg p-3 text-left border border-red-200 hover:border-red-400 transition"
+                  className="bg-surface-2 rounded-lg p-3 text-left border border-red-500/20 hover:border-red-500/40 transition"
                 >
                   <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-zinc-500">#{idx + 1}</span>
+                    <span className="text-xs text-fg-subtle">#{idx + 1}</span>
                     <span className={`text-xs font-bold px-2 py-0.5 rounded ${
                       score >= 81 ? 'bg-red-600 text-white' :
                       score >= 61 ? 'bg-orange-500 text-white' : 'bg-amber-500 text-white'
@@ -281,8 +267,8 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
                       {score}
                     </span>
                   </div>
-                  <p className="font-medium text-zinc-800 text-sm truncate">{area.nome}</p>
-                  <p className="text-xs text-zinc-500">{area.divergencias} div.</p>
+                  <p className="font-medium text-fg text-sm truncate">{area.nome}</p>
+                  <p className="text-xs text-fg-subtle">{area.divergencias} div.</p>
                 </button>
               );
             })}
@@ -305,18 +291,18 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
 
       {/* Results Count */}
       <div className="flex items-center justify-between mb-4">
-        <p className="text-sm text-zinc-500">
-          Mostrando <span className="font-semibold text-zinc-700">{filteredAreas.length}</span> de {heatmapAreas.length} áreas
+        <p className="text-sm text-fg-subtle">
+          Mostrando <span className="font-semibold text-fg-muted">{filteredAreas.length}</span> de {heatmapAreas.length} áreas
         </p>
       </div>
 
       {/* Heatmap Grid/List/Ranking */}
       {filteredAreas.length === 0 ? (
-        <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-12 text-center">
-          <BarChart3 size={48} className="mx-auto text-zinc-300 mb-4" />
-          <h3 className="text-lg font-semibold text-zinc-700 mb-2">Nenhuma área encontrada</h3>
-          <p className="text-zinc-500">Tente ajustar os filtros para ver mais resultados.</p>
-        </div>
+        <Card padding="none" className="p-12 text-center">
+          <BarChart3 size={48} className="mx-auto text-fg-subtle mb-4" />
+          <h3 className="text-lg font-semibold text-fg-muted mb-2">Nenhuma área encontrada</h3>
+          <p className="text-fg-subtle">Tente ajustar os filtros para ver mais resultados.</p>
+        </Card>
       ) : viewMode === 'grid' ? (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
           {filteredAreas.map((area) => (
@@ -341,12 +327,12 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="bg-orange-50 border-2 border-orange-200 rounded-xl p-4 mb-4">
+          <div className="bg-orange-500/10 border-2 border-orange-500/20 rounded-xl p-4 mb-4">
             <div className="flex items-center gap-2">
-              <BarChart3 size={20} className="text-orange-600" />
+              <BarChart3 size={20} className="text-orange-600 dark:text-orange-400" />
               <div>
-                <h4 className="font-bold text-orange-800">Ranking por Score de Risco</h4>
-                <p className="text-sm text-orange-600">Top 10 áreas com maior risco</p>
+                <h4 className="font-bold text-orange-700 dark:text-orange-400">Ranking por Score de Risco</h4>
+                <p className="text-sm text-orange-600 dark:text-orange-400">Top 10 áreas com maior risco</p>
               </div>
             </div>
           </div>

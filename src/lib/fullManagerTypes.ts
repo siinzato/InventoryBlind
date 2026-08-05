@@ -23,6 +23,7 @@ export type Marketplace = 'Mercado Livre' | 'Shopee' | 'Amazon FBA' | 'Outro';
 export interface FullOperation {
   id: string;
   company_id: string | null;
+  assigned_user_id: string | null;
   full_number: string;
   marketplace: Marketplace | string;
   responsible: string | null;
@@ -54,6 +55,7 @@ export interface FullOperationItem {
   quantity_picked: number;
   status: FullItemStatus;
   picker_notes: string | null;
+  picked_by_user_id: string | null;
   picked_at: string | null;
   created_at: string;
 }
@@ -71,22 +73,22 @@ export const STATUS_LABEL: Record<FullStatus, string> = {
 };
 
 export const STATUS_COLOR: Record<FullStatus, string> = {
-  scheduled: 'bg-blue-100 text-blue-700 border-blue-200',
-  preparing: 'bg-amber-100 text-amber-700 border-amber-200',
-  picking: 'bg-orange-100 text-orange-700 border-orange-200',
-  checking: 'bg-purple-100 text-purple-700 border-purple-200',
-  ready: 'bg-emerald-100 text-emerald-700 border-emerald-200',
-  completed: 'bg-zinc-100 text-zinc-600 border-zinc-200',
-  cancelled: 'bg-red-100 text-red-700 border-red-200',
+  scheduled: 'bg-accent/10 text-accent border-accent/20',
+  preparing: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
+  picking: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
+  checking: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20',
+  ready: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
+  completed: 'bg-surface-3 text-fg-muted border-edge',
+  cancelled: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
 };
 
 export const STATUS_DOT: Record<FullStatus, string> = {
-  scheduled: 'bg-blue-500',
+  scheduled: 'bg-accent',
   preparing: 'bg-amber-500',
   picking: 'bg-orange-500',
   checking: 'bg-purple-500',
   ready: 'bg-emerald-500',
-  completed: 'bg-zinc-400',
+  completed: 'bg-fg-subtle',
   cancelled: 'bg-red-500',
 };
 
@@ -101,13 +103,13 @@ export const ITEM_STATUS_LABEL: Record<FullItemStatus, string> = {
 };
 
 export const ITEM_STATUS_COLOR: Record<FullItemStatus, string> = {
-  found: 'bg-emerald-50 text-emerald-700',
-  no_location: 'bg-amber-50 text-amber-700',
-  insufficient_stock: 'bg-orange-50 text-orange-700',
-  not_found: 'bg-red-50 text-red-700',
-  picked: 'bg-emerald-100 text-emerald-800',
-  skipped: 'bg-zinc-100 text-zinc-600',
-  picking_error: 'bg-red-100 text-red-700',
+  found: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  no_location: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
+  insufficient_stock: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
+  not_found: 'bg-red-500/10 text-red-700 dark:text-red-400',
+  picked: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
+  skipped: 'bg-surface-3 text-fg-muted',
+  picking_error: 'bg-red-500/10 text-red-700 dark:text-red-400',
 };
 
 export const MARKETPLACES: Marketplace[] = ['Mercado Livre', 'Shopee', 'Amazon FBA', 'Outro'];

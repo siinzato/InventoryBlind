@@ -143,17 +143,17 @@ export const SafeDropdown: React.FC<SafeDropdownProps> = ({
         minWidth: '200px',
         zIndex: 2000,
       }}
-      className="bg-zinc-900 border border-zinc-700 rounded-lg shadow-xl overflow-hidden"
+      className="bg-surface-2 border border-edge rounded-lg shadow-xl overflow-hidden"
     >
       {items.map((item, index) => (
         <React.Fragment key={item.id}>
-          {item.divider && <div className="h-px bg-zinc-700" />}
+          {item.divider && <div className="h-px bg-edge" />}
           <button
             onClick={() => handleItemClick(item)}
             className={`w-full px-4 py-2.5 text-left text-sm font-medium flex items-center gap-2 transition ${
               item.active
-                ? 'bg-emerald-600 text-white'
-                : 'text-zinc-300 hover:bg-zinc-800 hover:text-white'
+                ? 'bg-accent text-white'
+                : 'text-fg-muted hover:bg-surface-3 hover:text-fg'
             }`}
           >
             {item.icon}

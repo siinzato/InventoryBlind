@@ -53,22 +53,22 @@ export const getRiskLevelLabel = (level: RiskLevel): string => {
 // Get risk level color class
 export const getRiskLevelColor = (level: RiskLevel): string => {
   switch (level) {
-    case 'none': return 'bg-zinc-100 text-zinc-600 border-zinc-300';
-    case 'low': return 'bg-emerald-100 text-emerald-700 border-emerald-300';
-    case 'medium': return 'bg-amber-100 text-amber-700 border-amber-300';
-    case 'high': return 'bg-orange-100 text-orange-700 border-orange-300';
-    case 'critical': return 'bg-red-100 text-red-700 border-red-300';
+    case 'none': return 'bg-surface-3 text-fg-muted border-edge';
+    case 'low': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+    case 'medium': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
+    case 'high': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30';
+    case 'critical': return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30';
   }
 };
 
 // Get risk bg gradient for cards
 export const getRiskGradient = (level: RiskLevel): string => {
   switch (level) {
-    case 'none': return 'bg-gradient-to-br from-zinc-50 to-zinc-100 border-zinc-200';
-    case 'low': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300';
-    case 'medium': return 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300';
-    case 'high': return 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-300';
-    case 'critical': return 'bg-gradient-to-br from-red-50 to-red-100 border-red-300';
+    case 'none': return 'bg-gradient-to-br from-surface-2 to-surface-3 border-edge';
+    case 'low': return 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/15 border-emerald-500/30';
+    case 'medium': return 'bg-gradient-to-br from-amber-500/5 to-amber-500/15 border-amber-500/30';
+    case 'high': return 'bg-gradient-to-br from-orange-500/5 to-orange-500/15 border-orange-500/30';
+    case 'critical': return 'bg-gradient-to-br from-red-500/5 to-red-500/15 border-red-500/30';
   }
 };
 
@@ -186,24 +186,24 @@ export const getCriticalityLevel = (area: HeatmapArea): CriticalityLevel => {
 // Get background color class based on criticality
 export const getCriticalityBgClass = (level: CriticalityLevel): string => {
   switch (level) {
-    case 'success': return 'bg-emerald-100 border-emerald-300';
-    case 'warning': return 'bg-amber-100 border-amber-300';
-    case 'danger': return 'bg-orange-100 border-orange-300';
-    case 'critical': return 'bg-red-100 border-red-300';
-    case 'neutral': return 'bg-zinc-100 border-zinc-300';
-    default: return 'bg-zinc-100 border-zinc-300';
+    case 'success': return 'bg-emerald-500/10 border-emerald-500/30';
+    case 'warning': return 'bg-amber-500/10 border-amber-500/30';
+    case 'danger': return 'bg-orange-500/10 border-orange-500/30';
+    case 'critical': return 'bg-red-500/10 border-red-500/30';
+    case 'neutral': return 'bg-surface-3 border-edge';
+    default: return 'bg-surface-3 border-edge';
   }
 };
 
 // Get text color class based on criticality
 export const getCriticalityTextClass = (level: CriticalityLevel): string => {
   switch (level) {
-    case 'success': return 'text-emerald-700';
-    case 'warning': return 'text-amber-700';
-    case 'danger': return 'text-orange-700';
-    case 'critical': return 'text-red-700';
-    case 'neutral': return 'text-zinc-500';
-    default: return 'text-zinc-700';
+    case 'success': return 'text-emerald-700 dark:text-emerald-400';
+    case 'warning': return 'text-amber-700 dark:text-amber-400';
+    case 'danger': return 'text-orange-700 dark:text-orange-400';
+    case 'critical': return 'text-red-700 dark:text-red-400';
+    case 'neutral': return 'text-fg-muted';
+    default: return 'text-fg-muted';
   }
 };
 
@@ -214,8 +214,8 @@ export const getProgressBgClass = (level: CriticalityLevel): string => {
     case 'warning': return 'bg-amber-500';
     case 'danger': return 'bg-orange-500';
     case 'critical': return 'bg-red-500';
-    case 'neutral': return 'bg-zinc-400';
-    default: return 'bg-zinc-400';
+    case 'neutral': return 'bg-fg-subtle';
+    default: return 'bg-fg-subtle';
   }
 };
 

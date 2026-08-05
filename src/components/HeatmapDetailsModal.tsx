@@ -35,6 +35,7 @@ import {
   getRiskLevelColor,
   generateDiagnosis,
 } from '../lib/heatmapUtils';
+import { Panel, PanelSection } from './ui';
 
 interface HeatmapDetailsModalProps {
   area: HeatmapArea | null;
@@ -134,33 +135,34 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4">
+    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 'var(--z-modal)' }}>
       {/* Backdrop */}
       <div
         className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        style={{ zIndex: 'var(--z-modal-backdrop)' }}
         onClick={onClose}
       />
 
       {/* Modal */}
-      <div className="relative bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
+      <div className="relative bg-surface border border-edge rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
         {/* Header */}
         <div className={`${bgClass} border-b-2 p-5`}>
           <div className="flex items-start justify-between">
             <div className="flex items-center gap-3">
-              <div className="p-2 bg-white/50 rounded-lg relative">
+              <div className="p-2 bg-surface-2/60 rounded-lg relative">
                 <MapPin size={24} className={textClass} />
                 {area.marcadoRecontagem && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-blue-600 rounded-full flex items-center justify-center">
+                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent rounded-full flex items-center justify-center">
                     <RefreshCcw size={10} className="text-white" />
                   </div>
                 )}
               </div>
               <div>
-                <h3 className="text-xl font-bold text-zinc-800">{area.nome}</h3>
+                <h3 className="text-xl font-bold text-fg">{area.nome}</h3>
                 <div className="flex items-center gap-2 mt-1">
-                  <Tag size={14} className="text-zinc-500" />
-                  <span className="text-sm text-zinc-500">{area.marcaNome}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full bg-white/50 ${textClass} font-medium`}>
+                  <Tag size={14} className="text-fg-subtle" />
+                  <span className="text-sm text-fg-subtle">{area.marcaNome}</span>
+                  <span className={`text-xs px-2 py-0.5 rounded-full bg-surface-2/60 ${textClass} font-medium`}>
                     {area.tipo.toUpperCase()}
                   </span>
                 </div>
@@ -168,9 +170,9 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
             </div>
             <button
               onClick={onClose}
-              className="p-2 rounded-lg hover:bg-white/50 transition"
+              className="p-2 rounded-lg hover:bg-surface-2/60 transition"
             >
-              <X size={24} className="text-zinc-600" />
+              <X size={24} className="text-fg-muted" />
             </button>
           </div>
         </div>
@@ -181,41 +183,29 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
           {area.progresso > 0 && (
             <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-zinc-700 flex items-center gap-2">
-                  <AlertOctagon size={18} className="text-zinc-500" />
+                <h4 className="font-semibold text-fg-muted flex items-center gap-2">
+                  <AlertOctagon size={18} className="text-fg-subtle" />
                   Score de Risco
                 </h4>
                 {area.marcadoRecontagem && (
-                  <span className="flex items-center gap-1 px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-medium">
+                  <span className="flex items-center gap-1 px-3 py-1 bg-accent/10 text-accent rounded-full text-sm font-medium">
                     <RefreshCcw size={14} />
                     Marcado para recontagem
                   </span>
                 )}
               </div>
 
-              <div className={`rounded-xl p-4 border-2 ${
-                riskLevel === 'critical' ? 'bg-red-50 border-red-300' :
-                riskLevel === 'high' ? 'bg-orange-50 border-orange-300' :
-                riskLevel === 'medium' ? 'bg-amber-50 border-amber-300' : 'bg-emerald-50 border-emerald-300'
-              }`}>
+              <div className={`rounded-xl p-4 border-2 ${riskColorClass}`}>
                 <div className="flex items-center justify-between mb-3">
                   <div className="flex items-center gap-3">
-                    <div className={`text-4xl font-black ${
-                      riskLevel === 'critical' ? 'text-red-600' :
-                      riskLevel === 'high' ? 'text-orange-600' :
-                      riskLevel === 'medium' ? 'text-amber-600' : 'text-emerald-600'
-                    }`}>
+                    <div className="text-4xl font-bold">
                       {riskScore}
                     </div>
                     <div>
-                      <div className={`text-sm font-bold ${
-                        riskLevel === 'critical' ? 'text-red-600' :
-                        riskLevel === 'high' ? 'text-orange-600' :
-                        riskLevel === 'medium' ? 'text-amber-600' : 'text-emerald-600'
-                      }`}>
+                      <div className="text-sm font-bold">
                         {riskLabel.toUpperCase()}
                       </div>
-                      <div className="text-xs text-zinc-500">de 0 a 100</div>
+                      <div className="text-caption">de 0 a 100</div>
                     </div>
                   </div>
                   {(riskLevel === 'critical' || riskLevel === 'high') && (
@@ -228,16 +218,16 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
 
                 {/* Risk Factors */}
                 {diagnosis.factors.length > 0 && (
-                  <div className="border-t border-white/50 pt-3 mt-3">
-                    <p className="text-xs text-zinc-500 mb-2">Fatores de risco:</p>
+                  <div className="border-t border-edge/60 pt-3 mt-3">
+                    <p className="text-caption mb-2">Fatores de risco:</p>
                     <div className="flex flex-wrap gap-2">
                       {diagnosis.factors.map((factor, i) => (
                         <span
                           key={i}
                           className={`px-2 py-1 rounded text-xs font-medium ${
-                            factor.impact === 'alta' ? 'bg-red-200 text-red-700' :
-                            factor.impact === 'média' ? 'bg-amber-200 text-amber-700' :
-                            'bg-zinc-200 text-zinc-600'
+                            factor.impact === 'alta' ? 'bg-red-500/15 text-red-700 dark:text-red-400' :
+                            factor.impact === 'média' ? 'bg-amber-500/15 text-amber-700 dark:text-amber-400' :
+                            'bg-edge text-fg-muted'
                           }`}
                         >
                           {factor.name}: {factor.value}
@@ -253,21 +243,21 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
           {/* Automatic Diagnosis */}
           {area.progresso > 0 && (
             <div className="mb-6">
-              <h4 className="font-semibold text-zinc-700 flex items-center gap-2 mb-3">
-                <Activity size={18} className="text-zinc-500" />
+              <h4 className="font-semibold text-fg-muted flex items-center gap-2 mb-3">
+                <Activity size={18} className="text-fg-subtle" />
                 Diagnóstico Automático
               </h4>
 
-              <div className="bg-zinc-50 rounded-xl p-4">
+              <div className="bg-surface-3 rounded-xl p-4">
                 {/* Issues */}
                 {diagnosis.issues.length > 0 && (
                   <div className="mb-4">
-                    <p className="text-xs text-zinc-500 mb-2">Problemas identificados:</p>
+                    <p className="text-caption mb-2">Problemas identificados:</p>
                     <div className="flex flex-wrap gap-2">
                       {diagnosis.issues.map((issue, i) => (
                         <span
                           key={i}
-                          className="flex items-center gap-1 px-2 py-1 bg-red-100 text-red-700 rounded text-xs font-medium"
+                          className="flex items-center gap-1 px-2 py-1 bg-red-500/10 text-red-700 dark:text-red-400 rounded text-xs font-medium"
                         >
                           <AlertTriangle size={12} />
                           {issue}
@@ -278,19 +268,19 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                 )}
 
                 {/* Recommendation */}
-                <div className="bg-white rounded-lg p-3 border border-zinc-200">
-                  <p className="text-xs text-zinc-500 mb-1">Recomendação:</p>
-                  <p className="text-sm text-zinc-700">{diagnosis.recommendation}</p>
+                <div className="bg-surface-2 rounded-lg p-3 border border-edge">
+                  <p className="text-caption mb-1">Recomendação:</p>
+                  <p className="text-sm text-fg-muted">{diagnosis.recommendation}</p>
                 </div>
 
                 {/* Suggested Actions */}
                 <div className="mt-3">
-                  <p className="text-xs text-zinc-500 mb-2">Ações sugeridas:</p>
+                  <p className="text-caption mb-2">Ações sugeridas:</p>
                   <div className="flex flex-wrap gap-2">
                     {diagnosis.suggestedActions.map((action, i) => (
                       <span
                         key={i}
-                        className="px-2 py-1 bg-blue-100 text-blue-700 rounded text-xs font-medium"
+                        className="px-2 py-1 bg-accent/10 text-accent rounded text-xs font-medium"
                       >
                         {action}
                       </span>
@@ -301,72 +291,75 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
             </div>
           )}
 
-          {/* Stats Grid */}
-          <div className="grid grid-cols-2 gap-3 mb-6">
-            <div className="bg-zinc-50 rounded-xl p-4">
-              <p className="text-xs text-zinc-500 mb-1">Total de SKUs</p>
-              <p className="text-2xl font-bold text-zinc-800">{area.totalSku}</p>
-            </div>
-            <div className="bg-zinc-50 rounded-xl p-4">
-              <p className="text-xs text-zinc-500 mb-1">SKUs Contados</p>
-              <p className="text-2xl font-bold text-zinc-800">{area.concluidos}</p>
-            </div>
-            <div className="bg-zinc-50 rounded-xl p-4">
-              <p className="text-xs text-zinc-500 mb-1">Pendentes</p>
-              <p className="text-2xl font-bold text-amber-600">{pending}</p>
-            </div>
-            <div className="bg-zinc-50 rounded-xl p-4">
-              <p className="text-xs text-zinc-500 mb-1">Divergências</p>
-              <p className={`text-2xl font-bold ${area.divergencias > 0 ? 'text-red-600' : 'text-zinc-400'}`}>
-                {area.divergencias}
-              </p>
-            </div>
-          </div>
+          {/* Overview: KPIs + Progress, one Panel instead of five stacked boxes */}
+          <Panel className="mb-6">
+            <PanelSection>
+              <div className="grid grid-cols-2">
+                {[
+                  { label: 'Total de SKUs', value: area.totalSku },
+                  { label: 'SKUs Contados', value: area.concluidos },
+                  { label: 'Pendentes', value: pending, valueClassName: 'text-amber-700 dark:text-amber-400' },
+                  {
+                    label: 'Divergências',
+                    value: area.divergencias,
+                    valueClassName: area.divergencias > 0 ? 'text-red-700 dark:text-red-400' : 'text-fg-subtle',
+                  },
+                ].map((kpi, i) => (
+                  <div
+                    key={kpi.label}
+                    className={`${i % 2 === 1 ? 'pl-4 border-l border-edge' : 'pr-4'} ${i >= 2 ? 'pt-3 border-t border-edge' : 'pb-3'}`}
+                  >
+                    <p className="text-caption">{kpi.label}</p>
+                    <p className={`text-2xl font-bold mt-1 ${kpi.valueClassName ?? 'text-fg'}`}>{kpi.value}</p>
+                  </div>
+                ))}
+              </div>
+            </PanelSection>
 
-          {/* Progress & Accuracy */}
-          <div className="bg-zinc-50 rounded-xl p-4 mb-6">
-            <div className="grid grid-cols-2 gap-4">
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-zinc-500">Progresso</span>
-                  <span className="font-bold text-zinc-800">{area.progresso.toFixed(1)}%</span>
+            <PanelSection>
+              <div className="grid grid-cols-2 gap-6">
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-fg-subtle">Progresso</span>
+                    <span className="font-bold text-fg">{area.progresso.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-3 bg-edge rounded-full overflow-hidden">
+                    <div
+                      className="h-full bg-accent transition-all"
+                      style={{ width: `${Math.min(area.progresso, 100)}%` }}
+                    />
+                  </div>
                 </div>
-                <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                  <div
-                    className="h-full bg-blue-500 transition-all"
-                    style={{ width: `${Math.min(area.progresso, 100)}%` }}
-                  />
+                <div>
+                  <div className="flex justify-between text-sm mb-1">
+                    <span className="text-fg-subtle">Acuracidade</span>
+                    <span className={`font-bold ${textClass}`}>{area.acuracidade.toFixed(1)}%</span>
+                  </div>
+                  <div className="h-3 bg-edge rounded-full overflow-hidden">
+                    <div
+                      className={`h-full ${
+                        area.acuracidade >= 90 ? 'bg-emerald-500' :
+                        area.acuracidade >= 70 ? 'bg-amber-500' :
+                        area.acuracidade >= 50 ? 'bg-orange-500' : 'bg-red-500'
+                      } transition-all`}
+                      style={{ width: `${Math.min(area.acuracidade, 100)}%` }}
+                    />
+                  </div>
                 </div>
               </div>
-              <div>
-                <div className="flex justify-between text-sm mb-1">
-                  <span className="text-zinc-500">Acuracidade</span>
-                  <span className={`font-bold ${textClass}`}>{area.acuracidade.toFixed(1)}%</span>
-                </div>
-                <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                  <div
-                    className={`h-full ${
-                      area.acuracidade >= 90 ? 'bg-emerald-500' :
-                      area.acuracidade >= 70 ? 'bg-amber-500' :
-                      area.acuracidade >= 50 ? 'bg-orange-500' : 'bg-red-500'
-                    } transition-all`}
-                    style={{ width: `${Math.min(area.acuracidade, 100)}%` }}
-                  />
-                </div>
-              </div>
-            </div>
-          </div>
+            </PanelSection>
+          </Panel>
 
           {/* Physical Locations */}
           <div className="mb-6">
             <div className="flex items-center justify-between mb-3">
-              <h4 className="font-semibold text-zinc-700 flex items-center gap-2">
-                <MapPinned size={18} className="text-zinc-500" />
+              <h4 className="font-semibold text-fg-muted flex items-center gap-2">
+                <MapPinned size={18} className="text-fg-subtle" />
                 Locais Físicos
               </h4>
               <button
                 onClick={handleStartEdit}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 rounded-lg transition"
               >
                 {!isAdmin && <Lock size={12} />}
                 {editMode ? 'Cancelar' : 'Editar'}
@@ -376,18 +369,18 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
             {editMode ? (
               <div className="space-y-3">
                 {locaisEditados.map((local, index) => (
-                  <div key={local.id} className="bg-zinc-50 rounded-lg p-3">
+                  <div key={local.id} className="bg-surface-3 rounded-lg p-3">
                     <div className="flex gap-2 mb-2">
                       <input
                         type="text"
                         placeholder="Nome do local (ex: Rua A)"
                         value={local.nome}
                         onChange={(e) => handleLocalChange(index, 'nome', e.target.value)}
-                        className="flex-1 px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                        className="flex-1 px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-transparent"
                       />
                       <button
                         onClick={() => handleRemoveLocal(index)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition"
+                        className="p-2 text-red-600 dark:text-red-400 hover:bg-red-500/10 rounded-lg transition"
                       >
                         <Trash2 size={18} />
                       </button>
@@ -397,14 +390,14 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                       placeholder="Descrição (ex: Corredor principal, vão 3)"
                       value={local.descricao}
                       onChange={(e) => handleLocalChange(index, 'descricao', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-zinc-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                      className="w-full px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-transparent"
                     />
                   </div>
                 ))}
                 <button
                   onClick={handleAddLocal}
                   disabled={locaisEditados.length >= 3}
-                  className="w-full py-2 border-2 border-dashed border-zinc-300 rounded-lg text-sm text-zinc-500 hover:border-zinc-400 hover:text-zinc-600 transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="w-full py-2 border-2 border-dashed border-edge rounded-lg text-sm text-fg-subtle hover:border-fg-subtle hover:text-fg-muted transition flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   <Plus size={16} />
                   Adicionar local ({locaisEditados.length}/3)
@@ -416,19 +409,19 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                   area.locaisFisicos.map((local) => (
                     <div
                       key={local.id}
-                      className="bg-zinc-50 rounded-lg p-3 flex items-center gap-3"
+                      className="bg-surface-3 rounded-lg p-3 flex items-center gap-3"
                     >
-                      <MapPin size={16} className="text-zinc-400" />
+                      <MapPin size={16} className="text-fg-subtle" />
                       <div>
-                        <p className="font-medium text-zinc-800">{local.nome}</p>
+                        <p className="font-medium text-fg">{local.nome}</p>
                         {local.descricao && (
-                          <p className="text-sm text-zinc-500">{local.descricao}</p>
+                          <p className="text-sm text-fg-subtle">{local.descricao}</p>
                         )}
                       </div>
                     </div>
                   ))
                 ) : (
-                  <p className="text-sm text-zinc-500 italic">
+                  <p className="text-sm text-fg-subtle italic">
                     Nenhum local físico cadastrado. Clique em Editar para adicionar.
                   </p>
                 )}
@@ -439,16 +432,16 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
           {/* Divergent Products */}
           {area.produtosDivergentes.length > 0 && (
             <div className="mb-6">
-              <h4 className="font-semibold text-zinc-700 mb-3 flex items-center gap-2">
+              <h4 className="font-semibold text-fg-muted mb-3 flex items-center gap-2">
                 <AlertTriangle size={18} className="text-red-500" />
                 Produtos Divergentes
               </h4>
-              <div className="bg-red-50 rounded-xl p-3">
+              <div className="bg-red-500/10 rounded-xl p-3">
                 <div className="flex flex-wrap gap-2">
                   {area.produtosDivergentes.map((sku, i) => (
                     <span
                       key={i}
-                      className="px-2 py-1 bg-red-100 text-red-700 text-xs font-mono rounded"
+                      className="px-2 py-1 bg-red-500/10 text-red-700 dark:text-red-400 text-xs font-mono rounded"
                     >
                       {sku}
                     </span>
@@ -459,41 +452,41 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
           )}
 
           {/* Additional Info */}
-          <div className="bg-zinc-50 rounded-xl p-4">
+          <div className="bg-surface-3 rounded-xl p-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
-                <p className="text-zinc-500 mb-1 flex items-center gap-1">
+                <p className="text-fg-subtle mb-1 flex items-center gap-1">
                   <User size={14} />
                   Responsável
                 </p>
-                <p className="font-medium text-zinc-800">{area.responsavel || 'Não definido'}</p>
+                <p className="font-medium text-fg">{area.responsavel || 'Não definido'}</p>
               </div>
               <div>
-                <p className="text-zinc-500 mb-1 flex items-center gap-1">
+                <p className="text-fg-subtle mb-1 flex items-center gap-1">
                   <Clock size={14} />
                   Última atualização
                 </p>
-                <p className="font-medium text-zinc-800">{formatDateTime(area.ultimaAtualizacao)}</p>
+                <p className="font-medium text-fg">{formatDateTime(area.ultimaAtualizacao)}</p>
               </div>
             </div>
             {area.observacoes && (
-              <div className="mt-4 pt-4 border-t border-zinc-200">
-                <p className="text-zinc-500 mb-1">Observações</p>
-                <p className="text-sm text-zinc-700">{area.observacoes}</p>
+              <div className="mt-4 pt-4 border-t border-edge">
+                <p className="text-fg-subtle mb-1">Observações</p>
+                <p className="text-sm text-fg-muted">{area.observacoes}</p>
               </div>
             )}
           </div>
         </div>
 
         {/* Footer Actions */}
-        <div className="border-t border-zinc-200 p-4 bg-zinc-50">
+        <div className="border-t border-edge p-4 bg-surface-3">
           <div className="flex flex-col sm:flex-row gap-2">
             <button
               onClick={() => onToggleRecontagem(area.id)}
               className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
                 area.marcadoRecontagem
-                  ? 'bg-blue-600 text-white hover:bg-blue-700'
-                  : 'bg-white border-2 border-blue-300 text-blue-700 hover:bg-blue-50'
+                  ? 'bg-accent text-white hover:bg-accent-strong'
+                  : 'bg-surface-2 border-2 border-accent/40 text-accent hover:bg-accent/10'
               }`}
             >
               <RefreshCcw size={18} />
@@ -501,7 +494,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
             </button>
             <button
               onClick={() => onExportReport(area)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition"
+              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 text-fg rounded-lg font-medium hover:bg-edge transition"
             >
               <FileDown size={18} />
               Exportar Relatório
@@ -511,17 +504,17 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
 
         {/* Edit Footer */}
         {editMode && (
-          <div className="border-t border-zinc-200 p-4 bg-zinc-100 flex justify-between">
+          <div className="border-t border-edge p-4 bg-surface-3 flex justify-between">
             <button
               onClick={handleCancel}
-              className="px-4 py-2 text-zinc-600 hover:bg-zinc-200 rounded-lg transition"
+              className="px-4 py-2 text-fg-muted hover:bg-edge rounded-lg transition"
             >
               Cancelar
             </button>
             <button
               onClick={handleSave}
               disabled={!hasChanges}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition disabled:opacity-50 disabled:cursor-not-allowed"
+              className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-strong transition disabled:opacity-50 disabled:cursor-not-allowed"
             >
               <Save size={18} />
               Salvar alterações

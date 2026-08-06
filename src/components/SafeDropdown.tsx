@@ -2,15 +2,16 @@
 
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
-import { ChevronDown } from 'lucide-react';
+import { Check } from 'lucide-react';
 
 interface DropdownItem {
   id: string;
-  label: string;
+  label: React.ReactNode;
   icon?: React.ReactNode;
   onClick: () => void;
   active?: boolean;
   divider?: boolean;
+  disabled?: boolean;
 }
 
 interface SafeDropdownProps {
@@ -33,9 +34,21 @@ export const SafeDropdown: React.FC<SafeDropdownProps> = ({
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);
+  const [entered, setEntered] = useState(false);
   const [position, setPosition] = useState<DropdownPosition>({ top: 0, left: 0, width: 0 });
   const triggerRef = useRef<HTMLDivElement>(null);
   const dropdownRef = useRef<HTMLDivElement>(null);
+
+  // Drive the open transition: mount at scale 0.98/opacity 0, then flip to
+  // entered on the next frame so the transition class change actually animates.
+  useEffect(() => {
+    if (!isOpen) {
+      setEntered(false);
+      return;
+    }
+    const id = requestAnimationFrame(() => setEntered(true));
+    return () => cancelAnimationFrame(id);
+  }, [isOpen]);
 
   // Calculate position of the dropdown
   const updatePosition = useCallback(() => {
@@ -143,21 +156,27 @@ export const SafeDropdown: React.FC<SafeDropdownProps> = ({
         minWidth: '200px',
         zIndex: 2000,
       }}
-      className="bg-surface-2 border border-edge rounded-lg shadow-xl overflow-hidden"
+      className={`origin-top-right bg-surface-2/95 backdrop-blur-xl border border-edge/70 rounded-xl shadow-2xl shadow-black/10 ring-1 ring-black/5 py-1.5 overflow-hidden transition-all duration-200 ease-out ${
+        entered ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
+      }`}
     >
-      {items.map((item, index) => (
+      {items.map((item) => (
         <React.Fragment key={item.id}>
-          {item.divider && <div className="h-px bg-edge" />}
+          {item.divider && <div className="my-1 mx-2 h-px bg-edge/70" />}
           <button
-            onClick={() => handleItemClick(item)}
-            className={`w-full px-4 py-2.5 text-left text-sm font-medium flex items-center gap-2 transition ${
-              item.active
-                ? 'bg-accent text-white'
-                : 'text-fg-muted hover:bg-surface-3 hover:text-fg'
+            onClick={() => !item.disabled && handleItemClick(item)}
+            disabled={item.disabled}
+            className={`w-[calc(100%-12px)] mx-1.5 my-0.5 px-2.5 py-2 rounded-lg text-left text-sm font-medium flex items-center gap-2 transition-colors duration-150 ${
+              item.disabled
+                ? 'text-fg-subtle/60 cursor-not-allowed'
+                : item.active
+                  ? 'bg-accent/10 text-accent'
+                  : 'text-fg-muted hover:bg-surface-3/80 hover:text-fg cursor-pointer'
             }`}
           >
-            {item.icon}
-            {item.label}
+            <span className="flex-shrink-0 [&>svg]:w-[14px] [&>svg]:h-[14px]">{item.icon}</span>
+            <span className="flex-1 truncate">{item.label}</span>
+            {item.active && <Check size={14} className="flex-shrink-0 text-accent" />}
           </button>
         </React.Fragment>
       ))}

@@ -200,3 +200,178 @@ export interface EmployeeIncentive {
   status: 'simulated' | 'sent' | 'failed';
   created_at: string;
 }
+
+// I.B Academy Types
+export interface AcademyTrack {
+  id: string;
+  key: string;
+  title: string;
+  description: string;
+  icon: string;
+  order_index: number;
+  created_at: string;
+}
+
+export interface AcademyCourse {
+  id: string;
+  track_id: string;
+  key: string;
+  title: string;
+  objectives: string;
+  workload_hours: number;
+  order_index: number;
+  is_placeholder: boolean;
+  pilar_tag: string | null;
+  created_at: string;
+}
+
+export interface AcademyLessonAttachment {
+  name: string;
+  url: string;
+  type: 'pdf' | 'image';
+}
+
+export interface AcademyLesson {
+  id: string;
+  course_id: string;
+  title: string;
+  body_richtext: string;
+  video_url: string | null;
+  attachments: AcademyLessonAttachment[];
+  order_index: number;
+  created_at: string;
+}
+
+export interface AcademyQuiz {
+  id: string;
+  course_id: string;
+  min_pass_pct: number;
+  created_at: string;
+}
+
+export interface AcademyQuizQuestion {
+  id: string;
+  quiz_id: string;
+  question: string;
+  options: string[];
+  correct_index: number;
+  order_index: number;
+}
+
+export interface AcademyEnrollment {
+  id: string;
+  company_id: string;
+  user_id: string;
+  track_id: string;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export type AcademyCourseStatus = 'not_started' | 'in_progress' | 'completed';
+
+export interface AcademyCourseProgress {
+  id: string;
+  company_id: string;
+  user_id: string;
+  course_id: string;
+  status: AcademyCourseStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  updated_at: string;
+}
+
+export interface AcademyLessonProgress {
+  id: string;
+  company_id: string;
+  user_id: string;
+  lesson_id: string;
+  completed: boolean;
+  completed_at: string | null;
+}
+
+export interface AcademyQuizAttempt {
+  id: string;
+  company_id: string;
+  user_id: string;
+  quiz_id: string;
+  answers: number[];
+  score_pct: number;
+  passed: boolean;
+  created_at: string;
+}
+
+export interface AcademyCertificate {
+  id: string;
+  company_id: string;
+  user_id: string;
+  track_id: string;
+  learner_name: string;
+  total_workload_hours: number;
+  issued_at: string;
+}
+
+export interface PilarChecklistProgress {
+  id: string;
+  company_id: string;
+  user_id: string;
+  item_key: string;
+  checked: boolean;
+  updated_at: string;
+}
+
+export interface PdiPlan {
+  id: string;
+  company_id: string;
+  employee_user_id: string;
+  created_by: string | null;
+  goal_title: string;
+  goal_description: string | null;
+  status: 'active' | 'completed' | 'archived';
+  created_at: string;
+}
+
+export interface PdiStep {
+  id: string;
+  company_id: string;
+  pdi_plan_id: string;
+  title: string;
+  course_id: string | null;
+  order_index: number;
+  completed: boolean;
+  completed_at: string | null;
+}
+
+export interface LibraryResource {
+  id: string;
+  title: string;
+  description: string | null;
+  category: 'pdf' | 'checklist' | 'pop' | 'template';
+  external_url: string | null;
+  is_placeholder: boolean;
+  order_index: number;
+  created_at: string;
+}
+
+export interface AcademyTrackProgressRow {
+  user_id: string;
+  company_id: string;
+  track_id: string;
+  track_title: string;
+  courses_total: number;
+  courses_completed: number;
+  pct_complete: number;
+  hours_studied: number;
+  has_certificate: boolean;
+}
+
+export interface AcademyTeamSummaryRow {
+  user_id: string;
+  company_id: string;
+  name: string | null;
+  role: string;
+  courses_completed: number;
+  certificates_count: number;
+  hours_studied: number;
+  last_activity_at: string | null;
+  never_accessed: boolean;
+}

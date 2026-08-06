@@ -15,6 +15,7 @@ import React, {
 } from 'react';
 import { supabase } from './supabase';
 import type { User, Session } from '@supabase/supabase-js';
+import { getRememberedWorkspaceDevice } from './workspacePrefs';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,12 @@ export interface Company {
   slug: string;
   plan: 'starter' | 'professional' | 'enterprise';
   settings: Record<string, unknown>;
+  icon: string | null;
+  description: string | null;
+}
+
+export interface CompanyMembership extends Company {
+  lastAccessedAt: string | null;
 }
 
 export interface Profile {
@@ -43,6 +50,7 @@ export type AuthView =
   | 'confirm-email'
   | 'link-company'
   | 'complete-profile'
+  | 'select-workspace'
   | 'auth-error'
   | 'app';
 
@@ -52,7 +60,7 @@ interface AuthContextValue {
   profile: Profile | null;
   company: Company | null;
   companyId: string;
-  companies: Company[];
+  companies: CompanyMembership[];
   switchingCompany: boolean;
   authLoading: boolean;
   profileLoading: boolean;
@@ -78,7 +86,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession]                 = useState<Session | null>(null);
   const [profile, setProfile]                 = useState<Profile | null>(null);
   const [company, setCompany]                 = useState<Company | null>(null);
-  const [companies, setCompanies]             = useState<Company[]>([]);
+  const [companies, setCompanies]             = useState<CompanyMembership[]>([]);
   const [switchingCompany, setSwitchingCompany] = useState(false);
   const [authLoading, setAuthLoading]         = useState(true);
   const [profileLoading, setProfileLoading]   = useState(false);
@@ -119,7 +127,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const doLoadCompany = useCallback(async (companyId: string): Promise<Company | null> => {
     const { data, error } = await supabase
       .from('companies')
-      .select('id, name, slug, plan, settings')
+      .select('id, name, slug, plan, settings, icon, description')
       .eq('id', companyId)
       .maybeSingle();
 
@@ -128,20 +136,22 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     return (data ?? null) as Company | null;
   }, []);
 
-  const doLoadMemberships = useCallback(async (userId: string): Promise<Company[]> => {
+  const doLoadMemberships = useCallback(async (userId: string): Promise<CompanyMembership[]> => {
     const { data, error } = await supabase
       .from('company_members')
-      .select('companies(id, name, slug, plan, settings)')
+      .select('last_accessed_at, companies(id, name, slug, plan, settings, icon, description)')
       .eq('user_id', userId);
 
     if (import.meta.env.DEV && error) console.warn('[Auth] Memberships error:', error.message);
 
-    const rows = (data ?? []) as unknown as { companies: Company | null }[];
-    return rows.map(r => r.companies).filter((c): c is Company => !!c);
+    const rows = (data ?? []) as unknown as { last_accessed_at: string | null; companies: Company | null }[];
+    return rows
+      .filter((r): r is { last_accessed_at: string | null; companies: Company } => !!r.companies)
+      .map(r => ({ ...r.companies, lastAccessedAt: r.last_accessed_at }));
   }, []);
 
   // ── Resolve which view to show ─────────────────────────────────────────────
-  const resolveView = useCallback((u: User, prof: Profile | null) => {
+  const resolveView = useCallback((u: User, prof: Profile | null, memberships: CompanyMembership[]) => {
     if (import.meta.env.DEV) console.log('[Auth] Resolving view — user:', u.email, 'profile:', prof, 'email_confirmed:', u.email_confirmed_at);
 
     if (!u.email_confirmed_at) {
@@ -157,6 +167,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!prof.company_id) {
       if (import.meta.env.DEV) console.log('[Auth] → link-company (no company_id in profile)');
       setView('link-company');
+      return;
+    }
+    if (memberships.length > 1 && !getRememberedWorkspaceDevice()) {
+      if (import.meta.env.DEV) console.log('[Auth] → select-workspace (', memberships.length, 'workspaces, not remembered on this device)');
+      setView('select-workspace');
       return;
     }
     if (import.meta.env.DEV) console.log('[Auth] → app ✓  role:', prof.role, 'company_id:', prof.company_id);
@@ -189,7 +204,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       if (mountedRef.current) setCompanies(memberships);
 
       if (mountedRef.current) {
-        resolveView(u, prof);
+        resolveView(u, prof, memberships);
       }
     } catch (err) {
       if (import.meta.env.DEV) console.error('[Auth] runAuthSequence error:', err);

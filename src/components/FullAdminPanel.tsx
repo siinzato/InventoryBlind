@@ -292,6 +292,7 @@ const ItemsPanel: React.FC<{
               <p className="text-sm">Nenhum item nesta operação.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-3 border-b border-edge sticky top-0">
                 <tr>
@@ -339,6 +340,7 @@ const ItemsPanel: React.FC<{
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
 

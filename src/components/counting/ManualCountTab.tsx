@@ -171,7 +171,7 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
             </div>
           </div>
 
-          <div className="grid grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label className={labelClass}>Total de SKUs</label>
               <input type="number" min="0" value={totalSku} onChange={e => setTotalSku(e.target.value)} className={`${inputClass} font-mono`} />
@@ -203,7 +203,7 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
           </div>
 
           {(metrics.accuracyInitial !== null || metrics.accuracyFinal !== null) && (
-            <div className="grid grid-cols-4 gap-3 rounded-lg border border-edge divide-x divide-edge overflow-hidden">
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg border border-edge divide-x divide-edge overflow-hidden">
               <div className="p-3 text-center">
                 <p className="text-xs text-fg-subtle">Acuracidade inicial</p>
                 <p className="text-sm font-semibold text-fg">{metrics.accuracyInitial !== null ? `${metrics.accuracyInitial.toFixed(1)}%` : '—'}</p>

@@ -14,7 +14,8 @@ export type Permission =
   | 'erp.manage'
   | 'security.view'
   | 'audit.view'
-  | 'settings.manage';
+  | 'settings.manage'
+  | 'academy.manage';
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: [
@@ -29,6 +30,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'security.view',
     'audit.view',
     'settings.manage',
+    'academy.manage',
   ],
   admin: [
     'products.read','products.write',
@@ -41,6 +43,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'erp.manage',
     'security.view',
     'audit.view',
+    'academy.manage',
   ],
   manager: [
     'products.read',
@@ -49,6 +52,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'full.read','full.write',
     'labels.use',
     'reports.export',
+    'academy.manage',
   ],
   lead: [
     'products.read',
@@ -57,6 +61,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'full.read','full.write',
     'labels.use',
     'reports.export',
+    'academy.manage',
   ],
   counter: [
     'products.read',

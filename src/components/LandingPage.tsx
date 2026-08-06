@@ -9,8 +9,9 @@
  * zero-props default-export contract that src/App.tsx imports.
  */
 
-import type { FC } from 'react';
+import { useEffect, type FC } from 'react';
 import { useAuth } from '../lib/auth';
+import { ScrollTrigger } from './landing/landingScroll';
 import { Navbar } from './landing/Navbar';
 import { Hero } from './landing/Hero';
 import { CinematicDashboard } from './landing/CinematicDashboard';
@@ -27,6 +28,23 @@ const LandingPage: FC = () => {
   const { setView } = useAuth();
   const onLogin = () => setView('login');
   const onSignup = () => setView('signup');
+
+  // Desktop's pin+scrub ScrollTrigger sequences (CinematicDashboard, OperationalJourney,
+  // KpiCounters, Differentials — all `tier === 'full'` only) measure trigger/pin distances
+  // at mount. If that happens before webfonts swap in or images finish loading, the measured
+  // layout is wrong and those sequences misfire — mobile/tablet never hits this because their
+  // fallback there is a simple one-shot/static render with no pin math to get wrong. A refresh
+  // once layout has actually settled fixes the measurements without touching any section file.
+  useEffect(() => {
+    const refresh = () => ScrollTrigger.refresh();
+    document.fonts?.ready?.then(refresh);
+    window.addEventListener('load', refresh);
+    const settleTimer = setTimeout(refresh, 500);
+    return () => {
+      window.removeEventListener('load', refresh);
+      clearTimeout(settleTimer);
+    };
+  }, []);
 
   return (
     <div className="bg-ink-950 min-h-screen">

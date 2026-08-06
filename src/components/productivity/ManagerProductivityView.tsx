@@ -1,24 +1,31 @@
 import { useEffect, useState } from 'react';
-import { Users, Target, TrendingUp, Package, Zap, Star, AlertTriangle, Award } from 'lucide-react';
+import { Users, Target, TrendingUp, Package, Zap, Star, AlertTriangle, Award, GraduationCap } from 'lucide-react';
 import { Panel, PanelSection } from '../ui';
 import { UserProductivityStats } from '../../lib/supabase';
 import { getTeamProductivity, rankTeam } from '../../lib/productivityService';
 import { getTeamUnlockedCounts } from '../../lib/achievementService';
+import { hasPermission } from '../../lib/permissionService';
 import { EmployeeProductivityTable } from './EmployeeProductivityTable';
 import { EmployeeProfile } from './EmployeeProfile';
 import { TeamProductivityReport } from './TeamProductivityReport';
+import { AcademyManagerView } from '../academy/AcademyManagerView';
 
 interface ManagerProductivityViewProps {
   companyId: string;
   currentUserId: string;
   currentUserEmail: string;
+  role: string | undefined;
 }
 
-export function ManagerProductivityView({ companyId, currentUserId, currentUserEmail }: ManagerProductivityViewProps) {
+type Section = 'produtividade' | 'academy';
+
+export function ManagerProductivityView({ companyId, currentUserId, currentUserEmail, role }: ManagerProductivityViewProps) {
   const [team, setTeam] = useState<UserProductivityStats[]>([]);
   const [achievementCounts, setAchievementCounts] = useState<Map<string, number>>(new Map());
   const [loading, setLoading] = useState(true);
   const [selectedEmployeeId, setSelectedEmployeeId] = useState<string | null>(null);
+  const [section, setSection] = useState<Section>('produtividade');
+  const canManageAcademy = hasPermission(role, 'academy.manage');
 
   useEffect(() => {
     let cancelled = false;
@@ -61,6 +68,27 @@ export function ManagerProductivityView({ companyId, currentUserId, currentUserE
 
   return (
     <div className="space-y-6">
+      {canManageAcademy && (
+        <div className="flex gap-2">
+          <button
+            onClick={() => setSection('produtividade')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${section === 'produtividade' ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'}`}
+          >
+            <Users size={16} /> Produtividade
+          </button>
+          <button
+            onClick={() => setSection('academy')}
+            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${section === 'academy' ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'}`}
+          >
+            <GraduationCap size={16} /> Academy
+          </button>
+        </div>
+      )}
+
+      {section === 'academy' && canManageAcademy ? (
+        <AcademyManagerView companyId={companyId} currentUserId={currentUserId} currentUserEmail={currentUserEmail} />
+      ) : (
+      <>
       <Panel>
         <PanelSection padding="md" className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {cards.map(card => (
@@ -91,6 +119,8 @@ export function ManagerProductivityView({ companyId, currentUserId, currentUserE
           currentUserEmail={currentUserEmail}
           onClose={() => setSelectedEmployeeId(null)}
         />
+      )}
+      </>
       )}
     </div>
   );

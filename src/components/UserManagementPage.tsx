@@ -285,6 +285,7 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
               <p className="text-sm">Nenhum usuário encontrado.</p>
             </div>
           ) : (
+            <div className="overflow-x-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-3 border-b border-edge">
                 <tr>
@@ -365,6 +366,7 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
                 ))}
               </tbody>
             </table>
+            </div>
           )}
         </div>
       </div>

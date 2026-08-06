@@ -241,7 +241,7 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
 
       {step === 'preview' && (
         <>
-          <PanelSection padding="md" className="grid grid-cols-5 divide-x divide-edge">
+          <PanelSection padding="md" className="grid grid-cols-2 sm:grid-cols-5 divide-y divide-edge sm:divide-y-0 sm:divide-x">
             <div className="text-center px-2"><p className="text-xs text-fg-subtle">Total</p><p className="text-lg font-semibold text-fg">{summary.total}</p></div>
             <div className="text-center px-2"><p className="text-xs text-fg-subtle">Corretos</p><p className="text-lg font-semibold text-emerald-600 dark:text-emerald-400">{summary.correct}</p></div>
             <div className="text-center px-2"><p className="text-xs text-fg-subtle">Divergentes</p><p className="text-lg font-semibold text-amber-600 dark:text-amber-400">{summary.divergent}</p></div>
@@ -260,7 +260,7 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
             ))}
           </PanelSection>
 
-          <div className="border-t border-edge max-h-96 overflow-y-auto">
+          <div className="border-t border-edge max-h-96 overflow-auto">
             <table className="w-full text-sm">
               <thead className="bg-surface-3 sticky top-0">
                 <tr>

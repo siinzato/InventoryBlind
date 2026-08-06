@@ -21,7 +21,13 @@ export type AuditAction =
   | 'access.denied'
   | 'productivity.view_team'
   | 'productivity.report_export'
-  | 'productivity.incentive_sent';
+  | 'productivity.incentive_sent'
+  | 'academy.course_started'
+  | 'academy.course_completed'
+  | 'academy.quiz_attempted'
+  | 'academy.certificate_generated'
+  | 'academy.pdi_created'
+  | 'academy.view_team';
 
 interface LogParams {
   companyId: string;

@@ -56,16 +56,22 @@ import {
   Code2,
   Webhook,
   Workflow,
-  FileText
+  FileText,
+  Settings,
+  Sun,
+  Moon,
+  GraduationCap
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory } from './lib/supabase';
 import { SafeDropdown } from './components/SafeDropdown';
 import { DashboardRankingPreview } from './components/DashboardRankingPreview';
 import { CountManagementCenter } from './components/counting/CountManagementCenter';
+import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
 import { hasPermission, getRoleLabel } from './lib/permissionService';
 import { usePWAInstall } from './lib/usePWAInstall';
+import { useTheme } from './lib/useTheme';
 import { LogoMark } from './components/landing/landingUi';
 import { ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
@@ -83,6 +89,7 @@ const UserManagementPage = React.lazy(() => import('./components/UserManagementP
 const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
 const ProductivityTab = React.lazy(() => import('./components/productivity/ProductivityTab').then(m => ({ default: m.ProductivityTab })));
+const AcademyRouter = React.lazy(() => import('./components/academy/AcademyRouter').then(m => ({ default: m.AcademyRouter })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -136,6 +143,7 @@ interface GlobalData {
 
 function AppContent() {
   const { profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
 
   const [brandsData, setBrandsData] = useState<BrandData[]>([]);
@@ -859,6 +867,13 @@ function AppContent() {
       ],
     },
     {
+      id: 'academy-group',
+      label: 'I.B Academy',
+      items: [
+        { id: 'academy', label: 'I.B Academy', icon: <GraduationCap />, onClick: () => { setActiveTab('academy'); setMobileOpen(false); }, active: activeTab === 'academy' },
+      ],
+    },
+    {
       id: 'counting-group',
       label: 'Contagens',
       items: [
@@ -954,20 +969,48 @@ function AppContent() {
           trigger={
             <button
               disabled={switchingCompany}
-              className="w-full flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-surface-3/60 hover:bg-surface-3 border border-edge text-xs font-semibold text-fg-muted hover:text-fg transition-colors disabled:opacity-60"
+              className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-xl bg-surface-2/70 hover:bg-surface-3 border border-edge/70 transition-colors duration-200 disabled:opacity-60"
             >
-              <Building2 size={12} className="text-fg-subtle flex-shrink-0" />
-              <span className="truncate">{switchingCompany ? 'Trocando...' : company.name}</span>
-              {companies.length > 1 && <ChevronDown size={11} className="text-fg-subtle flex-shrink-0 ml-auto" />}
+              <span className="w-6 h-6 rounded-md bg-gradient-to-br from-accent to-accent-strong flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 shadow-sm shadow-black/10">
+                {company.name.slice(0, 1).toUpperCase()}
+              </span>
+              <span className="min-w-0 text-left leading-tight">
+                <span className="block truncate text-xs font-semibold text-fg">
+                  {switchingCompany ? 'Trocando...' : company.name}
+                </span>
+                <span className="block text-[10px] text-fg-subtle">Workspace</span>
+              </span>
+              {companies.length > 1 && (
+                <ChevronDown size={12} className="text-fg-subtle flex-shrink-0 ml-auto transition-transform duration-200 group-hover:translate-y-0.5" />
+              )}
             </button>
           }
-          items={companies.map(c => ({
-            id: c.id,
-            label: c.name,
-            icon: <Building2 size={14} />,
-            active: c.id === company.id,
-            onClick: () => switchCompany(c.id),
-          }))}
+          items={[
+            ...companies.map(c => ({
+              id: c.id,
+              label: c.name,
+              icon: (
+                <span className="w-5 h-5 rounded-md bg-gradient-to-br from-accent to-accent-strong flex items-center justify-center text-white text-[9px] font-bold">
+                  {c.name.slice(0, 1).toUpperCase()}
+                </span>
+              ),
+              active: c.id === company.id,
+              onClick: () => switchCompany(c.id),
+            })),
+            {
+              id: 'add-company',
+              label: (
+                <span className="flex items-center gap-1.5">
+                  Adicionar empresa
+                  <span className="text-[9px] font-semibold uppercase tracking-wide text-fg-subtle bg-surface-3 rounded px-1 py-0.5">Em breve</span>
+                </span>
+              ),
+              icon: <Plus size={14} />,
+              disabled: true,
+              divider: true,
+              onClick: () => {},
+            },
+          ]}
         />
       )}
       <button
@@ -982,18 +1025,34 @@ function AppContent() {
   const userMenu = (
     <SafeDropdown
       trigger={
-        <button className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-surface-3 transition-colors">
-          <div className="w-7 h-7 rounded-full bg-accent-strong flex items-center justify-center text-xs font-bold text-white flex-shrink-0 uppercase">
+        <button className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface-3/70 transition-colors duration-200">
+          <span
+            title={profile?.email ?? undefined}
+            className="relative w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent-strong flex items-center justify-center text-xs font-bold text-white flex-shrink-0 uppercase ring-1 ring-white/15 shadow-[0_1px_3px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-105"
+          >
             {(profile?.email ?? '?').slice(0, 1)}
-          </div>
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" />
+          </span>
           <div className="hidden xl:block text-left leading-tight">
-            <p className="text-xs font-medium text-fg">{profile?.email?.split('@')[0]}</p>
-            <p className="text-[10px] text-fg-subtle">{getRoleLabel(profile?.role ?? '')}</p>
+            <p className="text-xs font-semibold text-fg">{profile?.email?.split('@')[0]}</p>
+            <p className="text-[10.5px] text-fg-subtle mt-0.5">{getRoleLabel(profile?.role ?? '')}</p>
           </div>
-          <ChevronDown size={12} className="text-fg-subtle hidden xl:block" />
+          <ChevronDown size={12} className="text-fg-subtle hidden xl:block transition-transform duration-200 group-hover:translate-y-0.5" />
         </button>
       }
       items={[
+        { id: 'conta', label: 'Minha Conta', icon: <User size={14} />, onClick: () => setActiveTab('conta') },
+        ...(hasPermission(profile?.role, 'security.view')
+          ? [{ id: 'config', label: 'Configurações', icon: <Settings size={14} />, onClick: () => setActiveTab('security') }]
+          : []),
+        {
+          id: 'theme',
+          label: theme === 'dark' ? 'Tema claro' : 'Tema escuro',
+          icon: theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />,
+          onClick: toggleTheme,
+          divider: true,
+        },
+        { id: 'empresa', label: company?.name ?? 'Empresa', icon: <Building2 size={14} />, disabled: true, onClick: () => {} },
         ...(canInstall ? [{ id: 'install', label: 'Instalar InventoryBlind', icon: <Download size={14} />, onClick: () => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } } }] : []),
         { id: 'signout', label: 'Sair', icon: <LogOut size={14} />, onClick: signOut, divider: true },
       ]}
@@ -1798,6 +1857,19 @@ function AppContent() {
           </React.Suspense>
         )}
 
+        {/* ABA I.B ACADEMY */}
+        {activeTab === 'academy' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AcademyRouter
+              userId={profile.id}
+              userEmail={profile.email ?? ''}
+              userName={profile.name ?? profile.email?.split('@')[0] ?? 'Colaborador'}
+              companyId={companyId}
+              role={profile.role}
+            />
+          </React.Suspense>
+        )}
+
           </> /* end activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' */
         )}
 
@@ -2324,6 +2396,7 @@ export default function App() {
 
   // Authenticated-only screens
   if (view === 'link-company' || view === 'complete-profile') return <LinkCompanyScreen />;
+  if (view === 'select-workspace') return <WorkspaceSelectorScreen />;
 
   // Profile loading after login
   if (profileLoading && view !== 'app') return <ProfileLoadingOverlay />;

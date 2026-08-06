@@ -4,6 +4,7 @@ import { PageHeader, Panel, PanelSection } from '../ui';
 import { UserProductivityStats } from '../../lib/supabase';
 import { getMyProductivity, computeCompetencyLevels } from '../../lib/productivityService';
 import { getAchievementProgress, checkAndUnlockAchievements } from '../../lib/achievementService';
+import { checkAndUnlockAcademyAchievements } from '../../lib/academyService';
 import { logAuditEvent } from '../../lib/auditLogService';
 import { hasPermission } from '../../lib/permissionService';
 import { ProductivityCards } from './ProductivityCards';
@@ -12,6 +13,7 @@ import { CompetencyLevels } from './CompetencyLevels';
 import { ProductivityTimeline } from './ProductivityTimeline';
 import { ProductivityReportExport } from './ProductivityReportExport';
 import { ManagerProductivityView } from './ManagerProductivityView';
+import { AcademyProductivitySection } from '../academy/AcademyProductivitySection';
 import type { AchievementDefinition, UserAchievement } from '../../lib/supabase';
 
 interface ProductivityTabProps {
@@ -35,7 +37,7 @@ export function ProductivityTab({ userId, userEmail, companyId, role }: Producti
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
-    checkAndUnlockAchievements(userId, companyId).finally(() => {
+    Promise.all([checkAndUnlockAchievements(userId, companyId), checkAndUnlockAcademyAchievements(userId, companyId)]).finally(() => {
       Promise.all([getMyProductivity(userId), getAchievementProgress(userId, companyId)]).then(([s, ach]) => {
         if (cancelled) return;
         setStats(s);
@@ -75,7 +77,7 @@ export function ProductivityTab({ userId, userEmail, companyId, role }: Producti
       )}
 
       {mode === 'team' && canViewTeam ? (
-        <ManagerProductivityView companyId={companyId} currentUserId={userId} currentUserEmail={userEmail} />
+        <ManagerProductivityView companyId={companyId} currentUserId={userId} currentUserEmail={userEmail} role={role} />
       ) : loading || !stats ? (
         <Panel><PanelSection padding="lg" className="text-center text-fg-subtle">Carregando produtividade...</PanelSection></Panel>
       ) : (
@@ -83,6 +85,7 @@ export function ProductivityTab({ userId, userEmail, companyId, role }: Producti
           <ProductivityCards stats={stats} />
           <CompetencyLevels levels={computeCompetencyLevels(stats)} />
           <AchievementGrid definitions={definitions} progress={progress} />
+          <AcademyProductivitySection userId={userId} companyId={companyId} />
           <ProductivityTimeline definitions={definitions} progress={progress} />
           <Panel>
             <ProductivityReportExport

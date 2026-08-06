@@ -14,7 +14,7 @@ interface AppHeaderProps {
 export function AppHeader({ onOpenMobileNav, left, right, className = '' }: AppHeaderProps) {
   return (
     <header
-      className={`h-14 flex items-center gap-3 px-4 md:px-6 border-b border-edge bg-surface flex-shrink-0 ${className}`}
+      className={`h-16 flex items-center gap-3 px-4 md:px-7 border-b border-edge/70 bg-surface/85 backdrop-blur-md flex-shrink-0 ${className}`}
     >
       {onOpenMobileNav && (
         <button

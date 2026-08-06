@@ -546,11 +546,11 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                     <p className="text-xs text-fg-subtle font-semibold uppercase mb-0.5">Nome</p>
                     <p className="font-bold text-fg text-sm">{product.name}</p>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
                     {[['SKU', product.sku], ['EAN', product.ean || '—'], ['Local', product.location || '—']].map(([l, v]) => (
-                      <div key={l} className="p-2.5 bg-surface-3 rounded-lg">
+                      <div key={l} className="p-2.5 bg-surface-3 rounded-lg min-w-0">
                         <p className="text-xs text-fg-subtle font-semibold uppercase mb-0.5">{l}</p>
-                        <p className="font-mono font-bold text-fg text-xs">{v}</p>
+                        <p className="font-mono font-bold text-fg text-xs truncate">{v}</p>
                       </div>
                     ))}
                   </div>

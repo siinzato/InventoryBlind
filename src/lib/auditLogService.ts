@@ -27,7 +27,21 @@ export type AuditAction =
   | 'academy.quiz_attempted'
   | 'academy.certificate_generated'
   | 'academy.pdi_created'
-  | 'academy.view_team';
+  | 'academy.view_team'
+  | 'cbc.recompute'
+  | 'risk.recompute'
+  | 'risk.criticality_override'
+  | 'abcxyz.recompute'
+  | 'slotting.layout_updated'
+  | 'slotting.recommendation_decided'
+  | 'slotting.sku_moved'
+  | 'rca.divergence_classified'
+  | 'rca.five_whys_opened'
+  | 'rca.five_whys_answered'
+  | 'rca.five_whys_completed'
+  | 'rca.settings_updated'
+  | 'audit.count_approved'
+  | 'audit.statistical_run';
 
 interface LogParams {
   companyId: string;

@@ -9,6 +9,8 @@ import { supabase } from '../../lib/supabase';
 import { normalizeEan, buildEanIndex } from '../../lib/nfe/nfeEanUtils';
 import { formatQty } from './nfeUi';
 import { Card, Button, Modal } from '../ui';
+import { useAuth } from '../../lib/auth';
+import { RcaClassificationModal, PendingRcaItem } from '../rca/RcaClassificationModal';
 
 interface Props {
   invoice: NfeInvoice;
@@ -19,7 +21,9 @@ interface Props {
 type Filter = 'all' | 'pending' | 'done';
 
 export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
+  const { companyId, profile } = useAuth();
   const [items, setItems] = useState<NfeInvoiceItem[]>([]);
+  const [pendingRcaItems, setPendingRcaItems] = useState<PendingRcaItem[]>([]);
   const [products, setProducts] = useState<Map<string, CatalogProduct>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -134,6 +138,30 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
     setError(null);
     try {
       await finalizeConference(invoice.id);
+
+      // RCA — recebimento com falta/sobra exige causa antes de fechar a conferência.
+      const finalItems = await getInvoiceItems(invoice.id);
+      const divergentItems = finalItems.filter((it) => it.result_status === 'missing' || it.result_status === 'surplus');
+      if (divergentItems.length > 0) {
+        setPendingRcaItems(divergentItems.map((it) => {
+          const prod = it.product_id ? products.get(it.product_id) : null;
+          return {
+            sourceItemId: it.id,
+            productId: it.product_id,
+            sku: it.snapshot_sku ?? prod?.sku ?? null,
+            productName: it.snapshot_product_name ?? it.description ?? prod?.name ?? null,
+            location: prod?.location ?? null,
+            operatorUserId: null,
+            operatorName: null,
+            supplierName: invoice.supplier_name,
+            supplierCnpj: invoice.supplier_cnpj,
+            divergenceQty: (it.physical_quantity ?? 0) - it.expected_quantity,
+          };
+        }));
+        setFinalizing(false);
+        return;
+      }
+
       onFinalized();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível finalizar.');
@@ -315,6 +343,18 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
           </Button>
         </div>
       </Modal>
+
+      {profile && companyId && (
+        <RcaClassificationModal
+          open={pendingRcaItems.length > 0}
+          sourceModule="nfe_receiving"
+          items={pendingRcaItems}
+          companyId={companyId}
+          userId={profile.id}
+          userEmail={profile.email ?? ''}
+          onDone={() => { setPendingRcaItems([]); onFinalized(); }}
+        />
+      )}
     </div>
   );
 }

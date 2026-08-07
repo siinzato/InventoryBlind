@@ -14,9 +14,10 @@
  * - Exportar lista como CSV
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import { SafeDropdown } from './SafeDropdown';
 import {
   ShieldAlert, RefreshCw, Search, Filter, ChevronDown, ChevronUp,
   Edit2, Trash2, XCircle, RotateCcw, Check, X, Download,
@@ -100,43 +101,26 @@ const StatusSelector: React.FC<{
   onSelect: (s: FullStatus) => void;
   loading?: boolean;
 }> = ({ current, options, onSelect, loading }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        disabled={loading}
-        className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border transition cursor-pointer hover:opacity-80 ${STATUS_COLOR[current]}`}
-      >
-        {loading ? <RefreshCw size={11} className="animate-spin" /> : <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[current]}`} />}
-        {STATUS_LABEL[current]}
-        <ChevronDown size={11} />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-surface-2 border border-edge rounded-xl shadow-xl min-w-[160px] py-1 overflow-hidden">
-          {options.map(s => (
-            <button
-              key={s}
-              onClick={() => { onSelect(s); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold hover:bg-surface-3 transition text-left ${s === current ? 'opacity-50 pointer-events-none' : ''}`}
-            >
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[s]}`} />
-              {STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <SafeDropdown
+      trigger={
+        <button
+          disabled={loading}
+          className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border transition cursor-pointer hover:opacity-80 ${STATUS_COLOR[current]}`}
+        >
+          {loading ? <RefreshCw size={11} className="animate-spin" /> : <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[current]}`} />}
+          {STATUS_LABEL[current]}
+          <ChevronDown size={11} />
+        </button>
+      }
+      items={options.map(s => ({
+        id: s,
+        label: STATUS_LABEL[s],
+        icon: <span className={`w-2 h-2 rounded-full ${STATUS_DOT[s]}`} />,
+        disabled: s === current,
+        onClick: () => onSelect(s),
+      }))}
+    />
   );
 };
 

@@ -16,8 +16,17 @@ import {
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { ProductFromDB } from '../lib/productImportTypes';
+import type { ProductConfidenceScore, ProductRiskScore, ProductAbcXyzClassification } from '../lib/supabase';
 import { formatPrice, formatDateTime, downloadFile, exportProductsToCSV } from '../lib/productImportUtils';
 import { Panel, PanelSection, Button, Table, Tr, Td } from './ui';
+import { useAuth } from '../lib/auth';
+import { getConfidenceForProducts } from '../lib/cbcService';
+import { getRiskForProducts } from '../lib/riskService';
+import { getClassificationsForProducts } from '../lib/abcXyzService';
+import { ConfidenceBadge } from './cbc/ConfidenceBadge';
+import { ProductConfidenceModal } from './cbc/ProductConfidenceModal';
+import { RiskBadge } from './risk/RiskBadge';
+import { ClassificationBadge } from './abcxyz/ClassificationBadge';
 
 interface ImportedProductsPageProps {
   onBack: () => void;
@@ -36,7 +45,12 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editData, setEditData] = useState<Partial<ProductFromDB>>({});
   const [totalProducts, setTotalProducts] = useState(0);
+  const [confidenceByProduct, setConfidenceByProduct] = useState<Map<string, ProductConfidenceScore>>(new Map());
+  const [riskByProduct, setRiskByProduct] = useState<Map<string, ProductRiskScore>>(new Map());
+  const [classificationByProduct, setClassificationByProduct] = useState<Map<string, ProductAbcXyzClassification>>(new Map());
+  const [selectedProduct, setSelectedProduct] = useState<ProductFromDB | null>(null);
   const pageSize = 20;
+  const { companyId, profile } = useAuth();
 
   // Load products
   const loadProducts = async () => {
@@ -68,6 +82,16 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
 
       setProducts(data || []);
       setTotalProducts(count || 0);
+      if (data && data.length > 0 && companyId) {
+        const ids = data.map((p: ProductFromDB) => p.id);
+        getConfidenceForProducts(ids, companyId).then(setConfidenceByProduct);
+        getRiskForProducts(ids, companyId).then(setRiskByProduct);
+        getClassificationsForProducts(ids, companyId).then(setClassificationByProduct);
+      } else {
+        setConfidenceByProduct(new Map());
+        setRiskByProduct(new Map());
+        setClassificationByProduct(new Map());
+      }
     } catch (err) {
       console.error('Error loading products:', err);
     }
@@ -262,6 +286,9 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">EAN</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Local</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Preco</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Confiança</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Risco</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">ABC/XYZ</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Atualizado</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Acoes</th>
                   </tr>
@@ -328,6 +355,39 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
                           />
                         ) : (
                           <span className="text-fg">{formatPrice(product.price)}</span>
+                        )}
+                      </Td>
+                      <Td>
+                        {confidenceByProduct.has(product.id) ? (
+                          <button onClick={() => setSelectedProduct(product)} className="cursor-pointer">
+                            <ConfidenceBadge
+                              riskLevel={confidenceByProduct.get(product.id)!.risk_level}
+                              score={confidenceByProduct.get(product.id)!.confidence_score}
+                            />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-fg-subtle">—</span>
+                        )}
+                      </Td>
+                      <Td>
+                        {riskByProduct.has(product.id) ? (
+                          <button onClick={() => setSelectedProduct(product)} className="cursor-pointer">
+                            <RiskBadge
+                              riskLevel={riskByProduct.get(product.id)!.risk_level}
+                              score={riskByProduct.get(product.id)!.risk_score}
+                            />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-fg-subtle">—</span>
+                        )}
+                      </Td>
+                      <Td>
+                        {classificationByProduct.has(product.id) ? (
+                          <button onClick={() => setSelectedProduct(product)} className="cursor-pointer">
+                            <ClassificationBadge combo={classificationByProduct.get(product.id)!.abc_xyz_class} />
+                          </button>
+                        ) : (
+                          <span className="text-xs text-fg-subtle">—</span>
                         )}
                       </Td>
                       <Td className="text-xs text-fg-subtle">
@@ -407,6 +467,19 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
           </>
         )}
       </Panel>
+
+      {selectedProduct && companyId && (
+        <ProductConfidenceModal
+          open={!!selectedProduct}
+          onClose={() => setSelectedProduct(null)}
+          productId={selectedProduct.id}
+          productName={selectedProduct.name}
+          companyId={companyId}
+          role={profile?.role}
+          userId={profile?.id}
+          userEmail={profile?.email ?? undefined}
+        />
+      )}
     </div>
   );
 };

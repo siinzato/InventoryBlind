@@ -1,6 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
+import { SafeDropdown } from './SafeDropdown';
 import {
   Plus, Calendar, RefreshCw, X, Check, Pencil, AlertTriangle,
   Package, User, Clock,
@@ -34,7 +35,6 @@ const AgendaCard: React.FC<{
   onNavigate: (opId: string) => void;
 }> = ({ op, onEdit, onStatusChange, onNavigate }) => {
   const tagCls = STATUS_COLOR[op.status];
-  const [openStatus, setOpenStatus] = useState(false);
 
   return (
     <div className="bg-surface-2 rounded-xl border border-edge overflow-hidden flex flex-col">
@@ -75,24 +75,19 @@ const AgendaCard: React.FC<{
       {/* Actions */}
       <div className="px-4 pb-4 flex gap-2 flex-wrap">
         {/* Status change */}
-        <div className="relative">
-          <button
-            onClick={() => setOpenStatus(v => !v)}
-            className="flex items-center gap-1.5 px-3 py-1.5 border border-edge bg-surface-3 hover:bg-edge rounded-lg text-xs font-semibold text-fg-muted transition"
-          >
-            <Clock size={12} /> Status
-          </button>
-          {openStatus && (
-            <div className="absolute bottom-9 left-0 z-20 bg-surface-2 border border-edge rounded-xl shadow-xl p-1 min-w-[160px]">
-              {ALL_STATUSES.map(s => (
-                <button key={s} onClick={() => { onStatusChange(s); setOpenStatus(false); }}
-                  className={`w-full text-left px-3 py-2 text-xs font-semibold rounded-lg transition ${op.status === s ? 'bg-edge' : 'hover:bg-surface-3'}`}>
-                  {STATUS_LABEL[s]}
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
+        <SafeDropdown
+          trigger={
+            <button className="flex items-center gap-1.5 px-3 py-1.5 border border-edge bg-surface-3 hover:bg-edge rounded-lg text-xs font-semibold text-fg-muted transition">
+              <Clock size={12} /> Status
+            </button>
+          }
+          items={ALL_STATUSES.map(s => ({
+            id: s,
+            label: STATUS_LABEL[s],
+            active: op.status === s,
+            onClick: () => onStatusChange(s),
+          }))}
+        />
 
         <button onClick={onEdit}
           className="flex items-center gap-1.5 px-3 py-1.5 border border-edge bg-surface-3 hover:bg-edge rounded-lg text-xs font-semibold text-fg-muted transition">

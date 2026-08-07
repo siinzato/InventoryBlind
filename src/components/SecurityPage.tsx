@@ -329,7 +329,7 @@ function AuditLogsTable({ companyId }: { companyId: string }) {
 
   return (
     <div className="bg-surface-2 border border-edge rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between p-5 border-b border-edge">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-edge">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-blue-500/15 rounded-xl flex items-center justify-center">
             <FileText size={18} className="text-blue-400" />
@@ -341,7 +341,7 @@ function AuditLogsTable({ companyId }: { companyId: string }) {
             value={filter}
             onChange={e => { setFilter(e.target.value); setPage(0); }}
             placeholder="Filtrar por ação..."
-            className="bg-surface-3 border border-edge rounded-lg px-3 py-1.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:border-accent w-44"
+            className="bg-surface-3 border border-edge rounded-lg px-3 py-1.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:border-accent w-44 max-w-full"
           />
           <button onClick={load} className="p-1.5 text-fg-subtle hover:text-fg-muted transition">
             <RefreshCw size={16} />
@@ -426,7 +426,7 @@ function SecurityLogsTable({ companyId }: { companyId: string }) {
 
   return (
     <div className="bg-surface-2 border border-edge rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between p-5 border-b border-edge">
+      <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-edge">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-red-500/15 rounded-xl flex items-center justify-center">
             <ShieldAlert size={18} className="text-red-400" />

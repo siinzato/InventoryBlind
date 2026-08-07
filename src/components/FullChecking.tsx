@@ -7,6 +7,9 @@ import {
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR } from '../lib/fullManagerTypes';
 import { Panel, PanelSection, Button } from './ui';
+import { recomputeForProducts } from '../lib/cbcService';
+import { recomputeRiskForProducts } from '../lib/riskService';
+import { RcaClassificationModal, PendingRcaItem } from './rca/RcaClassificationModal';
 
 // ── Operation selector ────────────────────────────────────────────────────────
 
@@ -60,11 +63,12 @@ const CheckingForm: React.FC<{
   onBack: () => void;
   onComplete: () => void;
 }> = ({ operation, items, onBack, onComplete }) => {
+  const { companyId, profile } = useAuth();
   const [checker, setChecker] = useState('');
   const [notes, setNotes] = useState('');
-  const [divergences, setDivergences] = useState('');
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
+  const [pendingRcaItems, setPendingRcaItems] = useState<PendingRcaItem[]>([]);
 
   const picked = items.filter(i => i.status === 'picked');
   const errors = items.filter(i => ['not_found', 'picking_error', 'skipped'].includes(i.status));
@@ -89,6 +93,33 @@ const CheckingForm: React.FC<{
       if (status === 'completed') update.completed_at = new Date().toISOString();
       const { error: err } = await supabase.from('full_operations').update(update).eq('id', operation.id);
       if (err) throw err;
+
+      // CBC — conclusão de operação Full é o sinal de "movimentação" para recálculo do score.
+      if (status === 'completed' && companyId) {
+        const productIds = items.map(i => i.product_id).filter((id): id is string => !!id);
+        if (productIds.length > 0) {
+          recomputeForProducts(productIds, companyId, profile?.id, profile?.email ?? undefined);
+          recomputeRiskForProducts(productIds, companyId, profile?.id, profile?.email ?? undefined);
+        }
+      }
+
+      // RCA — divergência (item não encontrado/erro/pulado) exige causa antes de fechar a
+      // operação; se não houver nenhuma, segue direto como antes.
+      if (status === 'completed' && errors.length > 0) {
+        setPendingRcaItems(errors.map(item => ({
+          sourceItemId: item.id,
+          productId: item.product_id,
+          sku: item.sku,
+          productName: item.product_name,
+          location: item.location,
+          operatorUserId: item.picked_by_user_id,
+          operatorName: null,
+          divergenceQty: item.quantity_picked - item.quantity_requested,
+        })));
+        setSaving(false);
+        return;
+      }
+
       onComplete();
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erro ao salvar.');
@@ -179,12 +210,6 @@ const CheckingForm: React.FC<{
               className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2 focus:ring-accent/40" />
           </div>
           <div>
-            <label className="block text-xs font-medium text-fg-subtle uppercase mb-1.5">Divergências</label>
-            <textarea rows={2} value={divergences} onChange={e => setDivergences(e.target.value)}
-              placeholder="Descreva divergências encontradas..."
-              className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
-          </div>
-          <div>
             <label className="block text-xs font-medium text-fg-subtle uppercase mb-1.5">Observações</label>
             <textarea rows={2} value={notes} onChange={e => setNotes(e.target.value)}
               className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm bg-surface text-fg focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
@@ -207,6 +232,18 @@ const CheckingForm: React.FC<{
           </div>
         </PanelSection>
       </Panel>
+
+      {profile && companyId && (
+        <RcaClassificationModal
+          open={pendingRcaItems.length > 0}
+          sourceModule="full_operation"
+          items={pendingRcaItems}
+          companyId={companyId}
+          userId={profile.id}
+          userEmail={profile.email ?? ''}
+          onDone={() => { setPendingRcaItems([]); onComplete(); }}
+        />
+      )}
     </div>
   );
 };

@@ -51,6 +51,7 @@ import {
   ShieldAlert,
   Plug,
   Boxes,
+  Warehouse,
   Server,
   Database,
   Code2,
@@ -60,7 +61,11 @@ import {
   Settings,
   Sun,
   Moon,
-  GraduationCap
+  GraduationCap,
+  LayoutGrid,
+  GitBranch,
+  SearchCheck,
+  BookOpen
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory } from './lib/supabase';
 import { SafeDropdown } from './components/SafeDropdown';
@@ -90,6 +95,13 @@ const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
 const ProductivityTab = React.lazy(() => import('./components/productivity/ProductivityTab').then(m => ({ default: m.ProductivityTab })));
 const AcademyRouter = React.lazy(() => import('./components/academy/AcademyRouter').then(m => ({ default: m.AcademyRouter })));
+const CBCDashboardPage = React.lazy(() => import('./components/cbc/CBCDashboardPage').then(m => ({ default: m.CBCDashboardPage })));
+const RiskDashboardPage = React.lazy(() => import('./components/risk/RiskDashboardPage').then(m => ({ default: m.RiskDashboardPage })));
+const AbcXyzDashboardPage = React.lazy(() => import('./components/abcxyz/AbcXyzDashboardPage').then(m => ({ default: m.AbcXyzDashboardPage })));
+const WarehouseDigitalTwinPage = React.lazy(() => import('./components/slotting/WarehouseDigitalTwinPage').then(m => ({ default: m.WarehouseDigitalTwinPage })));
+const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardPage').then(m => ({ default: m.RcaDashboardPage })));
+const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
+const KnowledgeCenterPage = React.lazy(() => import('./components/account/KnowledgeCenterPage').then(m => ({ default: m.KnowledgeCenterPage })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -864,6 +876,7 @@ function AppContent() {
       label: 'Minha Conta',
       items: [
         { id: 'conta', label: 'Produtividade', icon: <User />, onClick: () => { setActiveTab('conta'); setMobileOpen(false); }, active: activeTab === 'conta' },
+        { id: 'knowledge', label: 'Recursos e Conhecimento', icon: <BookOpen />, onClick: () => { setActiveTab('knowledge'); setMobileOpen(false); }, active: activeTab === 'knowledge' },
       ],
     },
     {
@@ -875,10 +888,16 @@ function AppContent() {
     },
     {
       id: 'counting-group',
-      label: 'Contagens',
+      label: 'Operações',
       items: [
-        { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,     onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
-        { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />, onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
+        { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
+        { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
+        { id: 'cbc',            label: 'Confidence Score',     icon: <Gauge />,       onClick: () => { setActiveTab('cbc'); setMobileOpen(false); },            active: activeTab === 'cbc' },
+        { id: 'risk',           label: 'Inventário por Risco', icon: <AlertTriangle />, onClick: () => { setActiveTab('risk'); setMobileOpen(false); },         active: activeTab === 'risk' },
+        { id: 'abcxyz',         label: 'Classificação ABC/XYZ', icon: <LayoutGrid />, onClick: () => { setActiveTab('abcxyz'); setMobileOpen(false); },   active: activeTab === 'abcxyz' },
+        { id: 'slotting',       label: 'Warehouse Digital Twin', icon: <Warehouse />, onClick: () => { setActiveTab('slotting'); setMobileOpen(false); },     active: activeTab === 'slotting' },
+        { id: 'rca',            label: 'Root Cause Analysis',  icon: <GitBranch />, onClick: () => { setActiveTab('rca'); setMobileOpen(false); },        active: activeTab === 'rca' },
+        { id: 'audit',          label: 'Auditoria de Estoque', icon: <SearchCheck />, onClick: () => { setActiveTab('audit'); setMobileOpen(false); },   active: activeTab === 'audit' },
       ],
     },
     {
@@ -1854,6 +1873,55 @@ function AppContent() {
               companyId={companyId}
               role={profile.role}
             />
+          </React.Suspense>
+        )}
+
+        {/* ABA RECURSOS E CONHECIMENTO */}
+        {activeTab === 'knowledge' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <KnowledgeCenterPage onNavigateToAcademy={() => setActiveTab('academy')} />
+          </React.Suspense>
+        )}
+
+        {/* ABA CBC — CONFIDENCE BASED COUNTING */}
+        {activeTab === 'cbc' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <CBCDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+          </React.Suspense>
+        )}
+
+        {/* ABA INVENTÁRIO POR RISCO */}
+        {activeTab === 'risk' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <RiskDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+          </React.Suspense>
+        )}
+
+        {/* ABA CLASSIFICAÇÃO ABC/XYZ */}
+        {activeTab === 'abcxyz' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AbcXyzDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+          </React.Suspense>
+        )}
+
+        {/* ABA WAREHOUSE DIGITAL TWIN */}
+        {activeTab === 'slotting' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <WarehouseDigitalTwinPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} />
+          </React.Suspense>
+        )}
+
+        {/* ABA ROOT CAUSE ANALYSIS */}
+        {activeTab === 'rca' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <RcaDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} />
+          </React.Suspense>
+        )}
+
+        {/* ABA AUDITORIA DE ESTOQUE */}
+        {activeTab === 'audit' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AuditDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} />
           </React.Suspense>
         )}
 

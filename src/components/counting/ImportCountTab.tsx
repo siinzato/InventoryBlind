@@ -9,6 +9,11 @@ import {
   calculateCountMetrics, generateCountInsight,
 } from '../../lib/countManagementUtils';
 import type { LiveCountStats } from './CountSidePanel';
+import { useAuth } from '../../lib/auth';
+import { recomputeForProducts } from '../../lib/cbcService';
+import { recomputeRiskForProducts } from '../../lib/riskService';
+import { recomputeAbcXyzForCompany } from '../../lib/abcXyzService';
+import { RcaClassificationModal, PendingRcaItem } from '../rca/RcaClassificationModal';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete';
 
@@ -31,6 +36,7 @@ const STATUS_LABEL: Record<string, string> = { correct: 'Correto', divergent: 'D
 const STATUS_BADGE: Record<string, 'success' | 'warning' | 'danger' | 'neutral'> = { correct: 'success', divergent: 'warning', missing: 'danger', surplus: 'danger' };
 
 export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved, onStatsChange }: ImportCountTabProps) {
+  const { profile } = useAuth();
   const [step, setStep] = useState<ImportStep>('upload');
   const [brandId, setBrandId] = useState('');
   const [responsavel, setResponsavel] = useState('');
@@ -41,6 +47,7 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const [filter, setFilter] = useState<'all' | ClassifiedCountRow['status']>('all');
   const [saving, setSaving] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
+  const [pendingRcaItems, setPendingRcaItems] = useState<PendingRcaItem[]>([]);
 
   const selectedBrand = brandsData.find(b => b.id === brandId);
   const stepIdx = STEPS.findIndex(s => s.key === step);
@@ -154,8 +161,35 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
         responsavel: r.responsavel,
       }));
 
-      const { error: itemsError } = await supabase.from('inventory_count_import_items').insert(itemRows);
+      const { data: insertedItems, error: itemsError } = await supabase.from('inventory_count_import_items').insert(itemRows).select();
       if (itemsError) console.error('Error inserting count import items:', itemsError);
+
+      if (insertedItems) {
+        const divergent = rows
+          .map((r, i) => ({ row: r, id: insertedItems[i]?.id as string | undefined }))
+          .filter((entry): entry is { row: typeof rows[number]; id: string } => !!entry.id && entry.row.status !== 'correct');
+        setPendingRcaItems(divergent.map(({ row, id }) => ({
+          sourceItemId: id,
+          productId: row.productId,
+          sku: row.sku,
+          productName: row.produto,
+          location: row.local,
+          operatorUserId: profile?.id ?? null,
+          operatorName: row.responsavel,
+          divergenceQty: row.diferenca ?? 0,
+        })));
+      }
+
+      // CBC — só a importação grava saldo por SKU, é o único gatilho automático real de
+      // recálculo "após inventário" (fire-and-forget, não bloqueia a conclusão da tela).
+      const productIds = rows.map(r => r.productId).filter((id): id is string => !!id);
+      if (productIds.length > 0) {
+        recomputeForProducts(productIds, companyId, profile?.id, profile?.email ?? undefined);
+        recomputeRiskForProducts(productIds, companyId, profile?.id, profile?.email ?? undefined);
+        // ABC/XYZ é recálculo de empresa inteira (a classe de um SKU depende do rank dele
+        // entre todos os outros) — diferente de CBC/Risco, que recalculam só os SKUs afetados.
+        recomputeAbcXyzForCompany(companyId, profile?.id, profile?.email ?? undefined);
+      }
     }
 
     onBrandsUpdated(brandsData.map(b => b.id === selectedBrand.id ? { ...b, done_sku: newDoneSku, divergences: newDivergences } : b));
@@ -306,6 +340,18 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
           </div>
           <Button onClick={handleReset}>Nova Importação</Button>
         </PanelSection>
+      )}
+
+      {profile && (
+        <RcaClassificationModal
+          open={pendingRcaItems.length > 0}
+          sourceModule="import_count"
+          items={pendingRcaItems}
+          companyId={companyId}
+          userId={profile.id}
+          userEmail={profile.email ?? ''}
+          onDone={() => setPendingRcaItems([])}
+        />
       )}
     </Panel>
   );

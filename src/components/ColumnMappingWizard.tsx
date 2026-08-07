@@ -132,6 +132,7 @@ export const ColumnMappingWizard: React.FC<ColumnMappingWizardProps> = ({
 
       {/* Mapping table */}
       <PanelSection>
+        <div className="overflow-x-auto">
         <Table>
           <Thead>
             <Tr>
@@ -199,6 +200,7 @@ export const ColumnMappingWizard: React.FC<ColumnMappingWizardProps> = ({
             })}
           </tbody>
         </Table>
+        </div>
       </PanelSection>
 
       {/* Preview of mapped data */}

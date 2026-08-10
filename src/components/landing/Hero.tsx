@@ -267,7 +267,7 @@ export function Hero({ onSignup }: HeroProps) {
         </div>
 
         <p className={`hero-subtext ${hidden} text-lg text-mist-400 max-w-2xl mx-auto mb-10`}>
-          InventoryBlind une conferência por NF-e, contagem cega, HeatMap de risco e um assistente de IA em uma única
+          InventoryBlind une conferência por NF-e, contagem cega, HeatMap de risco e o BlindAI em uma única
           operação — do recebimento ao relatório final.
         </p>
 

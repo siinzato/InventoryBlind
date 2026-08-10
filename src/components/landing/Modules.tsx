@@ -17,7 +17,7 @@ const MODULES: ModuleDef[] = [
   {
     icon: Bot,
     title: 'BlindAI',
-    desc: 'Assistente de IA que analisa divergências, aponta riscos e sugere ações antes que virem prejuízo.',
+    desc: 'O agente que acompanha a operação — analisa o que está acontecendo, identifica riscos e indica onde agir antes que a divergência vire prejuízo.',
     span: 'lg:col-span-2 lg:row-span-2',
     featured: true,
   },

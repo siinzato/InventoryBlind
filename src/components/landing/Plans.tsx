@@ -32,7 +32,7 @@ const PLANS: PlanDef[] = [
     price: 'R$ 120',
     period: '/mês',
     desc: 'Para operações que precisam de mais controle e inteligência.',
-    features: ['Recursos avançados de inventário', 'Confidence & Risk Score', 'Classificação ABC/XYZ', 'Indicadores avançados'],
+    features: ['BlindAI com análises avançadas', 'Confidence & Risk Score', 'Classificação ABC/XYZ', 'Indicadores avançados'],
     cta: 'Começar gratuitamente',
   },
   {
@@ -41,7 +41,7 @@ const PLANS: PlanDef[] = [
     price: 'R$ 320',
     period: '/mês',
     desc: 'Para operações em crescimento que precisam de mais escala e análise.',
-    features: ['HeatMap Inteligente', 'Analytics avançado', 'Auditoria avançada', 'Multiempresa'],
+    features: ['BlindAI com maior profundidade operacional', 'HeatMap Inteligente', 'Auditoria avançada', 'Multiempresa'],
     featured: true,
     cta: 'Começar gratuitamente',
   },
@@ -50,7 +50,7 @@ const PLANS: PlanDef[] = [
     name: 'Enterprise',
     price: 'Sob consulta',
     desc: 'Para operações corporativas com necessidades específicas.',
-    features: ['Auditoria avançada', 'Gestão de usuários e papéis', 'Suporte dedicado', 'SLA personalizado'],
+    features: ['BlindAI adaptado à operação corporativa', 'Gestão de usuários e papéis', 'Suporte dedicado', 'SLA personalizado'],
     cta: 'Falar com vendas',
   },
 ];

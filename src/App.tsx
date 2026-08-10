@@ -68,7 +68,8 @@ import {
   SearchCheck,
   BookOpen
 } from 'lucide-react';
-import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory } from './lib/supabase';
+import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation } from './lib/supabase';
+import { getBlindAISituations } from './lib/blindAIInsightsEngine';
 import { SafeDropdown } from './components/SafeDropdown';
 import { DashboardRankingPreview } from './components/DashboardRankingPreview';
 import { CountManagementCenter } from './components/counting/CountManagementCenter';
@@ -79,7 +80,7 @@ import { hasPermission, getRoleLabel } from './lib/permissionService';
 import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
 import { LogoMark } from './components/landing/landingUi';
-import { ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal } from './components/ui';
+import { ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
 
 // Code-split large page components for smaller initial bundle
@@ -114,6 +115,18 @@ const PageLoader = () => (
 // own bg-zinc-950 root, no spinner/logo, to avoid a flash-of-white before
 // the chunk (which also carries Motion/GSAP) finishes loading.
 const LandingFallback = () => <div className="min-h-screen w-full bg-zinc-950" />;
+
+const SITUATION_SEVERITY_TEXT: Record<BlindAISituation['severity'], string> = {
+  info: 'text-fg',
+  warning: 'text-amber-600 dark:text-amber-400',
+  critical: 'text-red-600 dark:text-red-400',
+};
+
+const SITUATION_SEVERITY_BADGE: Record<BlindAISituation['severity'], 'neutral' | 'warning' | 'danger'> = {
+  info: 'neutral',
+  warning: 'warning',
+  critical: 'danger',
+};
 
 interface OpCapa {
   nome: string;
@@ -443,159 +456,40 @@ function AppContent() {
     }
   }, [globais.acuracidade]);
 
-  // AI Assistant states
+  // BlindAI states
   const [showAIChat, setShowAIChat] = useState(false);
   const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiInsights, setAiInsights] = useState<string[]>([]);
+  const [situations, setSituations] = useState<BlindAISituation[]>([]);
+  const [situationsLoading, setSituationsLoading] = useState(false);
 
-  // Generate automatic insights based on data
-  const generateInsights = useCallback(() => {
-    const insights: string[] = [];
-
-    // Progress analysis
-    if (globais.progresso < 30) {
-      insights.push(`📊 O progresso geral está em ${globais.progresso.toFixed(1)}%. Considere aumentar a equipe ou focar nas linhas com maior volume.`);
-    } else if (globais.progresso > 80) {
-      insights.push(`🎉 Inventário quase completo! ${globais.progresso.toFixed(1)}% concluído. Prepare-se para a revisão final.`);
-    }
-
-    // Accuracy analysis
-    if (globais.acuracidade < 50) {
-      insights.push(`⚠️ Acuracidade baixa (${globais.acuracidade.toFixed(1)}%). Revise o processo de contagem e considere recontagem das linhas críticas.`);
-    } else if (globais.acuracidade >= 80) {
-      insights.push(`✅ Excelente acuracidade de ${globais.acuracidade.toFixed(1)}%! O inventário está bem controlado.`);
-    }
-
-    // Divergence analysis
-    const divRate = globais.totalDone > 0 ? (globais.totalDiv / globais.totalDone) * 100 : 0;
-    if (divRate > 5) {
-      insights.push(`🔍 Taxa de divergência alta: ${divRate.toFixed(1)}%. Analise as causas: erros de contagem, produtos vencidos ou danificados.`);
-    }
-
-    // Identify bottleneck lines
-    const slowLines = globais.tabela.filter(l => l.progress < 50 && l.status === 'ANDAMENTO');
-    if (slowLines.length > 0) {
-      const worstLine = slowLines.reduce((min, l) => l.progress < min.progress ? l : min, slowLines[0]);
-      insights.push(`🐌 "${worstLine.brand}" está com progresso de apenas ${worstLine.progress.toFixed(1)}%. Priorize esta linha.`);
-    }
-
-    // Best performing lines
-    const completedLines = globais.tabela.filter(l => l.status === 'CONCLUÍDO' && l.accuracy !== null);
-    if (completedLines.length > 3) {
-      const topLines = [...completedLines].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).slice(0, 3);
-      insights.push(`🏆 Top 3 linhas mais precisas: ${topLines.map(l => `${l.brand} (${l.accuracy?.toFixed(1)}%)`).join(', ')}`);
-    }
-
-    // Pending volume alert
-    const pending = globais.totalSku - globais.totalDone;
-    if (pending > 0) {
-      const avgDaily = 48;
-      const estimatedDays = Math.ceil(pending / avgDaily);
-      insights.push(`⏱️ ${pending.toLocaleString()} SKUs pendentes. Estimativa: ${estimatedDays} dias restantes (média ${avgDaily} SKUs/dia).`);
-    }
-
-    setAiInsights(insights.length > 0 ? insights : ['📈 Sistema operando normalmente. Nenhum alerta crítico detectado.']);
-  }, [globais]);
+  const loadSituations = useCallback(() => {
+    if (!companyId) return;
+    setSituationsLoading(true);
+    getBlindAISituations(companyId)
+      .then(setSituations)
+      .finally(() => setSituationsLoading(false));
+  }, [companyId]);
 
   useEffect(() => {
-    generateInsights();
-  }, [generateInsights]);
+    loadSituations();
+  }, [loadSituations]);
 
-  // AZBot I.A - Context about AZ ByGocase and GoCase
-  const AZBOT_CONTEXT = `
-    AZBot I.A é o assistente virtual da AZ ByGocase, empresa do grupo GoCase.
-
-    **Sobre o Grupo GoCase:**
-    - GoCase é uma empresa brasileira referência em capas e acessórios para smartphones
-    - Produtos: capas anti-impacto, garrafas térmicas, mochilas, bolsas, correias, acessórios tech
-    - Linha Pet com produtos para animais
-    - Presença em Marketplace: Mercado Livre, Amazon, Shopee, TikTok Shop
-    - Site oficial: gocase.com.br
-
-    **Sobre a AZ ByGocase:**
-    - Marca do grupo GoCase focada em produtos minimalistas
-    - Conecte-se com estilo - design, minimalismo e funcionalidade
-    - Produtos: capas, bolsas, térmicos e acessórios
-    - Venda em atacado e varejo
-    - Canais: Mercado Livre, Shopee, Amazon, TikTok Shop
-    - Instagram: @azbygocase
-
-    **Marcas do Grupo:**
-    - Gocase - linha principal de capas e acessórios
-    - AZ by Gocase - linha minimalista
-    - Godaily - produtos minimalistas para o dia a dia
-
-    **Linhas de Produtos mais vendidos:**
-    - ESR, Dexnor, X-Level, Nillkin, GoCase Capas, Ringke, AZ Capas, DUX
-  `;
-
-  // AI Assistant response generator
+  // AI Assistant response generator — apoio secundário, grounded nos dados reais do
+  // inventário (o produto principal do BlindAI são as situações acima, não este chat).
   const generateAIResponse = (question: string): string => {
     const q = question.toLowerCase();
 
-    // Company questions - GoCase/AZ
-    if (q.includes('gocase') || q.includes('go case') || q.includes('a empresa')) {
-      return `📱 **Sobre o Grupo GoCase**\n\n` +
-        `A GoCase é uma empresa brasileira referência em capas e acessórios para smartphones!\n\n` +
-        `**Produtos principais:**\n` +
-        `• Capas anti-impacto (Slim, Air, Glitter, Duo)\n` +
-        `• Garrafas térmicas\n` +
-        `• Mochilas e bolsas\n` +
-        `• Gostrap (correias)\n` +
-        `• Linha Pet\n\n` +
-        `**Canais de venda:**\n` +
-        `• Site: gocase.com.br\n` +
-        `• Mercado Livre, Amazon, Shopee, TikTok Shop\n\n` +
-        `💡 O inventário controla o estoque desses produtos!`;
-    }
-
-    // AZ ByGocase questions
-    if (q.includes('az') || q.includes('bygocase') || q.includes('az by')) {
-      return `✨ **Sobre a AZ ByGocase**\n\n` +
-        `A AZ é a linha minimalista do grupo GoCase!\n\n` +
-        `**Conceito:** Design, Minimalismo e Funcionalidade\n` +
-        `"Conecte-se com estilo"\n\n` +
-        `**Produtos:**\n` +
-        `• Capas minimalistas\n` +
-        `• Bolsas\n` +
-        `• Térmicos\n` +
-        `• Acessórios tech\n\n` +
-        `**Canais:** Mercado Livre, Shopee, Amazon, TikTok Shop\n` +
-        `Instagram: @azbygocase\n\n` +
-        `📊 Este inventário ajuda a manter o controle de estoque da AZ!`;
-    }
-
-    // Product lines questions
-    if (q.includes('linhas') || q.includes('marcas') || q.includes('esr') || q.includes('dexnor') || q.includes('nillkin') || q.includes('ringke')) {
-      const linhasProgress = globais.tabela.map(l =>
-        `• ${l.brand}: ${l.progress.toFixed(1)}% | ${l.status}`
-      ).join('\n');
-
-      return `📦 **Linhas/Marcas no Inventário**\n\n` +
-        `These são as principais linhas de produtos:\n\n` +
-        `**Marcas parceiras:**\n` +
-        `• ESR - Capas premium\n` +
-        `• Dexnor - Proteção anti-impacto\n` +
-        `• X-Level - Capas esportivas\n` +
-        `• Nillkin - Acessórios tech\n` +
-        `• Ringke - Design premium\n` +
-        `• GoCase Capas - Linha própria\n` +
-        `• AZ Capas - Minimalismo\n` +
-        `• DUX - Resistência\n\n` +
-        `**Status atual:**\n${linhasProgress}`;
-    }
-
     // Progress questions
     if (q.includes('progresso') || q.includes('andamento') || q.includes('como está')) {
-      return `📈 **Progresso Atual do Inventário AZ ByGocase**\n\n` +
+      return `📈 **Progresso Atual do Inventário**\n\n` +
         `• Total: ${globais.progresso.toFixed(1)}% concluído\n` +
         `• SKUs processados: ${globais.totalDone.toLocaleString()} de ${globais.totalSku.toLocaleString()}\n` +
         `• Pendentes: ${(globais.totalSku - globais.totalDone).toLocaleString()} SKUs\n` +
         `• Linhas em andamento: ${globais.tabela.filter(l => l.status === 'ANDAMENTO').length}\n` +
         `• Linhas concluídas: ${globais.tabela.filter(l => l.status === 'CONCLUÍDO').length}\n\n` +
-        `🎯 Foco: manter acuracidade alta para garantir estoque correto nos marketplaces!`;
+        `🎯 Foco: manter acuracidade alta para garantir estoque correto.`;
     }
 
     // Accuracy questions
@@ -605,7 +499,7 @@ function AppContent() {
         `• Total de divergências: ${globais.totalDiv}\n` +
         `• Taxa de divergência: ${globais.totalDone > 0 ? ((globais.totalDiv / globais.totalDone) * 100).toFixed(2) : 0}%\n\n` +
         `${globais.acuracidade >= 80 ? '✅ Status: Excelente! Inventário bem controlado.' : globais.acuracidade >= 50 ? '⚠️ Status: Mediano. Requer atenção.' : '🚨 Status: Crítico! Ação imediata necessária.'}\n\n` +
-        `📊 Uma boa acuracidade garante que os produtos estejam disponíveis nos marketplaces!`;
+        `📊 Uma boa acuracidade garante que os produtos estejam disponíveis para venda!`;
     }
 
     // Divergence questions
@@ -614,7 +508,7 @@ function AppContent() {
       return `🔍 **Análise de Divergências**\n\n` +
         `• Total de divergências: ${globais.totalDiv}\n` +
         `• Linhas com mais divergências:\n${highDivLines.map(l => `  - ${l.brand}: ${l.divergences} divergências`).join('\n')}\n\n` +
-        `💡 Divergências podem afetar vendas nos marketplaces. Priorize a investigação!`;
+        `💡 Divergências podem afetar vendas. Priorize a investigação!`;
     }
 
     // Best lines
@@ -623,7 +517,7 @@ function AppContent() {
       const top5 = [...completedLines].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).slice(0, 5);
       return `🏆 **Top 5 Linhas por Acuracidade**\n\n` +
         top5.map((l, i) => `${i + 1}. ${l.brand}: ${l.accuracy?.toFixed(1)}%`).join('\n') +
-        `\n\n✨ Parabéns à equipe responsável! Isso garante estoque preciso nos marketplaces.`;
+        `\n\n✨ Parabéns à equipe responsável! Isso garante estoque preciso.`;
     }
 
     // Worst lines / Attention needed
@@ -668,19 +562,13 @@ function AppContent() {
     // Who are you / Help
     if (q.includes('quem é você') || q.includes('quem e voce') || q.includes('seu nome') || q.includes('blindai')) {
       return `🤖 **BlindAI**\n\n` +
-        `Olá! Sou o BlindAI, assistente virtual da AZ ByGocase!\n\n` +
-        `Fui criado para ajudar você e a equipe a:\n` +
-        `• 📊 Monitorar o progresso do inventário\n` +
-        `• 🎯 Analisar acuracidade e divergências\n` +
-        `• ⚠️ Identificar linhas críticas\n` +
-        `• ⏱️ Estimar prazos\n` +
-        `• 📦 Acompanhar produtos mais vendidos\n\n` +
-        `Tudo para manter o estoque da AZ ByGocase e GoCase preciso nos marketplaces!`;
+        `Sou o BlindAI, o agente de inteligência operacional do InventoryBlind. Acompanho os dados da sua operação continuamente e trago as situações que precisam de atenção no painel acima — a conversa aqui é só um apoio para consultas pontuais.\n\n` +
+        `Pergunte sobre progresso, acuracidade, divergências, linhas de produtos ou produtos mais vendidos.`;
     }
 
     // Help / what can you do
     if (q.includes('ajuda') || q.includes('help') || q.includes('o que você faz') || q.includes('o que voce faz')) {
-      return `🤖 **BlindAI - Assistente da AZ ByGocase**\n\n` +
+      return `🤖 **BlindAI**\n\n` +
         `Posso ajudar com:\n` +
         `• 📊 Status do progresso\n` +
         `• 🎯 Análise de acuracidade\n` +
@@ -688,19 +576,18 @@ function AppContent() {
         `• 🏆 Linhas com melhor desempenho\n` +
         `• ⚠️ Linhas críticas que precisam atenção\n` +
         `• ⏱️ Previsão de término\n` +
-        `• 📦 Top produtos vendidos\n` +
-        `• 🏢 Informações sobre a GoCase e AZ ByGocase\n\n` +
+        `• 📦 Top produtos vendidos\n\n` +
         `Digite sua pergunta!`;
     }
 
     // Default response
     return `🤖 **BlindAI**\n\n` +
       `Analisei sua pergunta sobre "${question}".\n\n` +
-      `📊 **Status Atual do Inventário AZ ByGocase:**\n` +
+      `📊 **Status atual do inventário:**\n` +
       `• Progresso: ${globais.progresso.toFixed(1)}%\n` +
       `• Acuracidade: ${globais.acuracidade.toFixed(1)}%\n` +
       `• Divergências: ${globais.totalDiv}\n\n` +
-      `💡 Pergunte sobre progresso, acuracidade, linhas de produtos, ou informações da empresa!`;
+      `💡 Pergunte sobre progresso, acuracidade ou linhas de produtos!`;
   };
 
   const handleSendAIMessage = (e: React.FormEvent) => {
@@ -1264,15 +1151,16 @@ function AppContent() {
                       <Bot size={18} className="text-accent" />
                       BlindAI
                     </h3>
-                    <p className="text-caption mt-0.5">Insights automáticos sobre a operação</p>
+                    <p className="text-caption mt-0.5">Situações identificadas na operação</p>
                   </div>
                   <div className="flex gap-1.5 flex-shrink-0">
                     <button
-                      onClick={generateInsights}
-                      className="p-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors"
-                      title="Atualizar insights"
+                      onClick={loadSituations}
+                      disabled={situationsLoading}
+                      className="p-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
+                      title="Atualizar análise"
                     >
-                      <RefreshCw size={16} />
+                      <RefreshCw size={16} className={situationsLoading ? 'animate-spin' : ''} />
                     </button>
                     <button
                       onClick={() => setShowAIChat(!showAIChat)}
@@ -1285,18 +1173,39 @@ function AppContent() {
                   </div>
                 </div>
 
-                {/* Insights Automáticos */}
-                {aiInsights.length > 0 && (
-                  <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-x-6 gap-y-2">
-                    {aiInsights.slice(0, 3).map((insight, idx) => (
-                      <p key={idx} className="text-sm text-fg-muted leading-relaxed">
-                        {insight}
-                      </p>
-                    ))}
-                  </div>
-                )}
+                {/* Situações detectadas */}
+                <div className="mt-4">
+                  {situationsLoading && situations.length === 0 ? (
+                    <p className="text-sm text-fg-subtle">Analisando a operação...</p>
+                  ) : situations.length === 0 ? (
+                    <p className="text-sm text-fg-subtle">Nenhuma situação crítica identificada no momento.</p>
+                  ) : (
+                    <div className="divide-y divide-edge">
+                      {situations.map(s => (
+                        <button
+                          key={s.id}
+                          onClick={() => setActiveTab(s.module)}
+                          className="w-full flex items-start gap-3 py-3 first:pt-0 last:pb-0 text-left -mx-1 px-1 rounded-lg hover:bg-surface-3/60 transition-colors"
+                        >
+                          <span className="text-lg leading-none flex-shrink-0 mt-0.5">{s.icon}</span>
+                          <div className="min-w-0 flex-1 space-y-1">
+                            <div className="flex items-center gap-2 flex-wrap">
+                              <p className={`text-sm font-semibold ${SITUATION_SEVERITY_TEXT[s.severity]}`}>{s.title}</p>
+                              <Badge variant={SITUATION_SEVERITY_BADGE[s.severity]}>{s.actionLabel}</Badge>
+                            </div>
+                            <p className="text-sm text-fg-muted">{s.evidence}</p>
+                            <ul className="text-xs text-fg-subtle space-y-0.5">
+                              {s.reasons.map((reason, idx) => <li key={idx}>• {reason}</li>)}
+                            </ul>
+                            <p className="text-xs text-fg-subtle">→ {s.recommendation}</p>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
 
-                {/* Chat Interface */}
+                {/* Chat: apoio secundário, não o produto principal */}
                 {showAIChat && (
                   <div className="mt-4 bg-surface rounded-lg border border-edge overflow-hidden">
                     {/* Chat Messages */}
@@ -1305,14 +1214,14 @@ function AppContent() {
                         <div className="text-center py-4">
                           <Bot size={28} className="mx-auto text-fg-subtle mb-2" />
                           <p className="text-fg-subtle text-sm">
-                            Olá! Sou o BlindAI, assistente da AZ ByGocase. Pergunte sobre o inventário, produtos, ou a empresa!
+                            Pergunte sobre progresso, acuracidade ou divergências do inventário.
                           </p>
                           <div className="flex flex-wrap gap-2 justify-center mt-3">
                             {[
                               'Qual o progresso?',
-                              'Me fale sobre a GoCase',
                               'Quais linhas precisam de atenção?',
-                              'O que é a AZ ByGocase?'
+                              'Quais as maiores divergências?',
+                              'Quanto tempo falta?'
                             ].map((q) => (
                               <button
                                 key={q}

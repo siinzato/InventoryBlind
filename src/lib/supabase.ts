@@ -699,6 +699,25 @@ export interface WarehouseInsight {
   focusLocationCode: string | null;
 }
 
+/** Mesmo formato de "situação detectada + recomendação" do WarehouseInsight, generalizado
+ *  para o painel BlindAI no Dashboard: cada situação cruza um sinal já calculado por um dos
+ *  módulos de inteligência (Risco, Confidence, ABC/XYZ, RCA) e aponta para onde o usuário
+ *  deve ir para agir — nenhum score é recalculado aqui, só lido e ranqueado. */
+export interface BlindAISituation {
+  id: string;
+  icon: string;
+  severity: 'info' | 'warning' | 'critical';
+  title: string;
+  evidence: string;
+  /** Fatores que justificam a recomendação, na ordem de peso — exibidos como lista, nunca
+   *  uma conclusão sem explicação. */
+  reasons: string[];
+  recommendation: string;
+  /** Aba do Dashboard para onde o card navega ao ser clicado. */
+  module: 'risk' | 'cbc' | 'abcxyz' | 'rca';
+  actionLabel: string;
+}
+
 /** Estrutura pronta para reconstrução histórica do CD — hoje `isMock` é sempre `true`
  *  (retorna o snapshot atual rotulado como prévia); quando houver persistência histórica
  *  real, só `warehouseTimelineService.ts` muda, nenhum consumidor precisa mudar. */

@@ -104,11 +104,17 @@ export async function getPickRecords(companyId: string, days = 90): Promise<Pick
 }
 
 const FLOORPLAN_BUCKET = 'warehouse-floorplans';
+const FLOORPLAN_ALLOWED_TYPES = ['image/png', 'image/jpeg'];
+const FLOORPLAN_MAX_SIZE_BYTES = 10 * 1024 * 1024;
 
 /** Sobe a imagem da planta para o Storage privado e salva o caminho no layout — o app
  *  não tinha nenhum pipeline de upload até aqui; PDF/DWG com parsing automático continua
- *  fora de escopo (decisão confirmada), então só aceitamos imagem (PNG/JPG/SVG). */
+ *  fora de escopo (decisão confirmada), então só aceitamos imagem (PNG/JPG). SVG é
+ *  bloqueado (vetor de XSS armazenado) tanto aqui quanto no bucket (allowed_mime_types). */
 export async function uploadFloorPlanImage(companyId: string, layoutId: string, file: File, userId: string, userEmail: string): Promise<string | null> {
+  if (!FLOORPLAN_ALLOWED_TYPES.includes(file.type)) { console.error('[Slotting] Rejected floor plan upload: invalid type', file.type); return null; }
+  if (file.size > FLOORPLAN_MAX_SIZE_BYTES) { console.error('[Slotting] Rejected floor plan upload: file too large', file.size); return null; }
+
   const ext = file.name.split('.').pop() ?? 'png';
   const path = `${companyId}/${layoutId}-${Date.now()}.${ext}`;
 

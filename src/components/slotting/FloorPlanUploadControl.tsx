@@ -46,7 +46,7 @@ export function FloorPlanUploadControl({ companyId, userId, userEmail, layout, o
   return (
     <div className="space-y-3">
       <div className="flex items-center gap-3">
-        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg,image/svg+xml" onChange={handleFileChange} className="hidden" id="floorplan-upload-input" />
+        <input ref={fileInputRef} type="file" accept="image/png,image/jpeg" onChange={handleFileChange} className="hidden" id="floorplan-upload-input" />
         <Button variant="secondary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
           <ImageUp size={15} /> {uploading ? 'Enviando...' : layout.background_image_path ? 'Trocar planta' : 'Subir planta (imagem)'}
         </Button>

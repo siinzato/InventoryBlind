@@ -29,7 +29,7 @@ export function RcaEvidenceUpload({ files, onChange }: RcaEvidenceUploadProps) {
       >
         <Paperclip size={12} /> Anexar evidência (foto/arquivo)
       </button>
-      <input ref={inputRef} type="file" accept="image/*,.pdf" multiple className="hidden" onChange={handleSelect} />
+      <input ref={inputRef} type="file" accept="image/png,image/jpeg,.pdf" multiple className="hidden" onChange={handleSelect} />
       {files.length > 0 && (
         <ul className="space-y-1">
           {files.map((f, i) => (

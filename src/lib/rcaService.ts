@@ -16,6 +16,8 @@ import { logAuditEvent } from './auditLogService';
 import { checkRecurrence, computeParetoBuckets, groupByDimension, computeTrend, type ParetoBucket, type DimensionBucket, type RcaDimension, type TrendResult } from './rcaAlgorithm';
 
 const EVIDENCE_BUCKET = 'rca-evidence';
+const EVIDENCE_ALLOWED_TYPES = ['image/png', 'image/jpeg', 'application/pdf'];
+const EVIDENCE_MAX_SIZE_BYTES = 15 * 1024 * 1024;
 const DEFAULT_THRESHOLD_COUNT = 3;
 const DEFAULT_WINDOW_DAYS = 30;
 
@@ -245,6 +247,9 @@ export async function uploadEvidence(
 ): Promise<RcaEvidence[]> {
   const uploaded: RcaEvidence[] = [];
   for (const file of files) {
+    if (!EVIDENCE_ALLOWED_TYPES.includes(file.type)) { console.error('[RCA] Rejected evidence upload: invalid type', file.type); continue; }
+    if (file.size > EVIDENCE_MAX_SIZE_BYTES) { console.error('[RCA] Rejected evidence upload: file too large', file.size); continue; }
+
     const ext = file.name.split('.').pop() ?? 'jpg';
     const path = `${companyId}/${rcaRecordId}-${Date.now()}-${uploaded.length}.${ext}`;
     const { error: uploadError } = await supabase.storage.from(EVIDENCE_BUCKET).upload(path, file);

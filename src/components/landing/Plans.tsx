@@ -3,9 +3,10 @@ import { Check } from 'lucide-react';
 import { useAnimationTier } from '../../lib/useAnimationTier';
 import { motion, staggerContainer, fadeInUp, MagneticButton } from './landingMotion';
 import { useGSAP, gsap, SplitText } from './landingScroll';
+import { WHATSAPP_PLANS_URL } from './landingUi';
 
 interface PlanDef {
-  key: 'starter' | 'professional' | 'enterprise';
+  key: 'free' | 'pro' | 'business' | 'enterprise';
   name: string;
   price: string;
   period?: string;
@@ -17,31 +18,40 @@ interface PlanDef {
 
 const PLANS: PlanDef[] = [
   {
-    key: 'starter',
-    name: 'Starter',
-    price: 'R$ 297',
+    key: 'free',
+    name: 'Free',
+    price: 'R$ 0',
     period: '/mês',
-    desc: 'Para operações que estão organizando a casa.',
-    features: ['1 empresa', 'Dashboard geral', 'Conferência por NF-e', 'Indicadores essenciais'],
-    cta: 'Começar Gratuitamente',
+    desc: 'Para começar a organizar e controlar seu inventário.',
+    features: ['Acesso gratuito e permanente', 'Dashboard básico', 'Conferência de inventário', 'Indicadores essenciais'],
+    cta: 'Começar gratuitamente',
   },
   {
-    key: 'professional',
-    name: 'Professional',
-    price: 'R$ 697',
+    key: 'pro',
+    name: 'Pro',
+    price: 'R$ 120',
     period: '/mês',
-    desc: 'Para operações que querem controle total.',
-    features: ['Multiempresa', 'HeatMap Inteligente', 'Analytics avançado', 'BlindAI incluso'],
+    desc: 'Para operações que precisam de mais controle e inteligência.',
+    features: ['Recursos avançados de inventário', 'Confidence & Risk Score', 'Classificação ABC/XYZ', 'Indicadores avançados'],
+    cta: 'Começar gratuitamente',
+  },
+  {
+    key: 'business',
+    name: 'Business',
+    price: 'R$ 320',
+    period: '/mês',
+    desc: 'Para operações em crescimento que precisam de mais escala e análise.',
+    features: ['HeatMap Inteligente', 'Analytics avançado', 'Auditoria avançada', 'Multiempresa'],
     featured: true,
-    cta: 'Começar Gratuitamente',
+    cta: 'Começar gratuitamente',
   },
   {
     key: 'enterprise',
     name: 'Enterprise',
     price: 'Sob consulta',
-    desc: 'Para operações com escala e exigências específicas.',
+    desc: 'Para operações corporativas com necessidades específicas.',
     features: ['Auditoria avançada', 'Gestão de usuários e papéis', 'Suporte dedicado', 'SLA personalizado'],
-    cta: 'Falar com Vendas',
+    cta: 'Falar com vendas',
   },
 ];
 
@@ -75,10 +85,13 @@ export function Plans({ onSignup }: PlansProps) {
     <section id="plans" className="relative bg-ink-950 py-28 px-6">
       <div className="max-w-2xl mx-auto text-center mb-16" style={{ perspective: 700 }}>
         <h2 ref={headingRef} className="text-3xl sm:text-4xl font-semibold text-mist-100 tracking-tight mb-4">
-          Um plano para cada estágio da operação.
+          Comece no seu ritmo. Evolua quando sua operação exigir.
         </h2>
         <p ref={subRef} className="text-mist-400">
-          Comece pequeno, cresça sem trocar de sistema.
+          Tenha acesso ao InventoryBlind gratuitamente e avance para recursos mais completos conforme sua operação cresce.
+        </p>
+        <p className="text-mist-400/70 text-sm mt-3">
+          Sem cartão de crédito. Experimente os recursos avançados por 3 dias — depois, continue gratuitamente ou evolua quando quiser.
         </p>
       </div>
       <motion.div
@@ -86,7 +99,7 @@ export function Plans({ onSignup }: PlansProps) {
         initial="hidden"
         whileInView="visible"
         viewport={{ once: true, amount: 0.15 }}
-        className="max-w-5xl mx-auto grid md:grid-cols-3 gap-6 items-start"
+        className="max-w-6xl mx-auto grid sm:grid-cols-2 lg:grid-cols-4 gap-6 items-start"
       >
         {PLANS.map(plan => (
           <motion.div
@@ -118,7 +131,7 @@ export function Plans({ onSignup }: PlansProps) {
               ))}
             </ul>
             <MagneticButton
-              onClick={onSignup}
+              onClick={plan.key === 'enterprise' ? () => window.open(WHATSAPP_PLANS_URL, '_blank', 'noopener,noreferrer') : onSignup}
               variant={plan.featured ? 'solid' : 'ghost'}
               className="w-full justify-center py-3 rounded-xl text-sm font-semibold"
             >

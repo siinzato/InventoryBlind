@@ -1,5 +1,5 @@
 import { useRef } from 'react';
-import { Sparkles, TrendingUp } from 'lucide-react';
+import { Bot, TrendingUp } from 'lucide-react';
 import { useAnimationTier } from '../../lib/useAnimationTier';
 import { useGSAP, gsap, addCounterTween, formatCount } from './landingScroll';
 
@@ -189,7 +189,7 @@ export function CinematicDashboard() {
               ))}
             </div>
             <span className="inline-flex items-center gap-1.5 text-xs font-medium text-enterprise-300">
-              <Sparkles ref={headerIconRef} size={13} /> BlindAI ativo
+              <Bot ref={headerIconRef} size={13} /> BlindAI ativo
             </span>
           </div>
 
@@ -274,7 +274,7 @@ export function CinematicDashboard() {
                 ref={annotationRef}
                 className="mt-3 flex items-start gap-2 rounded-xl border border-red-500/30 bg-red-500/10 px-3.5 py-2.5"
               >
-                <Sparkles ref={annotationIconRef} size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
+                <Bot ref={annotationIconRef} size={14} className="text-red-400 flex-shrink-0 mt-0.5" />
                 <p className="text-xs text-red-300 leading-relaxed">
                   <span className="font-semibold">BlindAI:</span> variação atípica detectada nesta posição — recomenda-se
                   contagem cega de conferência.

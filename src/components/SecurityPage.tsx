@@ -5,7 +5,7 @@ import {
   Lock, Unlock, Users, Activity, Database,
   Eye, RefreshCw, ChevronDown, ChevronUp,
   FileText, Globe, Clock, Server, Key,
-  Upload, Link, Settings, Zap, ArrowLeft,
+  Upload, Link, Settings, KeyRound, ArrowLeft,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -757,7 +757,7 @@ function PermissionMatrix() {
         className="w-full flex items-center justify-between p-5 hover:bg-surface-3/60 transition-colors">
         <div className="flex items-center gap-3">
           <div className="w-9 h-9 bg-violet-500/15 rounded-xl flex items-center justify-center">
-            <Zap size={18} className="text-violet-400" />
+            <KeyRound size={18} className="text-violet-400" />
           </div>
           <div className="text-left">
             <h3 className="font-bold text-fg">Matriz de Permissões</h3>

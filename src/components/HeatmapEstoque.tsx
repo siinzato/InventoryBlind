@@ -239,7 +239,7 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
 
       {/* Top Critical Areas Alert */}
       {topCriticalAreas.length > 0 && topCriticalAreas[0] && calculateRiskScore(topCriticalAreas[0]) >= 60 && (
-        <div className="bg-gradient-to-r from-red-500/5 to-orange-500/5 border-2 border-red-500/20 rounded-xl p-4 mb-6">
+        <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 mb-6">
           <div className="flex items-center gap-3 mb-3">
             <div className="p-2 bg-red-500/10 rounded-lg">
               <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />

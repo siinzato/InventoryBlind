@@ -17,6 +17,24 @@ html, body {
   flex-direction: column;
 }
 
+/* iOS Safari's address bar show/hide makes `100vh` (h-screen/min-h-screen)
+   taller than the actually-visible viewport, so back-to-back full-height
+   landing sections (Hero, CinematicDashboard, OperationalJourney) can render
+   overlapping — the next section's content bleeds into the current one.
+   `100dvh` tracks the real visible viewport; @supports keeps `vh` as the
+   fallback for browsers that don't understand `dvh`. */
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+  #root {
+    min-height: 100dvh;
+  }
+}
+
 /* Z-index scale for layered components */
 :root {
   --z-base: 1;

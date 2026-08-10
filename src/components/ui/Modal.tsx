@@ -29,7 +29,7 @@ export function Modal({ open, onClose, title, children, maxWidth = 'max-w-lg' }:
             animate={{ opacity: 1, scale: 1, y: 0 }}
             exit={{ opacity: 0, scale: 0.96, y: 8 }}
             transition={{ duration: 0.2 }}
-            className={`relative w-full ${maxWidth} rounded-2xl border border-edge bg-surface shadow-2xl max-h-[90vh] overflow-y-auto`}
+            className={`relative w-full ${maxWidth} rounded-xl border border-edge bg-surface shadow-lg max-h-[90vh] overflow-y-auto`}
           >
             {title && (
               <div className="flex items-center justify-between px-6 py-4 border-b border-edge">

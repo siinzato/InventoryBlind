@@ -40,16 +40,16 @@ export function AcademyProductivitySection({ userId, companyId }: AcademyProduct
           <GraduationCap size={16} className="text-accent" />
           <p className="text-section">I.B Academy</p>
         </div>
-        <div className="grid grid-cols-3 gap-3 mb-4">
-          <div className="p-3 bg-surface-3/50 rounded-lg text-center">
+        <div className="grid grid-cols-3 divide-x divide-edge mb-4">
+          <div className="text-center">
             <p className="text-lg font-bold text-fg">{totalCourses}</p>
             <p className="text-xs text-fg-subtle">Cursos concluídos</p>
           </div>
-          <div className="p-3 bg-surface-3/50 rounded-lg text-center">
+          <div className="text-center">
             <p className="text-lg font-bold text-fg">{certificates.length}</p>
             <p className="text-xs text-fg-subtle">Certificados</p>
           </div>
-          <div className="p-3 bg-surface-3/50 rounded-lg text-center">
+          <div className="text-center">
             <p className="text-lg font-bold text-fg">{totalHours}h</p>
             <p className="text-xs text-fg-subtle">Horas estudadas</p>
           </div>

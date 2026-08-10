@@ -5,7 +5,7 @@ import type { HTMLAttributes, ReactNode } from 'react';
  *  bordered surface with quiet internal dividers reads as one block, not a stack of boxes. */
 export function Panel({ children, className = '', ...rest }: HTMLAttributes<HTMLDivElement>) {
   return (
-    <div className={`rounded-2xl border border-edge bg-surface-2 overflow-hidden ${className}`} {...rest}>
+    <div className={`rounded-xl border border-edge bg-surface-2 overflow-hidden ${className}`} {...rest}>
       {children}
     </div>
   );

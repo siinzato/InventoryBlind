@@ -47,7 +47,8 @@ import {
   Receipt,
   PieChart,
   Gauge,
-  Sparkles,
+  ClipboardCheck,
+  BarChart3,
   ShieldAlert,
   Plug,
   Boxes,
@@ -914,7 +915,7 @@ function AppContent() {
       label: 'Ferramentas',
       items: [
         { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
-        { id: 'full-manager',    label: 'Full Manager',         icon: <Zap />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
+        { id: 'full-manager',    label: 'Full Manager',         icon: <ClipboardCheck />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
       ],
     },
     {
@@ -944,7 +945,7 @@ function AppContent() {
       items: [
         { id: 'analytics-blindscore', label: 'BlindScore',              icon: <Gauge />,       onClick: () => {}, active: false, locked: true },
         { id: 'analytics-health',     label: 'Inventory Health Score',  icon: <Activity />,    onClick: () => {}, active: false, locked: true },
-        { id: 'analytics-ia',         label: 'IA Insights',              icon: <Sparkles />,    onClick: () => {}, active: false, locked: true },
+        { id: 'analytics-ia',         label: 'IA Insights',              icon: <BarChart3 />,    onClick: () => {}, active: false, locked: true },
         { id: 'analytics-audit',      label: 'Auditorias',               icon: <ShieldAlert />, onClick: () => {}, active: false, locked: true },
       ],
     },
@@ -1521,18 +1522,20 @@ function AppContent() {
                     </h3>
                   </PanelSection>
                   <PanelSection>
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
+                    <div className="divide-y divide-edge mb-4">
                       {customKPIs.map((kpi) => (
-                        <div key={kpi.id} className="bg-surface-3 rounded-lg p-3 relative group">
+                        <div key={kpi.id} className="flex items-center justify-between gap-3 py-3 group">
+                          <div className="min-w-0">
+                            <p className="text-caption uppercase">{kpi.titulo}</p>
+                            <p className="text-lg font-semibold text-fg mt-1">{kpi.valor} <span className="text-sm font-normal text-fg-muted">{kpi.unidade}</span></p>
+                            <p className="text-caption mt-1 truncate">{kpi.variacao}</p>
+                          </div>
                           <button
                             onClick={() => handleDeleteKPI(kpi.id)}
-                            className="absolute top-2 right-2 text-fg-subtle hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            className="text-fg-subtle hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
                           >
                             <Trash2 size={16} />
                           </button>
-                          <p className="text-caption uppercase">{kpi.titulo}</p>
-                          <p className="text-lg font-semibold text-fg mt-1">{kpi.valor} <span className="text-sm font-normal text-fg-muted">{kpi.unidade}</span></p>
-                          <p className="text-caption mt-1 truncate">{kpi.variacao}</p>
                         </div>
                       ))}
                     </div>

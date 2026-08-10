@@ -1,5 +1,5 @@
 import { useEffect, useState, useCallback } from 'react';
-import { Sparkles, Route, Footprints, Clock, TrendingUp, Check, X, Clock3, PenSquare, RefreshCw } from 'lucide-react';
+import { PackageOpen, Route, Footprints, Clock, TrendingUp, Check, X, Clock3, PenSquare, RefreshCw } from 'lucide-react';
 import { PageHeader, Panel, PanelSection, Button, Badge } from '../ui';
 import { supabase } from '../../lib/supabase';
 import {
@@ -218,7 +218,7 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
             <div><p className="text-xs text-fg-subtle">Distância Economizada (aprovadas)</p><p className="text-sm font-semibold text-fg">{Math.round(totalMetersSaved).toLocaleString('pt-BR')} m</p></div>
           </div>
           <div className="flex items-start gap-2.5">
-            <Sparkles size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
+            <PackageOpen size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
             <div><p className="text-xs text-fg-subtle">Endereços Subutilizados</p><p className="text-sm font-semibold text-fg">{underutilized.length}</p></div>
           </div>
         </PanelSection>

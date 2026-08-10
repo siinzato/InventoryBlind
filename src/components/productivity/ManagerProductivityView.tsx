@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Users, Target, TrendingUp, Package, Zap, Star, AlertTriangle, Award, GraduationCap } from 'lucide-react';
+import { Users, Target, TrendingUp, Package, ClipboardCheck, Star, AlertTriangle, Award, GraduationCap } from 'lucide-react';
 import { Panel, PanelSection } from '../ui';
 import { UserProductivityStats } from '../../lib/supabase';
 import { getTeamProductivity, rankTeam } from '../../lib/productivityService';
@@ -58,7 +58,7 @@ export function ManagerProductivityView({ companyId, currentUserId, currentUserE
     { label: 'Melhor Acuracidade', value: bestAccuracy ? `${(bestAccuracy.acuracidade_media ?? 0).toFixed(1)}% (${bestAccuracy.name ?? '—'})` : '—', icon: Target },
     { label: 'Maior Produtividade', value: mostProductive?.name ?? '—', icon: TrendingUp },
     { label: 'Mais SKUs Contados', value: mostSkus ? mostSkus.skus_contados.toLocaleString('pt-BR') : '0', icon: Package },
-    { label: 'Mais Fulls', value: mostFulls ? `${mostFulls.fulls_realizados} (${mostFulls.name ?? '—'})` : '—', icon: Zap },
+    { label: 'Mais Fulls', value: mostFulls ? `${mostFulls.fulls_realizados} (${mostFulls.name ?? '—'})` : '—', icon: ClipboardCheck },
     { label: 'Colaboradores em Destaque', value: destaques.length, icon: Star },
     { label: 'Baixa Produtividade', value: baixaProdutividade.length, icon: AlertTriangle },
     { label: 'Conquistas do Período', value: totalAchievementsThisPeriod, icon: Award },

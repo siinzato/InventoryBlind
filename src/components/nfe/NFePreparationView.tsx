@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
-  ArrowLeft, Loader2, AlertCircle, Search, Check, Link2, Sparkles, Play,
+  ArrowLeft, Loader2, AlertCircle, Search, Check, Link2, Play,
   Package, X, RefreshCw,
 } from 'lucide-react';
 import type { NfeInvoice, NfeInvoiceItem, CatalogProduct } from '../../lib/nfe/nfeTypes';
@@ -227,7 +227,7 @@ function PendingItemRow({ item, catalog, onLink }: RowProps) {
 
       {suggestion && (
         <div className="flex flex-wrap items-center gap-2 mb-4 p-4 rounded-lg bg-accent/10 border border-accent/20">
-          <Sparkles size={16} className="text-accent flex-shrink-0" />
+          <Link2 size={16} className="text-accent flex-shrink-0" />
           <p className="text-sm text-fg flex-1 min-w-[160px]">
             Esse produto é <span className="font-semibold">{suggestion.product.name}</span>?
             <span className="text-fg-muted"> (SKU {suggestion.product.sku})</span>

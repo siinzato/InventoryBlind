@@ -20,6 +20,7 @@ export function Hero({ onSignup }: HeroProps) {
   const sectionRef = useRef<HTMLElement>(null);
   const headlineWrapperRef = useRef<HTMLDivElement>(null);
   const headlineRef = useRef<HTMLHeadingElement>(null);
+  const splitTargetRef = useRef<HTMLSpanElement>(null);
   const glowFollowRef = useRef<HTMLDivElement>(null);
   const headlineParticleRefs = useRef<(HTMLSpanElement | null)[]>([]);
   const mockupRef = useRef<HTMLDivElement>(null);
@@ -51,9 +52,15 @@ export function Hero({ onSignup }: HeroProps) {
 
       if (tier === 'minimal') return;
 
-      const split = headlineRef.current ? new SplitText(headlineRef.current, { type: 'words,chars' }) : null;
+      // Only the plain-text lead-in is char-split — "sem pontos cegos." keeps its gradient
+      // background-clip text intact as a single element. SplitText wraps each character in
+      // a new span that inherits color:transparent but NOT the parent's background-image/
+      // background-clip, so splitting a gradient-clipped span makes that text permanently
+      // invisible once the reveal finishes. It gets its own simple fade below instead.
+      const split = splitTargetRef.current ? new SplitText(splitTargetRef.current, { type: 'words,chars' }) : null;
       if (split) gsap.set(split.chars, { yPercent: 130, rotateX: -80, opacity: 0 });
       gsap.set(headlineRef.current, { rotateX: 6, transformPerspective: 600 });
+      gsap.set(highlightRef.current, { opacity: 0, y: 14 });
 
       gsap.set(mockupRef.current, { rotateX: 10, rotateY: -10, clipPath: 'inset(38% 0% 0% 0%)', opacity: 0.4 });
       gsap.set(kpiTileRefs.current, { opacity: 0, y: 14 });
@@ -91,6 +98,8 @@ export function Hero({ onSignup }: HeroProps) {
           0.1
         );
       }
+      tl.to(highlightRef.current, { opacity: 1, y: 0, duration: 0.5, ease: 'power2.out' }, 0.5);
+
       tl.fromTo(
         '.hero-subtext',
         { filter: 'blur(8px)', opacity: 0, y: 16 },
@@ -236,14 +245,14 @@ export function Hero({ onSignup }: HeroProps) {
             ))}
 
           <span className="relative inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full border border-ink-600 bg-ink-900/60 text-xs font-medium text-enterprise-300 mb-8">
-            <span className="w-1.5 h-1.5 rounded-full bg-enterprise-400" /> Plataforma de Inventário Inteligente
+            <span className="w-1.5 h-1.5 rounded-full bg-enterprise-400" /> Plataforma de Auditoria de Inventário
           </span>
 
           <h1
             ref={headlineRef}
             className="relative text-4xl sm:text-5xl lg:text-6xl font-semibold text-mist-100 tracking-tight leading-[1.08] mb-6"
           >
-            O futuro do inventário é preciso, inteligente e{' '}
+            <span ref={splitTargetRef}>Inventário auditado é preciso, rastreável e{' '}</span>
             <span
               ref={highlightRef}
               className="bg-clip-text text-transparent"

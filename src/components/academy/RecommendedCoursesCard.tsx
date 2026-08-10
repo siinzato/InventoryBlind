@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Sparkles } from 'lucide-react';
+import { ListChecks } from 'lucide-react';
 import { Panel, PanelSection, Badge } from '../ui';
 import { getMyProductivity } from '../../lib/productivityService';
 import { getRecommendationsForUser, RecommendedCourse } from '../../lib/academyRecommendationService';
@@ -30,7 +30,7 @@ export function RecommendedCoursesCard({ userId, companyId }: RecommendedCourses
     <Panel>
       <PanelSection padding="md">
         <div className="flex items-center gap-2 mb-3">
-          <Sparkles size={16} className="text-accent" />
+          <ListChecks size={16} className="text-accent" />
           <p className="text-section">Recomendado para você</p>
         </div>
         <div className="space-y-2">

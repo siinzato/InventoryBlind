@@ -12,7 +12,7 @@ const PADDING = { none: '', sm: 'p-4', md: 'p-5', lg: 'p-7' } as const;
  *  shadows so surfaces don't compete for attention. */
 export function Card({ children, padding = 'md', className = '', ...rest }: CardProps) {
   return (
-    <div className={`rounded-2xl border border-edge bg-surface-2 ${PADDING[padding]} ${className}`} {...rest}>
+    <div className={`rounded-xl border border-edge bg-surface-2 ${PADDING[padding]} ${className}`} {...rest}>
       {children}
     </div>
   );

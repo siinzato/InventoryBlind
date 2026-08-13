@@ -2,11 +2,9 @@
 
 import React, { useState, useMemo, useCallback } from 'react';
 import {
-  Trophy,
   ArrowLeft,
   X,
   Award,
-  TrendingUp,
   Users,
   Clock,
   BarChart3,
@@ -17,9 +15,13 @@ import {
   ChevronDown,
   CheckCircle2,
   Activity,
+  Target,
 } from 'lucide-react';
 import { downloadFile } from '../lib/productImportUtils';
-import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button } from './ui';
+import {
+  Page, PageHeader, Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button,
+  Input, SegmentedControl, Stat, StatRow, StatCell, type SegmentedOption,
+} from './ui';
 
 interface BrandRow {
   id: string;
@@ -60,13 +62,15 @@ type TabId = 'acuracidade' | 'divergencias' | 'progresso' | 'andamento' | 'opera
 
 type SortDir = 'asc' | 'desc';
 
-const TABS: { id: TabId; label: string; icon: React.ReactNode }[] = [
-  { id: 'acuracidade', label: 'Acuracidade', icon: <Trophy size={16} /> },
-  { id: 'divergencias', label: 'Divergencias', icon: <AlertTriangle size={16} /> },
-  { id: 'progresso', label: 'Progresso', icon: <BarChart3 size={16} /> },
-  { id: 'andamento', label: 'Em Andamento', icon: <Clock size={16} /> },
-  { id: 'operadores', label: 'Operadores', icon: <Users size={16} /> },
-  { id: 'vendas', label: 'Top Vendas', icon: <Award size={16} /> },
+// Target is the metric, not the podium: "Acuracidade" is a measurement, so it
+// gets a gauge rather than the trophy it used to carry.
+const TABS: SegmentedOption<TabId>[] = [
+  { value: 'acuracidade', label: 'Acuracidade', icon: Target },
+  { value: 'divergencias', label: 'Divergências', icon: AlertTriangle },
+  { value: 'progresso', label: 'Progresso', icon: BarChart3 },
+  { value: 'andamento', label: 'Em Andamento', icon: Clock },
+  { value: 'operadores', label: 'Operadores', icon: Users },
+  { value: 'vendas', label: 'Top Vendas', icon: Award },
 ];
 
 interface SortState {
@@ -76,20 +80,31 @@ interface SortState {
 
 const PAGE_SIZE = 20;
 
-/** Rank medal chip (1st/2nd/3rd + default). Shared so every tab that shows a
- *  position renders it identically. Gold uses dark text — white-on-amber-400
- *  fails contrast. */
+/** Position marker. Deliberately not a medal: gold/silver/bronze chips are
+ *  gamification borrowed from leaderboards, and this is an operations report —
+ *  a warehouse manager reads it to decide where to send people, not to award
+ *  prizes. First place gets a quiet accent tint because it is the row the eye
+ *  should find; everything else is a plain tabular figure. */
 function RankBadge({ rank }: { rank: number }) {
-  const cls =
-    rank === 1 ? 'bg-amber-400 text-amber-950' :
-    rank === 2 ? 'bg-surface-3 text-fg-muted' :
-    rank === 3 ? 'bg-amber-700 text-white' :
-    'bg-surface-2 text-fg-subtle';
+  const cls = rank === 1 ? 'bg-accent/10 text-accent font-semibold' : 'text-fg-subtle';
   return (
-    <span className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${cls}`}>
+    <span
+      className={`inline-flex h-6 w-6 items-center justify-center rounded-full text-xs tabular-nums ${cls}`}
+    >
       {rank}
     </span>
   );
+}
+
+/** Colour policy for every metric in this page.
+ *
+ *  Only the genuinely-bad end earns colour. The tables previously ran a
+ *  three-way emerald/amber/red ramp on every numeric cell, which turns a ranking
+ *  into a traffic light: when every row is coloured, nothing stands out and a
+ *  real problem has no contrast left to claim. Good and middling values are now
+ *  plain figures, so red means "go look at this". */
+function metricTone(critical: boolean): string {
+  return critical ? 'text-red-600 dark:text-red-400' : 'text-fg';
 }
 
 /** Status pill. CONCLUÍDO is a real completion state, so it keeps semantic color;
@@ -280,22 +295,17 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
 
   return (
     <div className="min-h-screen bg-surface">
-      {/* Sticky Header */}
-      <div className="sticky top-0 z-50 bg-surface text-fg border-b border-edge">
-        <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <Button variant="secondary" onClick={onBack}>
-              <ArrowLeft size={16} />
-              <span className="hidden sm:inline">Voltar ao Dashboard</span>
-            </Button>
-            <div className="flex items-center gap-2">
-              <Trophy size={22} className="text-amber-500" />
-              <div>
-                <h1 className="font-bold text-base leading-tight">Rankings Completos</h1>
-                <p className="text-xs text-fg-subtle hidden sm:block">Analise completa de desempenho</p>
-              </div>
-            </div>
-          </div>
+      {/* Sticky bar is chrome only — navigation and actions. The page's own name
+          lives in the masthead below, like every other screen in the app. The
+          gold trophy that used to sit here was a decorative page mark: it named
+          nothing the heading doesn't and framed an operations report as a
+          leaderboard. */}
+      <div className="sticky top-0 z-50 border-b border-edge/70 bg-surface-2 text-fg">
+        <div className="mx-auto flex max-w-7xl items-center justify-between gap-4 px-4 py-3">
+          <Button variant="secondary" onClick={onBack}>
+            <ArrowLeft size={16} />
+            <span className="hidden sm:inline">Voltar ao Dashboard</span>
+          </Button>
           <div className="flex items-center gap-2">
             <Button variant="secondary" onClick={handleExport}>
               <Download size={16} />
@@ -303,7 +313,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
             </Button>
             <button
               onClick={onBack}
-              className="p-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition-colors"
+              className="rounded-control p-2 text-fg-muted transition-colors hover:bg-surface-3 hover:text-fg"
               title="Fechar"
             >
               <X size={20} />
@@ -312,87 +322,74 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
         </div>
       </div>
 
-      <div className="max-w-7xl mx-auto px-4 py-6 space-y-6">
+      <Page width="wide">
+        <PageHeader
+          eyebrow="Desempenho"
+          title="Rankings"
+          description="Acuracidade, divergências e progresso por linha, operador e produto — a leitura completa por trás do resumo do Dashboard."
+        />
 
-        {/* Summary Cards — one Panel, grouped, not four separately bordered boxes */}
+        {/* Four figures in ONE panel. Each used to carry its own icon inside a
+            tinted box and its own value colour, assigned per card rather than by
+            state — four boxes, three hues, colour chosen for variety. Now they go
+            through Stat, and only the critical line is coloured, so the one figure
+            that needs action is the one that looks like it. */}
         <Panel>
           <PanelSection padding="lg">
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-6">
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 bg-emerald-500/10 rounded-lg"><Trophy size={16} className="text-emerald-600 dark:text-emerald-400" /></div>
-                  <span className="text-xs font-semibold text-fg-subtle uppercase">Melhor Linha</span>
-                </div>
-                <p className="font-bold text-fg text-sm truncate">{melhorLinha?.nome ?? '—'}</p>
-                <p className="text-emerald-600 dark:text-emerald-400 font-mono text-lg font-bold">{melhorLinha?.valor ?? '—'}</p>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 bg-red-500/10 rounded-lg"><AlertTriangle size={16} className="text-red-600 dark:text-red-400" /></div>
-                  <span className="text-xs font-semibold text-fg-subtle uppercase">Linha Critica</span>
-                </div>
-                <p className="font-bold text-fg text-sm truncate">{piorLinha?.nome ?? '—'}</p>
-                <p className="text-red-600 dark:text-red-400 font-mono text-lg font-bold">{piorLinha?.valor ?? '—'}</p>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 bg-amber-500/10 rounded-lg"><Activity size={16} className="text-amber-600 dark:text-amber-400" /></div>
-                  <span className="text-xs font-semibold text-fg-subtle uppercase">Maior Divergencia</span>
-                </div>
-                <p className="font-bold text-fg text-sm truncate">{maiorDiv?.brand ?? '—'}</p>
-                <p className="text-amber-600 dark:text-amber-400 font-mono text-lg font-bold">{maiorDiv?.divergences ?? 0} unid.</p>
-              </div>
-
-              <div>
-                <div className="flex items-center gap-2 mb-2">
-                  <div className="p-2 bg-emerald-500/10 rounded-lg"><Users size={16} className="text-emerald-600 dark:text-emerald-400" /></div>
-                  <span className="text-xs font-semibold text-fg-subtle uppercase">Melhor Operador</span>
-                </div>
-                <p className="font-bold text-fg text-sm truncate">{melhorOp?.resp ?? '—'}</p>
-                <p className="text-emerald-600 dark:text-emerald-400 font-mono text-lg font-bold">{melhorOp?.valor ?? '—'}</p>
-              </div>
-            </div>
+            <StatRow>
+              <StatCell>
+                <Stat label="Melhor Linha" value={melhorLinha?.valor ?? '—'} context={melhorLinha?.nome} icon={<Target />} />
+              </StatCell>
+              <StatCell>
+                <Stat
+                  label="Linha Crítica"
+                  value={piorLinha?.valor ?? '—'}
+                  context={piorLinha?.nome}
+                  icon={<AlertTriangle />}
+                  valueTone="critical"
+                />
+              </StatCell>
+              <StatCell>
+                <Stat
+                  label="Maior Divergência"
+                  value={`${maiorDiv?.divergences ?? 0} un.`}
+                  context={maiorDiv?.brand}
+                  icon={<Activity />}
+                />
+              </StatCell>
+              <StatCell>
+                <Stat label="Melhor Operador" value={melhorOp?.valor ?? '—'} context={melhorOp?.resp} icon={<Users />} />
+              </StatCell>
+            </StatRow>
           </PanelSection>
         </Panel>
 
-        {/* Tabs */}
+        {/* Tabs. Was a fourth distinct tab pattern in the app (filled grey bar +
+            2px underline); now the same SegmentedControl every other module uses,
+            so switching views feels identical everywhere. */}
         <Panel>
-          {/* Tab bar */}
-          <div className="flex overflow-x-auto border-b border-edge bg-surface-3">
-            {TABS.map(tab => (
-              <button
-                key={tab.id}
-                onClick={() => handleTabChange(tab.id)}
-                className={`flex items-center gap-2 px-4 py-3 text-sm font-semibold whitespace-nowrap border-b-2 transition-colors ${
-                  activeTab === tab.id
-                    ? 'border-accent text-fg bg-surface-2'
-                    : 'border-transparent text-fg-subtle hover:text-fg hover:bg-surface-2'
-                }`}
-              >
-                {tab.icon}
-                {tab.label}
-              </button>
-            ))}
-          </div>
-
-          {/* Search bar */}
-          <div className="flex items-center gap-3 px-4 py-3 border-b border-edge">
-            <div className="relative flex-1 max-w-sm">
-              <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-              <input
+          <PanelSection padding="sm" className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <SegmentedControl
+              label="Ranking exibido"
+              options={TABS}
+              value={activeTab}
+              onChange={handleTabChange}
+            />
+            <div className="flex items-center gap-3">
+              <Input
+                icon={<Search />}
                 type="text"
                 placeholder="Buscar..."
+                aria-label="Buscar no ranking"
                 value={search}
                 onChange={e => handleSearch(e.target.value)}
-                className="w-full pl-9 pr-4 py-2 bg-surface-3 border border-edge rounded-lg text-sm placeholder:text-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40"
+                className="sm:w-64"
               />
+              <span className="whitespace-nowrap text-caption tabular-nums">
+                {currentData.length} registro{currentData.length !== 1 ? 's' : ''}
+              </span>
             </div>
-            <span className="text-xs text-fg-subtle font-medium">
-              {currentData.length} registro{currentData.length !== 1 ? 's' : ''}
-            </span>
-          </div>
+          </PanelSection>
 
           {/* Table */}
           <div className="overflow-x-auto">
@@ -414,14 +411,8 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                     <Tr key={i}>
                       <Td><RankBadge rank={row.rank} /></Td>
                       <Td className="font-medium">{row.nome}</Td>
-                      <Td className="text-right">
-                        <span className={`font-bold text-base ${
-                          row.rawVal >= 80 ? 'text-emerald-600 dark:text-emerald-400' :
-                          row.rawVal >= 50 ? 'text-amber-600 dark:text-amber-400' :
-                          'text-red-600 dark:text-red-400'
-                        }`}>
-                          {row.valor}
-                        </span>
+                      <Td numeric>
+                        <span className={`font-semibold ${metricTone(row.rawVal < 50)}`}>{row.valor}</span>
                       </Td>
                     </Tr>
                   ))}
@@ -436,11 +427,11 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                     <Th className="cursor-pointer select-none" onClick={() => handleSort('brand')}>
                       <span className="flex items-center gap-1">Linha / Marca <SortIcon field="brand" /></span>
                     </Th>
-                    <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('divergences')}>
-                      <span className="flex items-center justify-center gap-1">Divergencias <SortIcon field="divergences" /></span>
+                    <Th className="text-right cursor-pointer select-none" onClick={() => handleSort("divergences")}>
+                      <span className="flex items-center justify-end gap-1">Divergências <SortIcon field="divergences" /></span>
                     </Th>
-                    <Th className="text-center">Contados</Th>
-                    <Th className="text-center">Total SKU</Th>
+                    <Th className="text-right">Contados</Th>
+                    <Th className="text-right">Total SKU</Th>
                     <Th className="text-center">Status</Th>
                   </Tr>
                 </Thead>
@@ -448,17 +439,11 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                   {(pagedData as typeof divergenciasData).map((row, i) => (
                     <Tr key={i}>
                       <Td className="font-medium">{row.brand}</Td>
-                      <Td className="text-center">
-                        <span className={`font-bold text-base ${
-                          row.divergences === 0 ? 'text-emerald-600 dark:text-emerald-400' :
-                          row.divergences > 20 ? 'text-red-600 dark:text-red-400' :
-                          'text-amber-600 dark:text-amber-400'
-                        }`}>
-                          {row.divergences}
-                        </span>
+                      <Td numeric>
+                        <span className={`font-semibold ${metricTone(row.divergences > 20)}`}>{row.divergences}</span>
                       </Td>
-                      <Td className="text-center text-fg-muted">{row.doneSku}</Td>
-                      <Td className="text-center text-fg-muted">{row.totalSku}</Td>
+                      <Td numeric className="text-fg-muted">{row.doneSku}</Td>
+                      <Td numeric className="text-fg-muted">{row.totalSku}</Td>
                       <Td className="text-center"><StatusPill status={row.status} /></Td>
                     </Tr>
                   ))}
@@ -476,9 +461,9 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                     <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('progress')}>
                       <span className="flex items-center justify-center gap-1">Progresso <SortIcon field="progress" /></span>
                     </Th>
-                    <Th className="text-center">Concluidos</Th>
-                    <Th className="text-center">Total SKU</Th>
-                    <Th className="text-center">Acuracidade</Th>
+                    <Th className="text-right">Concluídos</Th>
+                    <Th className="text-right">Total SKU</Th>
+                    <Th className="text-right">Acuracidade</Th>
                     <Th className="text-center">Status</Th>
                   </Tr>
                 </Thead>
@@ -486,22 +471,27 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                   {(pagedData as typeof progressoData).map((row, i) => (
                     <Tr key={i}>
                       <Td className="font-medium">{row.brand}</Td>
+                      {/* Progress is a quantity, not a severity — a bar that turns
+                          red at 40% reads as an alarm for a line that is simply
+                          not finished yet. One accent bar, length carries it. */}
                       <Td>
                         <div className="flex items-center gap-2">
-                          <div className="flex-1 bg-edge rounded-full h-2 min-w-[80px]">
+                          <div className="h-1.5 min-w-[80px] flex-1 rounded-full bg-surface-3">
                             <div
-                              className={`h-2 rounded-full ${row.progress >= 100 ? 'bg-emerald-500' : row.progress >= 50 ? 'bg-amber-500' : 'bg-red-500'}`}
+                              className="h-1.5 rounded-full bg-accent"
                               style={{ width: `${Math.min(100, row.progress)}%` }}
                             />
                           </div>
-                          <span className="text-xs font-mono font-semibold w-12 text-right">{row.progress.toFixed(1)}%</span>
+                          <span className="w-12 text-right font-mono text-xs tabular-nums text-fg-muted">
+                            {row.progress.toFixed(1)}%
+                          </span>
                         </div>
                       </Td>
-                      <Td className="text-center text-fg-muted">{row.doneSku}</Td>
-                      <Td className="text-center text-fg-muted">{row.totalSku}</Td>
-                      <Td className="text-center font-bold">
+                      <Td numeric className="text-fg-muted">{row.doneSku}</Td>
+                      <Td numeric className="text-fg-muted">{row.totalSku}</Td>
+                      <Td numeric>
                         {row.accuracy !== null
-                          ? <span className={row.accuracy >= 80 ? 'text-emerald-600 dark:text-emerald-400' : row.accuracy >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}>{row.accuracy.toFixed(1)}%</span>
+                          ? <span className={`font-semibold ${metricTone(row.accuracy < 50)}`}>{row.accuracy.toFixed(1)}%</span>
                           : <span className="text-fg-subtle">—</span>
                         }
                       </Td>
@@ -522,34 +512,40 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                     <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('progress')}>
                       <span className="flex items-center justify-center gap-1">Progresso <SortIcon field="progress" /></span>
                     </Th>
-                    <Th className="text-center">Concluidos / Total</Th>
-                    <Th className="text-center">Divergencias</Th>
+                    <Th className="text-right">Concluídos / Total</Th>
+                    <Th className="text-right">Divergências</Th>
                   </Tr>
                 </Thead>
                 <tbody>
                   {(pagedData as typeof andamentoData).length === 0 ? (
-                    <tr><td colSpan={4} className="px-4 py-8 text-center text-fg-subtle">
-                      <CheckCircle2 size={32} className="mx-auto mb-2 text-emerald-600 dark:text-emerald-400" />
-                      Todas as linhas foram concluidas!
+                    <tr><td colSpan={4} className="px-4 py-10 text-center text-fg-subtle">
+                      <CheckCircle2 size={32} className="mx-auto mb-2 opacity-40" />
+                      <p className="text-sm">Nenhuma linha em andamento.</p>
+                      <p className="text-caption mt-1">Todas as linhas do inventário foram concluídas.</p>
                     </td></tr>
                   ) : (
                     (pagedData as typeof andamentoData).map((row, i) => (
                       <Tr key={i}>
                         <Td className="font-medium">{row.brand}</Td>
+                        {/* "In progress" is the default state of every row in this
+                            tab, so it gets no colour at all — an amber bar on
+                            every line is decoration, not information. */}
                         <Td>
                           <div className="flex items-center gap-2">
-                            <div className="flex-1 bg-edge rounded-full h-2 min-w-[80px]">
+                            <div className="h-1.5 min-w-[80px] flex-1 rounded-full bg-surface-3">
                               <div
-                                className="h-2 rounded-full bg-amber-500"
+                                className="h-1.5 rounded-full bg-accent"
                                 style={{ width: `${Math.min(100, row.progress)}%` }}
                               />
                             </div>
-                            <span className="text-xs font-mono font-bold text-amber-600 dark:text-amber-400 w-12 text-right">{row.progress.toFixed(1)}%</span>
+                            <span className="w-12 text-right font-mono text-xs tabular-nums text-fg-muted">
+                              {row.progress.toFixed(1)}%
+                            </span>
                           </div>
                         </Td>
-                        <Td className="text-center text-fg-muted">{row.doneSku} / {row.totalSku}</Td>
-                        <Td className="text-center font-bold">
-                          <span className={row.divergences > 0 ? 'text-red-600 dark:text-red-400' : 'text-emerald-600 dark:text-emerald-400'}>{row.divergences}</span>
+                        <Td numeric className="text-fg-muted">{row.doneSku} / {row.totalSku}</Td>
+                        <Td numeric>
+                          <span className={`font-semibold ${metricTone(row.divergences > 0)}`}>{row.divergences}</span>
                         </Td>
                       </Tr>
                     ))
@@ -581,10 +577,10 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                           {row.resp}
                         </span>
                       </Td>
-                      <Td className="text-right font-bold">
+                      <Td numeric>
                         {row.valor === 'Andamento'
-                          ? <span className="text-xs font-medium text-fg-subtle uppercase">Em Andamento</span>
-                          : <span className="text-fg">{row.valor}</span>
+                          ? <span className="text-overline">Em Andamento</span>
+                          : <span className="font-semibold text-fg">{row.valor}</span>
                         }
                       </Td>
                     </Tr>
@@ -611,9 +607,9 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                   {(pagedData as typeof vendasData).map((row, i) => (
                     <Tr key={i}>
                       <Td><RankBadge rank={(page - 1) * PAGE_SIZE + i + 1} /></Td>
-                      <Td className="font-medium max-w-[280px] truncate">{row.produto}</Td>
+                      <Td className="max-w-[280px] truncate font-medium">{row.produto}</Td>
                       <Td className="font-mono text-fg-subtle">{row.sku}</Td>
-                      <Td className="text-right font-bold">{row.vendas}</Td>
+                      <Td numeric className="font-semibold">{row.vendas}</Td>
                     </Tr>
                   ))}
                 </tbody>
@@ -623,8 +619,8 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
 
           {/* Pagination */}
           {totalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 border-t border-edge bg-surface-3">
-              <p className="text-xs text-fg-subtle">
+            <div className="flex items-center justify-between gap-3 border-t border-edge/60 px-4 py-3">
+              <p className="text-caption tabular-nums">
                 Mostrando {(page - 1) * PAGE_SIZE + 1}–{Math.min(page * PAGE_SIZE, currentData.length)} de {currentData.length}
               </p>
               <div className="flex items-center gap-1">
@@ -636,7 +632,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                 >
                   Anterior
                 </Button>
-                <span className="px-3 py-1.5 text-sm font-medium text-fg-muted">
+                <span className="px-3 text-sm tabular-nums text-fg-muted">
                   {page} / {totalPages}
                 </span>
                 <Button
@@ -645,26 +641,14 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                   onClick={() => setPage(p => Math.min(totalPages, p + 1))}
                   disabled={page === totalPages}
                 >
-                  Proximo
+                  Próximo
                 </Button>
               </div>
             </div>
           )}
 
         </Panel>
-
-        {/* Back button at bottom */}
-        <div className="flex justify-center pb-4">
-          <button
-            onClick={onBack}
-            className="flex items-center gap-2 px-6 py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-semibold transition shadow-sm"
-          >
-            <ArrowLeft size={18} />
-            Voltar ao Dashboard
-          </button>
-        </div>
-
-      </div>
+      </Page>
     </div>
   );
 };

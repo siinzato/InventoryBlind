@@ -49,24 +49,38 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   const [rawRows, setRawRows] = useState<Array<{ [key: string]: string | number | undefined }>>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>(null);
 
-  // Load existing products from database
+  // Load existing products from database.
+  // Paginated with .range() — a single unbounded .select() is silently capped
+  // (PostgREST/Supabase default row limit, ~1000) and any product past that
+  // cutoff would be wrongly treated as "new" below, causing duplicate-key
+  // failures on insert for SKUs that already exist in the database.
   const loadExistingProducts = async (): Promise<Map<string, ProductFromDB>> => {
+    const PAGE_SIZE = 1000;
+    const productsMap = new Map<string, ProductFromDB>();
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, sku, ean, location, price, created_at, updated_at, company_id');
+      let from = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, sku, ean, location, price, created_at, updated_at, company_id')
+          .order('id', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const productsMap = new Map<string, ProductFromDB>();
-      data?.forEach((item: ProductFromDB) => {
-        productsMap.set(item.sku.toUpperCase(), item);
-      });
+        data?.forEach((item: ProductFromDB) => {
+          productsMap.set(item.sku.toUpperCase(), item);
+        });
+
+        const pageLength = data?.length ?? 0;
+        if (pageLength < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
       return productsMap;
     } catch (err) {
       console.error('Error loading existing products:', err);
-      return new Map();
+      return productsMap;
     }
   };
 
@@ -475,7 +489,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
 
   // Admin check overlay
   const AdminCheckOverlay = () => (
-    <div className="rounded-2xl border border-amber-500/20 bg-amber-500/10 p-8 text-center">
+    <div className="rounded-container border border-amber-500/20 bg-amber-500/10 p-8 text-center">
       <div className="flex justify-center mb-4">
         <div className="p-4 bg-amber-500/10 rounded-full">
           <Lock size={40} className="text-amber-600 dark:text-amber-400" />

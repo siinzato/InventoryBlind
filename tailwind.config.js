@@ -5,7 +5,13 @@ export default {
   theme: {
     extend: {
       fontFamily: {
-        sans: ['-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        // Body/UI text. 'SF Pro Text' stays first so licensed files take over
+        // the moment they're installed — see the comment in src/index.css.
+        sans: ['SF Pro Text', 'Geist Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        // Headings, KPIs, page titles — anywhere size carries the hierarchy.
+        display: ['SF Pro Display', 'Geist Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        // Precision data: KPI values, table/ledger numbers, IDs, timestamps.
+        mono: ['SF Mono', 'Geist Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
       },
       colors: {
         ink: {
@@ -39,6 +45,25 @@ export default {
         'fg-subtle': 'rgb(var(--fg-subtle) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
         'accent-strong': 'rgb(var(--accent-strong) / <alpha-value>)',
+      },
+      // NOTE: the app's body/label type lift is NOT here. Overriding `sm`/`xs`
+      // globally would also resize the Landing and AuthPage, which are frozen —
+      // 70 usages in that zone would have changed silently. The lift lives in
+      // src/index.css scoped to [data-app-shell] instead.
+      borderRadius: {
+        // Explicit scale (brief §6/§22) instead of one flat radius reused for
+        // every concern. Existing rounded-xl/lg usage is untouched — these
+        // are additive, semantic names for the redesign to grow into.
+        control: '0.625rem',   // buttons, inputs, small controls
+        container: '0.75rem',  // cards, panels — same value as rounded-xl today
+        sheet: '1.25rem',       // modals, drawers, bottom sheets
+      },
+      boxShadow: {
+        // Deliberately quiet — most surfaces should need none of these at
+        // all (border + surface contrast carries depth instead).
+        control: '0 1px 2px rgb(0 0 0 / 0.04)',
+        panel: '0 1px 2px rgb(0 0 0 / 0.03), 0 1px 1px rgb(0 0 0 / 0.02)',
+        overlay: '0 16px 40px -12px rgb(0 0 0 / 0.22), 0 4px 12px -4px rgb(0 0 0 / 0.08)',
       },
     },
   },

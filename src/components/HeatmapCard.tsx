@@ -57,12 +57,13 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
     return (
       <button
         onClick={() => onClick(area)}
-        className={`${riskGradient} border-2 rounded-xl p-5 text-left transition-all hover:shadow-sm hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-accent/40 group relative overflow-hidden`}
+        className={`${riskGradient} border rounded-container p-5 text-left transition-colors hover:bg-surface-3/40 focus:outline-none focus:ring-2 focus:ring-accent/40 group relative overflow-hidden`}
       >
-        {/* Priority Badge */}
+        {/* Priority Badge — static: the red fill is already the signal, and a
+            pulsing alarm on a grid of cards competes with the data. */}
         {showPriorityBadge && (
           <div className="absolute top-2 right-2">
-            <span className="flex items-center gap-1 px-2 py-1 text-xs font-bold bg-red-600 text-white rounded-full animate-pulse">
+            <span className="flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-red-600 text-white rounded-full">
               <Flag size={12} />
               PRIORIDADE
             </span>
@@ -160,11 +161,11 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
     return (
       <button
         onClick={() => onClick(area)}
-        className={`w-full ${riskGradient} border-2 rounded-xl p-5 text-left transition-all hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/40 flex items-center gap-4 relative`}
+        className={`w-full ${riskGradient} border rounded-container p-5 text-left transition-colors hover:bg-surface-3/40 focus:outline-none focus:ring-2 focus:ring-accent/40 flex items-center gap-4 relative`}
       >
         {/* Priority Badge */}
         {showPriorityBadge && (
-          <span className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 text-xs font-bold bg-red-600 text-white rounded-full animate-pulse">
+          <span className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-red-600 text-white rounded-full">
             <Flag size={12} />
             PRIORIDADE
           </span>
@@ -240,12 +241,12 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
   return (
     <button
       onClick={() => onClick(area)}
-      className={`w-full ${riskGradient} border-2 rounded-xl p-5 text-left transition-all hover:shadow-sm focus:outline-none focus:ring-2 focus:ring-accent/40`}
+      className={`w-full ${riskGradient} border rounded-container p-5 text-left transition-colors hover:bg-surface-3/40 focus:outline-none focus:ring-2 focus:ring-accent/40`}
     >
       <div className="flex items-center gap-4">
         {/* Rank Badge */}
         <div
-          className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-white ${
+          className={`w-10 h-10 rounded-full flex items-center justify-center font-semibold tabular-nums text-white ${
             rank === 1 ? 'bg-red-600' : rank === 2 ? 'bg-orange-500' : rank === 3 ? 'bg-amber-500' : 'bg-fg-subtle'
           }`}
         >

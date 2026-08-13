@@ -34,8 +34,6 @@ import {
   RefreshCw,
   Map,
   FileSpreadsheet,
-  ChevronRight,
-  Undo2,
   Tag,
   UserCog,
   Building2,
@@ -66,10 +64,13 @@ import {
   LayoutGrid,
   GitBranch,
   SearchCheck,
-  BookOpen
+  BookOpen,
+  ArrowRight
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation } from './lib/supabase';
 import { getBlindAISituations } from './lib/blindAIInsightsEngine';
+import { tryFastPath, askBlindAIAgent, getContextualSuggestions, type ChatMessage } from './lib/blindAIAgent';
+import { computeGlobalStats } from './lib/blindAIAgentAlgorithm';
 import { SafeDropdown } from './components/SafeDropdown';
 import { DashboardRankingPreview } from './components/DashboardRankingPreview';
 import { CountManagementCenter } from './components/counting/CountManagementCenter';
@@ -80,7 +81,10 @@ import { hasPermission, getRoleLabel } from './lib/permissionService';
 import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
 import { LogoMark } from './components/landing/landingUi';
-import { ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge } from './components/ui';
+import {
+  ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge,
+  Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
+} from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
 
 // Code-split large page components for smaller initial bundle
@@ -112,16 +116,13 @@ const PageLoader = () => (
 );
 
 // Suspense fallback for the lazy-loaded LandingPage — color-matched to its
-// own bg-zinc-950 root, no spinner/logo, to avoid a flash-of-white before
+// own bg-ink-950 root, no spinner/logo, to avoid a flash-of-white before
 // the chunk (which also carries Motion/GSAP) finishes loading.
-const LandingFallback = () => <div className="min-h-screen w-full bg-zinc-950" />;
+const LandingFallback = () => <div className="min-h-screen w-full bg-ink-950" />;
 
-const SITUATION_SEVERITY_TEXT: Record<BlindAISituation['severity'], string> = {
-  info: 'text-fg',
-  warning: 'text-amber-600 dark:text-amber-400',
-  critical: 'text-red-600 dark:text-red-400',
-};
-
+// Severity reaches the UI through the icon tint (INSIGHT_ICON_TONE) and this
+// badge variant only — the title stays text-fg so the same signal isn't
+// repeated three times in one row.
 const SITUATION_SEVERITY_BADGE: Record<BlindAISituation['severity'], 'neutral' | 'warning' | 'danger'> = {
   info: 'neutral',
   warning: 'warning',
@@ -145,28 +146,6 @@ const initialOpCapas: OpCapa[] = [
   { nome: 'DUX', valor: 'Andamento', resp: 'Davi' },
 ];
 
-interface BrandRow {
-  id: string;
-  brand: string;
-  totalSku: number;
-  doneSku: number;
-  divergences: number;
-  progress: number;
-  accuracy: number | null;
-  status: string;
-}
-
-interface GlobalData {
-  tabela: BrandRow[];
-  totalSku: number;
-  totalDone: number;
-  totalDiv: number;
-  progresso: number;
-  acuracidade: number;
-  melhores: { nome: string; valor: string }[];
-  piores: { nome: string; valor: string }[];
-}
-
 function AppContent() {
   const { profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -185,9 +164,6 @@ function AppContent() {
 
   const isLoggedIn = canManageUsers(profile?.role);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [adminUser] = useState('');
-  const [adminPass] = useState('');
-  const [loginError] = useState(false);
   const { canInstall, hasPrompt, promptInstall } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
 
@@ -399,51 +375,7 @@ function AppContent() {
     setSnapshotBrands(data || []);
   };
 
-  const globais: GlobalData = useMemo(() => {
-    let totalSkuGeral = 0;
-    let totalDoneGeral = 0;
-    let totalDivGeral = 0;
-
-    const dataProcessada: BrandRow[] = brandsData.map(b => {
-      totalSkuGeral += b.total_sku;
-      totalDoneGeral += b.done_sku;
-      totalDivGeral += b.divergences;
-
-      const progress = b.total_sku > 0 ? Math.min(100, (b.done_sku / b.total_sku) * 100) : 0;
-      const accuracy = b.done_sku > 0 ? Math.max(0, ((b.done_sku - b.divergences) / b.done_sku) * 100) : null;
-
-      return {
-        id: b.id,
-        brand: b.brand,
-        totalSku: b.total_sku,
-        doneSku: b.done_sku,
-        divergences: b.divergences,
-        progress: progress,
-        accuracy: accuracy,
-        status: progress >= 100 ? 'CONCLUÍDO' : 'ANDAMENTO'
-      };
-    });
-
-    const progressoGeral = totalSkuGeral > 0 ? (totalDoneGeral / totalSkuGeral) * 100 : 0;
-    const acuracidadeGeral = totalDoneGeral > 0 ? Math.max(0, ((totalDoneGeral - totalDivGeral) / totalDoneGeral) * 100) : 0;
-
-    const concluidas = dataProcessada.filter(b => b.status === 'CONCLUÍDO' && b.accuracy !== null);
-    const concluidasOrdenadas = [...concluidas].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0));
-
-    const melhores = concluidasOrdenadas.slice(0, 10).map(b => ({ nome: b.brand, valor: `${b.accuracy?.toFixed(1)}%` }));
-    const piores = [...concluidasOrdenadas].reverse().map(b => ({ nome: b.brand, valor: `${b.accuracy?.toFixed(2)}%` }));
-
-    return {
-      tabela: dataProcessada,
-      totalSku: totalSkuGeral,
-      totalDone: totalDoneGeral,
-      totalDiv: totalDivGeral,
-      progresso: progressoGeral,
-      acuracidade: acuracidadeGeral,
-      melhores,
-      piores
-    };
-  }, [brandsData]);
+  const globais = useMemo(() => computeGlobalStats(brandsData), [brandsData]);
 
   const healthStatus = useMemo(() => {
     const acc = globais.acuracidade;
@@ -476,135 +408,43 @@ function AppContent() {
     loadSituations();
   }, [loadSituations]);
 
-  // AI Assistant response generator — apoio secundário, grounded nos dados reais do
-  // inventário (o produto principal do BlindAI são as situações acima, não este chat).
-  const generateAIResponse = (question: string): string => {
-    const q = question.toLowerCase();
+  // Sugestões contextuais: só oferece uma pergunta se o dado por trás dela existir de
+  // verdade (ver generateContextualSuggestions em blindAIAgentAlgorithm.ts).
+  const aiSuggestions = useMemo(
+    () => getContextualSuggestions({ situations, globais }),
+    [situations, globais]
+  );
 
-    // Progress questions
-    if (q.includes('progresso') || q.includes('andamento') || q.includes('como está')) {
-      return `📈 **Progresso Atual do Inventário**\n\n` +
-        `• Total: ${globais.progresso.toFixed(1)}% concluído\n` +
-        `• SKUs processados: ${globais.totalDone.toLocaleString()} de ${globais.totalSku.toLocaleString()}\n` +
-        `• Pendentes: ${(globais.totalSku - globais.totalDone).toLocaleString()} SKUs\n` +
-        `• Linhas em andamento: ${globais.tabela.filter(l => l.status === 'ANDAMENTO').length}\n` +
-        `• Linhas concluídas: ${globais.tabela.filter(l => l.status === 'CONCLUÍDO').length}\n\n` +
-        `🎯 Foco: manter acuracidade alta para garantir estoque correto.`;
-    }
-
-    // Accuracy questions
-    if (q.includes('acuracidade') || q.includes('precisão') || q.includes('erro')) {
-      return `🎯 **Acuracidade do Inventário**\n\n` +
-        `• Acuracidade geral: ${globais.acuracidade.toFixed(1)}%\n` +
-        `• Total de divergências: ${globais.totalDiv}\n` +
-        `• Taxa de divergência: ${globais.totalDone > 0 ? ((globais.totalDiv / globais.totalDone) * 100).toFixed(2) : 0}%\n\n` +
-        `${globais.acuracidade >= 80 ? '✅ Status: Excelente! Inventário bem controlado.' : globais.acuracidade >= 50 ? '⚠️ Status: Mediano. Requer atenção.' : '🚨 Status: Crítico! Ação imediata necessária.'}\n\n` +
-        `📊 Uma boa acuracidade garante que os produtos estejam disponíveis para venda!`;
-    }
-
-    // Divergence questions
-    if (q.includes('divergência') || q.includes('divergencias')) {
-      const highDivLines = globais.tabela.filter(l => l.divergences > 10).sort((a, b) => b.divergences - a.divergences).slice(0, 5);
-      return `🔍 **Análise de Divergências**\n\n` +
-        `• Total de divergências: ${globais.totalDiv}\n` +
-        `• Linhas com mais divergências:\n${highDivLines.map(l => `  - ${l.brand}: ${l.divergences} divergências`).join('\n')}\n\n` +
-        `💡 Divergências podem afetar vendas. Priorize a investigação!`;
-    }
-
-    // Best lines
-    if (q.includes('melhor') || q.includes('top') || q.includes('bom')) {
-      const completedLines = globais.tabela.filter(l => l.status === 'CONCLUÍDO' && l.accuracy !== null);
-      const top5 = [...completedLines].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).slice(0, 5);
-      return `🏆 **Top 5 Linhas por Acuracidade**\n\n` +
-        top5.map((l, i) => `${i + 1}. ${l.brand}: ${l.accuracy?.toFixed(1)}%`).join('\n') +
-        `\n\n✨ Parabéns à equipe responsável! Isso garante estoque preciso.`;
-    }
-
-    // Worst lines / Attention needed
-    if (q.includes('pior') || q.includes('problema') || q.includes('atenção') || q.includes('crítico')) {
-      const problemLines = globais.tabela
-        .filter(l => l.accuracy !== null && l.accuracy < 70)
-        .sort((a, b) => (a.accuracy ?? 0) - (b.accuracy ?? 0))
-        .slice(0, 5);
-      const slowLines = globais.tabela
-        .filter(l => l.status === 'ANDAMENTO' && l.progress < 30)
-        .sort((a, b) => a.progress - b.progress);
-
-      return `⚠️ **Linhas que Precisam de Atenção**\n\n` +
-        `**Menores acuracidades:**\n${problemLines.map(l => `• ${l.brand}: ${l.accuracy?.toFixed(1)}%`).join('\n')}\n\n` +
-        `**Progresso lento:**\n${slowLines.map(l => `• ${l.brand}: ${l.progress.toFixed(1)}%`).join('\n')}\n\n` +
-        `💡 Ação sugerida: Revisar processos de contagem para não impactar vendas.`;
-    }
-
-    // Estimate / Time remaining
-    if (q.includes('quanto tempo') || q.includes('previsão') || q.includes('estimativa') || q.includes('terminar')) {
-      const pending = globais.totalSku - globais.totalDone;
-      const avgDaily = 48;
-      const daysRemaining = Math.ceil(pending / avgDaily);
-      const etaDate = new Date();
-      etaDate.setDate(etaDate.getDate() + daysRemaining);
-
-      return `⏱️ **Estimativa de Conclusão**\n\n` +
-        `• SKUs pendentes: ${pending.toLocaleString()}\n` +
-        `• Média diária: ~${avgDaily} SKUs\n` +
-        `• Dias estimados: ${daysRemaining} dias\n` +
-        `• Previsão de término: ${etaDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n` +
-        `${globais.progresso > 50 ? '✅ Mais da metade concluída!' : '📈 Acelere o ritmo para cumprir o prazo.'}`;
-    }
-
-    // Top sales
-    if (q.includes('vendas') || q.includes('vendidos') || q.includes('produto')) {
-      return `📦 **Top 10 Produtos mais Vendidos**\n\n` +
-        topVendas.slice(0, 5).map((v, i) => `${i + 1}. ${v.produto}\n   SKU: ${v.sku} | ${v.vendas} vendas`).join('\n\n') +
-        `\n\n📊 Esses produtos são essenciais para o inventário - priorize a contagem!`;
-    }
-
-    // Who are you / Help
-    if (q.includes('quem é você') || q.includes('quem e voce') || q.includes('seu nome') || q.includes('blindai')) {
-      return `🤖 **BlindAI**\n\n` +
-        `Sou o BlindAI, o agente de inteligência operacional do InventoryBlind. Acompanho os dados da sua operação continuamente e trago as situações que precisam de atenção no painel acima — a conversa aqui é só um apoio para consultas pontuais.\n\n` +
-        `Pergunte sobre progresso, acuracidade, divergências, linhas de produtos ou produtos mais vendidos.`;
-    }
-
-    // Help / what can you do
-    if (q.includes('ajuda') || q.includes('help') || q.includes('o que você faz') || q.includes('o que voce faz')) {
-      return `🤖 **BlindAI**\n\n` +
-        `Posso ajudar com:\n` +
-        `• 📊 Status do progresso\n` +
-        `• 🎯 Análise de acuracidade\n` +
-        `• 🔍 Divergências encontradas\n` +
-        `• 🏆 Linhas com melhor desempenho\n` +
-        `• ⚠️ Linhas críticas que precisam atenção\n` +
-        `• ⏱️ Previsão de término\n` +
-        `• 📦 Top produtos vendidos\n\n` +
-        `Digite sua pergunta!`;
-    }
-
-    // Default response
-    return `🤖 **BlindAI**\n\n` +
-      `Analisei sua pergunta sobre "${question}".\n\n` +
-      `📊 **Status atual do inventário:**\n` +
-      `• Progresso: ${globais.progresso.toFixed(1)}%\n` +
-      `• Acuracidade: ${globais.acuracidade.toFixed(1)}%\n` +
-      `• Divergências: ${globais.totalDiv}\n\n` +
-      `💡 Pergunte sobre progresso, acuracidade ou linhas de produtos!`;
-  };
-
+  // Leituras puras (progresso/acuracidade/melhores linhas/produtos mais vendidos) respondem
+  // na hora, sem custo de LLM. Qualquer outra pergunta — priorização, causa raiz, estratégia,
+  // follow-ups, perguntas gerais de logística/e-commerce ou sobre o próprio SaaS — vai para o
+  // agente real (Claude + tool-calling), rodando na Edge Function blindai-agent. O histórico
+  // enviado é o próprio transcript da conversa: essa é a memória do agente, não um objeto à parte.
   const handleSendAIMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiInput.trim() || aiLoading) return;
+    if (!aiInput.trim() || aiLoading || !companyId) return;
 
     const userMessage = aiInput.trim();
     setAiInput('');
-    setAiMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setAiLoading(true);
+    const nextMessages: ChatMessage[] = [...aiMessages, { role: 'user', content: userMessage }];
+    setAiMessages(nextMessages);
 
-    // Simulate processing delay for better UX
-    setTimeout(() => {
-      const response = generateAIResponse(userMessage);
-      setAiMessages(prev => [...prev, { role: 'assistant', content: response }]);
-      setAiLoading(false);
-    }, 500);
+    const fastAnswer = tryFastPath(userMessage, { globais, topVendas });
+    if (fastAnswer !== null) {
+      setAiMessages(prev => [...prev, { role: 'assistant', content: fastAnswer }]);
+      return;
+    }
+
+    setAiLoading(true);
+    askBlindAIAgent(nextMessages, companyId)
+      .then(reply => {
+        setAiMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      })
+      .catch(err => {
+        console.error('[BlindAI] Error answering question:', err);
+        setAiMessages(prev => [...prev, { role: 'assistant', content: err instanceof Error ? err.message : 'Não consegui consultar o agente agora. Tente novamente em instantes.' }]);
+      })
+      .finally(() => setAiLoading(false));
   };
 
   const handleAddBrand = async (e: React.FormEvent) => {
@@ -709,16 +549,6 @@ function AppContent() {
     setCustomKPIs(customKPIs.filter(kpi => kpi.id !== id));
   };
 
-  const getIconColorClass = (cor: string) => {
-    switch (cor) {
-      case 'blue': return 'bg-accent/10 text-accent';
-      case 'red': return 'bg-red-500/10 text-red-600 dark:text-red-400';
-      case 'amber': return 'bg-amber-500/10 text-amber-600 dark:text-amber-400';
-      case 'emerald': return 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400';
-      default: return 'bg-surface-3 text-fg-muted';
-    }
-  };
-
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
@@ -733,7 +563,7 @@ function AppContent() {
   if (error) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center p-4">
-        <div className="bg-surface-2 rounded-2xl border border-edge p-8 max-w-md text-center">
+        <div className="bg-surface-2 rounded-sheet border border-edge p-8 max-w-md text-center">
           <AlertTriangle className="mx-auto text-red-500" size={40} />
           <h2 className="mt-4 text-lg font-semibold text-fg">Erro ao carregar</h2>
           <p className="mt-2 text-fg-muted">{error}</p>
@@ -878,14 +708,14 @@ function AppContent() {
               disabled={switchingCompany}
               className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-xl bg-surface-2/70 hover:bg-surface-3 border border-edge/70 transition-colors duration-200 disabled:opacity-60"
             >
-              <span className="w-6 h-6 rounded-md bg-gradient-to-br from-accent to-accent-strong flex items-center justify-center text-white text-[10px] font-bold flex-shrink-0 shadow-sm shadow-black/10">
+              <span className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
                 {company.name.slice(0, 1).toUpperCase()}
               </span>
               <span className="min-w-0 text-left leading-tight">
                 <span className="block truncate text-xs font-semibold text-fg">
                   {switchingCompany ? 'Trocando...' : company.name}
                 </span>
-                <span className="block text-[10px] text-fg-subtle">Workspace</span>
+                <span className="block text-caption">Workspace</span>
               </span>
               {companies.length > 1 && (
                 <ChevronDown size={12} className="text-fg-subtle flex-shrink-0 ml-auto transition-transform duration-200 group-hover:translate-y-0.5" />
@@ -897,7 +727,7 @@ function AppContent() {
               id: c.id,
               label: c.name,
               icon: (
-                <span className="w-5 h-5 rounded-md bg-gradient-to-br from-accent to-accent-strong flex items-center justify-center text-white text-[9px] font-bold">
+                <span className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white text-[9px] font-semibold">
                   {c.name.slice(0, 1).toUpperCase()}
                 </span>
               ),
@@ -909,7 +739,7 @@ function AppContent() {
               label: (
                 <span className="flex items-center gap-1.5">
                   Adicionar empresa
-                  <span className="text-[9px] font-semibold uppercase tracking-wide text-fg-subtle bg-surface-3 rounded px-1 py-0.5">Em breve</span>
+                  <span className="text-overline bg-surface-3 rounded px-1 py-0.5">Em breve</span>
                 </span>
               ),
               icon: <Plus size={14} />,
@@ -935,14 +765,14 @@ function AppContent() {
         <button className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface-3/70 transition-colors duration-200">
           <span
             title={profile?.email ?? undefined}
-            className="relative w-8 h-8 rounded-full bg-gradient-to-br from-accent to-accent-strong flex items-center justify-center text-xs font-bold text-white flex-shrink-0 uppercase ring-1 ring-white/15 shadow-[0_1px_3px_rgba(0,0,0,0.12),inset_0_1px_1px_rgba(255,255,255,0.35)] transition-transform duration-200 group-hover:scale-105"
+            className="relative w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 uppercase"
           >
             {(profile?.email ?? '?').slice(0, 1)}
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" />
           </span>
           <div className="hidden xl:block text-left leading-tight">
             <p className="text-xs font-semibold text-fg">{profile?.email?.split('@')[0]}</p>
-            <p className="text-[10.5px] text-fg-subtle mt-0.5">{getRoleLabel(profile?.role ?? '')}</p>
+            <p className="text-caption mt-0.5">{getRoleLabel(profile?.role ?? '')}</p>
           </div>
           <ChevronDown size={12} className="text-fg-subtle hidden xl:block transition-transform duration-200 group-hover:translate-y-0.5" />
         </button>
@@ -967,7 +797,9 @@ function AppContent() {
   );
 
   return (
-    <div className="h-screen bg-surface font-sans text-fg flex overflow-hidden">
+    // data-app-shell scopes the authenticated app's reduced-motion rules in
+    // index.css — the Landing zone resolves motion itself and is excluded.
+    <div data-app-shell className="h-screen bg-surface font-sans text-fg flex overflow-hidden">
 
       {/* ── SIDEBAR (desktop) ─────────────────────────────────────────────── */}
       <Sidebar groups={navGroups} header={sidebarHeader} className="hidden md:flex" />
@@ -1128,20 +960,30 @@ function AppContent() {
             {/* VISÃO GERAL: indicadores + BlindAI em um único painel */}
             <Panel>
               <PanelSection padding="lg">
-                <div className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-edge lg:divide-y-0 lg:divide-x">
-                  {[
-                    { label: 'Progresso Geral', value: `${globais.progresso.toFixed(1)}%`, subtitle: `${globais.totalDone} de ${globais.totalSku} SKUs` },
-                    { label: 'Acuracidade (IRA)', value: `${globais.acuracidade.toFixed(1)}%`, subtitle: 'Via divergências', valueClassName: globais.acuracidade >= 80 ? 'text-emerald-600 dark:text-emerald-400' : globais.acuracidade >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400' },
-                    { label: 'Tempo de Inventário', value: '44 dias', subtitle: 'Projeção: 27 dias' },
-                    { label: 'Divergências', value: globais.totalDiv, subtitle: 'Unidades p/ recontagem' },
-                  ].map((kpi, i) => (
-                    <div key={i} className={`px-0 lg:px-6 py-3 lg:py-0 ${i === 0 ? 'lg:pl-0' : ''}`}>
-                      <p className="text-section">{kpi.label}</p>
-                      <p className={`text-display mt-1.5 ${kpi.valueClassName ?? ''}`}>{kpi.value}</p>
-                      <p className="text-caption mt-1">{kpi.subtitle}</p>
-                    </div>
+                <StatRow>
+                  {([
+                    {
+                      label: 'Progresso Geral',
+                      value: `${globais.progresso.toFixed(1)}%`,
+                      context: `${globais.totalDone} de ${globais.totalSku} SKUs`,
+                    },
+                    {
+                      label: 'Acuracidade (IRA)',
+                      value: `${globais.acuracidade.toFixed(1)}%`,
+                      context: 'Via divergências',
+                      // The only figure here whose level is a condition, so the
+                      // only one allowed to carry colour.
+                      valueTone:
+                        globais.acuracidade >= 80 ? 'positive' : globais.acuracidade >= 50 ? 'warning' : 'critical',
+                    },
+                    { label: 'Tempo de Inventário', value: '44 dias', context: 'Projeção: 27 dias' },
+                    { label: 'Divergências', value: globais.totalDiv, context: 'Unidades p/ recontagem' },
+                  ] satisfies StatProps[]).map(kpi => (
+                    <StatCell key={kpi.label}>
+                      <Stat {...kpi} />
+                    </StatCell>
                   ))}
-                </div>
+                </StatRow>
               </PanelSection>
 
               <PanelSection padding="lg">
@@ -1157,14 +999,14 @@ function AppContent() {
                     <button
                       onClick={loadSituations}
                       disabled={situationsLoading}
-                      className="p-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
+                      className="p-2 rounded-control text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
                       title="Atualizar análise"
                     >
                       <RefreshCw size={16} className={situationsLoading ? 'animate-spin' : ''} />
                     </button>
                     <button
                       onClick={() => setShowAIChat(!showAIChat)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-accent hover:bg-accent/10 transition-colors font-medium text-sm"
+                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-control text-accent hover:bg-accent/10 transition-colors font-medium text-sm"
                     >
                       <MessageCircle size={15} />
                       Conversar
@@ -1181,48 +1023,49 @@ function AppContent() {
                     <p className="text-sm text-fg-subtle">Nenhuma situação crítica identificada no momento.</p>
                   ) : (
                     <div className="divide-y divide-edge">
-                      {situations.map(s => (
-                        <button
-                          key={s.id}
-                          onClick={() => setActiveTab(s.module)}
-                          className="w-full flex items-start gap-3 py-3 first:pt-0 last:pb-0 text-left -mx-1 px-1 rounded-lg hover:bg-surface-3/60 transition-colors"
-                        >
-                          <span className="text-lg leading-none flex-shrink-0 mt-0.5">{s.icon}</span>
-                          <div className="min-w-0 flex-1 space-y-1">
-                            <div className="flex items-center gap-2 flex-wrap">
-                              <p className={`text-sm font-semibold ${SITUATION_SEVERITY_TEXT[s.severity]}`}>{s.title}</p>
-                              <Badge variant={SITUATION_SEVERITY_BADGE[s.severity]}>{s.actionLabel}</Badge>
+                      {situations.map(s => {
+                        const SituationIcon = resolveInsightIcon(s.icon, s.severity);
+                        return (
+                          <button
+                            key={s.id}
+                            onClick={() => setActiveTab(s.module)}
+                            className="w-full flex items-start gap-3 py-3 first:pt-0 last:pb-0 text-left -mx-1 px-1 rounded-control hover:bg-surface-3/60 transition-colors"
+                          >
+                            <SituationIcon size={15} className={`flex-shrink-0 mt-0.5 ${INSIGHT_ICON_TONE[s.severity]}`} />
+                            <div className="min-w-0 flex-1 space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <p className="text-sm font-semibold text-fg">{s.title}</p>
+                                <Badge variant={SITUATION_SEVERITY_BADGE[s.severity]}>{s.actionLabel}</Badge>
+                              </div>
+                              <p className="text-sm text-fg-muted">{s.evidence}</p>
+                              <ul className="text-xs text-fg-subtle space-y-0.5">
+                                {s.reasons.map((reason, idx) => <li key={idx}>• {reason}</li>)}
+                              </ul>
+                              <p className="flex items-start gap-1 text-xs text-fg-subtle">
+                                <ArrowRight size={12} className="mt-0.5 flex-shrink-0" />
+                                {s.recommendation}
+                              </p>
                             </div>
-                            <p className="text-sm text-fg-muted">{s.evidence}</p>
-                            <ul className="text-xs text-fg-subtle space-y-0.5">
-                              {s.reasons.map((reason, idx) => <li key={idx}>• {reason}</li>)}
-                            </ul>
-                            <p className="text-xs text-fg-subtle">→ {s.recommendation}</p>
-                          </div>
-                        </button>
-                      ))}
+                          </button>
+                        );
+                      })}
                     </div>
                   )}
                 </div>
 
                 {/* Chat: apoio secundário, não o produto principal */}
                 {showAIChat && (
-                  <div className="mt-4 bg-surface rounded-lg border border-edge overflow-hidden">
+                  <div className="mt-4 bg-surface rounded-container border border-edge overflow-hidden">
                     {/* Chat Messages */}
                     <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: '300px' }}>
                       {aiMessages.length === 0 && (
                         <div className="text-center py-4">
                           <Bot size={28} className="mx-auto text-fg-subtle mb-2" />
                           <p className="text-fg-subtle text-sm">
-                            Pergunte sobre progresso, acuracidade ou divergências do inventário.
+                            Pergunte sobre prioridades, risco, divergências ou estratégia de contagem.
                           </p>
                           <div className="flex flex-wrap gap-2 justify-center mt-3">
-                            {[
-                              'Qual o progresso?',
-                              'Quais linhas precisam de atenção?',
-                              'Quais as maiores divergências?',
-                              'Quanto tempo falta?'
-                            ].map((q) => (
+                            {aiSuggestions.map((q) => (
                               <button
                                 key={q}
                                 onClick={() => {
@@ -1242,7 +1085,7 @@ function AppContent() {
                           className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
                         >
                           <div
-                            className={`max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap ${
+                            className={`max-w-[80%] rounded-control px-4 py-2 text-sm whitespace-pre-wrap ${
                               msg.role === 'user'
                                 ? 'bg-accent text-white'
                                 : 'bg-surface-2 text-fg'
@@ -1254,7 +1097,7 @@ function AppContent() {
                       ))}
                       {aiLoading && (
                         <div className="flex justify-start">
-                          <div className="bg-surface-2 rounded-lg px-4 py-2 flex items-center gap-2">
+                          <div className="bg-surface-2 rounded-control px-4 py-2 flex items-center gap-2">
                             <Loader2 size={16} className="animate-spin text-fg-subtle" />
                             <span className="text-fg-subtle text-sm">Analisando...</span>
                           </div>
@@ -1269,13 +1112,13 @@ function AppContent() {
                         value={aiInput}
                         onChange={(e) => setAiInput(e.target.value)}
                         placeholder="Pergunte sobre o inventário..."
-                        className="flex-1 bg-surface-2 text-fg placeholder-fg-subtle rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                        className="flex-1 bg-surface-2 text-fg placeholder-fg-subtle rounded-control px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
                         disabled={aiLoading}
                       />
                       <button
                         type="submit"
                         disabled={aiLoading || !aiInput.trim()}
-                        className="bg-accent hover:bg-accent-strong text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
+                        className="bg-accent hover:bg-accent-strong text-white px-4 py-2 rounded-control transition disabled:opacity-50 disabled:cursor-not-allowed"
                       >
                         <Send size={18} />
                       </button>
@@ -1330,10 +1173,10 @@ function AppContent() {
                       {globais.tabela.map((row) => (
                         <tr key={row.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
                           <td className="px-6 py-3.5 font-medium text-fg">{row.brand}</td>
-                          <td className="px-3 py-3.5 text-center text-fg-muted">{row.totalSku}</td>
-                          <td className="px-3 py-3.5 text-center font-semibold text-fg">{row.doneSku}</td>
-                          <td className="px-3 py-3.5 text-center text-fg-muted font-mono text-xs">{row.progress.toFixed(1)}%</td>
-                          <td className="px-3 py-3.5 text-center font-semibold text-fg">
+                          <td className="px-3 py-3.5 text-center text-fg-muted text-numeric">{row.totalSku}</td>
+                          <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">{row.doneSku}</td>
+                          <td className="px-3 py-3.5 text-center text-fg-muted text-numeric text-xs">{row.progress.toFixed(1)}%</td>
+                          <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">
                             {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : '—'}
                           </td>
                           <td className="px-6 py-3.5 text-center">
@@ -1569,34 +1412,44 @@ function AppContent() {
             {customKPIs.length > 0 && (
               <Panel>
                 <PanelSection padding="lg">
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 divide-y divide-edge lg:divide-y-0 lg:divide-x">
-                    {customKPIs.map((kpi, i) => (
-                      <div key={kpi.id} className={`px-0 lg:px-6 py-3 lg:py-0 ${i === 0 ? 'lg:pl-0' : ''}`}>
-                        <div className="flex items-center justify-between">
-                          <p className="text-section">{kpi.titulo}</p>
-                          <div className={`p-1.5 rounded-md ${getIconColorClass(kpi.cor_icone)}`}>
-                            {kpi.cor_icone === 'blue' && <Zap size={14} />}
-                            {kpi.cor_icone === 'red' && <AlertTriangle size={14} />}
-                            {kpi.cor_icone === 'amber' && <Clock size={14} />}
-                            {kpi.cor_icone === 'emerald' && <Users size={14} />}
-                          </div>
-                        </div>
-                        <p className="text-display mt-1.5">
-                          {kpi.valor} <span className="text-base font-normal text-fg-muted">{kpi.unidade}</span>
-                        </p>
-                        <div className={`flex items-center gap-1 mt-1 text-xs font-medium ${
-                          kpi.tipo_variacao === 'up' ? 'text-emerald-600 dark:text-emerald-400' :
-                          kpi.tipo_variacao === 'down' ? 'text-red-600 dark:text-red-400' :
-                          'text-fg-subtle'
-                        }`}>
-                          {kpi.tipo_variacao === 'up' && <ArrowUpRight size={13} />}
-                          {kpi.tipo_variacao === 'down' && <ArrowDownRight size={13} />}
-                          {kpi.tipo_variacao === 'neutral' && <Calendar size={13} />}
-                          <span>{kpi.variacao}</span>
-                        </div>
-                      </div>
+                  {/* The per-KPI icon used to sit in a coloured badge driven by a
+                      `cor_icone` column — colour chosen for variety, not meaning.
+                      The glyph stays as a quiet leading mark; the variation keeps
+                      its existing up/down semantics through the trend slot. */}
+                  <StatRow className="md:grid-cols-2">
+                    {customKPIs.map(kpi => (
+                      <StatCell key={kpi.id}>
+                        <Stat
+                          label={kpi.titulo}
+                          icon={
+                            kpi.cor_icone === 'red' ? <AlertTriangle /> :
+                            kpi.cor_icone === 'amber' ? <Clock /> :
+                            kpi.cor_icone === 'emerald' ? <Users /> :
+                            <Zap />
+                          }
+                          value={
+                            <>
+                              {kpi.valor}
+                              {kpi.unidade && (
+                                <span className="ml-1 text-base font-normal text-fg-muted">{kpi.unidade}</span>
+                              )}
+                            </>
+                          }
+                          trend={
+                            kpi.variacao
+                              ? {
+                                  value: kpi.variacao,
+                                  direction:
+                                    kpi.tipo_variacao === 'up' ? 'up' : kpi.tipo_variacao === 'down' ? 'down' : 'flat',
+                                  intent:
+                                    kpi.tipo_variacao === 'up' ? 'positive' : kpi.tipo_variacao === 'down' ? 'negative' : 'neutral',
+                                }
+                              : undefined
+                          }
+                        />
+                      </StatCell>
                     ))}
-                  </div>
+                  </StatRow>
                 </PanelSection>
               </Panel>
             )}
@@ -2201,7 +2054,7 @@ function AppContent() {
       {/* PWA Install Instructions Modal (iOS) */}
       {showInstallModal && (
         <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowInstallModal(false)}>
-          <div className="bg-surface-2 border border-edge rounded-2xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+          <div className="bg-surface-2 border border-edge rounded-sheet p-6 max-w-sm mx-4 shadow-overlay" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
                 <Smartphone size={20} className="text-accent" />
@@ -2229,47 +2082,94 @@ function AppContent() {
 // ── Link Company screen ───────────────────────────────────────────────────────
 
 function LinkCompanyScreen() {
-  const { linkToAZ, signOut, user } = useAuth();
-  const [linking, setLinking] = useState(false);
+  const { linkToAZ, createCompany, signOut, user } = useAuth();
+  const [companyName, setCompanyName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [linkingAZ, setLinkingAZ] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLink = async () => {
-    setLinking(true);
+  // This screen is a recovery path — the golden signup flow creates the
+  // company via create_company_onboarding() right after signUp() and never
+  // lands here. A user only reaches this if that RPC call failed (network
+  // blip) or their profile predates onboarding. "Vincular à empresa AZ" is a
+  // legacy dev/demo shortcut, not a real option for a genuine new tenant —
+  // keep it visible only for the one account it was ever meant for.
+  const isDevOwner = user?.email === 'victor@azbuy.com.br';
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyName.trim()) { setError('Informe o nome da empresa.'); return; }
+    setCreating(true);
+    setError('');
+    try {
+      await createCompany(companyName.trim());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[LinkCompanyScreen] createCompany error:', msg);
+      setError('Não foi possível concluir a configuração da empresa. Tente novamente.');
+      setCreating(false);
+    }
+  };
+
+  const handleLinkAZ = async () => {
+    setLinkingAZ(true);
     setError('');
     try {
       await linkToAZ();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[LinkCompanyScreen] Error:', msg);
+      console.error('[LinkCompanyScreen] linkToAZ error:', msg);
       setError(msg);
-      setLinking(false);
+      setLinkingAZ(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-surface-2 border border-edge rounded-2xl p-8 text-center shadow-2xl">
-        <div className="w-14 h-14 bg-accent/10 rounded-2xl flex items-center justify-center mx-auto mb-5">
+      <div className="w-full max-w-md bg-surface-2 border border-edge rounded-sheet p-8 text-center shadow-overlay">
+        <div className="w-14 h-14 bg-accent/10 rounded-container flex items-center justify-center mx-auto mb-5">
           <LogoMark size={28} className="text-accent" />
         </div>
-        <h2 className="text-xl font-bold text-fg mb-2">Vincular Empresa</h2>
+        <h2 className="text-xl font-bold text-fg mb-2">Configurar Empresa</h2>
         <p className="text-fg-subtle text-sm mb-1">Logado como</p>
         <p className="text-fg text-sm font-semibold mb-6">{user?.email}</p>
         <p className="text-fg-muted text-sm mb-6">
-          Sua conta está ativa mas ainda não está vinculada a uma empresa.
+          Sua conta está ativa mas ainda não está vinculada a uma empresa. Crie a sua para continuar.
         </p>
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4 text-left">
-            <p className="text-red-400 text-xs font-mono break-all whitespace-pre-wrap">{error}</p>
+          <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4 text-left">
+            <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-red-400" />
+            <p className="text-red-400 text-xs">{error}</p>
           </div>
         )}
-        <button
-          onClick={handleLink}
-          disabled={linking}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-xl font-bold text-sm transition mb-3"
-        >
-          {linking ? <Loader2 size={16} className="animate-spin" /> : 'Vincular à empresa AZ'}
-        </button>
+        <form onSubmit={handleCreate} className="text-left mb-3">
+          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1.5">
+            Nome da Empresa
+          </label>
+          <input
+            type="text"
+            value={companyName}
+            onChange={e => setCompanyName(e.target.value)}
+            placeholder="Minha Empresa Ltda"
+            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-xl text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
+          />
+          <button
+            type="submit"
+            disabled={creating}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-xl font-bold text-sm transition"
+          >
+            {creating ? <Loader2 size={16} className="animate-spin" /> : 'Criar minha empresa'}
+          </button>
+        </form>
+        {isDevOwner && (
+          <button
+            onClick={handleLinkAZ}
+            disabled={linkingAZ}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-fg-subtle hover:text-fg-muted disabled:opacity-60 text-xs transition mb-3"
+          >
+            {linkingAZ ? <Loader2 size={14} className="animate-spin" /> : 'Vincular à empresa AZ (conta de teste)'}
+          </button>
+        )}
         <button onClick={signOut} className="text-xs text-fg-subtle hover:text-fg-muted transition">
           Sair
         </button>
@@ -2285,8 +2185,8 @@ function AuthErrorScreen() {
 
   return (
     <div className="min-h-screen bg-surface flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-surface-2 border border-red-500/20 rounded-2xl p-8 text-center shadow-2xl">
-        <div className="w-14 h-14 bg-red-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+      <div className="w-full max-w-md bg-surface-2 border border-red-500/20 rounded-sheet p-8 text-center shadow-overlay">
+        <div className="w-14 h-14 bg-red-500/15 rounded-container flex items-center justify-center mx-auto mb-5">
           <AlertTriangle size={28} className="text-red-400" />
         </div>
         <h2 className="text-xl font-bold text-fg mb-2">Erro ao carregar</h2>

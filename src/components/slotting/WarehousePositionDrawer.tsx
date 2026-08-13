@@ -103,7 +103,7 @@ export function WarehousePositionDrawer({ open, onClose, companyId, cell, status
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="absolute right-0 top-0 h-full w-full max-w-sm bg-surface border-l border-edge shadow-2xl overflow-y-auto"
+            className="absolute right-0 top-0 z-10 h-full w-full max-w-sm bg-surface border-l border-edge shadow-overlay overflow-y-auto"
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-edge">
               <h2 className="text-base font-semibold text-fg flex items-center gap-2">

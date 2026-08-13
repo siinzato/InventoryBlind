@@ -61,14 +61,17 @@ export const getRiskLevelColor = (level: RiskLevel): string => {
   }
 };
 
-// Get risk bg gradient for cards
+/** Risk surface for heatmap cards. Flat tint, not a gradient: the hue already
+ *  encodes the risk level, so a gradient added no information and read as
+ *  decoration. Border tints are kept subtler than the badge scale above so the
+ *  card body stays calm while the badge carries the signal. */
 export const getRiskGradient = (level: RiskLevel): string => {
   switch (level) {
-    case 'none': return 'bg-gradient-to-br from-surface-2 to-surface-3 border-edge';
-    case 'low': return 'bg-gradient-to-br from-emerald-500/5 to-emerald-500/15 border-emerald-500/30';
-    case 'medium': return 'bg-gradient-to-br from-amber-500/5 to-amber-500/15 border-amber-500/30';
-    case 'high': return 'bg-gradient-to-br from-orange-500/5 to-orange-500/15 border-orange-500/30';
-    case 'critical': return 'bg-gradient-to-br from-red-500/5 to-red-500/15 border-red-500/30';
+    case 'none': return 'bg-surface-2 border-edge';
+    case 'low': return 'bg-emerald-500/[0.07] border-emerald-500/20';
+    case 'medium': return 'bg-amber-500/[0.07] border-amber-500/20';
+    case 'high': return 'bg-orange-500/[0.07] border-orange-500/20';
+    case 'critical': return 'bg-red-500/[0.07] border-red-500/25';
   }
 };
 

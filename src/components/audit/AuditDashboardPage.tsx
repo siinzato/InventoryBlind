@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { PageHeader } from '../ui';
+import { Calculator, GitCompareArrows, Sigma, TrendingUp } from 'lucide-react';
+import { Page, PageHeader, SegmentedControl, type SegmentedOption } from '../ui';
 import { InventorySimulationPanel } from './InventorySimulationPanel';
 import { CrossCheckPanel } from './CrossCheckPanel';
 import { StatisticalAuditPanel } from './StatisticalAuditPanel';
@@ -14,11 +15,11 @@ interface AuditDashboardPageProps {
 
 type AuditSubModule = 'simulacao' | 'cruzada' | 'estatistica' | 'tendencia';
 
-const SUBMODULES: { id: AuditSubModule; label: string; icon: string }[] = [
-  { id: 'simulacao', label: 'Simulação de Inventário', icon: '🧮' },
-  { id: 'cruzada', label: 'Auditoria Cruzada', icon: '🔍' },
-  { id: 'estatistica', label: 'Auditoria Estatística', icon: '📐' },
-  { id: 'tendencia', label: 'Análise de Tendência', icon: '📈' },
+const SUBMODULES: SegmentedOption<AuditSubModule>[] = [
+  { value: 'simulacao', label: 'Simulação de Inventário', icon: Calculator },
+  { value: 'cruzada', label: 'Auditoria Cruzada', icon: GitCompareArrows },
+  { value: 'estatistica', label: 'Auditoria Estatística', icon: Sigma },
+  { value: 'tendencia', label: 'Análise de Tendência', icon: TrendingUp },
 ];
 
 /** Composição raiz de "Auditoria de Estoque" — não toca em nenhum arquivo de contagem/RCA
@@ -31,30 +32,23 @@ export function AuditDashboardPage({ companyId, userId, userEmail, role }: Audit
   const [submodule, setSubmodule] = useState<AuditSubModule>('simulacao');
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page>
       <PageHeader
         title="Auditoria de Estoque"
         description="Ferramentas avançadas de planejamento, rastreabilidade e análise estatística sobre as contagens e divergências já registradas."
       />
 
-      <div className="flex flex-wrap gap-1.5">
-        {SUBMODULES.map(s => (
-          <button
-            key={s.id}
-            onClick={() => setSubmodule(s.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-              submodule === s.id ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge hover:bg-surface-3'
-            }`}
-          >
-            {s.icon} {s.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Submódulo de auditoria"
+        options={SUBMODULES}
+        value={submodule}
+        onChange={setSubmodule}
+      />
 
       {submodule === 'simulacao' && <InventorySimulationPanel companyId={companyId} />}
       {submodule === 'cruzada' && <CrossCheckPanel companyId={companyId} userId={userId} userEmail={userEmail} canEdit={canEdit} />}
       {submodule === 'estatistica' && <StatisticalAuditPanel companyId={companyId} userId={userId} userEmail={userEmail} />}
       {submodule === 'tendencia' && <TrendAnalysisPanel companyId={companyId} />}
-    </div>
+    </Page>
   );
 }

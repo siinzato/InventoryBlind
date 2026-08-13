@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { motion } from 'motion/react';
 import { Play, Pause, RotateCcw, Footprints as FootprintsIcon } from 'lucide-react';
-import { Panel, PanelSection, Badge, Button } from '../ui';
+import { Panel, PanelSection, Badge, Button, SegmentedControl, Select } from '../ui';
 import { getRecentOperations, getOperationLocations, type RecentOperationSummary } from '../../lib/slottingLayoutService';
 import { computeRouteThroughStops, findExpeditionCell, estimatePickingTimeSeconds, type GridPoint, type RouteResult } from '../../lib/slottingEngine';
 import { FloorPlanBackground } from './FloorPlanBackground';
@@ -127,16 +127,17 @@ export function PickingReplay({ companyId, layout, cells, demoRoute }: PickingRe
           {demoRoute ? (
             <Badge variant="accent">{demoRoute.label}</Badge>
           ) : (
-            <select
+            <Select
               value={selectedId}
               onChange={e => setSelectedId(e.target.value)}
-              className="p-2 border border-edge rounded-lg bg-surface text-sm text-fg min-w-[220px]"
+              aria-label="Operação Full para o replay"
+              className="w-full sm:w-auto sm:min-w-[220px]"
             >
               <option value="">Selecione uma operação Full...</option>
               {operations.map(op => (
                 <option key={op.id} value={op.id}>{op.fullNumber} — {new Date(op.createdAt).toLocaleDateString('pt-BR')} ({op.itemCount} SKUs)</option>
               ))}
-            </select>
+            </Select>
           )}
         </div>
 
@@ -151,19 +152,12 @@ export function PickingReplay({ companyId, layout, cells, demoRoute }: PickingRe
               <Button variant="secondary" size="sm" onClick={() => { setPlaying(false); setStep(0); }}>
                 <RotateCcw size={14} /> Reiniciar
               </Button>
-              <div className="flex gap-1">
-                {SPEEDS.map(s => (
-                  <button
-                    key={s}
-                    onClick={() => setSpeed(s)}
-                    className={`px-2 py-1 rounded text-xs font-medium border transition-colors ${
-                      speed === s ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'
-                    }`}
-                  >
-                    {s}x
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl
+                label="Velocidade do replay"
+                options={SPEEDS.map(s => ({ value: String(s) as `${(typeof SPEEDS)[number]}`, label: `${s}x` }))}
+                value={String(speed) as `${(typeof SPEEDS)[number]}`}
+                onChange={v => setSpeed(Number(v) as (typeof SPEEDS)[number])}
+              />
             </div>
 
             <div className="flex gap-4 text-xs text-fg-subtle flex-wrap">
@@ -227,7 +221,7 @@ export function PickingReplay({ companyId, layout, cells, demoRoute }: PickingRe
 
                 {current && (
                   <motion.div
-                    className="absolute w-3 h-3 rounded-full bg-accent-strong ring-2 ring-white/80 shadow-lg pointer-events-none"
+                    className="absolute w-3 h-3 rounded-full bg-accent-strong ring-2 ring-surface shadow-control pointer-events-none"
                     style={{ marginLeft: -6, marginTop: -6 }}
                     animate={{ left: (current.x + 0.5) * CELL_PX, top: (current.y + 0.5) * CELL_PX }}
                     transition={{ duration: playing ? BASE_STEP_MS / 1000 / speed : 0.3, ease: 'linear' }}

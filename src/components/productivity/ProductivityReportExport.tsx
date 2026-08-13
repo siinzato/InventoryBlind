@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { jsPDF } from 'jspdf';
 import { FileText, FileSpreadsheet, FileDown } from 'lucide-react';
-import { PanelSection, Button } from '../ui';
+import { PanelSection, Button, SegmentedControl } from '../ui';
 import { downloadFile } from '../../lib/productImportUtils';
 import { UserProductivityStats } from '../../lib/supabase';
 import { ReportPeriod, resolvePeriodRange, getProductivityForPeriod, generateExecutiveSummary } from '../../lib/productivityService';
@@ -102,17 +102,12 @@ export function ProductivityReportExport({ employeeName, userId, companyId, user
   return (
     <PanelSection padding="md" className="space-y-3">
       <p className="text-section">Relatório de Produtividade</p>
-      <div className="flex flex-wrap gap-2">
-        {(Object.keys(PERIOD_LABEL) as ReportPeriod[]).map(p => (
-          <button
-            key={p}
-            onClick={() => setPeriod(p)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${period === p ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'}`}
-          >
-            {PERIOD_LABEL[p]}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Período do relatório"
+        options={(Object.keys(PERIOD_LABEL) as ReportPeriod[]).map(p => ({ value: p, label: PERIOD_LABEL[p] }))}
+        value={period}
+        onChange={setPeriod}
+      />
       <div className="flex flex-wrap gap-2 pt-1">
         <Button variant="secondary" size="sm" disabled={exporting} onClick={handleExportPDF}><FileText size={14} /> PDF</Button>
         <Button variant="secondary" size="sm" disabled={exporting} onClick={handleExportExcel}><FileSpreadsheet size={14} /> Excel</Button>

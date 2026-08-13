@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { TrendingUp, TrendingDown, Minus, AlertTriangle } from 'lucide-react';
-import { Panel, PanelSection, Badge } from '../ui';
+import { Panel, PanelSection, Badge, ListRow, SegmentedControl } from '../ui';
 import { listRecords } from '../../lib/rcaService';
 import { groupByDimension, computeTrend, topConcentration, type RcaDimension, type TrendDirection } from '../../lib/rcaAlgorithm';
 import type { RcaRecord } from '../../lib/supabase';
@@ -75,36 +75,29 @@ export function TrendAnalysisPanel({ companyId }: TrendAnalysisPanelProps) {
     <div className="space-y-4">
       <Panel>
         <PanelSection padding="md">
-          <div className="flex flex-wrap gap-1.5 mb-3">
-            {DIMENSIONS.map(d => (
-              <button
-                key={d.value}
-                onClick={() => setDimension(d.value)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                  dimension === d.value ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge hover:bg-surface-3'
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
+          <div className="mb-3">
+            <SegmentedControl
+              label="Dimensão da análise"
+              options={DIMENSIONS}
+              value={dimension}
+              onChange={setDimension}
+            />
           </div>
           {concentration && (
             <p className="text-sm text-fg-muted mb-3">
               <span className="font-medium text-fg">{concentration.label}</span> concentra {concentration.pct.toFixed(0)}% das divergências classificadas.
             </p>
           )}
-          <div className="space-y-1">
+          <div>
             {buckets.map(b => (
-              <button
+              <ListRow
                 key={b.key}
                 onClick={() => setSelectedKey(b.key)}
-                className={`w-full flex items-center justify-between gap-3 py-1.5 px-2 rounded-lg text-left border-b border-edge last:border-0 transition-colors ${
-                  selectedKey === b.key ? 'bg-surface-3' : 'hover:bg-surface-3/60'
-                }`}
+                value={<Badge variant="neutral">{b.count}</Badge>}
+                className={selectedKey === b.key ? 'bg-surface-3' : ''}
               >
-                <p className="text-sm text-fg truncate">{b.label}</p>
-                <Badge variant="neutral">{b.count}</Badge>
-              </button>
+                <p className="truncate text-sm text-fg">{b.label}</p>
+              </ListRow>
             ))}
           </div>
         </PanelSection>

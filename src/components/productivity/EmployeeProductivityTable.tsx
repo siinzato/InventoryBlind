@@ -82,7 +82,7 @@ export function EmployeeProductivityTable({ team, achievementCounts, onSelectEmp
         </select>
       </div>
 
-      <div className="border border-edge rounded-2xl overflow-x-auto">
+      <div className="border border-edge rounded-container overflow-x-auto">
         <Table>
           <Thead>
             <Tr>

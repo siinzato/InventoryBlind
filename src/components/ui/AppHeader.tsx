@@ -13,13 +13,16 @@ interface AppHeaderProps {
  *  just the minimum needed so the interface has one focal row instead of two. */
 export function AppHeader({ onOpenMobileNav, left, right, className = '' }: AppHeaderProps) {
   return (
+    // bg-surface-2, not bg-surface: the header is chrome and belongs with the
+    // sidebar rail, while `surface` is now the recessed canvas the content
+    // panels sit on. Chrome frame light, canvas recessed, panels light again.
     <header
-      className={`h-16 flex items-center gap-3 px-4 md:px-7 border-b border-edge/70 bg-surface flex-shrink-0 ${className}`}
+      className={`h-16 flex items-center gap-3 px-4 md:px-7 border-b border-edge/70 bg-surface-2 flex-shrink-0 ${className}`}
     >
       {onOpenMobileNav && (
         <button
           onClick={onOpenMobileNav}
-          className="md:hidden -ml-1 p-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors flex-shrink-0"
+          className="md:hidden -ml-1 p-2 rounded-control text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors flex-shrink-0"
         >
           <Menu size={18} />
         </button>

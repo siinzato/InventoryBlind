@@ -165,7 +165,7 @@ export function NFeReportView({ invoice, onReopened, onBack }: Props) {
           <div className="flex flex-wrap items-center gap-2 no-print">
             <div className="flex gap-1 bg-surface-3 rounded-lg p-1 flex-wrap">
               {([['all', 'Todos'], ['ok', 'OK'], ['missing', 'Faltas'], ['surplus', 'Sobras'], ['pending', 'Não conferidos']] as [Filter, string][]).map(([f, label]) => (
-                <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${filter === f ? 'bg-surface-2 text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}>
+                <button key={f} onClick={() => setFilter(f)} className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${filter === f ? 'bg-surface-2 text-fg shadow-control' : 'text-fg-muted hover:text-fg'}`}>
                   {label}
                 </button>
               ))}

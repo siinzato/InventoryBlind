@@ -3,7 +3,7 @@
 import React from 'react';
 import { Filter, SortAsc, SortDesc, Search, X } from 'lucide-react';
 import type { HeatmapFilters as HeatmapFiltersType, StatusFilter, SortOption, CriticalityLevel, ViewMode } from '../lib/heatmapTypes';
-import { Card } from './ui';
+import { Card, Select } from './ui';
 
 interface HeatmapFiltersProps {
   filters: HeatmapFiltersType;
@@ -69,7 +69,7 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
             placeholder="Buscar por nome, marca ou responsável..."
             value={filters.busca}
             onChange={(e) => onFilterChange({ busca: e.target.value })}
-            className="w-full pl-10 pr-4 py-2.5 bg-surface-3 border border-edge rounded-lg text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-transparent"
+            className="w-full pl-10 pr-4 py-2.5 bg-surface-3 border border-edge rounded-control text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-transparent"
           />
           {filters.busca && (
             <button
@@ -82,14 +82,14 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex gap-1 bg-surface-3 p-1 rounded-lg">
+        <div className="flex gap-1 bg-surface-3 p-1 rounded-control">
           {viewModeOptions.map((option) => (
             <button
               key={option.value}
               onClick={() => onViewModeChange(option.value)}
-              className={`px-4 py-1.5 text-sm font-medium rounded-md transition ${
+              className={`px-4 py-1.5 text-sm font-medium rounded-control transition ${
                 viewMode === option.value
-                  ? 'bg-surface-2 text-fg shadow-sm'
+                  ? 'bg-surface-2 text-fg shadow-control'
                   : 'text-fg-subtle hover:text-fg-muted'
               }`}
             >
@@ -104,47 +104,35 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
         {/* Status Filter */}
         <div className="flex items-center gap-2">
           <Filter size={16} className="text-fg-muted" />
-          <select
-            value={filters.status}
-            onChange={(e) => onFilterChange({ status: e.target.value as StatusFilter })}
-            className="px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
-          >
+          <Select value={filters.status} onChange={(e) => onFilterChange({ status: e.target.value as StatusFilter })}>
             {statusOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Brand Filter */}
-        <select
-          value={filters.marca}
-          onChange={(e) => onFilterChange({ marca: e.target.value })}
-          className="px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
-        >
+        <Select value={filters.marca} onChange={(e) => onFilterChange({ marca: e.target.value })}>
           <option value="">Todas as marcas</option>
           {marcas.map((marca) => (
             <option key={marca.id} value={marca.id}>
               {marca.nome}
             </option>
           ))}
-        </select>
+        </Select>
 
         {/* Sort */}
         <div className="flex items-center gap-2">
           {filters.ordenacao === 'nome' ? <SortAsc size={16} className="text-fg-muted" /> : <SortDesc size={16} className="text-fg-muted" />}
-          <select
-            value={filters.ordenacao}
-            onChange={(e) => onFilterChange({ ordenacao: e.target.value as SortOption })}
-            className="px-3 py-2 bg-surface-3 border border-edge rounded-lg text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
-          >
+          <Select value={filters.ordenacao} onChange={(e) => onFilterChange({ ordenacao: e.target.value as SortOption })}>
             {sortOptions.map((opt) => (
               <option key={opt.value} value={opt.value}>
                 {opt.label}
               </option>
             ))}
-          </select>
+          </Select>
         </div>
 
         {/* Criticality Pills */}
@@ -170,7 +158,7 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
         {hasActiveFilters && (
           <button
             onClick={onReset}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-lg transition"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-control transition"
           >
             <X size={14} />
             Limpar filtros

@@ -15,7 +15,9 @@ export type Permission =
   | 'security.view'
   | 'audit.view'
   | 'settings.manage'
-  | 'academy.manage';
+  | 'academy.manage'
+  | 'counting.count'
+  | 'counting.approve';
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: [
@@ -31,6 +33,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'audit.view',
     'settings.manage',
     'academy.manage',
+    'counting.count','counting.approve',
   ],
   admin: [
     'products.read','products.write',
@@ -44,6 +47,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'security.view',
     'audit.view',
     'academy.manage',
+    'counting.count','counting.approve',
   ],
   manager: [
     'products.read',
@@ -53,6 +57,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'labels.use',
     'reports.export',
     'academy.manage',
+    'counting.count','counting.approve',
   ],
   lead: [
     'products.read',
@@ -62,12 +67,14 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'labels.use',
     'reports.export',
     'academy.manage',
+    'counting.count',
   ],
   counter: [
     'products.read',
     'inventory.read','inventory.write',
     'full.read','full.write',
     'labels.use',
+    'counting.count',
   ],
   viewer: [
     'products.read',
@@ -95,16 +102,30 @@ export function getRoleLabel(role: Role | string): string {
   return labels[role] ?? role;
 }
 
+/** Role badge treatment.
+ *
+ *  A role is neutral metadata, not a condition needing attention, so it does not
+ *  get a loud colour. Previously each of the six roles had its own high-chroma
+ *  hue (emerald/blue/violet/teal/amber/zinc) — a palette used for variety rather
+ *  than meaning, which also put `violet` outside the project's colour set and
+ *  relied on `text-*-400` shades that only read correctly in dark mode.
+ *
+ *  Now: the two privileged roles carry a quiet accent tint (accent = "this one
+ *  can change things"), everything else is neutral surface + muted text. All
+ *  values are theme tokens, so both themes are correct by construction. */
 export function getRoleBadgeColor(role: Role | string): string {
+  const PRIVILEGED = 'bg-accent/10 text-accent border-accent/25';
+  const NEUTRAL = 'bg-surface-3 text-fg-muted border-edge';
+
   const colors: Record<string, string> = {
-    owner:   'bg-emerald-500/15 text-emerald-400 border-emerald-500/30',
-    admin:   'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    manager: 'bg-violet-500/15 text-violet-400 border-violet-500/30',
-    lead:    'bg-teal-500/15 text-teal-400 border-teal-500/30',
-    counter: 'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    viewer:  'bg-zinc-500/15 text-zinc-400 border-zinc-500/30',
+    owner:   PRIVILEGED,
+    admin:   PRIVILEGED,
+    manager: NEUTRAL,
+    lead:    NEUTRAL,
+    counter: NEUTRAL,
+    viewer:  NEUTRAL,
   };
-  return colors[role] ?? 'bg-zinc-500/15 text-zinc-400 border-zinc-500/30';
+  return colors[role] ?? NEUTRAL;
 }
 
 export function canManageUsers(role: Role | string | undefined): boolean {

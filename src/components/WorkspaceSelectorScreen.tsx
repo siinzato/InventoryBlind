@@ -33,7 +33,7 @@ export default function WorkspaceSelectorScreen() {
     <div className="min-h-screen bg-surface flex items-center justify-center px-4 py-12">
       <div className="w-full max-w-3xl">
         <div className="flex flex-col items-center text-center mb-10">
-          <div className="w-12 h-12 bg-accent/10 rounded-2xl flex items-center justify-center mb-4">
+          <div className="w-12 h-12 bg-accent/10 rounded-container flex items-center justify-center mb-4">
             <LogoMark size={24} className="text-accent" />
           </div>
           <h1 className="text-2xl font-bold text-fg mb-1.5">Selecione seu Workspace</h1>

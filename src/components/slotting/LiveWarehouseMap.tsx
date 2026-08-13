@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { ZoomIn, ZoomOut, Maximize2, Radio } from 'lucide-react';
+import { SegmentedControl } from '../ui';
 import { FloorPlanBackground } from './FloorPlanBackground';
 import type {
   WarehouseLayout, WarehouseCell, LocationLiveStatus, WarehouseLiveLayer, RiskBand, RiskLevel, AbcClass,
@@ -180,21 +181,16 @@ export function LiveWarehouseMap({
   return (
     <div className="space-y-3">
       {!lockLayer && (
-        <div className="flex flex-wrap items-center gap-1.5">
-          {LAYERS.map(l => (
-            <button
-              key={l.id}
-              onClick={() => onLayerChange?.(l.id)}
-              className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                layer === l.id ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge hover:bg-surface-3'
-              }`}
-            >
-              {l.label}
-            </button>
-          ))}
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl
+            label="Camada do mapa"
+            options={LAYERS.map(l => ({ value: l.id, label: l.label }))}
+            value={layer}
+            onChange={id => onLayerChange?.(id)}
+          />
           {simulationActive && (
-            <span className="flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400 ml-1">
-              <Radio size={11} className="animate-pulse" /> Simulação ativa
+            <span className="flex items-center gap-1 text-[11px] font-medium text-fg-muted">
+              <Radio size={11} /> Simulação ativa
             </span>
           )}
         </div>
@@ -202,7 +198,14 @@ export function LiveWarehouseMap({
       {activeLayerMeta && <p className="text-xs text-fg-subtle">{activeLayerMeta.hint}</p>}
 
       <div className="relative">
-        <div ref={containerRef} className="overflow-auto border border-edge rounded-xl p-2 bg-surface" style={{ maxHeight: 480 }}>
+        {/* Viewport-relative height instead of a flat 480px: on a phone the map
+            no longer eats the whole screen, and on a tablet/desktop it uses the
+            space that's actually there. Clamped so it never collapses. */}
+        <div
+          ref={containerRef}
+          className="overflow-auto rounded-container border border-edge bg-surface p-2"
+          style={{ maxHeight: 'clamp(280px, 55vh, 620px)' }}
+        >
           <div style={{ width: gridWidthPx * scale, height: gridHeightPx * scale }}>
             <motion.div
               className="relative inline-grid gap-0.5"
@@ -263,7 +266,7 @@ export function LiveWarehouseMap({
           </div>
         </div>
 
-        <div className="absolute top-2 right-2 flex flex-col gap-1 bg-surface/90 backdrop-blur border border-edge rounded-lg p-1 shadow-sm">
+        <div className="absolute top-2 right-2 flex flex-col gap-1 bg-surface/90 backdrop-blur border border-edge rounded-control p-1 shadow-control">
           <button type="button" onClick={() => setScale(s => Math.min(MAX_SCALE, s + 0.4))} className="p-1.5 text-fg-muted hover:text-fg hover:bg-surface-3 rounded transition-colors" title="Aproximar">
             <ZoomIn size={14} />
           </button>

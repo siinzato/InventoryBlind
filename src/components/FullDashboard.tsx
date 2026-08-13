@@ -10,7 +10,7 @@ import {
   STATUS_LABEL, STATUS_COLOR, STATUS_DOT,
   formatFullDate,
 } from '../lib/fullManagerTypes';
-import { Panel, PanelSection, Button } from './ui';
+import { Panel, PanelSection, Stat, StatRow, StatCell, type StatProps, Button } from './ui';
 
 // ── Marketplace icon letter ───────────────────────────────────────────────────
 const MktIcon: React.FC<{ marketplace: string }> = ({ marketplace }) => {
@@ -104,20 +104,19 @@ const FullDashboard: React.FC<FullDashboardProps> = ({ onNavigate }) => {
       {/* KPIs */}
       <Panel>
         <PanelSection padding="lg">
-          <div className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-edge lg:divide-y-0 lg:divide-x">
-            {[
-              { label: 'FULLs Agendados', value: kpi.scheduled, icon: <Calendar size={14} /> },
-              { label: 'Em Separação', value: kpi.picking, icon: <Package size={14} /> },
-              { label: 'Finalizados Hoje', value: kpi.completedToday, icon: <CheckSquare size={14} />, valueClassName: 'text-emerald-600 dark:text-emerald-400' },
-              { label: 'Peças Separadas Hoje', value: kpi.piecesToday, sub: `Top: ${topMkt}`, icon: <TrendingUp size={14} /> },
-            ].map((k, i) => (
-              <div key={k.label} className={`px-0 lg:px-6 py-3 lg:py-0 ${i === 0 ? 'lg:pl-0' : ''}`}>
-                <p className="text-section flex items-center gap-1.5">{k.icon}{k.label}</p>
-                <p className={`text-display mt-1.5 ${k.valueClassName ?? ''}`}>{k.value}</p>
-                {k.sub && <p className="text-caption mt-1">{k.sub}</p>}
-              </div>
+          <StatRow>
+            {([
+              { label: 'FULLs Agendados', value: kpi.scheduled, icon: <Calendar /> },
+              { label: 'Em Separação', value: kpi.picking, icon: <Package /> },
+              // Completions today are the one genuinely good-news figure here.
+              { label: 'Finalizados Hoje', value: kpi.completedToday, icon: <CheckSquare />, valueTone: 'positive' },
+              { label: 'Peças Separadas Hoje', value: kpi.piecesToday, context: `Top: ${topMkt}`, icon: <TrendingUp /> },
+            ] satisfies StatProps[]).map(k => (
+              <StatCell key={k.label}>
+                <Stat {...k} />
+              </StatCell>
             ))}
-          </div>
+          </StatRow>
         </PanelSection>
       </Panel>
 

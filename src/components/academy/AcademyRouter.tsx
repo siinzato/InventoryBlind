@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { GraduationCap, BookOpen, LayoutGrid, Route, Library, HelpCircle, Target } from 'lucide-react';
-import { PageHeader } from '../ui';
+import { Page, PageHeader } from '../ui';
 import { AcademyHome } from './AcademyHome';
 import { MetodoIBPage } from './MetodoIBPage';
 import { PilaresIndexPage } from './PilaresIndexPage';
@@ -50,7 +50,7 @@ export function AcademyRouter({ userId, userEmail, userName, companyId, role }: 
     view === 'pilar' ? 'pilares' : view === 'track' || view === 'course' ? 'trilhas' : view;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page>
       <PageHeader title="I.B Academy" description="A plataforma oficial de capacitação em gestão de estoques e inventário inteligente." />
 
       <div className="flex flex-wrap gap-2">
@@ -108,6 +108,6 @@ export function AcademyRouter({ userId, userEmail, userName, companyId, role }: 
       {view === 'biblioteca' && <BibliotecaPage />}
       {view === 'central' && <CentralConhecimentoPage />}
       {view === 'pdi' && <PDIPage userId={userId} companyId={companyId} role={role} />}
-    </div>
+    </Page>
   );
 }

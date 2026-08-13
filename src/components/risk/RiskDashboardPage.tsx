@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { AlertOctagon, Gauge, RefreshCw, ArrowUpRight, ArrowDownRight, ListOrdered, MapPin } from 'lucide-react';
-import { PageHeader, Panel, PanelSection, Button } from '../ui';
+import { Page,
+  PageHeader, Panel, PanelSection, Button, Stat, StatRow, StatCell, SegmentedControl,
+  type StatProps, type SegmentedOption,
+} from '../ui';
 import {
   getCompanyRiskSummary, getTop50Critical, getRiskBandMigrations, getRiskTrend,
   listRiskWithFilter, recomputeAllRiskForCompany, RiskFilter, ProductRiskRow, RiskCompanySummaryRow, RiskBandMigration, RiskTrendPoint,
@@ -13,13 +16,13 @@ interface RiskDashboardPageProps {
   userEmail: string;
 }
 
-const FILTERS: { id: RiskFilter; label: string }[] = [
-  { id: 'all', label: 'Todos' },
-  { id: 'critico', label: 'Risco Crítico' },
-  { id: 'alto', label: 'Alto Risco' },
-  { id: 'medio', label: 'Médio' },
-  { id: 'baixo', label: 'Baixo' },
-  { id: 'priority_queue', label: 'Contagem Prioritária' },
+const FILTERS: SegmentedOption<RiskFilter>[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'critico', label: 'Risco Crítico' },
+  { value: 'alto', label: 'Alto Risco' },
+  { value: 'medio', label: 'Médio' },
+  { value: 'baixo', label: 'Baixo' },
+  { value: 'priority_queue', label: 'Contagem Prioritária' },
 ];
 
 function Sparkline({ points }: { points: RiskTrendPoint[] }) {
@@ -87,15 +90,25 @@ export function RiskDashboardPage({ companyId, userId, userEmail }: RiskDashboar
   const worsened = migrations.filter(m => m.direction === 'up').length;
   const improved = migrations.filter(m => m.direction === 'down').length;
 
-  const cards = summary ? [
-    { label: 'Risco Médio', value: summary.avg_risk, icon: Gauge },
-    { label: 'SKUs Avaliados', value: summary.total_scored, icon: ListOrdered },
-    { label: 'Risco Crítico', value: summary.critico_count, icon: AlertOctagon },
-    { label: 'Alto Risco', value: summary.alto_count, icon: AlertOctagon },
+  const cards: StatProps[] = summary ? [
+    { label: 'Risco Médio', value: summary.avg_risk, icon: <Gauge />, context: 'score 0–100' },
+    { label: 'SKUs Avaliados', value: summary.total_scored, icon: <ListOrdered /> },
+    {
+      label: 'Risco Crítico',
+      value: summary.critico_count,
+      icon: <AlertOctagon />,
+      context: summary.total_scored ? `de ${summary.total_scored} SKUs` : undefined,
+    },
+    {
+      label: 'Alto Risco',
+      value: summary.alto_count,
+      icon: <AlertOctagon />,
+      context: summary.total_scored ? `de ${summary.total_scored} SKUs` : undefined,
+    },
   ] : [];
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page>
       <PageHeader
         title="Inventário por Risco"
         description="Prioriza a contagem de cada SKU por um Risk Score, combinando risco e proximidade física em vez de só endereço."
@@ -111,16 +124,14 @@ export function RiskDashboardPage({ companyId, userId, userEmail }: RiskDashboar
       ) : (
         <>
           <Panel>
-            <PanelSection padding="md" className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {cards.map(card => (
-                <div key={card.label} className="flex items-start gap-2.5">
-                  <card.icon size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-fg-subtle truncate">{card.label}</p>
-                    <p className="text-sm font-semibold text-fg truncate">{card.value}</p>
-                  </div>
-                </div>
-              ))}
+            <PanelSection padding="md">
+              <StatRow>
+                {cards.map(card => (
+                  <StatCell key={card.label}>
+                    <Stat {...card} />
+                  </StatCell>
+                ))}
+              </StatRow>
             </PanelSection>
           </Panel>
 
@@ -160,18 +171,13 @@ export function RiskDashboardPage({ companyId, userId, userEmail }: RiskDashboar
 
           <Panel>
             <PanelSection padding="md">
-              <div className="flex flex-wrap gap-2 mb-4">
-                {FILTERS.map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => setFilter(f.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      filter === f.id ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              <div className="mb-4">
+                <SegmentedControl
+                  label="Filtro de risco"
+                  options={FILTERS}
+                  value={filter}
+                  onChange={setFilter}
+                />
               </div>
               {filter === 'priority_queue' && (
                 <p className="text-xs text-fg-subtle mb-3">
@@ -202,6 +208,6 @@ export function RiskDashboardPage({ companyId, userId, userEmail }: RiskDashboar
           </Panel>
         </>
       )}
-    </div>
+    </Page>
   );
 }

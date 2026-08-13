@@ -49,24 +49,26 @@ export function Sidebar({ groups, header, footer, collapsed = false, className =
 
   return (
     <aside
-      className={`flex flex-col h-full bg-surface-2 border-r border-edge ${collapsed ? 'w-[76px]' : 'w-56'} flex-shrink-0 transition-[width] duration-200 ${className}`}
+      // Hairline divider instead of a full border: the rail already reads as
+      // chrome because the canvas beside it is recessed.
+      className={`flex flex-col h-full bg-surface-2 border-r border-edge/70 ${collapsed ? 'w-[76px]' : 'w-60'} flex-shrink-0 transition-[width] duration-200 ${className}`}
     >
-      {header && <div className="flex-shrink-0 px-3 pt-5 pb-3">{header}</div>}
+      {header && <div className="flex-shrink-0 px-4 pt-5 pb-4">{header}</div>}
 
-      <nav className="flex-1 overflow-y-auto px-3 py-3 space-y-1">
+      <nav className="flex-1 overflow-y-auto px-3 py-2 space-y-0.5">
         {groups.map((group) => {
           const isOpen = collapsed || expandedId === group.id;
 
           return (
             <div key={group.id}>
               {group.sectionLabel && !collapsed && (
-                <p className="text-section px-3 mt-6 mb-2">{group.sectionLabel}</p>
+                <p className="text-overline px-3 mt-6 mb-2">{group.sectionLabel}</p>
               )}
 
               {!collapsed && (
                 <button
                   onClick={() => setExpandedId(curr => (curr === group.id ? '' : group.id))}
-                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg text-xs font-semibold uppercase tracking-wide transition-colors ${
+                  className={`w-full flex items-center justify-between gap-2 px-3 py-2 rounded-control text-xs font-medium transition-colors ${
                     group.locked ? 'text-fg-subtle/70' : 'text-fg-subtle hover:text-fg hover:bg-surface-3'
                   }`}
                 >
@@ -89,8 +91,8 @@ export function Sidebar({ groups, header, footer, collapsed = false, className =
                           onClick={locked ? undefined : item.onClick}
                           title={locked ? LOCKED_TOOLTIP : collapsed ? item.label : undefined}
                           disabled={locked}
-                          className={`group w-full flex items-center gap-3 rounded-lg text-sm font-medium transition-colors ${
-                            collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2'
+                          className={`group w-full flex items-center gap-3 rounded-control text-sm font-medium transition-colors ${
+                            collapsed ? 'justify-center px-0 py-2.5' : 'px-3 py-2.5'
                           } ${
                             locked
                               ? 'text-fg-subtle/60 cursor-not-allowed'

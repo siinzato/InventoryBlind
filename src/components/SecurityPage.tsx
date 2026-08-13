@@ -11,6 +11,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { hasPermission, getRoleLabel, getRoleBadgeColor } from '../lib/permissionService';
 import type { AuditLog, SecurityLog } from '../lib/auditLogService';
+import { Panel, PanelSection, Card, Table, Thead, Tr, Th, Td, Badge, Button } from './ui';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -38,30 +39,32 @@ function StatusBadge({ status }: { status: HealthStatus }) {
     <span className="flex items-center gap-1 text-fg-subtle text-xs"><RefreshCw size={12} className="animate-spin" /> Verificando...</span>
   );
   if (status === 'ok') return (
-    <span className="flex items-center gap-1 text-emerald-400 text-xs font-semibold"><CheckCircle2 size={14} /> OK</span>
+    <Badge variant="success"><CheckCircle2 size={12} /> OK</Badge>
   );
   if (status === 'warning') return (
-    <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold"><AlertTriangle size={14} /> Atenção</span>
+    <Badge variant="warning"><AlertTriangle size={12} /> Atenção</Badge>
   );
   return (
-    <span className="flex items-center gap-1 text-red-400 text-xs font-semibold"><XCircle size={14} /> Crítico</span>
+    <Badge variant="danger"><XCircle size={12} /> Crítico</Badge>
   );
 }
 
+const SEVERITY_VARIANT: Record<string, 'neutral' | 'warning' | 'danger'> = {
+  info: 'neutral',
+  warning: 'warning',
+  high: 'danger',
+  critical: 'danger',
+};
+
+const SEVERITY_LABEL: Record<string, string> = {
+  info: 'Info', warning: 'Atenção', high: 'Alto', critical: 'Crítico',
+};
+
 function SeverityBadge({ severity }: { severity: string }) {
-  const map: Record<string, string> = {
-    info:     'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    warning:  'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    high:     'bg-orange-500/15 text-orange-400 border-orange-500/30',
-    critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  };
-  const labels: Record<string, string> = {
-    info: 'Info', warning: 'Atenção', high: 'Alto', critical: 'Crítico',
-  };
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${map[severity] ?? map.info}`}>
-      {labels[severity] ?? severity}
-    </span>
+    <Badge variant={SEVERITY_VARIANT[severity] ?? 'neutral'}>
+      {SEVERITY_LABEL[severity] ?? severity}
+    </Badge>
   );
 }
 
@@ -149,26 +152,24 @@ function HealthCheck({ companyId }: { companyId: string }) {
   const critCount = items.filter(i => i.status === 'critical').length;
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-5">
+    <Panel>
+      <PanelSection className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-            <ShieldCheck size={20} className="text-emerald-400" />
-          </div>
+          <ShieldCheck size={20} className="text-fg-muted" />
           <div>
-            <h3 className="font-bold text-fg">Security Health Check</h3>
+            <h3 className="text-sm font-semibold text-fg">Security Health Check</h3>
             <p className="text-fg-subtle text-xs">InventoryBlind Security Audit</p>
           </div>
         </div>
         {!loading && (
           <div className="flex gap-3 text-xs">
-            <span className="text-emerald-400 font-semibold">{okCount} OK</span>
-            {warnCount > 0 && <span className="text-amber-400 font-semibold">{warnCount} Atenção</span>}
-            {critCount > 0 && <span className="text-red-400 font-semibold">{critCount} Crítico</span>}
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{okCount} OK</span>
+            {warnCount > 0 && <span className="text-amber-600 dark:text-amber-400 font-semibold">{warnCount} Atenção</span>}
+            {critCount > 0 && <span className="text-red-600 dark:text-red-400 font-semibold">{critCount} Crítico</span>}
           </div>
         )}
-      </div>
-      <div className="space-y-2">
+      </PanelSection>
+      <PanelSection className="space-y-2">
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
               <div key={i} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-surface-3 animate-pulse">
@@ -177,7 +178,7 @@ function HealthCheck({ companyId }: { companyId: string }) {
               </div>
             ))
           : items.map((item) => (
-              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-surface-3 hover:bg-surface-3 transition-colors">
+              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-surface-3">
                 <div>
                   <span className="text-fg text-sm">{item.label}</span>
                   {item.detail && <span className="text-fg-subtle text-xs ml-2">— {item.detail}</span>}
@@ -185,8 +186,8 @@ function HealthCheck({ companyId }: { companyId: string }) {
                 <StatusBadge status={item.status} />
               </div>
             ))}
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -227,54 +228,42 @@ function OverviewCards({ companyId }: { companyId: string }) {
 
   const cards = [
     {
-      icon: <Shield size={20} />,
-      iconBg: 'bg-emerald-500/15',
-      iconColor: 'text-emerald-400',
+      icon: <Shield size={14} />,
       label: 'RLS Status',
       value: data?.rlsActive ? 'Ativo' : 'FALHA',
       sub: 'Isolamento multiempresa',
       status: data?.rlsActive ? 'ok' : 'critical',
     },
     {
-      icon: <FileText size={20} />,
-      iconBg: 'bg-blue-500/15',
-      iconColor: 'text-blue-400',
+      icon: <FileText size={14} />,
       label: 'Logs de Auditoria',
       value: data?.auditCount?.toLocaleString('pt-BR') ?? '—',
       sub: 'Eventos registrados',
       status: 'ok',
     },
     {
-      icon: <ShieldAlert size={20} />,
-      iconBg: data?.criticalAlerts ? 'bg-red-500/15' : 'bg-surface-3',
-      iconColor: data?.criticalAlerts ? 'text-red-400' : 'text-fg-subtle',
+      icon: <ShieldAlert size={14} />,
       label: 'Alertas Críticos',
       value: data?.criticalAlerts?.toLocaleString('pt-BR') ?? '—',
       sub: 'Severidade alta/crítica',
       status: (data?.criticalAlerts ?? 0) > 0 ? 'critical' : 'ok',
     },
     {
-      icon: <Users size={20} />,
-      iconBg: 'bg-violet-500/15',
-      iconColor: 'text-violet-400',
+      icon: <Users size={14} />,
       label: 'Usuários da Empresa',
       value: data?.profileCount?.toLocaleString('pt-BR') ?? '—',
       sub: 'Perfis vinculados',
       status: 'ok',
     },
     {
-      icon: <Database size={20} />,
-      iconBg: 'bg-teal-500/15',
-      iconColor: 'text-teal-400',
+      icon: <Database size={14} />,
       label: 'Logs de Segurança',
       value: data?.secCount?.toLocaleString('pt-BR') ?? '—',
       sub: 'Eventos de segurança',
       status: 'ok',
     },
     {
-      icon: <Lock size={20} />,
-      iconBg: 'bg-amber-500/15',
-      iconColor: 'text-amber-400',
+      icon: <Lock size={14} />,
       label: 'Backup',
       value: 'Supabase',
       sub: 'Gerenciado automaticamente',
@@ -283,18 +272,18 @@ function OverviewCards({ companyId }: { companyId: string }) {
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
+    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
       {cards.map((card) => (
-        <div key={card.label} className="bg-surface-2 border border-edge rounded-2xl p-4">
-          <div className={`w-9 h-9 ${card.iconBg} rounded-xl flex items-center justify-center mb-3`}>
-            <span className={card.iconColor}>{card.icon}</span>
+        <Card key={card.label} padding="sm">
+          <div className="flex items-center gap-1.5 text-fg-subtle mb-2">
+            {card.icon}
+            <span className="text-xs font-medium">{card.label}</span>
           </div>
-          <div className={`text-xl font-bold mb-0.5 ${card.status === 'critical' ? 'text-red-400' : card.status === 'warning' ? 'text-amber-400' : 'text-fg'}`}>
-            {data ? card.value : <span className="inline-block w-8 h-5 bg-edge rounded animate-pulse" />}
+          <div className={`text-xl font-semibold tabular-nums ${card.status === 'critical' ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>
+            {data ? card.value : <span className="inline-block w-8 h-5 bg-surface-3 rounded animate-pulse" />}
           </div>
-          <div className="text-fg-subtle text-xs font-semibold">{card.label}</div>
           <div className="text-fg-subtle text-xs mt-0.5">{card.sub}</div>
-        </div>
+        </Card>
       ))}
     </div>
   );
@@ -328,14 +317,9 @@ function AuditLogsTable({ companyId }: { companyId: string }) {
   useEffect(() => { if (companyId) load(); }, [load]);
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-edge">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-500/15 rounded-xl flex items-center justify-center">
-            <FileText size={18} className="text-blue-400" />
-          </div>
-          <h3 className="font-bold text-fg">Logs de Auditoria</h3>
-        </div>
+    <Panel>
+      <PanelSection className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-fg">Logs de Auditoria</h3>
         <div className="flex items-center gap-2">
           <input
             value={filter}
@@ -347,53 +331,53 @@ function AuditLogsTable({ companyId }: { companyId: string }) {
             <RefreshCw size={16} />
           </button>
         </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-edge bg-surface-3">
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Data/Hora</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Usuário</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Ação</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Recurso</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Descrição</th>
-            </tr>
-          </thead>
+      </PanelSection>
+      <div className="border-t border-edge overflow-x-auto">
+        <Table>
+          <Thead>
+            <Tr>
+              <Th>Data/Hora</Th>
+              <Th>Usuário</Th>
+              <Th>Ação</Th>
+              <Th>Recurso</Th>
+              <Th>Descrição</Th>
+            </Tr>
+          </Thead>
           <tbody>
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-edge/60">
+                  <Tr key={i}>
                     {Array.from({ length: 5 }).map((__, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-3 bg-surface-3 rounded animate-pulse" /></td>
+                      <Td key={j}><div className="h-3 bg-surface-3 rounded animate-pulse" /></Td>
                     ))}
-                  </tr>
+                  </Tr>
                 ))
               : logs.length === 0
               ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-fg-subtle text-sm">Nenhum log encontrado.</td></tr>
+                  <Tr><Td colSpan={5} className="text-center py-8 text-fg-subtle text-sm">Nenhum log encontrado.</Td></Tr>
                 )
               : logs.map((log) => (
-                  <tr key={log.id} className="border-b border-edge/60 hover:bg-surface-3/60 transition-colors">
-                    <td className="px-4 py-3 text-fg-subtle text-xs whitespace-nowrap">{formatDate(log.created_at)}</td>
-                    <td className="px-4 py-3 text-fg-muted text-xs">{truncate(log.user_email, 28)}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs bg-surface-3 px-2 py-0.5 rounded text-emerald-400">{log.action}</span>
-                    </td>
-                    <td className="px-4 py-3 text-fg-subtle text-xs">{log.resource_type ?? '—'}</td>
-                    <td className="px-4 py-3 text-fg-subtle text-xs">{truncate(log.description)}</td>
-                  </tr>
+                  <Tr key={log.id}>
+                    <Td className="text-fg-subtle text-xs whitespace-nowrap">{formatDate(log.created_at)}</Td>
+                    <Td className="text-fg-muted text-xs">{truncate(log.user_email, 28)}</Td>
+                    <Td>
+                      <span className="font-mono text-xs bg-surface-3 px-2 py-0.5 rounded text-fg-muted">{log.action}</span>
+                    </Td>
+                    <Td className="text-fg-subtle text-xs">{log.resource_type ?? '—'}</Td>
+                    <Td className="text-fg-subtle text-xs">{truncate(log.description)}</Td>
+                  </Tr>
                 ))}
           </tbody>
-        </table>
+        </Table>
       </div>
-      <div className="flex items-center justify-between px-4 py-3 border-t border-edge">
+      <PanelSection padding="sm" className="flex items-center justify-between">
         <span className="text-fg-subtle text-xs">Página {page + 1}</span>
         <div className="flex gap-2">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="text-xs px-3 py-1 rounded bg-surface-3 hover:bg-edge disabled:opacity-40 text-fg-muted transition">Anterior</button>
-          <button disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)} className="text-xs px-3 py-1 rounded bg-surface-3 hover:bg-edge disabled:opacity-40 text-fg-muted transition">Próxima</button>
+          <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+          <Button variant="secondary" size="sm" disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)}>Próxima</Button>
         </div>
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -425,14 +409,9 @@ function SecurityLogsTable({ companyId }: { companyId: string }) {
   useEffect(() => { if (companyId) load(); }, [load]);
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl overflow-hidden">
-      <div className="flex flex-wrap items-center justify-between gap-3 p-5 border-b border-edge">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-red-500/15 rounded-xl flex items-center justify-center">
-            <ShieldAlert size={18} className="text-red-400" />
-          </div>
-          <h3 className="font-bold text-fg">Logs de Segurança</h3>
-        </div>
+    <Panel>
+      <PanelSection className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-fg">Logs de Segurança</h3>
         <div className="flex items-center gap-2">
           <select
             value={severityFilter}
@@ -449,53 +428,53 @@ function SecurityLogsTable({ companyId }: { companyId: string }) {
             <RefreshCw size={16} />
           </button>
         </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-edge bg-surface-3">
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Data/Hora</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Severidade</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Evento</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">Descrição</th>
-              <th className="text-left px-4 py-3 text-fg-subtle font-semibold text-xs">IP</th>
-            </tr>
-          </thead>
+      </PanelSection>
+      <div className="border-t border-edge overflow-x-auto">
+        <Table>
+          <Thead>
+            <Tr>
+              <Th>Data/Hora</Th>
+              <Th>Severidade</Th>
+              <Th>Evento</Th>
+              <Th>Descrição</Th>
+              <Th>IP</Th>
+            </Tr>
+          </Thead>
           <tbody>
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-edge/60">
+                  <Tr key={i}>
                     {Array.from({ length: 5 }).map((__, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-3 bg-surface-3 rounded animate-pulse" /></td>
+                      <Td key={j}><div className="h-3 bg-surface-3 rounded animate-pulse" /></Td>
                     ))}
-                  </tr>
+                  </Tr>
                 ))
               : logs.length === 0
               ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-fg-subtle text-sm">Nenhum evento de segurança registrado.</td></tr>
+                  <Tr><Td colSpan={5} className="text-center py-8 text-fg-subtle text-sm">Nenhum evento de segurança registrado.</Td></Tr>
                 )
               : logs.map((log) => (
-                  <tr key={log.id} className="border-b border-edge/60 hover:bg-surface-3/60 transition-colors">
-                    <td className="px-4 py-3 text-fg-subtle text-xs whitespace-nowrap">{formatDate(log.created_at)}</td>
-                    <td className="px-4 py-3"><SeverityBadge severity={log.severity} /></td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs bg-surface-3 px-2 py-0.5 rounded text-amber-400">{log.event_type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-fg-subtle text-xs">{truncate(log.description)}</td>
-                    <td className="px-4 py-3 text-fg-subtle text-xs font-mono">{log.ip_address ?? '—'}</td>
-                  </tr>
+                  <Tr key={log.id}>
+                    <Td className="text-fg-subtle text-xs whitespace-nowrap">{formatDate(log.created_at)}</Td>
+                    <Td><SeverityBadge severity={log.severity} /></Td>
+                    <Td>
+                      <span className="font-mono text-xs bg-surface-3 px-2 py-0.5 rounded text-fg-muted">{log.event_type}</span>
+                    </Td>
+                    <Td className="text-fg-subtle text-xs">{truncate(log.description)}</Td>
+                    <Td className="text-fg-subtle text-xs font-mono">{log.ip_address ?? '—'}</Td>
+                  </Tr>
                 ))}
           </tbody>
-        </table>
+        </Table>
       </div>
-      <div className="flex items-center justify-between px-4 py-3 border-t border-edge">
+      <PanelSection padding="sm" className="flex items-center justify-between">
         <span className="text-fg-subtle text-xs">Página {page + 1}</span>
         <div className="flex gap-2">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="text-xs px-3 py-1 rounded bg-surface-3 hover:bg-edge disabled:opacity-40 text-fg-muted transition">Anterior</button>
-          <button disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)} className="text-xs px-3 py-1 rounded bg-surface-3 hover:bg-edge disabled:opacity-40 text-fg-muted transition">Próxima</button>
+          <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+          <Button variant="secondary" size="sm" disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)}>Próxima</Button>
         </div>
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -506,32 +485,30 @@ function ActiveSessions() {
   const sessionStart = new Date(Date.now() - Math.random() * 3600000).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' });
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-violet-500/15 rounded-xl flex items-center justify-center">
-          <Activity size={18} className="text-violet-400" />
-        </div>
-        <div>
-          <h3 className="font-bold text-fg">Sessões Ativas</h3>
-          <p className="text-fg-subtle text-xs">Dispositivos com acesso ativo</p>
-        </div>
-      </div>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between p-3 bg-surface-3 rounded-xl border border-emerald-500/20">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <div>
-              <p className="text-fg text-sm font-semibold">{profile?.email ?? user?.email}</p>
-              <p className="text-fg-subtle text-xs">Sessão atual · Iniciada {sessionStart}</p>
-            </div>
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-4">
+          <Activity size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Sessões Ativas</h3>
+            <p className="text-fg-subtle text-xs">Dispositivos com acesso ativo</p>
           </div>
-          <span className="text-xs text-fg-subtle bg-edge/60 px-2 py-0.5 rounded-full">Atual</span>
         </div>
-        <div className="p-3 bg-surface-3/40 rounded-xl border border-edge text-center">
-          <p className="text-fg-subtle text-xs">Gerenciamento avançado de sessões em breve</p>
+        <div className="space-y-3">
+          <div className="flex items-center justify-between p-3 bg-surface-3 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+              <div>
+                <p className="text-fg text-sm font-semibold">{profile?.email ?? user?.email}</p>
+                <p className="text-fg-subtle text-xs">Sessão atual · Iniciada {sessionStart}</p>
+              </div>
+            </div>
+            <Badge variant="neutral">Atual</Badge>
+          </div>
+          <p className="text-fg-subtle text-xs text-center py-1">Gerenciamento avançado de sessões em breve</p>
         </div>
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -569,51 +546,50 @@ function SecuritySettingsPanel({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-amber-500/15 rounded-xl flex items-center justify-center">
-          <Settings size={18} className="text-amber-400" />
-        </div>
-        <div>
-          <h3 className="font-bold text-fg">Configurações de Segurança</h3>
-          <p className="text-fg-subtle text-xs">Políticas de acesso da empresa</p>
-        </div>
-      </div>
-      {!settings
-        ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-surface-3 rounded-xl animate-pulse" />)}</div>
-        : (
-          <div className="space-y-4">
-            <Row label="Confirmação de e-mail obrigatória" sub="Usuários devem confirmar o e-mail">
-              <Toggle value={settings.require_email_confirmation} disabled={!canEdit}
-                onChange={v => setSettings(s => s ? { ...s, require_email_confirmation: v } : s)} />
-            </Row>
-            <Row label="Autenticação 2FA" sub="Em breve">
-              <span className="text-xs text-fg-subtle bg-surface-3 px-2 py-1 rounded-lg">Em breve</span>
-            </Row>
-            <Row label="Timeout de sessão" sub={`${settings.session_timeout_minutes} min`}>
-              <input type="number" value={settings.session_timeout_minutes} disabled={!canEdit}
-                onChange={e => setSettings(s => s ? { ...s, session_timeout_minutes: Number(e.target.value) } : s)}
-                className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
-            </Row>
-            <Row label="Máx. tentativas de login" sub="Antes do bloqueio temporário">
-              <input type="number" value={settings.max_failed_login_attempts} disabled={!canEdit}
-                onChange={e => setSettings(s => s ? { ...s, max_failed_login_attempts: Number(e.target.value) } : s)}
-                className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
-            </Row>
-            <Row label="Tamanho máx. de upload (MB)" sub="Planilhas de importação">
-              <input type="number" value={settings.max_upload_size_mb} disabled={!canEdit}
-                onChange={e => setSettings(s => s ? { ...s, max_upload_size_mb: Number(e.target.value) } : s)}
-                className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
-            </Row>
-            {canEdit && (
-              <button onClick={save} disabled={saving}
-                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-fg rounded-xl font-semibold text-sm transition mt-2">
-                {saving ? 'Salvando…' : saved ? '✓ Salvo' : 'Salvar Configurações'}
-              </button>
-            )}
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-5">
+          <Settings size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Configurações de Segurança</h3>
+            <p className="text-fg-subtle text-xs">Políticas de acesso da empresa</p>
           </div>
-        )}
-    </div>
+        </div>
+        {!settings
+          ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-surface-3 rounded-xl animate-pulse" />)}</div>
+          : (
+            <div className="space-y-4">
+              <Row label="Confirmação de e-mail obrigatória" sub="Usuários devem confirmar o e-mail">
+                <Toggle value={settings.require_email_confirmation} disabled={!canEdit}
+                  onChange={v => setSettings(s => s ? { ...s, require_email_confirmation: v } : s)} />
+              </Row>
+              <Row label="Autenticação 2FA" sub="Em breve">
+                <Badge variant="neutral">Em breve</Badge>
+              </Row>
+              <Row label="Timeout de sessão" sub={`${settings.session_timeout_minutes} min`}>
+                <input type="number" value={settings.session_timeout_minutes} disabled={!canEdit}
+                  onChange={e => setSettings(s => s ? { ...s, session_timeout_minutes: Number(e.target.value) } : s)}
+                  className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
+              </Row>
+              <Row label="Máx. tentativas de login" sub="Antes do bloqueio temporário">
+                <input type="number" value={settings.max_failed_login_attempts} disabled={!canEdit}
+                  onChange={e => setSettings(s => s ? { ...s, max_failed_login_attempts: Number(e.target.value) } : s)}
+                  className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
+              </Row>
+              <Row label="Tamanho máx. de upload (MB)" sub="Planilhas de importação">
+                <input type="number" value={settings.max_upload_size_mb} disabled={!canEdit}
+                  onChange={e => setSettings(s => s ? { ...s, max_upload_size_mb: Number(e.target.value) } : s)}
+                  className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
+              </Row>
+              {canEdit && (
+                <Button onClick={save} disabled={saving} className="w-full mt-2">
+                  {saving ? 'Salvando…' : saved ? '✓ Salvo' : 'Salvar Configurações'}
+                </Button>
+              )}
+            </div>
+          )}
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -632,8 +608,8 @@ function Row({ label, sub, children }: { label: string; sub: string; children: R
 function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button onClick={() => !disabled && onChange(!value)}
-      className={`relative w-11 h-6 rounded-full transition-colors ${value ? 'bg-emerald-500' : 'bg-edge'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0'}`} />
+      className={`relative w-11 h-6 rounded-full transition-colors ${value ? 'bg-accent' : 'bg-edge'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-control transition-transform ${value ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );
 }
@@ -650,28 +626,28 @@ function BackupStatus() {
   ];
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-teal-500/15 rounded-xl flex items-center justify-center">
-          <Server size={18} className="text-teal-400" />
-        </div>
-        <div>
-          <h3 className="font-bold text-fg">Status de Backup</h3>
-          <p className="text-fg-subtle text-xs">Gerenciado pelo Supabase</p>
-        </div>
-      </div>
-      <div className="space-y-2">
-        {items.map(item => (
-          <div key={item.label} className="flex items-center justify-between p-2.5 bg-surface-3 rounded-xl">
-            <span className="text-fg-subtle text-sm">{item.label}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-fg text-sm font-semibold">{item.value}</span>
-              <CheckCircle2 size={14} className="text-emerald-400" />
-            </div>
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-4">
+          <Server size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Status de Backup</h3>
+            <p className="text-fg-subtle text-xs">Gerenciado pelo Supabase</p>
           </div>
-        ))}
-      </div>
-    </div>
+        </div>
+        <div className="space-y-2">
+          {items.map(item => (
+            <div key={item.label} className="flex items-center justify-between p-2.5 bg-surface-3 rounded-xl">
+              <span className="text-fg-subtle text-sm">{item.label}</span>
+              <div className="flex items-center gap-2">
+                <span className="text-fg text-sm font-semibold">{item.value}</span>
+                <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+              </div>
+            </div>
+          ))}
+        </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -686,44 +662,44 @@ function ERPIntegrations({ companyId }: { companyId: string }) {
   }, [companyId]);
 
   const statusColor = (s: string) =>
-    s === 'active' ? 'text-emerald-400' : s === 'error' ? 'text-red-400' : 'text-fg-subtle';
+    s === 'active' ? 'text-emerald-600 dark:text-emerald-400' : s === 'error' ? 'text-red-600 dark:text-red-400' : 'text-fg-subtle';
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-blue-500/15 rounded-xl flex items-center justify-center">
-          <Link size={18} className="text-blue-400" />
-        </div>
-        <div>
-          <h3 className="font-bold text-fg">Integrações ERP</h3>
-          <p className="text-fg-subtle text-xs">Conexões com sistemas externos</p>
-        </div>
-      </div>
-      {integrations.length === 0
-        ? (
-          <div className="text-center py-8">
-            <Globe size={28} className="text-fg-subtle mx-auto mb-2" />
-            <p className="text-fg-subtle text-sm">Nenhuma integração configurada</p>
-            <p className="text-fg-subtle text-xs mt-1">Tiny, Bling, Omie, SAP, TOTVS e outros em breve</p>
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-5">
+          <Link size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Integrações ERP</h3>
+            <p className="text-fg-subtle text-xs">Conexões com sistemas externos</p>
           </div>
-        )
-        : (
-          <div className="space-y-2">
-            {integrations.map(i => (
-              <div key={i.provider} className="flex items-center justify-between p-3 bg-surface-3 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <Key size={14} className="text-fg-subtle" />
-                  <span className="text-fg text-sm font-semibold">{i.provider}</span>
+        </div>
+        {integrations.length === 0
+          ? (
+            <div className="text-center py-8">
+              <Globe size={28} className="text-fg-subtle mx-auto mb-2" />
+              <p className="text-fg-subtle text-sm">Nenhuma integração configurada</p>
+              <p className="text-fg-subtle text-xs mt-1">Tiny, Bling, Omie, SAP, TOTVS e outros em breve</p>
+            </div>
+          )
+          : (
+            <div className="space-y-2">
+              {integrations.map(i => (
+                <div key={i.provider} className="flex items-center justify-between p-3 bg-surface-3 rounded-xl">
+                  <div className="flex items-center gap-2">
+                    <Key size={14} className="text-fg-subtle" />
+                    <span className="text-fg text-sm font-semibold">{i.provider}</span>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    {i.last_sync_at && <span className="text-fg-subtle text-xs">{formatDate(i.last_sync_at)}</span>}
+                    <span className={`text-xs font-semibold capitalize ${statusColor(i.status)}`}>{i.status}</span>
+                  </div>
                 </div>
-                <div className="flex items-center gap-3">
-                  {i.last_sync_at && <span className="text-fg-subtle text-xs">{formatDate(i.last_sync_at)}</span>}
-                  <span className={`text-xs font-semibold capitalize ${statusColor(i.status)}`}>{i.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-    </div>
+              ))}
+            </div>
+          )}
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -752,53 +728,51 @@ function PermissionMatrix() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-2xl overflow-hidden">
+    <Panel>
       <button onClick={() => setOpen(o => !o)}
         className="w-full flex items-center justify-between p-5 hover:bg-surface-3/60 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-violet-500/15 rounded-xl flex items-center justify-center">
-            <KeyRound size={18} className="text-violet-400" />
-          </div>
+          <KeyRound size={18} className="text-fg-muted" />
           <div className="text-left">
-            <h3 className="font-bold text-fg">Matriz de Permissões</h3>
+            <h3 className="text-sm font-semibold text-fg">Matriz de Permissões</h3>
             <p className="text-fg-subtle text-xs">Permissões por role</p>
           </div>
         </div>
         {open ? <ChevronUp size={16} className="text-fg-subtle" /> : <ChevronDown size={16} className="text-fg-subtle" />}
       </button>
       {open && (
-        <div className="overflow-x-auto border-t border-edge">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-surface-3">
-                <th className="text-left px-4 py-3 text-fg-subtle font-semibold w-48">Permissão</th>
+        <div className="border-t border-edge overflow-x-auto">
+          <Table>
+            <Thead>
+              <Tr>
+                <Th className="w-48">Permissão</Th>
                 {ROLES.map(r => (
-                  <th key={r} className="px-3 py-3 text-center">
+                  <Th key={r} className="text-center">
                     <span className={`px-2 py-0.5 rounded-full border text-xs font-semibold ${getRoleBadgeColor(r)}`}>
                       {getRoleLabel(r)}
                     </span>
-                  </th>
+                  </Th>
                 ))}
-              </tr>
-            </thead>
+              </Tr>
+            </Thead>
             <tbody>
               {ALL_PERMISSIONS.map(p => (
-                <tr key={p.key} className="border-t border-edge/60 hover:bg-surface-3/40 transition-colors">
-                  <td className="px-4 py-2.5 text-fg-muted font-mono">{p.label}</td>
+                <Tr key={p.key}>
+                  <Td className="text-fg-muted font-mono text-xs">{p.label}</Td>
                   {ROLES.map(r => (
-                    <td key={r} className="px-3 py-2.5 text-center">
+                    <Td key={r} className="text-center">
                       {hasPermission(r, p.key)
-                        ? <CheckCircle2 size={14} className="text-emerald-400 mx-auto" />
+                        ? <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400 mx-auto" />
                         : <XCircle size={14} className="text-fg-subtle mx-auto" />}
-                    </td>
+                    </Td>
                   ))}
-                </tr>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -818,12 +792,10 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <ShieldX size={48} className="text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-fg mb-2">Acesso negado</h2>
+          <ShieldX size={48} className="text-red-600 dark:text-red-400 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-fg mb-2">Acesso negado</h2>
           <p className="text-fg-subtle text-sm mb-6">Você não tem permissão para ver esta seção.</p>
-          <button onClick={onBack} className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg rounded-xl text-sm font-semibold transition">
-            Voltar ao Dashboard
-          </button>
+          <Button variant="secondary" onClick={onBack}>Voltar ao Dashboard</Button>
         </div>
       </div>
     );
@@ -848,11 +820,9 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-                <ShieldCheck size={18} className="text-emerald-400" />
-              </div>
+              <ShieldCheck size={20} className="text-fg-muted" />
               <div>
-                <h1 className="text-fg font-bold text-lg">Central de Segurança</h1>
+                <h1 className="text-fg font-semibold text-lg">Central de Segurança</h1>
                 <p className="text-fg-subtle text-xs">Monitoramento e controle de acesso</p>
               </div>
             </div>
@@ -862,7 +832,7 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                   tab === t.id
-                    ? 'border-emerald-500 text-emerald-400'
+                    ? 'border-accent text-fg'
                     : 'border-transparent text-fg-subtle hover:text-fg-muted'
                 }`}>
                 {t.icon} {t.label}

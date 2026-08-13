@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { LayoutGrid, RefreshCw, ArrowLeftRight } from 'lucide-react';
-import { PageHeader, Panel, PanelSection, Button } from '../ui';
+import { Page,
+  PageHeader, Panel, PanelSection, Button, Stat, StatRow, StatCell, ListRow,
+  SegmentedControl, type SegmentedOption,
+} from '../ui';
 import {
   getMatrixCounts, listWithFilter, getClassMigrations, recomputeAbcXyzForCompany,
   AbcXyzFilter, ProductAbcXyzRow, AbcXyzMigration,
@@ -16,11 +19,11 @@ interface AbcXyzDashboardPageProps {
   userEmail: string;
 }
 
-const QUICK_FILTERS: { id: AbcXyzFilter; label: string }[] = [
-  { id: 'all', label: 'Todos' },
-  { id: 'combo:AX', label: 'Apenas AX' },
-  { id: 'combo:AZ', label: 'Apenas AZ' },
-  { id: 'combo:CZ', label: 'Apenas CZ' },
+const QUICK_FILTERS: SegmentedOption<AbcXyzFilter>[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'combo:AX', label: 'Apenas AX' },
+  { value: 'combo:AZ', label: 'Apenas AZ' },
+  { value: 'combo:CZ', label: 'Apenas CZ' },
 ];
 
 export function AbcXyzDashboardPage({ companyId, userId, userEmail }: AbcXyzDashboardPageProps) {
@@ -61,7 +64,7 @@ export function AbcXyzDashboardPage({ companyId, userId, userEmail }: AbcXyzDash
   const totalValue = matrix ? Object.values(matrix).reduce((s, c) => s + c.value, 0) : 0;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page>
       <PageHeader
         title="Classificação ABC+XYZ"
         description="Prioriza estratégia operacional de estoque combinando valor movimentado (ABC) e previsibilidade de demanda (XYZ)."
@@ -77,28 +80,27 @@ export function AbcXyzDashboardPage({ companyId, userId, userEmail }: AbcXyzDash
       ) : (
         <>
           <Panel>
-            <PanelSection padding="md" className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              <div className="flex items-start gap-2.5">
-                <LayoutGrid size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-fg-subtle">SKUs Classificados</p>
-                  <p className="text-sm font-semibold text-fg">{totalSkus}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <LayoutGrid size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-fg-subtle">Valor Movimentado Total</p>
-                  <p className="text-sm font-semibold text-fg">R$ {totalValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}</p>
-                </div>
-              </div>
-              <div className="flex items-start gap-2.5">
-                <ArrowLeftRight size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
-                <div>
-                  <p className="text-xs text-fg-subtle">Mudaram de Classe</p>
-                  <p className="text-sm font-semibold text-fg">{migrations.length}</p>
-                </div>
-              </div>
+            <PanelSection padding="md">
+              <StatRow>
+                <StatCell>
+                  <Stat label="SKUs Classificados" value={totalSkus} icon={<LayoutGrid />} />
+                </StatCell>
+                <StatCell>
+                  <Stat
+                    label="Valor Movimentado Total"
+                    value={`R$ ${totalValue.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}`}
+                    icon={<LayoutGrid />}
+                  />
+                </StatCell>
+                <StatCell>
+                  <Stat
+                    label="Mudaram de Classe"
+                    value={migrations.length}
+                    icon={<ArrowLeftRight />}
+                    context={totalSkus ? `de ${totalSkus} SKUs` : undefined}
+                  />
+                </StatCell>
+              </StatRow>
             </PanelSection>
           </Panel>
 
@@ -118,35 +120,30 @@ export function AbcXyzDashboardPage({ companyId, userId, userEmail }: AbcXyzDash
 
           <Panel>
             <PanelSection padding="md">
-              <div className="flex flex-wrap gap-2 mb-4">
-                {QUICK_FILTERS.map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => { setSelectedCombo(null); setFilter(f.id); }}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      !selectedCombo && filter === f.id ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'
-                    }`}
-                  >
-                    {f.label}
-                  </button>
-                ))}
+              <div className="mb-4">
+                <SegmentedControl
+                  label="Filtro rápido de classificação"
+                  options={QUICK_FILTERS}
+                  value={selectedCombo ? null : filter}
+                  onChange={next => { setSelectedCombo(null); setFilter(next); }}
+                />
               </div>
-              <div className="space-y-1">
-                {rows.length === 0 && <p className="text-xs text-fg-subtle">Nenhum SKU nesse filtro.</p>}
-                {rows.map(row => (
-                  <div key={row.id} className="flex items-center justify-between gap-3 py-2 border-b border-edge last:border-0">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-fg truncate">{row.product_name}</p>
-                      <p className="text-xs text-fg-subtle">{row.product_sku} · R$ {row.value_moved.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} movimentados</p>
-                    </div>
-                    <ClassificationBadge combo={row.abc_xyz_class} />
-                  </div>
-                ))}
-              </div>
+              {rows.length === 0 ? (
+                <p className="text-xs text-fg-subtle">Nenhum SKU nesse filtro.</p>
+              ) : (
+                rows.map(row => (
+                  <ListRow key={row.id} value={<ClassificationBadge combo={row.abc_xyz_class} />}>
+                    <p className="truncate text-sm font-medium text-fg">{row.product_name}</p>
+                    <p className="text-caption">
+                      {row.product_sku} · R$ {row.value_moved.toLocaleString('pt-BR', { maximumFractionDigits: 0 })} movimentados
+                    </p>
+                  </ListRow>
+                ))
+              )}
             </PanelSection>
           </Panel>
         </>
       )}
-    </div>
+    </Page>
   );
 }

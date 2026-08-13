@@ -112,7 +112,7 @@ export const SafeDropdown: React.FC<SafeDropdownProps> = ({
   useEffect(() => {
     if (!isOpen) return;
 
-    const handleClickOutside = (event: MouseEvent) => {
+    const handleClickOutside = (event: MouseEvent | TouchEvent) => {
       if (
         triggerRef.current && !triggerRef.current.contains(event.target as Node) &&
         dropdownRef.current && !dropdownRef.current.contains(event.target as Node)
@@ -128,10 +128,12 @@ export const SafeDropdown: React.FC<SafeDropdownProps> = ({
     };
 
     document.addEventListener('mousedown', handleClickOutside);
+    document.addEventListener('touchstart', handleClickOutside);
     document.addEventListener('keydown', handleEscape);
 
     return () => {
       document.removeEventListener('mousedown', handleClickOutside);
+      document.removeEventListener('touchstart', handleClickOutside);
       document.removeEventListener('keydown', handleEscape);
     };
   }, [isOpen]);
@@ -156,7 +158,7 @@ export const SafeDropdown: React.FC<SafeDropdownProps> = ({
         minWidth: '200px',
         zIndex: 2000,
       }}
-      className={`origin-top-right bg-surface-2/95 backdrop-blur-xl border border-edge/70 rounded-xl shadow-2xl shadow-black/10 ring-1 ring-black/5 py-1.5 overflow-hidden transition-all duration-200 ease-out ${
+      className={`origin-top-right bg-surface-2/95 backdrop-blur-xl border border-edge/70 rounded-container shadow-overlay py-1.5 overflow-hidden transition-all duration-200 ease-out ${
         entered ? 'opacity-100 scale-100' : 'opacity-0 scale-95'
       }`}
     >

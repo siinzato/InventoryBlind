@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
-import { Panel, PanelSection, Button, Badge } from '../ui';
+import { Panel, PanelSection, Button, Badge, SegmentedControl } from '../ui';
 import { supabase, BrandData } from '../../lib/supabase';
 import {
   CountRow, CountColumnMapping, COUNT_FIELDS,
@@ -283,15 +283,16 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
             <div className="text-center px-2"><p className="text-xs text-fg-subtle">Sobrando</p><p className="text-lg font-semibold text-red-600 dark:text-red-400">{summary.surplus}</p></div>
           </PanelSection>
 
-          <PanelSection padding="sm" className="flex gap-2 flex-wrap">
-            {(['all', 'correct', 'divergent', 'missing', 'surplus'] as const).map(f => (
-              <button
-                key={f} onClick={() => setFilter(f)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${filter === f ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'}`}
-              >
-                {f === 'all' ? 'Todos' : STATUS_LABEL[f]}
-              </button>
-            ))}
+          <PanelSection padding="sm">
+            <SegmentedControl
+              label="Filtro de resultado da importação"
+              options={(['all', 'correct', 'divergent', 'missing', 'surplus'] as const).map(f => ({
+                value: f,
+                label: f === 'all' ? 'Todos' : STATUS_LABEL[f],
+              }))}
+              value={filter}
+              onChange={setFilter}
+            />
           </PanelSection>
 
           <div className="border-t border-edge max-h-96 overflow-auto">

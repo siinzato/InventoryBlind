@@ -1,6 +1,11 @@
 import { useEffect, useState, useCallback, useMemo } from 'react';
-import { Radio, Sparkles } from 'lucide-react';
-import { PageHeader, Panel, PanelSection, Badge } from '../ui';
+import {
+  // `Map` is aliased: the unaliased lucide import shadows the global Map
+  // constructor, and this file builds `new Map(...)` lookups.
+  Radio, Sparkles, Map as MapIcon, Package, Flame, Footprints, TrendingUp, PieChart,
+  AlertTriangle, ListChecks,
+} from 'lucide-react';
+import { Page, PageHeader, Panel, PanelSection, Badge, Button, SegmentedControl, type SegmentedOption } from '../ui';
 import { getActiveLayout, getCells, getPickCountsByLocation } from '../../lib/slottingLayoutService';
 import { getLiveLayerData } from '../../lib/warehouseTwinService';
 import { computeInsights } from '../../lib/warehouseInsightsEngine';
@@ -27,15 +32,15 @@ interface WarehouseDigitalTwinPageProps {
 
 type SubModule = 'mapa' | 'slotting' | 'heatmaps' | 'replay' | 'analytics' | 'ocupacao' | 'divergencias' | 'recomendacoes';
 
-const SUBMODULES: { id: SubModule; label: string; icon: string }[] = [
-  { id: 'mapa', label: 'Mapa', icon: '🗺️' },
-  { id: 'slotting', label: 'Slotting', icon: '📦' },
-  { id: 'heatmaps', label: 'Heatmaps', icon: '🔥' },
-  { id: 'replay', label: 'Picking Replay', icon: '🚶' },
-  { id: 'analytics', label: 'Analytics', icon: '📈' },
-  { id: 'ocupacao', label: 'Ocupação', icon: '📊' },
-  { id: 'divergencias', label: 'Divergências', icon: '⚠️' },
-  { id: 'recomendacoes', label: 'Recomendações', icon: '🤖' },
+const SUBMODULES: SegmentedOption<SubModule>[] = [
+  { value: 'mapa', label: 'Mapa', icon: MapIcon },
+  { value: 'slotting', label: 'Slotting', icon: Package },
+  { value: 'heatmaps', label: 'Heatmaps', icon: Flame },
+  { value: 'replay', label: 'Picking Replay', icon: Footprints },
+  { value: 'analytics', label: 'Analytics', icon: TrendingUp },
+  { value: 'ocupacao', label: 'Ocupação', icon: PieChart },
+  { value: 'divergencias', label: 'Divergências', icon: AlertTriangle },
+  { value: 'recomendacoes', label: 'Recomendações', icon: ListChecks },
 ];
 
 /** Composição raiz da Fase 3 (Warehouse Digital Twin). Não toca em nenhum arquivo do
@@ -132,53 +137,52 @@ export function WarehouseDigitalTwinPage({ companyId, userId, userEmail, role }:
   const selectedStatus = selectedCell?.location_code ? effectiveLiveData.get(selectedCell.location_code) ?? null : null;
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page width="wide">
       <PageHeader
         title="Warehouse Digital Twin"
         description="O que está acontecendo agora no seu armazém — mapa vivo, replay de picking e insights automáticos sobre a mesma grade do Slotting Intelligence."
         actions={
           <>
-            <button
+            {/* Both are toggles, so `secondary` is the off state and `primary`
+                the on state — accent marks active, per the color rule. Emerald
+                previously marked "simulation on", which spent a semantic color
+                on a non-semantic state. */}
+            <Button
+              size="sm"
+              variant={simulationActive ? 'primary' : 'secondary'}
               onClick={() => setSimulationActive(a => !a)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                simulationActive ? 'bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 border-emerald-500/30' : 'bg-surface-2 text-fg-muted border-edge hover:bg-surface-3'
-              }`}
+              aria-pressed={simulationActive}
               title="Pulsos visuais de atividade — não é um feed de posição em tempo real"
             >
               <Radio size={13} /> Simulação ao vivo
-            </button>
-            <button
+            </Button>
+            <Button
+              size="sm"
+              variant={demoMode ? 'primary' : 'secondary'}
               onClick={() => setDemoMode(d => !d)}
-              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                demoMode ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge hover:bg-surface-3'
-              }`}
+              aria-pressed={demoMode}
               title="Preenche o mapa com dados fictícios para demonstração comercial"
             >
               <Sparkles size={13} /> Modo Apresentação
-            </button>
+            </Button>
           </>
         }
       />
 
       {demoMode && (
-        <Badge variant="accent">🎭 Modo Apresentação ativo — ocupação, insights e rota são fictícios, nada é salvo</Badge>
+        <Badge variant="accent">
+          Modo Apresentação ativo — ocupação, insights e rota são fictícios, nada é salvo
+        </Badge>
       )}
 
       <WarehouseInsightsStrip insights={effectiveInsights} onFocus={handleFocus} />
 
-      <div className="flex flex-wrap gap-1.5">
-        {SUBMODULES.map(s => (
-          <button
-            key={s.id}
-            onClick={() => setSubmodule(s.id)}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-              submodule === s.id ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge hover:bg-surface-3'
-            }`}
-          >
-            {s.icon} {s.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Submódulo do Digital Twin"
+        options={SUBMODULES}
+        value={submodule}
+        onChange={setSubmodule}
+      />
 
       {submodule === 'mapa' && (
         <>
@@ -262,6 +266,6 @@ export function WarehouseDigitalTwinPage({ companyId, userId, userEmail, role }:
         cells={cells}
         cellSizeMeters={layout.cell_size_meters}
       />
-    </div>
+    </Page>
   );
 }

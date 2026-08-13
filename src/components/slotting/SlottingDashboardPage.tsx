@@ -1,6 +1,6 @@
 import { useEffect, useState, useCallback } from 'react';
 import { PackageOpen, Route, Footprints, Clock, TrendingUp, Check, X, Clock3, PenSquare, RefreshCw } from 'lucide-react';
-import { PageHeader, Panel, PanelSection, Button, Badge } from '../ui';
+import { Page, PageHeader, Panel, PanelSection, Button, Badge, ListRow } from '../ui';
 import { supabase } from '../../lib/supabase';
 import {
   getActiveLayout, createLayout, getCells, getPickCountsByLocation, getPickRecords,
@@ -173,7 +173,7 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
   const operatorRanking = Array.from(operatorDistances.entries()).sort(([, a], [, b]) => b - a).slice(0, 10);
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page width="wide">
       <PageHeader
         title="Slotting Intelligence"
         description="Otimiza o layout do armazém a partir de distâncias reais calculadas sobre a grade desenhada."
@@ -244,16 +244,13 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
         <Panel>
           <PanelSection padding="md">
             <p className="text-section mb-3 flex items-center gap-1.5"><Route size={14} /> SKUs Mais Percorridos</p>
-            <div className="space-y-1.5">
+            <div>
               {skuRanking.length === 0 && <p className="text-xs text-fg-subtle">Sem dados suficientes ainda.</p>}
               {skuRanking.map(sku => (
-                <div key={sku.locationCode} className="flex items-center justify-between gap-2 py-1.5 border-b border-edge last:border-0">
-                  <div className="min-w-0">
-                    <p className="text-sm font-medium text-fg truncate">{productNames.get(sku.locationCode) ?? sku.locationCode}</p>
-                    <p className="text-xs text-fg-subtle">{sku.locationCode} · {sku.pickCount} picks</p>
-                  </div>
-                  <Badge variant="neutral">{Math.round(sku.totalDistanceMeters)} m</Badge>
-                </div>
+                <ListRow key={sku.locationCode} value={<Badge variant="neutral">{Math.round(sku.totalDistanceMeters)} m</Badge>}>
+                  <p className="truncate text-sm font-medium text-fg">{productNames.get(sku.locationCode) ?? sku.locationCode}</p>
+                  <p className="text-caption">{sku.locationCode} · {sku.pickCount} picks</p>
+                </ListRow>
               ))}
             </div>
           </PanelSection>
@@ -262,13 +259,12 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
         <Panel>
           <PanelSection padding="md">
             <p className="text-section mb-3">Ranking de Corredores</p>
-            <div className="space-y-1.5">
+            <div>
               {corridorRanking.length === 0 && <p className="text-xs text-fg-subtle">Sem dados suficientes ainda.</p>}
               {corridorRanking.map(([key, count]) => (
-                <div key={key} className="flex items-center justify-between gap-2 py-1.5 border-b border-edge last:border-0">
+                <ListRow key={key} value={<Badge variant="neutral">{count} passagens</Badge>}>
                   <p className="text-sm text-fg">Corredor ({key})</p>
-                  <Badge variant="neutral">{count} passagens</Badge>
-                </div>
+                </ListRow>
               ))}
             </div>
           </PanelSection>
@@ -278,13 +274,12 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
       <Panel>
         <PanelSection padding="md">
           <p className="text-section mb-3">Distância por Operador</p>
-          <div className="space-y-1.5">
+          <div>
             {operatorRanking.length === 0 && <p className="text-xs text-fg-subtle">Sem dados suficientes ainda.</p>}
             {operatorRanking.map(([operatorId, meters]) => (
-              <div key={operatorId} className="flex items-center justify-between gap-2 py-1.5 border-b border-edge last:border-0">
+              <ListRow key={operatorId} value={<Badge variant="neutral">{Math.round(meters).toLocaleString('pt-BR')} m</Badge>}>
                 <p className="text-sm text-fg">{operatorNames.get(operatorId) ?? operatorId}</p>
-                <Badge variant="neutral">{Math.round(meters).toLocaleString('pt-BR')} m</Badge>
-              </div>
+              </ListRow>
             ))}
           </div>
         </PanelSection>
@@ -330,17 +325,19 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
       <Panel>
         <PanelSection padding="md">
           <p className="text-section mb-3">Histórico de Otimizações</p>
-          <div className="space-y-1.5">
+          <div>
             {history.length === 0 && <p className="text-xs text-fg-subtle">Nenhuma otimização aprovada ainda.</p>}
             {history.map(h => (
-              <div key={h.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-edge last:border-0">
+              <ListRow
+                key={h.id}
+                value={<span className="text-caption">{new Date(h.recorded_at).toLocaleDateString('pt-BR')}</span>}
+              >
                 <p className="text-sm text-fg-muted">{h.event}</p>
-                <span className="text-xs text-fg-subtle flex-shrink-0">{new Date(h.recorded_at).toLocaleDateString('pt-BR')}</span>
-              </div>
+              </ListRow>
             ))}
           </div>
         </PanelSection>
       </Panel>
-    </div>
+    </Page>
   );
 }

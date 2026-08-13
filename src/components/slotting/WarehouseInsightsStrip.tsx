@@ -1,4 +1,5 @@
-import { Panel, PanelSection, Badge } from '../ui';
+import { ArrowRight } from 'lucide-react';
+import { Panel, PanelSection, Badge, resolveInsightIcon, INSIGHT_ICON_TONE } from '../ui';
 import type { WarehouseInsight } from '../../lib/supabase';
 
 interface WarehouseInsightsStripProps {
@@ -9,12 +10,6 @@ interface WarehouseInsightsStripProps {
   onFocus?: (locationCode: string) => void;
 }
 
-const SEVERITY_TEXT: Record<WarehouseInsight['severity'], string> = {
-  info: 'text-fg',
-  warning: 'text-amber-600 dark:text-amber-400',
-  critical: 'text-red-600 dark:text-red-400',
-};
-
 const SEVERITY_BADGE: Record<WarehouseInsight['severity'], 'neutral' | 'warning' | 'danger'> = {
   info: 'neutral',
   warning: 'warning',
@@ -24,7 +19,10 @@ const SEVERITY_BADGE: Record<WarehouseInsight['severity'], 'neutral' | 'warning'
 /** Um único Panel com linhas divididas (não N cards separados) — regra de linguagem
  *  visual do app: agrupar informação relacionada num bloco só, com divisores discretos.
  *  Cada linha responde às 3 perguntas do Intelligence Panel: o que está acontecendo
- *  (título/impacto), onde (badge de localização) e o que fazer (recomendação). */
+ *  (título/impacto), onde (badge de localização) e o que fazer (recomendação).
+ *
+ *  O título fica sempre em `text-fg`: a severidade já é carregada pelo ícone e pelo
+ *  Badge, e colorir os três ao mesmo tempo repetia o sinal três vezes. */
 export function WarehouseInsightsStrip({ insights, onFocus }: WarehouseInsightsStripProps) {
   if (insights.length === 0) {
     return (
@@ -38,26 +36,48 @@ export function WarehouseInsightsStrip({ insights, onFocus }: WarehouseInsightsS
 
   return (
     <Panel>
-      <PanelSection padding="sm" className="divide-y divide-edge">
+      <PanelSection padding="sm" className="divide-y divide-edge/60">
         {insights.map(insight => {
           const clickable = !!onFocus && !!insight.focusLocationCode;
-          return (
-            <div
-              key={insight.id}
-              onClick={clickable ? () => onFocus!(insight.focusLocationCode!) : undefined}
-              className={`flex items-start gap-3 py-3 first:pt-0 last:pb-0 -mx-1 px-1 rounded-lg transition-colors ${clickable ? 'cursor-pointer hover:bg-surface-3/60' : ''}`}
-              title={clickable ? 'Ver no mapa' : undefined}
-            >
-              <span className="text-lg leading-none flex-shrink-0 mt-0.5">{insight.icon}</span>
+          const Icon = resolveInsightIcon(insight.icon, insight.severity);
+
+          const body = (
+            <>
+              <Icon size={15} className={`mt-0.5 flex-shrink-0 ${INSIGHT_ICON_TONE[insight.severity]}`} />
               <div className="min-w-0 flex-1 space-y-1">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className={`text-sm font-semibold ${SEVERITY_TEXT[insight.severity]}`}>{insight.title}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  <p className="text-sm font-semibold text-fg">{insight.title}</p>
                   {insight.location && <Badge variant={SEVERITY_BADGE[insight.severity]}>{insight.location}</Badge>}
                 </div>
                 <p className="text-sm text-fg-muted">{insight.impact}</p>
-                <p className="text-xs text-fg-subtle">→ {insight.recommendation}</p>
+                <p className="flex items-start gap-1 text-xs text-fg-subtle">
+                  <ArrowRight size={12} className="mt-0.5 flex-shrink-0" />
+                  {insight.recommendation}
+                </p>
               </div>
-            </div>
+            </>
+          );
+
+          // A real <button> when actionable: the previous clickable <div> was
+          // unreachable by keyboard and announced as plain text.
+          if (!clickable) {
+            return (
+              <div key={insight.id} className="flex items-start gap-3 py-3 first:pt-0 last:pb-0">
+                {body}
+              </div>
+            );
+          }
+
+          return (
+            <button
+              key={insight.id}
+              type="button"
+              onClick={() => onFocus!(insight.focusLocationCode!)}
+              title="Ver no mapa"
+              className="-mx-1 flex w-full items-start gap-3 rounded-control px-1 py-3 text-left transition-colors first:pt-0 last:pb-0 hover:bg-surface-3/60"
+            >
+              {body}
+            </button>
           );
         })}
       </PanelSection>

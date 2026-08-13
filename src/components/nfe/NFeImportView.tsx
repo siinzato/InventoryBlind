@@ -82,7 +82,7 @@ export function NFeImportView({ onImported, onOpenExisting }: Props) {
         <button
           disabled={busy}
           onClick={() => fileRef.current?.click()}
-          className="flex flex-col items-center justify-center gap-3 p-8 rounded-2xl border-2 border-dashed border-edge hover:border-accent/40 hover:bg-accent/5 transition-colors disabled:opacity-50"
+          className="flex flex-col items-center justify-center gap-3 p-8 rounded-container border-2 border-dashed border-edge hover:border-accent/40 hover:bg-accent/5 transition-colors disabled:opacity-50"
         >
           <div className="p-3 rounded-xl bg-accent/10 text-accent"><Upload size={24} /></div>
           <span className="text-sm font-semibold text-fg">Selecionar arquivo XML</span>

@@ -153,7 +153,7 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
                 <button
                   key={cat.id}
                   onClick={() => handleTileClick(cat.id)}
-                  className={`text-left p-5 rounded-2xl border transition-colors flex flex-col gap-3 ${
+                  className={`text-left p-5 rounded-container border transition-colors flex flex-col gap-3 ${
                     active ? 'border-accent bg-accent/5' : 'border-edge bg-surface-2 hover:border-accent/40 hover:bg-surface-3'
                   }`}
                 >
@@ -174,7 +174,7 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
                 <button
                   key={tile.id}
                   onClick={() => handleTileClick(tile.id)}
-                  className={`text-left p-5 rounded-2xl border transition-colors flex flex-col gap-3 ${
+                  className={`text-left p-5 rounded-container border transition-colors flex flex-col gap-3 ${
                     active ? 'border-accent bg-accent/5' : 'border-edge bg-surface-2 hover:border-accent/40 hover:bg-surface-3'
                   }`}
                 >

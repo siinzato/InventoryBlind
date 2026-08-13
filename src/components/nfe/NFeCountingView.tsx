@@ -237,7 +237,7 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
             <button
               key={f}
               onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${filter === f ? 'bg-surface-2 text-fg shadow-sm' : 'text-fg-muted hover:text-fg'}`}
+              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${filter === f ? 'bg-surface-2 text-fg shadow-control' : 'text-fg-muted hover:text-fg'}`}
             >
               {label}
             </button>

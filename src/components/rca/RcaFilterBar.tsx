@@ -1,4 +1,5 @@
 import { CAUSE_CATEGORIES } from '../../lib/rcaAlgorithm';
+import { Input, SegmentedControl, type SegmentedOption } from '../ui';
 import type { RcaFilters } from '../../lib/rcaService';
 
 interface RcaFilterBarProps {
@@ -6,51 +7,78 @@ interface RcaFilterBarProps {
   onChange: (filters: RcaFilters) => void;
 }
 
-/** Filtros por período/causa/SKU/operador/endereço/fornecedor/recorrência — sem componente
- *  de filtro compartilhado no app (Risk/CBC/ABC-XYZ também fazem isso manualmente), então
- *  segue a mesma convenção de pill-buttons + inputs simples usada nesses dashboards. */
+const ALL = '__all__';
+
+/** Filtros por período/causa/SKU/operador/endereço/fornecedor/recorrência.
+ *
+ *  Antes cada pill carregava a própria borda (N caixinhas em fila) e cada input
+ *  repetia as classes de campo à mão. Agora usa os primitivos compartilhados —
+ *  SegmentedControl para a causa e Input para os campos — o que também traz os
+ *  alvos de toque para 44px, relevante porque este filtro é usado em tablet no
+ *  chão de operação. */
 export function RcaFilterBar({ filters, onChange }: RcaFilterBarProps) {
   const set = (patch: Partial<RcaFilters>) => onChange({ ...filters, ...patch });
 
+  const causeOptions: SegmentedOption<string>[] = [
+    { value: ALL, label: 'Todas as causas' },
+    ...CAUSE_CATEGORIES.map(c => ({ value: c.value, label: c.label })),
+  ];
+
   return (
     <div className="space-y-3">
-      <div className="flex flex-wrap gap-2">
-        <button
-          onClick={() => set({ causeCategory: undefined })}
-          className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-            !filters.causeCategory ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'
-          }`}
-        >
-          Todas as causas
-        </button>
-        {CAUSE_CATEGORIES.map(c => (
-          <button
-            key={c.value}
-            onClick={() => set({ causeCategory: c.value })}
-            className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-              filters.causeCategory === c.value ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'
-            }`}
-          >
-            {c.label}
-          </button>
-        ))}
-      </div>
+      <SegmentedControl
+        label="Categoria de causa"
+        options={causeOptions}
+        value={filters.causeCategory ?? ALL}
+        onChange={value => set({ causeCategory: value === ALL ? undefined : (value as RcaFilters['causeCategory']) })}
+      />
 
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-2">
-        <input type="date" value={filters.from ?? ''} onChange={e => set({ from: e.target.value || undefined })}
-          className="p-2 border border-edge rounded-lg bg-surface text-xs text-fg" title="De" />
-        <input type="date" value={filters.to ?? ''} onChange={e => set({ to: e.target.value || undefined })}
-          className="p-2 border border-edge rounded-lg bg-surface text-xs text-fg" title="Até" />
-        <input placeholder="SKU" value={filters.sku ?? ''} onChange={e => set({ sku: e.target.value || undefined })}
-          className="p-2 border border-edge rounded-lg bg-surface text-xs text-fg" />
-        <input placeholder="Operador" value={filters.operatorName ?? ''} onChange={e => set({ operatorName: e.target.value || undefined })}
-          className="p-2 border border-edge rounded-lg bg-surface text-xs text-fg" />
-        <input placeholder="Endereço" value={filters.location ?? ''} onChange={e => set({ location: e.target.value || undefined })}
-          className="p-2 border border-edge rounded-lg bg-surface text-xs text-fg" />
-        <input placeholder="Fornecedor" value={filters.supplierName ?? ''} onChange={e => set({ supplierName: e.target.value || undefined })}
-          className="p-2 border border-edge rounded-lg bg-surface text-xs text-fg" />
-        <label className="flex items-center gap-1.5 text-xs text-fg-muted px-2">
-          <input type="checkbox" checked={!!filters.recurringOnly} onChange={e => set({ recurringOnly: e.target.checked || undefined })} />
+      <div className="grid grid-cols-2 gap-2 md:grid-cols-4">
+        <Input
+          type="date"
+          value={filters.from ?? ''}
+          onChange={e => set({ from: e.target.value || undefined })}
+          title="De"
+          aria-label="Data inicial"
+        />
+        <Input
+          type="date"
+          value={filters.to ?? ''}
+          onChange={e => set({ to: e.target.value || undefined })}
+          title="Até"
+          aria-label="Data final"
+        />
+        <Input
+          placeholder="SKU"
+          aria-label="SKU"
+          value={filters.sku ?? ''}
+          onChange={e => set({ sku: e.target.value || undefined })}
+        />
+        <Input
+          placeholder="Operador"
+          aria-label="Operador"
+          value={filters.operatorName ?? ''}
+          onChange={e => set({ operatorName: e.target.value || undefined })}
+        />
+        <Input
+          placeholder="Endereço"
+          aria-label="Endereço"
+          value={filters.location ?? ''}
+          onChange={e => set({ location: e.target.value || undefined })}
+        />
+        <Input
+          placeholder="Fornecedor"
+          aria-label="Fornecedor"
+          value={filters.supplierName ?? ''}
+          onChange={e => set({ supplierName: e.target.value || undefined })}
+        />
+        <label className="flex min-h-[44px] items-center gap-2 px-2 text-xs text-fg-muted">
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-accent"
+            checked={!!filters.recurringOnly}
+            onChange={e => set({ recurringOnly: e.target.checked || undefined })}
+          />
           Só recorrentes
         </label>
       </div>

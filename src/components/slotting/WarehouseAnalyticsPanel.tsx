@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Panel, PanelSection, Badge } from '../ui';
+import { Panel, PanelSection, Badge, ListRow } from '../ui';
 import { listRecords } from '../../lib/rcaService';
 import { groupByDimension, type DimensionBucket } from '../../lib/rcaAlgorithm';
 import { getMatrixCounts } from '../../lib/abcXyzService';
@@ -45,13 +45,12 @@ export function WarehouseAnalyticsPanel({ companyId }: WarehouseAnalyticsPanelPr
       <Panel>
         <PanelSection padding="md">
           <p className="text-section mb-3">Divergências por Endereço</p>
-          <div className="space-y-1">
+          <div>
             {byLocation.length === 0 && <p className="text-xs text-fg-subtle">Nenhuma divergência classificada ainda.</p>}
             {byLocation.slice(0, 10).map(b => (
-              <div key={b.key} className="flex items-center justify-between gap-3 py-1.5 border-b border-edge last:border-0">
-                <p className="text-sm text-fg truncate">{b.label}</p>
-                <Badge variant="neutral">{b.count}</Badge>
-              </div>
+              <ListRow key={b.key} value={<Badge variant="neutral">{b.count}</Badge>}>
+                <p className="truncate text-sm text-fg">{b.label}</p>
+              </ListRow>
             ))}
           </div>
         </PanelSection>

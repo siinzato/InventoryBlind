@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { Gauge, TrendingUp, AlertTriangle, ShieldCheck, RefreshCw, ArrowUpRight, ArrowDownRight } from 'lucide-react';
-import { PageHeader, Panel, PanelSection, Button } from '../ui';
+import { Page,
+  PageHeader, Panel, PanelSection, Button, Stat, StatRow, StatCell, ListRow,
+  SegmentedControl, type StatProps, type SegmentedOption,
+} from '../ui';
 import {
   getCompanySummary, getCriticalProducts, getMostReliableProducts, getBandMigrations, getScoreTrend,
   listWithFilter, recomputeAllForCompany, CBCFilter, ProductConfidenceRow, CBCCompanySummaryRow, BandMigration, ScoreTrendPoint,
@@ -13,12 +16,12 @@ interface CBCDashboardPageProps {
   userEmail: string;
 }
 
-const FILTERS: { id: CBCFilter; label: string }[] = [
-  { id: 'all', label: 'Todos' },
-  { id: 'critical', label: 'Apenas Críticos' },
-  { id: 'high_confidence', label: 'Alta Confiança' },
-  { id: 'overdue', label: 'Contagem Vencida' },
-  { id: 'due_this_week', label: 'Programada Esta Semana' },
+const FILTERS: SegmentedOption<CBCFilter>[] = [
+  { value: 'all', label: 'Todos' },
+  { value: 'critical', label: 'Apenas Críticos' },
+  { value: 'high_confidence', label: 'Alta Confiança' },
+  { value: 'overdue', label: 'Contagem Vencida' },
+  { value: 'due_this_week', label: 'Programada Esta Semana' },
 ];
 
 function Sparkline({ points }: { points: ScoreTrendPoint[] }) {
@@ -89,15 +92,20 @@ export function CBCDashboardPage({ companyId, userId, userEmail }: CBCDashboardP
   const migratedUp = migrations.filter(m => m.direction === 'up').length;
   const migratedDown = migrations.filter(m => m.direction === 'down').length;
 
-  const cards = summary ? [
-    { label: 'Média Geral', value: summary.avg_confidence, icon: Gauge },
-    { label: 'SKUs Avaliados', value: summary.total_scored, icon: ShieldCheck },
-    { label: 'Contagem Vencida', value: summary.overdue_count, icon: AlertTriangle },
-    { label: 'Programada Esta Semana', value: summary.due_this_week_count, icon: TrendingUp },
+  const cards: StatProps[] = summary ? [
+    { label: 'Média Geral', value: summary.avg_confidence, icon: <Gauge />, context: 'confidence score' },
+    { label: 'SKUs Avaliados', value: summary.total_scored, icon: <ShieldCheck /> },
+    {
+      label: 'Contagem Vencida',
+      value: summary.overdue_count,
+      icon: <AlertTriangle />,
+      context: summary.total_scored ? `de ${summary.total_scored} SKUs` : undefined,
+    },
+    { label: 'Programada Esta Semana', value: summary.due_this_week_count, icon: <TrendingUp /> },
   ] : [];
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page>
       <PageHeader
         title="Confidence Based Counting (CBC)"
         description="Prioriza a próxima contagem de cada SKU por um Confidence Score, em vez de ciclos fixos."
@@ -113,16 +121,14 @@ export function CBCDashboardPage({ companyId, userId, userEmail }: CBCDashboardP
       ) : (
         <>
           <Panel>
-            <PanelSection padding="md" className="grid grid-cols-2 md:grid-cols-4 gap-4">
-              {cards.map(card => (
-                <div key={card.label} className="flex items-start gap-2.5">
-                  <card.icon size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-fg-subtle truncate">{card.label}</p>
-                    <p className="text-sm font-semibold text-fg truncate">{card.value}</p>
-                  </div>
-                </div>
-              ))}
+            <PanelSection padding="md">
+              <StatRow>
+                {cards.map(card => (
+                  <StatCell key={card.label}>
+                    <Stat {...card} />
+                  </StatCell>
+                ))}
+              </StatRow>
             </PanelSection>
           </Panel>
 
@@ -139,77 +145,74 @@ export function CBCDashboardPage({ companyId, userId, userEmail }: CBCDashboardP
             </PanelSection>
           </Panel>
 
-          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-            <Panel>
-              <PanelSection padding="md">
-                <p className="text-section mb-3 flex items-center gap-1.5"><AlertTriangle size={14} className="text-red-500" /> SKUs Mais Críticos</p>
-                <div className="space-y-1.5">
-                  {critical.length === 0 && <p className="text-xs text-fg-subtle">Nenhum SKU crítico no momento.</p>}
-                  {critical.map(row => (
-                    <div key={row.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-edge last:border-0">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-fg truncate">{row.product_name}</p>
-                        <p className="text-xs text-fg-subtle">{row.product_sku}</p>
-                      </div>
-                      <ConfidenceBadge riskLevel={row.risk_level} score={row.confidence_score} />
-                    </div>
-                  ))}
-                </div>
-              </PanelSection>
-            </Panel>
+          {/* Two related rankings read as ONE grouped surface split by a hairline,
+              not as two bordered cards sitting next to each other. */}
+          <Panel>
+            <PanelSection padding="md" className="grid grid-cols-1 gap-6 lg:grid-cols-2 lg:gap-0 lg:divide-x lg:divide-edge">
+              <div className="lg:pr-6">
+                <p className="text-section mb-2 flex items-center gap-1.5">
+                  <AlertTriangle size={13} className="text-red-500" /> SKUs Mais Críticos
+                </p>
+                {critical.length === 0 ? (
+                  <p className="text-xs text-fg-subtle">Nenhum SKU crítico no momento.</p>
+                ) : (
+                  critical.map(row => (
+                    <ListRow
+                      key={row.id}
+                      value={<ConfidenceBadge riskLevel={row.risk_level} score={row.confidence_score} />}
+                    >
+                      <p className="truncate text-sm font-medium text-fg">{row.product_name}</p>
+                      <p className="text-caption">{row.product_sku}</p>
+                    </ListRow>
+                  ))
+                )}
+              </div>
 
-            <Panel>
-              <PanelSection padding="md">
-                <p className="text-section mb-3 flex items-center gap-1.5"><ShieldCheck size={14} className="text-emerald-500" /> SKUs Mais Confiáveis</p>
-                <div className="space-y-1.5">
-                  {reliable.length === 0 && <p className="text-xs text-fg-subtle">Ainda sem SKUs de alta confiança.</p>}
-                  {reliable.map(row => (
-                    <div key={row.id} className="flex items-center justify-between gap-2 py-1.5 border-b border-edge last:border-0">
-                      <div className="min-w-0">
-                        <p className="text-sm font-medium text-fg truncate">{row.product_name}</p>
-                        <p className="text-xs text-fg-subtle">{row.product_sku}</p>
-                      </div>
-                      <ConfidenceBadge riskLevel={row.risk_level} score={row.confidence_score} />
-                    </div>
-                  ))}
-                </div>
-              </PanelSection>
-            </Panel>
-          </div>
+              <div className="lg:pl-6">
+                <p className="text-section mb-2 flex items-center gap-1.5">
+                  <ShieldCheck size={13} className="text-emerald-500" /> SKUs Mais Confiáveis
+                </p>
+                {reliable.length === 0 ? (
+                  <p className="text-xs text-fg-subtle">Ainda sem SKUs de alta confiança.</p>
+                ) : (
+                  reliable.map(row => (
+                    <ListRow
+                      key={row.id}
+                      value={<ConfidenceBadge riskLevel={row.risk_level} score={row.confidence_score} />}
+                    >
+                      <p className="truncate text-sm font-medium text-fg">{row.product_name}</p>
+                      <p className="text-caption">{row.product_sku}</p>
+                    </ListRow>
+                  ))
+                )}
+              </div>
+            </PanelSection>
+          </Panel>
 
           <Panel>
             <PanelSection padding="md">
-              <div className="flex flex-wrap gap-2 mb-4">
-                {FILTERS.map(f => (
-                  <button
-                    key={f.id}
-                    onClick={() => setFilter(f.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      filter === f.id ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'
-                    }`}
+              <div className="mb-4">
+                <SegmentedControl label="Filtro de SKUs" options={FILTERS} value={filter} onChange={setFilter} />
+              </div>
+              {filteredRows.length === 0 ? (
+                <p className="text-xs text-fg-subtle">Nenhum SKU nesse filtro.</p>
+              ) : (
+                filteredRows.map(row => (
+                  <ListRow
+                    key={row.id}
+                    value={<ConfidenceBadge riskLevel={row.risk_level} score={row.confidence_score} />}
                   >
-                    {f.label}
-                  </button>
-                ))}
-              </div>
-              <div className="space-y-1">
-                {filteredRows.length === 0 && <p className="text-xs text-fg-subtle">Nenhum SKU nesse filtro.</p>}
-                {filteredRows.map(row => (
-                  <div key={row.id} className="flex items-center justify-between gap-3 py-2 border-b border-edge last:border-0">
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium text-fg truncate">{row.product_name}</p>
-                      <p className="text-xs text-fg-subtle">
-                        {row.product_sku} · próxima contagem {new Date(row.next_count_date).toLocaleDateString('pt-BR')}
-                      </p>
-                    </div>
-                    <ConfidenceBadge riskLevel={row.risk_level} score={row.confidence_score} />
-                  </div>
-                ))}
-              </div>
+                    <p className="truncate text-sm font-medium text-fg">{row.product_name}</p>
+                    <p className="text-caption">
+                      {row.product_sku} · próxima contagem {new Date(row.next_count_date).toLocaleDateString('pt-BR')}
+                    </p>
+                  </ListRow>
+                ))
+              )}
             </PanelSection>
           </Panel>
         </>
       )}
-    </div>
+    </Page>
   );
 }

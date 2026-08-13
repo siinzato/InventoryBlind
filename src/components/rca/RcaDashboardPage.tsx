@@ -1,6 +1,9 @@
 import { useEffect, useState, useCallback } from 'react';
 import { GitBranch, ListOrdered, AlertOctagon } from 'lucide-react';
-import { PageHeader, Panel, PanelSection, Table, Thead, Tr, Th, Td } from '../ui';
+import { Page,
+  PageHeader, Panel, PanelSection, Table, Thead, Tr, Th, Td, Stat, StatRow, StatCell,
+  ListRow, SegmentedControl, type StatProps, type SegmentedOption,
+} from '../ui';
 import {
   listRecords, getParetoSummary, getCauseBreakdown, getTrend, RcaFilters,
 } from '../../lib/rcaService';
@@ -18,12 +21,12 @@ interface RcaDashboardPageProps {
   role: string;
 }
 
-const DIMENSIONS: { id: RcaDimension; label: string }[] = [
-  { id: 'operator', label: 'Operador' },
-  { id: 'location', label: 'Endereço' },
-  { id: 'sku', label: 'SKU' },
-  { id: 'supplier', label: 'Fornecedor' },
-  { id: 'period', label: 'Período' },
+const DIMENSIONS: SegmentedOption<RcaDimension>[] = [
+  { value: 'operator', label: 'Operador' },
+  { value: 'location', label: 'Endereço' },
+  { value: 'sku', label: 'SKU' },
+  { value: 'supplier', label: 'Fornecedor' },
+  { value: 'period', label: 'Período' },
 ];
 
 function TrendSparkline({ points }: { points: { period: string; count: number }[] }) {
@@ -79,14 +82,19 @@ export function RcaDashboardPage({ companyId, userId, userEmail, role }: RcaDash
   const distinctSkus = new Set(records.map(r => r.sku).filter(Boolean)).size;
   const topCause = pareto[0] ? CAUSE_LABEL[pareto[0].category] : '—';
 
-  const cards = [
-    { label: 'Divergências Classificadas', value: records.length, icon: ListOrdered },
-    { label: 'SKUs Afetados', value: distinctSkus, icon: AlertOctagon },
-    { label: 'Causa Mais Frequente', value: topCause, icon: GitBranch },
+  const cards: StatProps[] = [
+    { label: 'Divergências Classificadas', value: records.length, icon: <ListOrdered /> },
+    {
+      label: 'SKUs Afetados',
+      value: distinctSkus,
+      icon: <AlertOctagon />,
+      context: records.length ? `em ${records.length} divergências` : undefined,
+    },
+    { label: 'Causa Mais Frequente', value: topCause, icon: <GitBranch /> },
   ];
 
   return (
-    <div className="max-w-6xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
+    <Page>
       <PageHeader
         title="Root Cause Analysis"
         description="Toda divergência fechada vira causa classificada — Pareto de causas, recorrência e 5 Porquês para prevenir, não só registrar."
@@ -103,16 +111,14 @@ export function RcaDashboardPage({ companyId, userId, userEmail, role }: RcaDash
       ) : (
         <>
           <Panel>
-            <PanelSection padding="md" className="grid grid-cols-1 md:grid-cols-3 gap-4">
-              {cards.map(card => (
-                <div key={card.label} className="flex items-start gap-2.5">
-                  <card.icon size={16} className="text-fg-subtle mt-0.5 flex-shrink-0" />
-                  <div className="min-w-0">
-                    <p className="text-xs text-fg-subtle truncate">{card.label}</p>
-                    <p className="text-sm font-semibold text-fg truncate">{card.value}</p>
-                  </div>
-                </div>
-              ))}
+            <PanelSection padding="md">
+              <StatRow>
+                {cards.map(card => (
+                  <StatCell key={card.label}>
+                    <Stat {...card} />
+                  </StatCell>
+                ))}
+              </StatRow>
             </PanelSection>
           </Panel>
 
@@ -132,27 +138,25 @@ export function RcaDashboardPage({ companyId, userId, userEmail, role }: RcaDash
 
           <Panel>
             <PanelSection padding="md" className="space-y-3">
-              <div className="flex flex-wrap gap-2">
-                {DIMENSIONS.map(d => (
-                  <button
-                    key={d.id}
-                    onClick={() => setDimension(d.id)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors ${
-                      dimension === d.id ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'
-                    }`}
-                  >
-                    Causas por {d.label}
-                  </button>
-                ))}
+              <div>
+                <p className="text-section mb-2">Causas por</p>
+                <SegmentedControl
+                  label="Dimensão da quebra de causas"
+                  options={DIMENSIONS}
+                  value={dimension}
+                  onChange={setDimension}
+                />
               </div>
-              <div className="space-y-1">
-                {breakdown.length === 0 && <p className="text-xs text-fg-subtle">Sem dados para essa quebra ainda.</p>}
-                {breakdown.slice(0, 15).map(b => (
-                  <div key={b.key} className="flex items-center justify-between gap-3 py-1.5 border-b border-edge last:border-0">
-                    <p className="text-sm text-fg truncate">{b.label}</p>
-                    <span className="text-sm font-semibold text-fg-muted flex-shrink-0">{b.count}</span>
-                  </div>
-                ))}
+              <div>
+                {breakdown.length === 0 ? (
+                  <p className="text-xs text-fg-subtle">Sem dados para essa quebra ainda.</p>
+                ) : (
+                  breakdown.slice(0, 15).map(b => (
+                    <ListRow key={b.key} value={b.count}>
+                      <p className="truncate text-sm text-fg">{b.label}</p>
+                    </ListRow>
+                  ))
+                )}
               </div>
             </PanelSection>
           </Panel>
@@ -192,6 +196,6 @@ export function RcaDashboardPage({ companyId, userId, userEmail, role }: RcaDash
           </Panel>
         </>
       )}
-    </div>
+    </Page>
   );
 }

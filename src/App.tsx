@@ -77,6 +77,7 @@ import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
 import { hasPermission, getRoleLabel, canSyncIntegrations } from './lib/permissionService';
+import type { DrillTarget } from './lib/intelligence/contracts';
 import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
 import { LogoMark } from './components/landing/landingUi';
@@ -101,6 +102,8 @@ const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
 // the whole integration service and is opened by a minority of sessions.
 const IntegrationsPage = React.lazy(() => import('./components/integrations/IntegrationsPage').then(m => ({ default: m.IntegrationsPage })));
 const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'));
+// Lazy: pulls the intelligence engines and only renders on the dashboard tab.
+const ErpIntelligenceSection = React.lazy(() => import('./components/intelligence/ErpIntelligenceSection').then(m => ({ default: m.ErpIntelligenceSection })));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
 const ProductivityTab = React.lazy(() => import('./components/productivity/ProductivityTab').then(m => ({ default: m.ProductivityTab })));
 const AcademyRouter = React.lazy(() => import('./components/academy/AcademyRouter').then(m => ({ default: m.AcademyRouter })));
@@ -364,6 +367,30 @@ function AppContent() {
   };
 
   const globais = useMemo(() => computeGlobalStats(brandsData), [brandsData]);
+
+  /** Where an ERP-intelligence drill-down lands.
+   *
+   *  The section emits a typed target and knows nothing about tabs; this maps each
+   *  one to a destination. Targets without a dedicated screen yet go to the
+   *  integrations page, which is where the underlying data and its configuration
+   *  live — better than a dead click, and honest about where the work happens. */
+  const handleIntelligenceDrill = useCallback((target: DrillTarget) => {
+    switch (target) {
+      case 'missing_ean':
+      case 'missing_warehouse':
+        // The imported-products screen is where a catalogue gap gets fixed.
+        setActiveTab('products');
+        break;
+      case 'negative_stock':
+      case 'discrepancies':
+      case 'sync_log':
+      case 'adjustment_queue':
+      case 'integration_settings':
+      case 'minimum_stock_settings':
+        setActiveTab('integracoes');
+        break;
+    }
+  }, []);
 
   const healthStatus = useMemo(() => {
     const acc = globais.acuracidade;
@@ -967,7 +994,17 @@ function AppContent() {
                       valueTone:
                         globais.acuracidade >= 80 ? 'positive' : globais.acuracidade >= 50 ? 'warning' : 'critical',
                     },
-                    { label: 'Tempo de Inventário', value: '44 dias', context: 'Projeção: 27 dias' },
+                    {
+                      // Was 'Tempo de Inventário: 44 dias / Projeção: 27 dias',
+                      // both hardcoded. Nothing in the data model records a start
+                      // date or elapsed time, so neither figure could be derived
+                      // from anything — they were the same two numbers for every
+                      // company on every day. Replaced by a count that does come
+                      // from the loaded brands.
+                      label: 'Marcas concluídas',
+                      value: `${globais.tabela.filter(b => b.status === 'CONCLUÍDO').length} de ${globais.tabela.length}`,
+                      context: 'Contagem 100% finalizada',
+                    },
                     { label: 'Divergências', value: globais.totalDiv, context: 'Unidades p/ recontagem' },
                   ] satisfies StatProps[]).map(kpi => (
                     <StatCell key={kpi.label}>
@@ -1118,6 +1155,20 @@ function AppContent() {
                 )}
               </PanelSection>
             </Panel>
+
+            {/* ESTOQUE NO ERP — camada de inteligência sobre os dados sincronizados.
+                Added as a section of the existing Dashboard rather than replacing it:
+                the panels above describe the physical count operation, this one
+                describes what the ERP holds. Two different questions.
+
+                Every figure inside carries its own availability state, so with no
+                integration connected this renders the onboarding panel instead of a
+                wall of zeros. */}
+            {canSyncIntegrations(profile?.role) && (
+              <React.Suspense fallback={null}>
+                <ErpIntelligenceSection onDrill={handleIntelligenceDrill} />
+              </React.Suspense>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
 

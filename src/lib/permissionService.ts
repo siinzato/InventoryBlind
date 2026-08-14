@@ -132,6 +132,20 @@ export function canManageUsers(role: Role | string | undefined): boolean {
   return hasPermission(role, 'users.manage');
 }
 
+/** Who may operate an integration — configure a connection, paste a credential,
+ *  trigger a sync, send approved adjustments to the ERP.
+ *
+ *  The list is duplicated in SYNC_ROLES (src/lib/integrations/authorization.ts),
+ *  which is what the Edge Functions actually enforce. This copy exists only so the
+ *  UI does not offer buttons that would come back 403 — it is not the barrier, and
+ *  removing it would change nothing about who can actually write to an ERP. Kept as
+ *  an explicit list rather than routed through hasPermission because there is no
+ *  'integrations.*' permission in the map, and inventing one here would imply a
+ *  server-side check that does not read it. */
+export function canSyncIntegrations(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
 export function canWrite(role: Role | string | undefined): boolean {
   return hasPermission(role, 'inventory.write');
 }

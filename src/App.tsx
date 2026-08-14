@@ -16,8 +16,6 @@ import {
   Zap,
   Users,
   Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
   BarChart2,
   Plus,
   Trash2,
@@ -67,7 +65,8 @@ import {
   BookOpen,
   ArrowRight
 } from 'lucide-react';
-import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation } from './lib/supabase';
+import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
+import { getTeamProductivity } from './lib/productivityService';
 import { getBlindAISituations } from './lib/blindAIInsightsEngine';
 import { tryFastPath, askBlindAIAgent, getContextualSuggestions, type ChatMessage } from './lib/blindAIAgent';
 import { computeGlobalStats } from './lib/blindAIAgentAlgorithm';
@@ -77,7 +76,7 @@ import { CountManagementCenter } from './components/counting/CountManagementCent
 import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
-import { hasPermission, getRoleLabel } from './lib/permissionService';
+import { hasPermission, getRoleLabel, canSyncIntegrations } from './lib/permissionService';
 import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
 import { LogoMark } from './components/landing/landingUi';
@@ -98,6 +97,10 @@ const LabelGeneratorPage = React.lazy(() => import('./components/LabelGeneratorP
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
 const UserManagementPage = React.lazy(() => import('./components/UserManagementPage'));
 const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
+// Integrations is lazy for the same reason every other module screen is: it pulls
+// the whole integration service and is opened by a minority of sessions.
+const IntegrationsPage = React.lazy(() => import('./components/integrations/IntegrationsPage').then(m => ({ default: m.IntegrationsPage })));
+const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
 const ProductivityTab = React.lazy(() => import('./components/productivity/ProductivityTab').then(m => ({ default: m.ProductivityTab })));
 const AcademyRouter = React.lazy(() => import('./components/academy/AcademyRouter').then(m => ({ default: m.AcademyRouter })));
@@ -129,23 +132,6 @@ const SITUATION_SEVERITY_BADGE: Record<BlindAISituation['severity'], 'neutral' |
   critical: 'danger',
 };
 
-interface OpCapa {
-  nome: string;
-  valor: string;
-  resp: string;
-}
-
-const initialOpCapas: OpCapa[] = [
-  { nome: 'ESR', valor: '94,1%', resp: 'Davi' },
-  { nome: 'Dexnor', valor: '79,2%', resp: 'Jackson' },
-  { nome: 'X-Level', valor: '66,6%', resp: 'Jackson' },
-  { nome: 'Nillkin', valor: '64,1%', resp: 'Willian' },
-  { nome: 'GoCase Capas', valor: '51,8%', resp: 'Geovanna' },
-  { nome: 'Ringke', valor: '29,2%', resp: 'Leo' },
-  { nome: 'AZ Capas', valor: 'Andamento', resp: 'Giovani' },
-  { nome: 'DUX', valor: 'Andamento', resp: 'Davi' },
-];
-
 function AppContent() {
   const { profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
@@ -154,7 +140,7 @@ function AppContent() {
   const [brandsData, setBrandsData] = useState<BrandData[]>([]);
   const [topVendas, setTopVendas] = useState<TopVenda[]>([]);
   const [customKPIs, setCustomKPIs] = useState<CustomKPI[]>([]);
-  const [opCapas] = useState<OpCapa[]>(initialOpCapas);
+  const [operatorStats, setOperatorStats] = useState<UserProductivityStats[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -198,10 +184,11 @@ function AppContent() {
       try {
         setLoading(true);
 
-        const [brandsRes, vendasRes, kpisRes] = await Promise.all([
+        const [brandsRes, vendasRes, kpisRes, operatorStatsRes] = await Promise.all([
           supabase.from('inventory_brands').select('id, brand, total_sku, done_sku, divergences, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
           supabase.from('top_vendas').select('id, produto, sku, vendas, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
-          supabase.from('custom_kpis').select('id, titulo, valor, unidade, variacao, tipo_variacao, cor_icone, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index')
+          supabase.from('custom_kpis').select('id, titulo, valor, unidade, variacao, tipo_variacao, cor_icone, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
+          getTeamProductivity(companyId)
         ]);
 
         if (brandsRes.error) throw brandsRes.error;
@@ -211,6 +198,7 @@ function AppContent() {
         setBrandsData(brandsRes.data || []);
         setTopVendas(vendasRes.data || []);
         setCustomKPIs(kpisRes.data || []);
+        setOperatorStats(operatorStatsRes);
 
         // Set inventory start date from oldest brand creation
         if (brandsRes.data && brandsRes.data.length > 0) {
@@ -645,6 +633,20 @@ function AppContent() {
       ],
     },
     {
+      // Moved above the "Em breve" divider now that Tiny ERP is live. The group is
+      // no longer locked at group level — a locked group makes every item inside it
+      // non-interactive, including the one that works — so the remaining providers
+      // carry their own locks instead.
+      id: 'integracoes-group',
+      label: 'Integrações',
+      items: [
+        { id: 'integracoes', label: 'Tiny ERP', icon: <Boxes />, onClick: () => { setActiveTab('integracoes'); setMobileOpen(false); }, active: activeTab === 'integracoes' },
+        { id: 'integracoes-bling', label: 'Bling',     icon: <Plug />,    onClick: () => {}, active: false, locked: true },
+        { id: 'integracoes-sap',   label: 'SAP',       icon: <Server />,  onClick: () => {}, active: false, locked: true },
+        { id: 'integracoes-totvs', label: 'TOTVS',     icon: <Database />, onClick: () => {}, active: false, locked: true },
+      ],
+    },
+    {
       id: 'financeiro-group',
       label: 'Financeiro',
       sectionLabel: 'Em breve',
@@ -664,17 +666,6 @@ function AppContent() {
         { id: 'analytics-health',     label: 'Inventory Health Score',  icon: <Activity />,    onClick: () => {}, active: false, locked: true },
         { id: 'analytics-ia',         label: 'IA Insights',              icon: <BarChart3 />,    onClick: () => {}, active: false, locked: true },
         { id: 'analytics-audit',      label: 'Auditorias',               icon: <ShieldAlert />, onClick: () => {}, active: false, locked: true },
-      ],
-    },
-    {
-      id: 'integracoes-group',
-      label: 'Integrações',
-      locked: true,
-      items: [
-        { id: 'integracoes-tiny',  label: 'Tiny ERP', icon: <Boxes />,    onClick: () => {}, active: false, locked: true },
-        { id: 'integracoes-bling', label: 'Bling',     icon: <Plug />,    onClick: () => {}, active: false, locked: true },
-        { id: 'integracoes-sap',   label: 'SAP',       icon: <Server />,  onClick: () => {}, active: false, locked: true },
-        { id: 'integracoes-totvs', label: 'TOTVS',     icon: <Database />, onClick: () => {}, active: false, locked: true },
       ],
     },
     {
@@ -843,7 +834,7 @@ function AppContent() {
       )}
 
       {/* ── CONTENT COLUMN ────────────────────────────────────────────────── */}
-      <div className="flex-1 min-w-0 flex flex-col">
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <AppHeader
           onOpenMobileNav={() => setMobileOpen(true)}
           right={
@@ -855,7 +846,7 @@ function AppContent() {
         />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 overflow-y-auto overflow-x-hidden">
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none]">
 
         {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' && activeTab !== 'users' && (
           <>
@@ -1468,37 +1459,34 @@ function AppContent() {
                     <thead>
                       <tr className="border-b border-edge">
                         <th className="p-3 text-left font-medium text-fg-subtle text-xs uppercase tracking-wide">Operador</th>
-                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">SKUs Dia</th>
+                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">SKUs Contados</th>
                         <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">Acuracidade</th>
-                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">Tendência</th>
+                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">Divergências</th>
                       </tr>
                     </thead>
                     <tbody>
-                      {[
-                        { nome: 'Davi', skus: 65, acuracidade: 94.1, tendencia: 'up' },
-                        { nome: 'Jackson', skus: 52, acuracidade: 79.2, tendencia: 'up' },
-                        { nome: 'Willian', skus: 48, acuracidade: 64.1, tendencia: 'down' },
-                        { nome: 'Geovanna', skus: 45, acuracidade: 51.8, tendencia: 'up' },
-                        { nome: 'Leo', skus: 42, acuracidade: 29.2, tendencia: 'down' },
-                        { nome: 'Giovani', skus: 38, acuracidade: null, tendencia: 'up' },
-                      ].map((op, idx) => (
-                        <tr key={idx} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
-                          <td className="p-3 font-medium text-fg">{op.nome}</td>
-                          <td className="p-3 text-center font-semibold text-fg">{op.skus}</td>
-                          <td className="p-3 text-center">
-                            <span className={`font-semibold ${op.acuracidade !== null ? (op.acuracidade >= 80 ? 'text-emerald-600 dark:text-emerald-400' : op.acuracidade >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') : 'text-fg-subtle'}`}>
-                              {op.acuracidade !== null ? `${op.acuracidade.toFixed(1)}%` : 'Em andamento'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            {op.tendencia === 'up' ? (
-                              <ArrowUpRight size={16} className="mx-auto text-emerald-600 dark:text-emerald-400" />
-                            ) : (
-                              <ArrowDownRight size={16} className="mx-auto text-red-600 dark:text-red-400" />
-                            )}
-                          </td>
+                      {operatorStats.length === 0 ? (
+                        <tr>
+                          <td colSpan={4} className="p-6 text-center text-fg-subtle text-sm">Nenhuma contagem registrada ainda.</td>
                         </tr>
-                      ))}
+                      ) : (
+                        [...operatorStats]
+                          .filter(op => op.contagens > 0)
+                          .sort((a, b) => (b.acuracidade_media ?? 0) - (a.acuracidade_media ?? 0))
+                          .slice(0, 6)
+                          .map((op) => (
+                            <tr key={op.user_id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                              <td className="p-3 font-medium text-fg">{op.name || '—'}</td>
+                              <td className="p-3 text-center font-semibold text-fg">{op.skus_contados}</td>
+                              <td className="p-3 text-center">
+                                <span className={`font-semibold ${op.acuracidade_media !== null ? (op.acuracidade_media >= 80 ? 'text-emerald-600 dark:text-emerald-400' : op.acuracidade_media >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') : 'text-fg-subtle'}`}>
+                                  {op.acuracidade_media !== null ? `${op.acuracidade_media.toFixed(1)}%` : '—'}
+                                </span>
+                              </td>
+                              <td className="p-3 text-center text-fg-muted">{op.divergencias_reais}</td>
+                            </tr>
+                          ))
+                      )}
                     </tbody>
                   </table>
                 </div>
@@ -1710,13 +1698,13 @@ function AppContent() {
 
       {/* ABA RANKINGS COMPLETOS - rendered as full page, outside overflow container */}
       {activeTab === 'rankings' && (
-        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <RankingsPage
             onBack={() => setActiveTab('dashboard')}
             brandsData={globais.tabela}
             topVendas={topVendas}
-            opCapas={opCapas}
+            operatorStats={operatorStats}
             melhores={globais.melhores}
             piores={globais.piores}
             inProgress={globais.tabela.filter(b => b.status === 'ANDAMENTO')}
@@ -1727,7 +1715,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: GERADOR DE ETIQUETAS */}
       {activeTab === 'label-generator' && (
-        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <LabelGeneratorPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1736,7 +1724,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: FULL MANAGER */}
       {activeTab === 'full-manager' && (
-        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <FullManagerPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1745,7 +1733,7 @@ function AppContent() {
 
       {/* CONFERÊNCIA CEGA POR NF-E */}
       {activeTab === 'nfe-conference' && (
-        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <NFeConferencePage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1754,16 +1742,32 @@ function AppContent() {
 
       {/* GERENCIAMENTO DE USUÁRIOS */}
       {activeTab === 'users' && (
-        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <UserManagementPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         </div>
       )}
 
+      {/* INTEGRAÇÕES — ERP e marketplaces.
+          Gated on the same roles the sync Edge Function accepts (owner/admin/
+          manager). The function refuses anyone else regardless, so this only keeps
+          the screen from offering buttons that would come back 403. */}
+      {activeTab === 'integracoes' && (
+        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+          <React.Suspense fallback={<PageLoader />}>
+          {canSyncIntegrations(profile?.role) ? (
+            <IntegrationsPage onBack={() => setActiveTab('dashboard')} />
+          ) : (
+            <AccessDeniedPage onBack={() => setActiveTab('dashboard')} />
+          )}
+          </React.Suspense>
+        </div>
+      )}
+
       {/* CENTRAL DE SEGURANÇA */}
       {activeTab === 'security' && (
-        <div className="fixed inset-0 md:left-56 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
           <React.Suspense fallback={<PageLoader />}>
           <SecurityPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>

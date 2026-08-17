@@ -176,20 +176,11 @@ export function AutoRecountSettingsTab({ canManage, canAcknowledge }: Props) {
                 {THRESHOLD_HELP[settings.thresholdType]}
               </p>
 
-              {/* Limitação conhecida deste modo, encontrada em dado real. Avisada
-                  aqui porque quem escolhe o modo é quem precisa saber — e porque a
-                  avaliação no servidor tem o mesmo ponto cego. */}
-              {settings.thresholdType === 'unit_deviation_percent' && (
-                <p className="mt-2 flex items-start gap-1.5 rounded border border-amber-500/30 bg-amber-500/10 px-2.5 py-2 text-xs leading-relaxed text-amber-700 dark:text-amber-400">
-                  <AlertTriangle size={12} className="mt-0.5 flex-shrink-0" />
-                  <span>
-                    Numa faixa cujo saldo total no ERP é zero, este modo mede 0% mesmo com desvio
-                    grande, porque o percentual fica indefinido. Se você conta faixas com saldo
-                    zerado no ERP, prefira “{THRESHOLD_LABEL.divergent_item_percent}” ou “
-                    {THRESHOLD_LABEL.absolute_unit_deviation}”.
-                  </span>
-                </p>
-              )}
+              {/* O aviso amarelo que existia aqui descrevia um ponto cego deste modo
+                  (saldo zero no ERP media 0% e nunca disparava). A migration 050
+                  corrigiu o cálculo, então o aviso saiu — deixá-lo seria alertar
+                  sobre um defeito que não existe mais. O comportamento novo está
+                  descrito no texto de ajuda acima. */}
             </label>
 
             <label className="block">

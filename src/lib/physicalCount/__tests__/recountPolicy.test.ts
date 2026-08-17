@@ -5,10 +5,10 @@ import {
   decideRecount,
   describeDecision,
   formatMeasured,
-  hasUnitPercentBlindSpot,
   isPercentThreshold,
   measureDivergence,
   measuredValueFor,
+  usedPhysicalBase,
   type MeasurableItem,
   type RecountSettings,
   type RecountThresholdType,
@@ -70,6 +70,7 @@ describe('measureDivergence', () => {
       divergentItems: 0,
       absoluteUnitDeviation: 0,
       erpTotal: 0,
+      physicalTotal: 0,
     });
   });
 
@@ -120,11 +121,12 @@ describe('measuredValueFor', () => {
     }
   });
 
-  it('protege a divisão com ERP total zero', () => {
-    // Faixa inteira zerada no ERP e algo encontrado fisicamente: divisão por zero.
+  it('mede contra o total físico quando o ERP total é zero', () => {
+    // Faixa zerada no ERP e algo encontrado. Antes da migration 050 o percentual
+    // por unidade caía para 0 aqui; agora usa o total físico como base e mede 100%.
+    // Cenário detalhado no bloco 'saldo zero no ERP' mais abaixo.
     const measure = measureDivergence([item(0, 5)]);
-    expect(Number.isFinite(measuredValueFor('unit_deviation_percent', measure))).toBe(true);
-    // O modo por item ainda enxerga o problema, e o absoluto também.
+    expect(measuredValueFor('unit_deviation_percent', measure)).toBe(100);
     expect(measuredValueFor('divergent_item_percent', measure)).toBe(100);
     expect(measuredValueFor('absolute_unit_deviation', measure)).toBe(5);
   });
@@ -258,6 +260,7 @@ describe('decideRecount', () => {
       divergentItems: 1,
       absoluteUnitDeviation: 10,
       erpTotal: 100,
+      physicalTotal: 90,
     });
     expect(measuredValueFor('divergent_item_percent', measure)).toBe((1 / 2) * 100);
     expect(measuredValueFor('unit_deviation_percent', measure)).toBe((10 / 100) * 100);
@@ -317,58 +320,97 @@ describe('formatação e texto', () => {
   });
 });
 
-describe('ponto cego do modo percentual por unidade', () => {
-  // Encontrado em dado de produção: uma sessão com um item contado em 8.790
-  // unidades contra saldo zero no ERP.
-  const realCase = measureDivergence([item(0, 8790)]);
+describe('saldo zero no ERP — a correção da migration 050', () => {
+  // Dois casos reais deste banco: 7 itens somando 800 unidades contra saldo zero, e
+  // 1 item com 8.790 contra saldo zero. Antes da 050 os dois mediam 0% no modo por
+  // unidade e a automação os ignorava por completo.
+  const realCase8790 = measureDivergence([item(0, 8790)]);
+  const realCase800 = measureDivergence(Array.from({ length: 7 }, () => item(0, 800 / 7)));
 
   it('reproduz o caso real', () => {
-    expect(realCase).toMatchObject({
+    expect(realCase8790).toEqual({
       countedItems: 1,
       divergentItems: 1,
       absoluteUnitDeviation: 8790,
       erpTotal: 0,
+      physicalTotal: 8790,
     });
   });
 
-  it('o modo por unidade mede 0% e nunca dispararia', () => {
-    // Não é um bug de arredondamento: é o percentual ficando indefinido, e a
-    // divisão protegida devolvendo 0 para não gerar NaN. Seguro contra crash,
-    // errado em substância — a automação ignoraria 8.790 unidades de desvio.
-    expect(measuredValueFor('unit_deviation_percent', realCase)).toBe(0);
-    const decision = decide([item(0, 8790)], {
-      thresholdType: 'unit_deviation_percent',
-      thresholdValue: 0.1,
-    });
-    expect(decision).toMatchObject({ action: 'skip', reason: 'below_threshold' });
+  it('mede 100% em vez de 0%', () => {
+    // Com saldo esperado zero, todo o encontrado era inesperado. É a mesma medida
+    // contra a única base que existe, não uma regra especial — e continua sendo um
+    // percentual comparável ao limite.
+    expect(measuredValueFor('unit_deviation_percent', realCase8790)).toBe(100);
+    expect(measuredValueFor('unit_deviation_percent', realCase800)).toBe(100);
   });
 
-  it('os outros dois modos pegam o caso corretamente', () => {
-    expect(measuredValueFor('divergent_item_percent', realCase)).toBe(100);
-    expect(measuredValueFor('absolute_unit_deviation', realCase)).toBe(8790);
+  it('agora dispara, com qualquer limite razoável', () => {
+    for (const thresholdValue of [0.1, 5, 50, 100]) {
+      expect(
+        decide([item(0, 8790)], { thresholdType: 'unit_deviation_percent', thresholdValue }).action
+      ).toBe('create');
+    }
+  });
 
-    for (const thresholdType of ['divergent_item_percent', 'absolute_unit_deviation'] as const) {
+  it('os três modos concordam neste caso', () => {
+    // Antes da 050 o modo por unidade discordava dos outros dois — 0% contra 100% e
+    // 8.790. Concordar aqui é o sinal de que a correção alinhou as três leituras.
+    expect(measuredValueFor('divergent_item_percent', realCase8790)).toBe(100);
+    expect(measuredValueFor('unit_deviation_percent', realCase8790)).toBe(100);
+    expect(measuredValueFor('absolute_unit_deviation', realCase8790)).toBe(8790);
+
+    for (const thresholdType of [
+      'divergent_item_percent',
+      'unit_deviation_percent',
+      'absolute_unit_deviation',
+    ] as const) {
       expect(decide([item(0, 8790)], { thresholdType, thresholdValue: 5 }).action).toBe('create');
     }
   });
 
-  it('o padrão da empresa é um dos modos que pegam', () => {
-    // Importa porque quem não escolher nada fica coberto.
-    expect(DEFAULT_RECOUNT_SETTINGS.thresholdType).toBe('divergent_item_percent');
+  it('não muda nada quando o ERP tem saldo', () => {
+    // O escopo da correção: só alcança o caso em que a definição anterior era
+    // indefinida. 10 de 400 unidades continua sendo 2,5%.
+    const normal = measureDivergence([item(100, 90), item(100, 100), item(100, 100), item(100, 100)]);
+    expect(measuredValueFor('unit_deviation_percent', normal)).toBe(2.5);
+    expect(usedPhysicalBase('unit_deviation_percent', normal)).toBe(false);
   });
 
-  it('hasUnitPercentBlindSpot detecta exatamente esse caso', () => {
-    expect(hasUnitPercentBlindSpot('unit_deviation_percent', realCase)).toBe(true);
-    // Outros modos nunca são cegos.
-    expect(hasUnitPercentBlindSpot('divergent_item_percent', realCase)).toBe(false);
-    expect(hasUnitPercentBlindSpot('absolute_unit_deviation', realCase)).toBe(false);
-    // Com saldo no ERP, o modo funciona e não há alerta.
-    expect(
-      hasUnitPercentBlindSpot('unit_deviation_percent', measureDivergence([item(100, 90)]))
-    ).toBe(false);
-    // Sem desvio nenhum não há nada para ser cego a respeito.
-    expect(
-      hasUnitPercentBlindSpot('unit_deviation_percent', measureDivergence([item(0, 0)]))
-    ).toBe(false);
+  it('as duas bases em zero medem zero, sem NaN', () => {
+    // Faixa contada e nada encontrado, ERP também zero: não há divergência, e a
+    // ausência de denominador não pode virar NaN nem disparar.
+    const bothZero = measureDivergence([item(0, 0)]);
+    const value = measuredValueFor('unit_deviation_percent', bothZero);
+    expect(Number.isFinite(value)).toBe(true);
+    expect(value).toBe(0);
+    expect(decide([item(0, 0)], { thresholdType: 'unit_deviation_percent' })).toMatchObject({
+      action: 'skip',
+      reason: 'below_threshold',
+    });
+  });
+
+  it('funciona também quando falta estoque contra ERP zero', () => {
+    // Caso inverso e mais raro: ERP zero, físico zero num item e sobra em outro.
+    // A base é o total físico, então continua definido.
+    const mixed = measureDivergence([item(0, 0), item(0, 40)]);
+    expect(mixed.physicalTotal).toBe(40);
+    expect(measuredValueFor('unit_deviation_percent', mixed)).toBe(100);
+  });
+
+  it('usedPhysicalBase marca exatamente quando a base alternativa foi usada', () => {
+    // A frase muda: "100% do que foi encontrado era inesperado" não é a mesma
+    // afirmação que "100% do saldo esperado divergiu".
+    expect(usedPhysicalBase('unit_deviation_percent', realCase8790)).toBe(true);
+    // Outros modos nunca usam essa base.
+    expect(usedPhysicalBase('divergent_item_percent', realCase8790)).toBe(false);
+    expect(usedPhysicalBase('absolute_unit_deviation', realCase8790)).toBe(false);
+    // Sem desvio não há base alternativa em uso.
+    expect(usedPhysicalBase('unit_deviation_percent', measureDivergence([item(0, 0)]))).toBe(false);
+  });
+
+  it('o padrão da empresa continua sendo o modo por item', () => {
+    // Não mudou com a 050 — só deixou de ser a única opção segura.
+    expect(DEFAULT_RECOUNT_SETTINGS.thresholdType).toBe('divergent_item_percent');
   });
 });

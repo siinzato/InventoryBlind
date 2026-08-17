@@ -53,7 +53,7 @@ export const THRESHOLD_HELP: Record<RecountThresholdType, string> = {
   divergent_item_percent:
     'Proporção de itens contados que não bateram com o ERP. Um item de 1 unidade pesa igual a um de 500.',
   unit_deviation_percent:
-    'Soma das diferenças em unidades, em relação ao saldo total do ERP. Sensível ao tamanho do erro, não à quantidade de itens.',
+    'Soma das diferenças em unidades, em relação ao saldo total do ERP. Sensível ao tamanho do erro, não à quantidade de itens. Quando o ERP indica saldo zero na faixa, a comparação passa a ser contra o total encontrado.',
   absolute_unit_deviation:
     'Soma das diferenças em unidades, em número absoluto. Útil quando o que importa é o volume do desvio, independente do tamanho da faixa.',
 };
@@ -96,6 +96,9 @@ export interface DivergenceMeasure {
   /** Σ|diff|. Absoluto, NÃO líquido. */
   absoluteUnitDeviation: number;
   erpTotal: number;
+  /** Σ do total físico encontrado. Serve de denominador quando `erpTotal` é zero —
+   *  ver `measuredValueFor` e a migration 050. */
+  physicalTotal: number;
 }
 
 /** Mede a divergência de uma sessão.
@@ -116,6 +119,7 @@ export function measureDivergence(items: readonly MeasurableItem[]): DivergenceM
   let divergentItems = 0;
   let absoluteUnitDeviation = 0;
   let erpTotal = 0;
+  let physicalTotal = 0;
 
   for (const item of items) {
     // Itens não contados ficam de fora. Incluí-los trataria "não contado" como
@@ -128,13 +132,14 @@ export function measureDivergence(items: readonly MeasurableItem[]): DivergenceM
 
     countedItems += 1;
     erpTotal += erp;
+    physicalTotal += total;
     if (diff !== 0) {
       divergentItems += 1;
       absoluteUnitDeviation += Math.abs(diff);
     }
   }
 
-  return { countedItems, divergentItems, absoluteUnitDeviation, erpTotal };
+  return { countedItems, divergentItems, absoluteUnitDeviation, erpTotal, physicalTotal };
 }
 
 /** Aplica o modo de limite à medida.
@@ -146,41 +151,49 @@ export function measuredValueFor(
   type: RecountThresholdType,
   measure: DivergenceMeasure
 ): number {
-  // NOTA: `unit_deviation_percent` tem um ponto cego real, encontrado em dado de
-  // produção. Quando o saldo total do ERP na faixa é zero e existe quantidade
-  // contada, o percentual é indefinido; a divisão protegida devolve 0, então um
-  // desvio de qualquer tamanho — 8.790 unidades num caso real — mede 0% e nunca
-  // alcança limite nenhum. Ver `hasUnitPercentBlindSpot` abaixo e o relatório.
-
   switch (type) {
+    // Denominador = itens contados. Zero só quando o desvio também é zero, então
+    // não há caso indefinido a tratar.
     case 'divergent_item_percent':
       return measure.countedItems > 0 ? (measure.divergentItems / measure.countedItems) * 100 : 0;
-    case 'unit_deviation_percent':
-      return measure.erpTotal > 0 ? (measure.absoluteUnitDeviation / measure.erpTotal) * 100 : 0;
+
+    // Denominador = saldo do ERP; na falta dele, o total físico encontrado.
+    //
+    // O fallback é a correção da migration 050. Antes dela o denominador era só
+    // erpTotal, e com saldo esperado zero o percentual indefinido virava 0 pela
+    // divisão protegida — um desvio de qualquer tamanho media 0% e nunca alcançava
+    // limite nenhum. Duas sessões reais deste banco caíam nisso, com 800 e 8.790
+    // unidades de desvio.
+    //
+    // Com Σ ERP = 0 e algo encontrado, o resultado é 100%: todo o encontrado era
+    // inesperado. É a mesma medida contra a única base que existe naquele caso, não
+    // uma regra especial — e por isso continua comparável ao limite e legível no
+    // relatório. Onde Σ ERP > 0, nada muda.
+    case 'unit_deviation_percent': {
+      const base = measure.erpTotal > 0 ? measure.erpTotal : measure.physicalTotal;
+      return base > 0 ? (measure.absoluteUnitDeviation / base) * 100 : 0;
+    }
+
     case 'absolute_unit_deviation':
       return measure.absoluteUnitDeviation;
   }
 }
 
-/** O modo escolhido é cego para esta medida?
+/** A medida usou o total físico como denominador em vez do saldo do ERP?
  *
- *  Só acontece com `unit_deviation_percent`: saldo total do ERP igual a zero na
- *  faixa e desvio maior que zero. O percentual é matematicamente indefinido, a
- *  divisão protegida devolve 0, e o resultado é uma automação que ignora um desvio
- *  arbitrariamente grande.
- *
- *  Encontrado em dado real: uma sessão com um item contado em 8.790 unidades contra
- *  saldo zero no ERP mede 0% neste modo e 100% no modo por item.
- *
- *  Isto NÃO conserta o gatilho — a avaliação que vale roda no SQL e tem o mesmo
- *  ponto cego. Serve para a tela avisar em vez de a pessoa configurar um limite
- *  achando que está coberta. Os outros dois modos tratam o caso corretamente, e o
- *  padrão (`divergent_item_percent`) é um deles. */
-export function hasUnitPercentBlindSpot(
+ *  Verdadeiro só no modo por unidade quando Σ ERP é zero e existe desvio. Não é um
+ *  problema — é a correção da migration 050 em ação, e o percentual resultante é
+ *  válido. Exposto porque a frase muda: "100% do que foi encontrado era inesperado"
+ *  é uma afirmação diferente de "100% do saldo esperado divergiu", e apresentar uma
+ *  como a outra seria impreciso justamente no caso em que o cadastro do ERP está
+ *  errado. */
+export function usedPhysicalBase(
   type: RecountThresholdType,
   measure: DivergenceMeasure
 ): boolean {
-  return type === 'unit_deviation_percent' && measure.erpTotal === 0 && measure.absoluteUnitDeviation > 0;
+  return (
+    type === 'unit_deviation_percent' && measure.erpTotal === 0 && measure.absoluteUnitDeviation > 0
+  );
 }
 
 // ── Decisão (pré-visualização) ──────────────────────────────────────────────

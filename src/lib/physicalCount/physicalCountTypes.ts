@@ -104,3 +104,33 @@ export interface ErpSyncReport {
   failed: number;
   results: ErpSyncItemResult[];
 }
+
+// ── Recontagem automática por limite de divergência (migration 049) ──────────
+
+/** Uma avaliação automática registrada no fecho de uma contagem.
+ *
+ *  Guarda a regra aplicada (`thresholdType`/`thresholdValue`) congelada junto do
+ *  valor medido, então a linha se explica sozinha mesmo depois de alguém mudar a
+ *  configuração. `measuredValue` é o número que o SQL calculou — a UI mostra este,
+ *  nunca um recálculo, para não haver dois números para o mesmo fato. */
+export interface RecountEvent {
+  id: string;
+  companyId: string;
+  sourceSessionId: string;
+  /** null quando foi ignorado ou falhou. */
+  recountSessionId: string | null;
+  status: 'created' | 'skipped' | 'failed';
+  /** Código estável para skipped (below_threshold, max_rounds_reached,
+   *  no_divergent_items) ou mensagem do banco para failed. */
+  reason: string | null;
+  thresholdType: string;
+  thresholdValue: number;
+  measuredValue: number;
+  countedItems: number;
+  divergentItems: number;
+  absoluteUnitDeviation: number;
+  recipientId: string | null;
+  acknowledgedAt: string | null;
+  acknowledgedBy: string | null;
+  createdAt: string;
+}

@@ -4,6 +4,7 @@
 import { supabase } from '../supabase';
 import { listDistinctLocations, resolveProductsInLocationRange } from './locationAddressing';
 import { dequeue, enqueue, listPending, type QueuedCount } from './offlineQueue';
+import { DEFAULT_RECOUNT_SETTINGS, type RecountSettings, type RecountThresholdType } from './recountPolicy';
 import type {
   CountMode,
   CountSource,
@@ -12,6 +13,7 @@ import type {
   PhysicalCountFinalResultRow,
   PhysicalCountItem,
   PhysicalCountSession,
+  RecountEvent,
 } from './physicalCountTypes';
 
 function mapSession(row: Record<string, unknown>): PhysicalCountSession {
@@ -405,4 +407,124 @@ export async function callErpSync(sessionId: string): Promise<ErpSyncReport> {
   });
   if (error) throw error;
   return data as ErpSyncReport;
+}
+
+// ── Recontagem automática por limite de divergência (migration 049) ──────────
+//
+// A decisão em si não passa por aqui: pc_evaluate_auto_recount roda dentro de
+// pc_finalize_session, no servidor. Estas funções só leem a configuração, gravam a
+// configuração e leem o rastro — o cliente não dispara a automação nem pode
+// contorná-la.
+
+/** Configuração da empresa. Ausente = nunca configurado, e nesse caso vale o
+ *  default com `enabled: false`, mantendo o fluxo manual de hoje. */
+export async function getRecountSettings(): Promise<RecountSettings> {
+  const { data, error } = await supabase
+    .from('physical_count_recount_settings')
+    .select('enabled, threshold_type, threshold_value, notify_user_id')
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return DEFAULT_RECOUNT_SETTINGS;
+
+  return {
+    enabled: Boolean(data.enabled),
+    thresholdType: data.threshold_type as RecountThresholdType,
+    thresholdValue: Number(data.threshold_value),
+    notifyUserId: (data.notify_user_id as string | null) ?? null,
+  };
+}
+
+/** Grava a configuração.
+ *
+ *  Upsert porque a linha pode não existir: company_id tem
+ *  `DEFAULT get_my_company_id()::uuid`, então a empresa não é enviada pelo cliente
+ *  nem em insert nem em update — quem define o tenant é o banco, e a policy de
+ *  INSERT exige que o valor resultante bata com a empresa do JWT. */
+export async function saveRecountSettings(settings: RecountSettings): Promise<void> {
+  const { data: companyId, error: companyError } = await supabase.rpc('get_my_company_id');
+  if (companyError) throw companyError;
+  if (!companyId) throw new Error('Nenhuma empresa ativa na sessão.');
+
+  const { error } = await supabase.from('physical_count_recount_settings').upsert(
+    {
+      company_id: companyId as string,
+      enabled: settings.enabled,
+      threshold_type: settings.thresholdType,
+      threshold_value: settings.thresholdValue,
+      notify_user_id: settings.notifyUserId,
+    },
+    { onConflict: 'company_id' }
+  );
+
+  if (error) throw error;
+}
+
+function mapRecountEvent(row: Record<string, unknown>): RecountEvent {
+  return {
+    id: row.id as string,
+    companyId: row.company_id as string,
+    sourceSessionId: row.source_session_id as string,
+    recountSessionId: (row.recount_session_id as string | null) ?? null,
+    status: row.status as RecountEvent['status'],
+    reason: (row.reason as string | null) ?? null,
+    thresholdType: row.threshold_type as string,
+    thresholdValue: Number(row.threshold_value),
+    measuredValue: Number(row.measured_value),
+    countedItems: Number(row.counted_items ?? 0),
+    divergentItems: Number(row.divergent_items ?? 0),
+    absoluteUnitDeviation: Number(row.absolute_unit_deviation ?? 0),
+    recipientId: (row.recipient_id as string | null) ?? null,
+    acknowledgedAt: (row.acknowledged_at as string | null) ?? null,
+    acknowledgedBy: (row.acknowledged_by as string | null) ?? null,
+    createdAt: row.created_at as string,
+  };
+}
+
+const RECOUNT_EVENT_COLUMNS =
+  'id, company_id, source_session_id, recount_session_id, status, reason, threshold_type, ' +
+  'threshold_value, measured_value, counted_items, divergent_items, absolute_unit_deviation, ' +
+  'recipient_id, acknowledged_at, acknowledged_by, created_at';
+
+/** O feed de avisos: avaliações que geraram recontagem ou falharam e ninguém
+ *  reconheceu ainda.
+ *
+ *  Os `skipped` por limite não aparecem — a 049 já os grava com
+ *  `acknowledged_at` preenchido, porque "não passou do limite" é registro, não
+ *  aviso. Transformar isso em pendência daria ao gestor uma notificação para
+ *  dispensar a cada contagem correta. */
+export async function listPendingRecountEvents(): Promise<RecountEvent[]> {
+  const { data, error } = await supabase
+    .from('physical_count_recount_events')
+    .select(RECOUNT_EVENT_COLUMNS)
+    .is('acknowledged_at', null)
+    .order('created_at', { ascending: false })
+    .limit(20)
+    // A lista de colunas vem de uma constante, e o client tipado só consegue
+    // inferir a partir de literal. `.returns` recupera o tipo sem obrigar a trocar
+    // por `select('*')`.
+    .returns<Record<string, unknown>[]>();
+
+  if (error) throw error;
+  return (data ?? []).map(mapRecountEvent);
+}
+
+/** A avaliação de uma sessão específica, para o painel de resultado explicar o que
+ *  a automação fez quando aquela contagem foi fechada. */
+export async function getRecountEventForSession(sessionId: string): Promise<RecountEvent | null> {
+  const { data, error } = await supabase
+    .from('physical_count_recount_events')
+    .select(RECOUNT_EVENT_COLUMNS)
+    .eq('source_session_id', sessionId)
+    .maybeSingle<Record<string, unknown>>();
+
+  if (error) throw error;
+  return data ? mapRecountEvent(data) : null;
+}
+
+/** Dá baixa no aviso via RPC, que registra quem reconheceu. Um UPDATE direto
+ *  passaria pela policy mas não gravaria o autor. */
+export async function acknowledgeRecountEvent(eventId: string): Promise<void> {
+  const { error } = await supabase.rpc('pc_acknowledge_recount_event', { p_event_id: eventId });
+  if (error) throw error;
 }

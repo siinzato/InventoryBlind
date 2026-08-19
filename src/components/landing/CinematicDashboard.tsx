@@ -55,7 +55,7 @@ export function CinematicDashboard() {
 
       const tl = gsap.timeline({
         scrollTrigger: full
-          ? { trigger: sectionRef.current, start: 'top top', end: '+=3400', scrub: 1, pin: true, anticipatePin: 1 }
+          ? { trigger: sectionRef.current, start: 'top top', end: '+=3400', scrub: 1, pin: true, pinType: 'transform', anticipatePin: 1 }
           : { trigger: sectionRef.current, start: 'top 72%', once: true },
       });
 
@@ -63,7 +63,7 @@ export function CinematicDashboard() {
       tl.addLabel('structure', 0)
         .fromTo(
           frameRef.current,
-          { scale: 0.94, opacity: 0.3, filter: 'blur(10px)' },
+          { scale: 0.94, opacity: 0.3, filter: 'blur(10px)', willChange: 'filter, transform' },
           { scale: 1, opacity: 1, filter: 'blur(0px)', duration: d(0.1, 0.6), ease: 'power2.out' },
           'structure'
         )

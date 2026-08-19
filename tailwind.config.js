@@ -45,6 +45,10 @@ export default {
         'fg-subtle': 'rgb(var(--fg-subtle) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
         'accent-strong': 'rgb(var(--accent-strong) / <alpha-value>)',
+        rail: 'rgb(var(--rail) / <alpha-value>)',
+        'rail-active': 'rgb(var(--rail-active) / <alpha-value>)',
+        'rail-fg': 'rgb(var(--rail-fg) / <alpha-value>)',
+        'rail-fg-muted': 'rgb(var(--rail-fg-muted) / <alpha-value>)',
       },
       // NOTE: the app's body/label type lift is NOT here. Overriding `sm`/`xs`
       // globally would also resize the Landing and AuthPage, which are frozen —

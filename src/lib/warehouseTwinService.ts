@@ -29,21 +29,35 @@ export interface ProductLocationIndex {
 /** Única consulta genuinamente nova desta feature — nenhum outro módulo expõe um índice
  *  endereço→produto pronto (cada um resolve só o join que precisa para si). */
 export async function getCompanyProductLocationIndex(companyId: string): Promise<ProductLocationIndex> {
-  const { data, error } = await supabase
-    .from('products')
-    .select('id, sku, name, location, stock_quantity')
-    .eq('company_id', companyId);
-  if (error) {
-    console.error('[WarehouseTwin] Error loading product location index:', error);
-    return { byLocation: new Map(), byProductId: new Map() };
-  }
-
   const byLocation = new Map<string, CompanyProductLite>();
   const byProductId = new Map<string, CompanyProductLite>();
-  for (const row of (data ?? []) as CompanyProductLite[]) {
-    byProductId.set(row.id, row);
-    if (row.location) byLocation.set(row.location, row);
+
+  // Paginado com .range() — um único .select() sem paginação é cortado
+  // silenciosamente pelo limite padrão do PostgREST/Supabase (~1000 linhas),
+  // deixando a cauda do catálogo de fora do mapa e/em empresas com muitos SKUs.
+  const PAGE_SIZE = 1000;
+  let from = 0;
+  for (;;) {
+    const { data, error } = await supabase
+      .from('products')
+      .select('id, sku, name, location, stock_quantity')
+      .eq('company_id', companyId)
+      .order('id', { ascending: true })
+      .range(from, from + PAGE_SIZE - 1);
+    if (error) {
+      console.error('[WarehouseTwin] Error loading product location index:', error);
+      break;
+    }
+
+    const batch = (data ?? []) as CompanyProductLite[];
+    for (const row of batch) {
+      byProductId.set(row.id, row);
+      if (row.location) byLocation.set(row.location, row);
+    }
+    if (batch.length < PAGE_SIZE) break;
+    from += PAGE_SIZE;
   }
+
   return { byLocation, byProductId };
 }
 

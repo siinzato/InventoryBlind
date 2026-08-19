@@ -44,6 +44,8 @@ import {
   PieChart,
   Gauge,
   ClipboardCheck,
+  ClipboardList,
+  Monitor,
   BarChart3,
   ShieldAlert,
   Plug,
@@ -63,7 +65,8 @@ import {
   GitBranch,
   SearchCheck,
   BookOpen,
-  ArrowRight
+  ArrowRight,
+  HelpCircle
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -76,16 +79,18 @@ import { CountManagementCenter } from './components/counting/CountManagementCent
 import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
-import { hasPermission, getRoleLabel, canSyncIntegrations } from './lib/permissionService';
+import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations } from './lib/permissionService';
 import type { DrillTarget } from './lib/intelligence/contracts';
 import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
 import { LogoMark } from './components/landing/landingUi';
+import { WhatsNewButton } from './components/WhatsNewPanel';
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
 } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
+import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnosticStorage';
 
 // Code-split large page components for smaller initial bundle
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -96,12 +101,17 @@ const ImportHistoryPage = React.lazy(() => import('./components/ImportHistoryPag
 const RankingsPage = React.lazy(() => import('./components/RankingsPage').then(m => ({ default: m.RankingsPage })));
 const LabelGeneratorPage = React.lazy(() => import('./components/LabelGeneratorPage').then(m => ({ default: m.LabelGeneratorPage })));
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
+const InventoryFullPage = React.lazy(() => import('./components/InventoryFullPage').then(m => ({ default: m.InventoryFullPage })));
 const UserManagementPage = React.lazy(() => import('./components/UserManagementPage'));
 const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
 // Integrations is lazy for the same reason every other module screen is: it pulls
 // the whole integration service and is opened by a minority of sessions.
 const IntegrationsPage = React.lazy(() => import('./components/integrations/IntegrationsPage').then(m => ({ default: m.IntegrationsPage })));
 const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'));
+const AutomationsPage = React.lazy(() => import('./components/automation/AutomationsPage').then(m => ({ default: m.AutomationsPage })));
+// Diagnóstico da operação — opcional, nunca no caminho crítico da autenticação.
+const OperationDiagnostic = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.OperationDiagnostic })));
+const DiagnosticInvite = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.DiagnosticInvite })));
 // Lazy: pulls the intelligence engines and only renders on the dashboard tab.
 const ErpIntelligenceSection = React.lazy(() => import('./components/intelligence/ErpIntelligenceSection').then(m => ({ default: m.ErpIntelligenceSection })));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
@@ -114,6 +124,10 @@ const WarehouseDigitalTwinPage = React.lazy(() => import('./components/slotting/
 const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardPage').then(m => ({ default: m.RcaDashboardPage })));
 const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
 const KnowledgeCenterPage = React.lazy(() => import('./components/account/KnowledgeCenterPage').then(m => ({ default: m.KnowledgeCenterPage })));
+const BlindScorePage = React.lazy(() => import('./components/analytics/BlindScorePage').then(m => ({ default: m.BlindScorePage })));
+const InventoryHealthPage = React.lazy(() => import('./components/analytics/InventoryHealthPage').then(m => ({ default: m.InventoryHealthPage })));
+const IaInsightsPage = React.lazy(() => import('./components/analytics/IaInsightsPage').then(m => ({ default: m.IaInsightsPage })));
+const AuditsAnalyticsPage = React.lazy(() => import('./components/analytics/AuditsAnalyticsPage').then(m => ({ default: m.AuditsAnalyticsPage })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -135,10 +149,40 @@ const SITUATION_SEVERITY_BADGE: Record<BlindAISituation['severity'], 'neutral' |
   critical: 'danger',
 };
 
+function greetingPrefix(hour: number): string {
+  if (hour >= 5 && hour < 12) return 'Bom dia';
+  if (hour >= 12 && hour < 18) return 'Boa tarde';
+  return 'Boa noite';
+}
+
+/** Saudação discreta no espaço vazio do AppHeader — só na aba Dashboard (ver
+ *  `left={activeTab === 'dashboard' ? ... }` no AppHeader mais abaixo). */
+function DashboardGreeting({ name }: { name: string | null }) {
+  const firstName = name?.trim().split(/\s+/)[0] ?? null;
+  const prefix = greetingPrefix(new Date().getHours());
+  return (
+    <p className="text-sm text-fg-muted truncate">
+      {firstName ? `${prefix}, ${firstName}` : prefix}
+    </p>
+  );
+}
+
 function AppContent() {
-  const { profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
+  const { user, profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
+
+  // ── Diagnóstico da operação ───────────────────────────────────────────────
+  // Lido do metadata do próprio usuário, que o AuthProvider já carregou — nenhuma
+  // consulta extra só para decidir se o convite aparece. Quem já respondeu (ou
+  // dispensou nesta sessão) não vê o convite; ninguém é obrigado a responder.
+  const diagnosticRecord = useMemo(
+    () => readCompletedDiagnostic(user?.user_metadata as Record<string, unknown> | undefined),
+    [user?.user_metadata]
+  );
+  const [diagnosticDone, setDiagnosticDone] = useState(false);
+  const [diagnosticDismissed, setDiagnosticDismissed] = useState(false);
+  const showDiagnosticInvite = diagnosticRecord == null && !diagnosticDone && !diagnosticDismissed;
 
   const [brandsData, setBrandsData] = useState<BrandData[]>([]);
   const [topVendas, setTopVendas] = useState<TopVenda[]>([]);
@@ -153,6 +197,25 @@ function AppContent() {
 
   const isLoggedIn = canManageUsers(profile?.role);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Per-device only — same rationale as workspacePrefs.ts (remembered workspace):
+  // whether the sidebar is collapsed is a device convenience, not an account setting.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('ib-sidebar-collapsed') === 'true'; } catch { return false; }
+  });
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('ib-sidebar-collapsed', String(next)); } catch { /* private browsing, etc. */ }
+      return next;
+    });
+  };
+  // Escape closes the mobile nav drawer, matching its button/overlay close paths.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileOpen(false); };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [mobileOpen]);
   const { canInstall, hasPrompt, promptInstall } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
 
@@ -593,10 +656,15 @@ function AppContent() {
     );
   }
 
+  // As 3 seções abaixo (sectionLabel em cada primeiro grupo) são só uma camada visual —
+  // igual ao "Em breve" que já existia acima de financeiro-group. Nenhum id, onClick,
+  // rota ou permissão de item muda: só a posição do grupo no array e a legenda acima dele.
   const navGroups: SidebarNavGroup[] = [
     {
       id: 'dashboard-group',
       label: 'Dashboard',
+      sectionLabel: 'Visão Geral',
+      railSection: true,
       items: [
         { id: 'dashboard', label: 'Dashboard',           icon: <LayoutDashboard />, onClick: () => { setActiveTab('dashboard'); setMobileOpen(false); }, active: activeTab === 'dashboard' },
         { id: 'heatmap',   label: 'Heatmap',              icon: <Map />,             onClick: () => { setActiveTab('heatmap'); setMobileOpen(false); },   active: activeTab === 'heatmap' },
@@ -605,23 +673,10 @@ function AppContent() {
       ],
     },
     {
-      id: 'account-group',
-      label: 'Minha Conta',
-      items: [
-        { id: 'conta', label: 'Produtividade', icon: <User />, onClick: () => { setActiveTab('conta'); setMobileOpen(false); }, active: activeTab === 'conta' },
-        { id: 'knowledge', label: 'Recursos e Conhecimento', icon: <BookOpen />, onClick: () => { setActiveTab('knowledge'); setMobileOpen(false); }, active: activeTab === 'knowledge' },
-      ],
-    },
-    {
-      id: 'academy-group',
-      label: 'I.B Academy',
-      items: [
-        { id: 'academy', label: 'I.B Academy', icon: <GraduationCap />, onClick: () => { setActiveTab('academy'); setMobileOpen(false); }, active: activeTab === 'academy' },
-      ],
-    },
-    {
       id: 'counting-group',
       label: 'Operações',
+      sectionLabel: 'Operação Inteligente',
+      railSection: true,
       items: [
         { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
         { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
@@ -631,6 +686,28 @@ function AppContent() {
         { id: 'slotting',       label: 'Warehouse Digital Twin', icon: <Warehouse />, onClick: () => { setActiveTab('slotting'); setMobileOpen(false); },     active: activeTab === 'slotting' },
         { id: 'rca',            label: 'Root Cause Analysis',  icon: <GitBranch />, onClick: () => { setActiveTab('rca'); setMobileOpen(false); },        active: activeTab === 'rca' },
         { id: 'audit',          label: 'Auditoria de Estoque', icon: <SearchCheck />, onClick: () => { setActiveTab('audit'); setMobileOpen(false); },   active: activeTab === 'audit' },
+      ],
+    },
+    {
+      // Movido para o cluster "Operação Inteligente" — só posição/legenda, nada de
+      // rota/permissão muda (ver comentário no topo de navGroups).
+      id: 'analytics-group',
+      label: 'Analytics',
+      items: [
+        { id: 'analytics-blindscore', label: 'BlindScore',             icon: <Gauge />,     onClick: () => { setActiveTab('analytics-blindscore'); setMobileOpen(false); }, active: activeTab === 'analytics-blindscore' },
+        { id: 'analytics-health',     label: 'Inventory Health Score', icon: <Activity />,  onClick: () => { setActiveTab('analytics-health'); setMobileOpen(false); },     active: activeTab === 'analytics-health' },
+        { id: 'analytics-ia',         label: 'IA Insights',            icon: <BarChart3 />, onClick: () => { setActiveTab('analytics-ia'); setMobileOpen(false); },         active: activeTab === 'analytics-ia' },
+        { id: 'analytics-audit',      label: 'Auditorias',             icon: <ShieldAlert />, onClick: () => { setActiveTab('analytics-audit'); setMobileOpen(false); },     active: activeTab === 'analytics-audit' },
+      ],
+    },
+    {
+      // Grupo próprio e destravado. Não reaproveitei o item 'config-automacoes' que
+      // existia em Configurações Avançadas porque aquele grupo tem lock de grupo — que
+      // torna todo item interno não-interativo.
+      id: 'automacoes-group',
+      label: 'Automações',
+      items: [
+        { id: 'automacoes', label: 'Agentes e Automações', icon: <Workflow />, onClick: () => { setActiveTab('automacoes'); setMobileOpen(false); }, active: activeTab === 'automacoes' },
       ],
     },
     {
@@ -648,6 +725,27 @@ function AppContent() {
       items: [
         { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
         { id: 'full-manager',    label: 'Full Manager',         icon: <ClipboardCheck />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
+        { id: 'inventoryfull',   label: 'InventoryFull',        icon: <Monitor />, onClick: () => { setActiveTab('inventoryfull'); setMobileOpen(false); },     active: activeTab === 'inventoryfull' },
+      ],
+    },
+    {
+      id: 'academy-group',
+      label: 'I.B Academy',
+      sectionLabel: 'Aprendizado e Gestão',
+      railSection: true,
+      items: [
+        { id: 'academy', label: 'I.B Academy', icon: <GraduationCap />, onClick: () => { setActiveTab('academy'); setMobileOpen(false); }, active: activeTab === 'academy' },
+      ],
+    },
+    {
+      id: 'account-group',
+      label: 'Minha Conta',
+      items: [
+        { id: 'conta', label: 'Produtividade', icon: <User />, onClick: () => { setActiveTab('conta'); setMobileOpen(false); }, active: activeTab === 'conta' },
+        { id: 'knowledge', label: 'Recursos e Conhecimento', icon: <BookOpen />, onClick: () => { setActiveTab('knowledge'); setMobileOpen(false); }, active: activeTab === 'knowledge' },
+        // Entrada permanente: quem já usava o sistema antes do diagnóstico existir
+        // acha por aqui, e quem já respondeu pode refazer quando a operação mudar.
+        { id: 'diagnostico', label: 'Diagnóstico da operação', icon: <ClipboardList />, onClick: () => { setActiveTab('diagnostico'); setMobileOpen(false); }, active: activeTab === 'diagnostico' },
       ],
     },
     {
@@ -685,24 +783,12 @@ function AppContent() {
       ],
     },
     {
-      id: 'analytics-group',
-      label: 'Analytics',
-      locked: true,
-      items: [
-        { id: 'analytics-blindscore', label: 'BlindScore',              icon: <Gauge />,       onClick: () => {}, active: false, locked: true },
-        { id: 'analytics-health',     label: 'Inventory Health Score',  icon: <Activity />,    onClick: () => {}, active: false, locked: true },
-        { id: 'analytics-ia',         label: 'IA Insights',              icon: <BarChart3 />,    onClick: () => {}, active: false, locked: true },
-        { id: 'analytics-audit',      label: 'Auditorias',               icon: <ShieldAlert />, onClick: () => {}, active: false, locked: true },
-      ],
-    },
-    {
       id: 'config-avancada-group',
       label: 'Configurações Avançadas',
       locked: true,
       items: [
         { id: 'config-api',         label: 'API',         icon: <Code2 />,    onClick: () => {}, active: false, locked: true },
         { id: 'config-webhooks',    label: 'Webhooks',    icon: <Webhook />,  onClick: () => {}, active: false, locked: true },
-        { id: 'config-automacoes',  label: 'Automações',  icon: <Workflow />, onClick: () => {}, active: false, locked: true },
         { id: 'config-logs',        label: 'Logs',        icon: <FileText />, onClick: () => {}, active: false, locked: true },
       ],
     },
@@ -777,6 +863,25 @@ function AppContent() {
     </div>
   );
 
+  // Compartilhado pelo trigger do header (userMenu) e pelo avatar da faixa navy do
+  // Sidebar — mesmo menu, dois pontos de entrada, sem duplicar a lógica de permissão.
+  const userMenuItems = [
+    { id: 'conta', label: 'Minha Conta', icon: <User size={14} />, onClick: () => setActiveTab('conta') },
+    ...(hasPermission(profile?.role, 'security.view')
+      ? [{ id: 'config', label: 'Configurações', icon: <Settings size={14} />, onClick: () => setActiveTab('security') }]
+      : []),
+    {
+      id: 'theme',
+      label: theme === 'dark' ? 'Tema claro' : 'Tema escuro',
+      icon: theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />,
+      onClick: toggleTheme,
+      divider: true,
+    },
+    { id: 'empresa', label: company?.name ?? 'Empresa', icon: <Building2 size={14} />, disabled: true, onClick: () => {} },
+    ...(canInstall ? [{ id: 'install', label: 'Instalar InventoryBlind', icon: <Download size={14} />, onClick: () => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } } }] : []),
+    { id: 'signout', label: 'Sair', icon: <LogOut size={14} />, onClick: signOut, divider: true },
+  ];
+
   const userMenu = (
     <SafeDropdown
       trigger={
@@ -795,32 +900,45 @@ function AppContent() {
           <ChevronDown size={12} className="text-fg-subtle hidden xl:block transition-transform duration-200 group-hover:translate-y-0.5" />
         </button>
       }
-      items={[
-        { id: 'conta', label: 'Minha Conta', icon: <User size={14} />, onClick: () => setActiveTab('conta') },
-        ...(hasPermission(profile?.role, 'security.view')
-          ? [{ id: 'config', label: 'Configurações', icon: <Settings size={14} />, onClick: () => setActiveTab('security') }]
-          : []),
-        {
-          id: 'theme',
-          label: theme === 'dark' ? 'Tema claro' : 'Tema escuro',
-          icon: theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />,
-          onClick: toggleTheme,
-          divider: true,
-        },
-        { id: 'empresa', label: company?.name ?? 'Empresa', icon: <Building2 size={14} />, disabled: true, onClick: () => {} },
-        ...(canInstall ? [{ id: 'install', label: 'Instalar InventoryBlind', icon: <Download size={14} />, onClick: () => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } } }] : []),
-        { id: 'signout', label: 'Sair', icon: <LogOut size={14} />, onClick: signOut, divider: true },
-      ]}
+      items={userMenuItems}
+    />
+  );
+
+  const railAvatar = (
+    <SafeDropdown
+      trigger={
+        <button
+          title={profile?.email ?? undefined}
+          className="relative w-9 h-9 flex-shrink-0 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-white uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+        >
+          {(profile?.email ?? '?').slice(0, 1)}
+          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-rail" />
+        </button>
+      }
+      items={userMenuItems}
     />
   );
 
   return (
     // data-app-shell scopes the authenticated app's reduced-motion rules in
     // index.css — the Landing zone resolves motion itself and is excluded.
-    <div data-app-shell className="h-screen bg-surface font-sans text-fg flex overflow-hidden">
+    // pl/pr com os insets laterais: em landscape com notch a lateral esquerda do shell
+    // (a sidebar) ficava embaixo do recorte. Em portrait e no desktop os insets são 0.
+    <div
+      data-app-shell
+      className="h-screen bg-surface font-sans text-fg flex overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+    >
 
       {/* ── SIDEBAR (desktop) ─────────────────────────────────────────────── */}
-      <Sidebar groups={navGroups} header={sidebarHeader} className="hidden md:flex" />
+      <Sidebar
+        groups={navGroups}
+        header={sidebarHeader}
+        className="hidden md:flex"
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebarCollapsed}
+        railHelp={{ icon: <HelpCircle size={17} />, label: 'Recursos e Conhecimento', onClick: () => setActiveTab('knowledge') }}
+        railAvatar={railAvatar}
+      />
 
       {/* ── SIDEBAR (mobile drawer) ──────────────────────────────────────── */}
       {mobileOpen && (
@@ -830,6 +948,12 @@ function AppContent() {
             <Sidebar
               groups={navGroups}
               header={sidebarHeader}
+              hideRail
+              // O drawer é `fixed inset-0`: cobre a barra de status em cima e a barra de
+              // gesto embaixo. Sem os insets, o topo do menu ficava sob o relógio e o
+              // "Sair" do rodapé sob o home indicator. `box-border` já é global, então o
+              // padding cabe dentro do `h-full` e a `nav` interna encolhe sozinha.
+              className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
               footer={
                 <div className="space-y-2">
                   <div className="flex items-center justify-between px-1 pb-1">
@@ -852,7 +976,7 @@ function AppContent() {
             />
             <button
               onClick={() => setMobileOpen(false)}
-              className="absolute top-3 left-full ml-2 p-2 rounded-lg bg-surface-2 border border-edge text-fg-muted"
+              className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] left-full ml-2 p-2 rounded-lg bg-surface-2 border border-edge text-fg-muted"
             >
               <X size={18} />
             </button>
@@ -864,8 +988,10 @@ function AppContent() {
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <AppHeader
           onOpenMobileNav={() => setMobileOpen(true)}
+          left={activeTab === 'dashboard' ? <DashboardGreeting name={profile?.name ?? null} /> : undefined}
           right={
             <>
+              <WhatsNewButton />
               <ThemeToggle className="hidden md:flex" />
               {userMenu}
             </>
@@ -873,7 +999,11 @@ function AppContent() {
         />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none]">
+      {/* pb com o inset inferior: o `main` termina na borda da viewport, então o último
+          elemento da página ficava embaixo da barra de gesto e fora de alcance do toque.
+          O padding entra no conteúdo rolável, garantindo que dê para rolar o fim da
+          página acima do home indicator. */}
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none] pb-[env(safe-area-inset-bottom)]">
 
         {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' && activeTab !== 'users' && (
           <>
@@ -883,6 +1013,7 @@ function AppContent() {
           <React.Suspense fallback={<PageLoader />}>
           <HeatmapEstoque
             brandsData={brandsData}
+            companyId={companyId}
             onRequestAdminAccess={() => {
               if (!isLoggedIn) {
                 setActiveTab('admin');
@@ -974,6 +1105,17 @@ function AppContent() {
         {/* ABA DASHBOARD */}
         {activeTab === 'dashboard' && (
           <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+
+            {/* Convite ao diagnóstico — painel dispensável no topo do dashboard, não
+                um bloqueio na entrada. Some assim que for respondido ou dispensado. */}
+            {showDiagnosticInvite && (
+              <React.Suspense fallback={null}>
+                <DiagnosticInvite
+                  onStart={() => setActiveTab('diagnostico')}
+                  onDismiss={() => setDiagnosticDismissed(true)}
+                />
+              </React.Suspense>
+            )}
 
             {/* VISÃO GERAL: indicadores + BlindAI em um único painel */}
             <Panel>
@@ -1729,6 +1871,34 @@ function AppContent() {
           </React.Suspense>
         )}
 
+        {/* ANALYTICS: BLINDSCORE */}
+        {activeTab === 'analytics-blindscore' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <BlindScorePage companyId={companyId} />
+          </React.Suspense>
+        )}
+
+        {/* ANALYTICS: INVENTORY HEALTH */}
+        {activeTab === 'analytics-health' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <InventoryHealthPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
+        {/* ANALYTICS: IA INSIGHTS */}
+        {activeTab === 'analytics-ia' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <IaInsightsPage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        )}
+
+        {/* ANALYTICS: AUDITORIAS */}
+        {activeTab === 'analytics-audit' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AuditsAnalyticsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
         {/* ABA I.B ACADEMY */}
         {activeTab === 'academy' && profile && (
           <React.Suspense fallback={<PageLoader />}>
@@ -1749,7 +1919,7 @@ function AppContent() {
 
       {/* ABA RANKINGS COMPLETOS - rendered as full page, outside overflow container */}
       {activeTab === 'rankings' && (
-        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <RankingsPage
             onBack={() => setActiveTab('dashboard')}
@@ -1766,7 +1936,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: GERADOR DE ETIQUETAS */}
       {activeTab === 'label-generator' && (
-        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <LabelGeneratorPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1775,16 +1945,25 @@ function AppContent() {
 
       {/* FERRAMENTAS: FULL MANAGER */}
       {activeTab === 'full-manager' && (
-        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <FullManagerPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         </div>
       )}
 
+      {/* FERRAMENTAS: INVENTORYFULL (app desktop — apresentação e download) */}
+      {activeTab === 'inventoryfull' && (
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <InventoryFullPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* CONFERÊNCIA CEGA POR NF-E */}
       {activeTab === 'nfe-conference' && (
-        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <NFeConferencePage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1793,9 +1972,39 @@ function AppContent() {
 
       {/* GERENCIAMENTO DE USUÁRIOS */}
       {activeTab === 'users' && (
-        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <UserManagementPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* DIAGNÓSTICO DA OPERAÇÃO.
+          Mesma moldura em overlay das demais telas de tela cheia. Opcional por
+          definição: sair a qualquer momento devolve ao dashboard, e o rascunho local
+          guarda o que já foi respondido. */}
+      {activeTab === 'diagnostico' && (
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <OperationDiagnostic
+            initial={diagnosticRecord}
+            onClose={() => setActiveTab('dashboard')}
+            onCompleted={() => setDiagnosticDone(true)}
+          />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* AGENTES E AUTOMAÇÕES.
+          A tela é legível para qualquer papel; criar, editar e ativar é restrito, e o
+          gate espelha a policy da 051 para não oferecer controle que o banco recusa. */}
+      {activeTab === 'automacoes' && (
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <AutomationsPage
+            canManage={canManageAutomations(profile?.role)}
+            onBack={() => setActiveTab('dashboard')}
+          />
           </React.Suspense>
         </div>
       )}
@@ -1805,7 +2014,7 @@ function AppContent() {
           manager). The function refuses anyone else regardless, so this only keeps
           the screen from offering buttons that would come back 403. */}
       {activeTab === 'integracoes' && (
-        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           {canSyncIntegrations(profile?.role) ? (
             <IntegrationsPage onBack={() => setActiveTab('dashboard')} />
@@ -1818,7 +2027,7 @@ function AppContent() {
 
       {/* CENTRAL DE SEGURANÇA */}
       {activeTab === 'security' && (
-        <div className="fixed inset-0 md:left-60 z-[900] bg-surface overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <SecurityPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -2307,7 +2516,7 @@ function hasPersistedSession(): boolean {
 }
 
 export default function App() {
-  const { view, authLoading, profileLoading } = useAuth();
+  const { view, authLoading, profileLoading, companyId } = useAuth();
   const [hadStoredSession] = useState(hasPersistedSession);
 
   // Auth error
@@ -2336,8 +2545,20 @@ export default function App() {
   // Profile loading after login
   if (profileLoading && view !== 'app') return <ProfileLoadingOverlay />;
 
-  // Main app
-  if (view === 'app') return <AppContent />;
+  // Main app.
+  //
+  // `key={companyId}`: trocar de workspace muda profiles.company_id, e o RLS passa a
+  // responder pela empresa nova na hora — mas a árvore React continuava montada, então
+  // toda tela que busca dados no mount (sem companyId nas deps) seguia exibindo o que
+  // já tinha carregado da empresa anterior. Não é vazamento de banco (uma leitura nova
+  // seria barrada), mas na tela é indistinguível de um. Remontar é a única correção que
+  // vale para as telas de hoje e para as que ainda vão existir; corrigir dependência a
+  // dependência deixaria a próxima tela nova com o mesmo bug.
+  //
+  // Só dispara na troca: quando `view` vira 'app' o companyId já está resolvido, então
+  // não há remontagem extra na entrada. O activeTab volta para o dashboard, que é o
+  // correto — a aba aberta descrevia o contexto da empresa anterior.
+  if (view === 'app') return <AppContent key={companyId} />;
 
   // Absolute fallback
   return (

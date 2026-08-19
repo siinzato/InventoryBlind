@@ -127,6 +127,7 @@ export function createHorizontalPin(container: Element, track: HTMLElement, pin 
       end: () => `+=${Math.max(distance(), 1)}`,
       scrub: 1,
       pin,
+      pinType: 'transform',
       invalidateOnRefresh: true,
     },
   });

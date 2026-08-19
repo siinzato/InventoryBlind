@@ -30,7 +30,7 @@ export function Differentials() {
       gsap.set(platformRef.current, { opacity: 0, clipPath: 'inset(0% 0% 0% 100%)', rotateY: -10 });
       gsap
         .timeline({
-          scrollTrigger: { trigger: sectionRef.current, start: 'top top', end: '+=1600', scrub: 1, pin: true },
+          scrollTrigger: { trigger: sectionRef.current, start: 'top top', end: '+=1600', scrub: 1, pin: true, pinType: 'transform' },
         })
         .to(manualRef.current, { opacity: 0, scale: 0.9, rotateY: 10, filter: 'blur(8px)', ease: 'none' }, 0.15)
         .to(platformRef.current, { opacity: 1, clipPath: 'inset(0% 0% 0% 0%)', rotateY: 0, ease: 'none' }, 0.15)

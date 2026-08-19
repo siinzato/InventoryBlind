@@ -134,7 +134,7 @@ export function NFePreparationView({ invoice, onStarted, onBack }: Props) {
           </div>
 
           {items.length > 0 && (
-            <div className="sticky bottom-0 bg-gradient-to-t from-surface via-surface to-transparent pt-4 pb-2">
+            <div className="sticky bottom-0 bg-gradient-to-t from-surface via-surface to-transparent pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
               <Button
                 disabled={!allLinked || starting}
                 onClick={handleStart}

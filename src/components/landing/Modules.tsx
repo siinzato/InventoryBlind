@@ -1,6 +1,28 @@
 import { useRef } from 'react';
 import type { LucideIcon } from 'lucide-react';
-import { Bot, Flame, ScanLine, LayoutDashboard, BarChart3, Building2, Gauge, ShieldCheck, Users } from 'lucide-react';
+import {
+  Bot,
+  Flame,
+  ScanLine,
+  Tablet,
+  LayoutDashboard,
+  BarChart3,
+  Building2,
+  Gauge,
+  ShieldCheck,
+  Users,
+  Target,
+  AlertTriangle,
+  GitBranch,
+  Warehouse,
+  Workflow,
+  LayoutGrid,
+  SearchCheck,
+  TrendingUp,
+  GraduationCap,
+  BookOpen,
+  Monitor,
+} from 'lucide-react';
 import { useAnimationTier } from '../../lib/useAnimationTier';
 import { motion, staggerContainer, useTiltHover, EASE, type Variants } from './landingMotion';
 import { useGSAP, gsap, SplitText } from './landingScroll';
@@ -13,6 +35,14 @@ interface ModuleDef {
   featured?: boolean;
 }
 
+/** A ordem e os `span` somam linhas cheias de 4 colunas, na sequência em que os
+ *  cards são declarados — o `grid-flow-row-dense` continua ali como rede de
+ *  segurança, mas não precisa reordenar nada para fechar o bento.
+ *
+ *  O comprimento de `desc` é parte do contrato do layout: a linha tem altura fixa
+ *  (180px) e o card é `overflow-hidden`, então sobram ~2 linhas de texto. Em
+ *  `col-span-1` isso é ~50 caracteres (a coluna encolhe a 1024px); em
+ *  `col-span-2`, ~120. Passar disso não empurra o card — corta a frase. */
 const MODULES: ModuleDef[] = [
   {
     icon: Bot,
@@ -28,21 +58,93 @@ const MODULES: ModuleDef[] = [
     span: 'lg:col-span-2',
   },
   {
-    icon: ScanLine,
-    title: 'Conferência por NF-e',
-    desc: 'Cruza automaticamente o recebido com o faturado — a divergência aparece na hora, com o item exato e a nota de origem.',
+    icon: Target,
+    title: 'Confidence Score',
+    desc: 'Recontagem por confiança, não por ciclo fixo.',
     span: 'lg:col-span-1',
   },
-  { icon: LayoutDashboard, title: 'Dashboard', desc: 'Visão geral da operação em tempo real, sem planilha nenhuma.', span: 'lg:col-span-1' },
+  {
+    icon: AlertTriangle,
+    title: 'Inventário por Risco',
+    desc: 'Um Risk Score define o que contar primeiro.',
+    span: 'lg:col-span-1',
+  },
+  {
+    icon: GitBranch,
+    title: 'Root Cause Analysis',
+    desc: 'Toda divergência fechada vira causa classificada — Pareto, recorrência e 5 Porquês para prevenir, não só registrar.',
+    span: 'lg:col-span-2',
+  },
+  {
+    icon: Warehouse,
+    title: 'Warehouse Digital Twin',
+    desc: 'Mapa vivo do armazém: replay de picking, distâncias reais e insights automáticos sobre o layout que você desenhou.',
+    span: 'lg:col-span-2',
+  },
+  {
+    icon: Workflow,
+    title: 'Agentes e Automações',
+    desc: 'Quando algo acontecer, avalie condições e execute ações — você monta o fluxo, o servidor executa sozinho.',
+    span: 'lg:col-span-2',
+  },
+  {
+    icon: LayoutGrid,
+    title: 'Classificação ABC/XYZ',
+    desc: 'Valor movimentado e previsibilidade de demanda.',
+    span: 'lg:col-span-1',
+  },
+  {
+    icon: ScanLine,
+    title: 'Conferência por NF-e',
+    desc: 'Cruza o recebido com o faturado, item a item.',
+    span: 'lg:col-span-1',
+  },
+  {
+    icon: Tablet,
+    title: 'Paperless Inventory',
+    desc: 'Contagens, reconferências e auditorias direto no tablet, com rastreabilidade completa e integração ao ERP.',
+    span: 'lg:col-span-2',
+  },
+  {
+    icon: TrendingUp,
+    title: 'Produtividade por Operador',
+    desc: 'Desempenho, evolução e conquistas de cada operador, com visão de gestor para comparar a equipe.',
+    span: 'lg:col-span-2',
+  },
+  {
+    icon: SearchCheck,
+    title: 'Auditoria de Estoque',
+    desc: 'Auditoria cruzada, estatística e por tendência, mais simulação de inventário — evidência antes da decisão.',
+    span: 'lg:col-span-2',
+  },
   {
     icon: BarChart3,
     title: 'Analytics',
     desc: 'Rankings, tendências e comparativos entre períodos, filiais e operadores.',
     span: 'lg:col-span-2',
   },
-  { icon: Building2, title: 'Multiempresa', desc: 'Cada empresa isolada com segurança, sem misturar dado de ninguém.', span: 'lg:col-span-1' },
-  { icon: Gauge, title: 'Indicadores', desc: 'KPIs operacionais sempre visíveis, do chão de fábrica à diretoria.', span: 'lg:col-span-1' },
-  { icon: ShieldCheck, title: 'Auditoria', desc: 'Toda ação registrada e rastreável — quem fez, quando e o quê.', span: 'lg:col-span-2' },
+  { icon: LayoutDashboard, title: 'Dashboard', desc: 'Visão geral da operação em tempo real.', span: 'lg:col-span-1' },
+  {
+    icon: GraduationCap,
+    title: 'I.B Academy',
+    desc: 'Capacitação oficial em gestão de estoques e inventário inteligente, com trilhas e certificado.',
+    span: 'lg:col-span-2',
+  },
+  {
+    icon: BookOpen,
+    title: 'Recursos e Conhecimento',
+    desc: 'Documentação, FAQ e glossário do produto.',
+    span: 'lg:col-span-1',
+  },
+  {
+    icon: Monitor,
+    title: 'App InventoryFull',
+    desc: 'Aplicativo Windows que cruza localmente as planilhas do depósito Full do Tiny e do Mercado Livre.',
+    span: 'lg:col-span-2',
+  },
+  { icon: Building2, title: 'Multiempresa', desc: 'Cada empresa isolada, sem dado misturado.', span: 'lg:col-span-1' },
+  { icon: Gauge, title: 'Indicadores', desc: 'KPIs operacionais sempre visíveis.', span: 'lg:col-span-1' },
+  { icon: ShieldCheck, title: 'Trilha de Auditoria', desc: 'Toda ação registrada e rastreável — quem fez, quando e o quê.', span: 'lg:col-span-2' },
   { icon: Users, title: 'Gestão de Usuários', desc: 'Papéis e permissões claras para cada pessoa da operação.', span: 'lg:col-span-2' },
 ];
 
@@ -90,7 +192,7 @@ export function Modules() {
     () => {
       if (tier === 'minimal' || !headingRef.current) return;
       const split = new SplitText(headingRef.current, { type: 'words' });
-      gsap.set(split.words, { yPercent: 100, opacity: 0, rotateX: -60 });
+      gsap.set(split.words, { yPercent: 100, opacity: 0, rotateX: -60, backfaceVisibility: 'hidden' });
       gsap.set(subRef.current, { opacity: 0, y: 10, filter: 'blur(6px)' });
 
       gsap

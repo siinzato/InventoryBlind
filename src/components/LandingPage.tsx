@@ -36,12 +36,22 @@ const LandingPage: FC = () => {
   // fallback there is a simple one-shot/static render with no pin math to get wrong. A refresh
   // once layout has actually settled fixes the measurements without touching any section file.
   useEffect(() => {
+    // Official GSAP mitigation for iOS Safari's address-bar/rubber-band scroll
+    // jitter during pinned+scrubbed sequences (CinematicDashboard, Differentials,
+    // OperationalJourney's horizontal pin) — all now pinType:'transform' too.
+    ScrollTrigger.normalizeScroll(true);
+
     const refresh = () => ScrollTrigger.refresh();
     document.fonts?.ready?.then(refresh);
     window.addEventListener('load', refresh);
+    // Device rotation can cross the 1024px `full`-tier boundary, remounting a
+    // section's pinned sequence with structurally different JSX — refresh so
+    // ScrollTrigger re-measures against the new layout instead of stale pin distances.
+    window.addEventListener('orientationchange', refresh);
     const settleTimer = setTimeout(refresh, 500);
     return () => {
       window.removeEventListener('load', refresh);
+      window.removeEventListener('orientationchange', refresh);
       clearTimeout(settleTimer);
     };
   }, []);

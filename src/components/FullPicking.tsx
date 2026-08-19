@@ -7,6 +7,7 @@ import {
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR } from '../lib/fullManagerTypes';
+import { Card } from './ui';
 
 // ── Operation selector ────────────────────────────────────────────────────────
 
@@ -83,7 +84,7 @@ const PickingCard: React.FC<{
       </div>
 
       {/* Main card */}
-      <div className="bg-surface-2 rounded-2xl border border-edge shadow-lg overflow-hidden">
+      <Card padding="none" className="overflow-hidden">
         {/* Location banner */}
         <div className="bg-accent text-white px-5 py-4 flex items-center gap-3">
           <MapPin size={20} className="flex-shrink-0" />
@@ -122,7 +123,7 @@ const PickingCard: React.FC<{
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Action buttons */}
       <div className="grid grid-cols-2 gap-2">
@@ -164,7 +165,7 @@ const PickingSummary: React.FC<{
 
   return (
     <div className="max-w-sm mx-auto space-y-4">
-      <div className="bg-surface-2 rounded-2xl border border-edge shadow-lg p-6 text-center">
+      <Card padding="none" className="p-6 text-center">
         <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
           <Check size={28} className="text-emerald-600 dark:text-emerald-400" />
         </div>
@@ -180,7 +181,7 @@ const PickingSummary: React.FC<{
             <p className="text-xs text-red-600 dark:text-red-400 font-semibold">Com erro</p>
           </div>
         </div>
-      </div>
+      </Card>
       <button onClick={send} disabled={sending}
         className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-xl font-bold text-sm transition disabled:opacity-60">
         {sending ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}

@@ -295,7 +295,7 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
         </div>
       )}
 
-      <div className="sticky bottom-0 bg-gradient-to-t from-surface via-surface to-transparent pt-4 pb-2">
+      <div className="sticky bottom-0 bg-gradient-to-t from-surface via-surface to-transparent pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <Button onClick={() => setShowFinalize(true)} className="w-full">
           <Flag size={18} /> Finalizar Conferência
         </Button>

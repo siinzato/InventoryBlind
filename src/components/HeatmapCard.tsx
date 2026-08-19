@@ -195,7 +195,10 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
             </span>
           </div>
           <p className="text-sm text-fg-subtle">
-            {area.marcaNome || 'Sem marca'} · {area.responsavel}
+            {/* O responsável agora vem da contagem real e pode não existir ainda —
+                sem o guarda, a linha terminava num "·" solto. */}
+            {area.marcaNome || 'Sem marca'}
+            {area.responsavel && ` · ${area.responsavel}`}
           </p>
         </div>
 

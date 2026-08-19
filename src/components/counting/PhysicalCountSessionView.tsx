@@ -67,11 +67,11 @@ export function PhysicalCountSessionView({ sessionId, companyId, onDone }: Physi
   }, [sessionId]);
 
   useEffect(() => {
-    setPending(pendingCount());
-    const flush = () => flushPendingCounts().then(({ stillPending }) => setPending(stillPending));
+    setPending(pendingCount(companyId));
+    const flush = () => flushPendingCounts(companyId).then(({ stillPending }) => setPending(stillPending));
     window.addEventListener('online', flush);
     return () => window.removeEventListener('online', flush);
-  }, []);
+  }, [companyId]);
 
   const searchResults = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -98,6 +98,7 @@ export function PhysicalCountSessionView({ sessionId, companyId, onDone }: Physi
     setError(null);
     try {
       const resulting = await registerCount({
+        companyId,
         itemId: current.id,
         mode: 'increment',
         quantity: amount,
@@ -107,7 +108,7 @@ export function PhysicalCountSessionView({ sessionId, companyId, onDone }: Physi
       applyLocalResult(current.id, resulting);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao registrar a contagem — mantida na fila local.');
-      setPending(pendingCount());
+      setPending(pendingCount(companyId));
     } finally {
       setBusy(false);
     }
@@ -121,6 +122,7 @@ export function PhysicalCountSessionView({ sessionId, companyId, onDone }: Physi
     setError(null);
     try {
       const resulting = await registerCount({
+        companyId,
         itemId: current.id,
         mode: 'set',
         quantity,
@@ -131,7 +133,7 @@ export function PhysicalCountSessionView({ sessionId, companyId, onDone }: Physi
       setManualInput('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao registrar a contagem — mantida na fila local.');
-      setPending(pendingCount());
+      setPending(pendingCount(companyId));
     } finally {
       setBusy(false);
     }

@@ -4,56 +4,9 @@ import { useAnimationTier } from '../../lib/useAnimationTier';
 import { motion, staggerContainer, fadeInUp, MagneticButton } from './landingMotion';
 import { useGSAP, gsap, SplitText } from './landingScroll';
 import { WHATSAPP_PLANS_URL } from './landingUi';
-
-interface PlanDef {
-  key: 'free' | 'pro' | 'business' | 'enterprise';
-  name: string;
-  price: string;
-  period?: string;
-  desc: string;
-  features: string[];
-  featured?: boolean;
-  cta: string;
-}
-
-const PLANS: PlanDef[] = [
-  {
-    key: 'free',
-    name: 'Free',
-    price: 'R$ 0',
-    period: '/mês',
-    desc: 'Para começar a organizar e controlar seu inventário.',
-    features: ['Acesso gratuito e permanente', 'Dashboard básico', 'Conferência de inventário', 'Indicadores essenciais'],
-    cta: 'Começar gratuitamente',
-  },
-  {
-    key: 'pro',
-    name: 'Pro',
-    price: 'R$ 120',
-    period: '/mês',
-    desc: 'Para operações que precisam de mais controle e inteligência.',
-    features: ['BlindAI com análises avançadas', 'Confidence & Risk Score', 'Classificação ABC/XYZ', 'Indicadores avançados'],
-    cta: 'Começar gratuitamente',
-  },
-  {
-    key: 'business',
-    name: 'Business',
-    price: 'R$ 320',
-    period: '/mês',
-    desc: 'Para operações em crescimento que precisam de mais escala e análise.',
-    features: ['BlindAI com maior profundidade operacional', 'HeatMap Inteligente', 'Auditoria avançada', 'Multiempresa'],
-    featured: true,
-    cta: 'Começar gratuitamente',
-  },
-  {
-    key: 'enterprise',
-    name: 'Enterprise',
-    price: 'Sob consulta',
-    desc: 'Para operações corporativas com necessidades específicas.',
-    features: ['BlindAI adaptado à operação corporativa', 'Gestão de usuários e papéis', 'Suporte dedicado', 'SLA personalizado'],
-    cta: 'Falar com vendas',
-  },
-];
+// Catálogo movido para src/lib/plans.ts: o diagnóstico da operação recomenda um plano
+// real e não pode manter uma segunda cópia dos mesmos dados comerciais.
+import { PLANS } from '../../lib/plans';
 
 interface PlansProps {
   onSignup: () => void;
@@ -68,7 +21,7 @@ export function Plans({ onSignup }: PlansProps) {
     () => {
       if (tier === 'minimal' || !headingRef.current) return;
       const split = new SplitText(headingRef.current, { type: 'words' });
-      gsap.set(split.words, { yPercent: 100, opacity: 0, rotateX: -60 });
+      gsap.set(split.words, { yPercent: 100, opacity: 0, rotateX: -60, backfaceVisibility: 'hidden' });
       gsap.set(subRef.current, { opacity: 0, y: 10, filter: 'blur(6px)' });
 
       gsap

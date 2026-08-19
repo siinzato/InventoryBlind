@@ -28,6 +28,13 @@ export type AuditAction =
   | 'academy.certificate_generated'
   | 'academy.pdi_created'
   | 'academy.view_team'
+  // Automações (migration 051+). Ações que criam trabalho ou alteram estoque sozinhas
+  // pertencem ao mesmo rastro de auditoria do resto do sistema.
+  | 'automation.created'
+  | 'automation.updated'
+  | 'automation.activated'
+  | 'automation.deactivated'
+  | 'automation.deleted'
   | 'cbc.recompute'
   | 'risk.recompute'
   | 'risk.criticality_override'
@@ -41,7 +48,13 @@ export type AuditAction =
   | 'rca.five_whys_completed'
   | 'rca.settings_updated'
   | 'audit.count_approved'
-  | 'audit.statistical_run';
+  | 'audit.statistical_run'
+  | 'physical_count.session_started'
+  | 'physical_count.finalized'
+  | 'physical_count.recount_created'
+  | 'physical_count.approved'
+  | 'physical_count.erp_sync_attempted'
+  | 'tools.inventoryfull_download_started';
 
 interface LogParams {
   companyId: string;

@@ -87,7 +87,14 @@ export function WarehouseTimelinePanel({ companyId, layoutId, layout, cells, onS
         </div>
 
         {snapshot?.isMock && (
-          <Badge variant="warning">Prévia — histórico real ainda não persistido, mostrando estado atual</Badge>
+          <Badge variant="warning">Sem histórico registrado até esta data — nada a reconstruir</Badge>
+        )}
+        {snapshot && !snapshot.isMock && snapshot.date !== dates[0] && (
+          // A ocupação endereço→produto não é historiada; picks e scores são. Dizer qual
+          // camada é da data e qual é de hoje evita ler o mapa inteiro como passado.
+          <Badge variant="neutral">
+            Atividade e scores desta data · ocupação dos endereços conforme hoje
+          </Badge>
         )}
 
         {snapshot ? (

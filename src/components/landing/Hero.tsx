@@ -58,11 +58,11 @@ export function Hero({ onSignup }: HeroProps) {
       // background-clip, so splitting a gradient-clipped span makes that text permanently
       // invisible once the reveal finishes. It gets its own simple fade below instead.
       const split = splitTargetRef.current ? new SplitText(splitTargetRef.current, { type: 'words,chars' }) : null;
-      if (split) gsap.set(split.chars, { yPercent: 130, rotateX: -80, opacity: 0 });
+      if (split) gsap.set(split.chars, { yPercent: 130, rotateX: -80, opacity: 0, backfaceVisibility: 'hidden' });
       gsap.set(headlineRef.current, { rotateX: 6, transformPerspective: 600 });
       gsap.set(highlightRef.current, { opacity: 0, y: 14 });
 
-      gsap.set(mockupRef.current, { rotateX: 10, rotateY: -10, clipPath: 'inset(38% 0% 0% 0%)', opacity: 0.4 });
+      gsap.set(mockupRef.current, { rotateX: 10, rotateY: -10, clipPath: 'inset(38% 0% 0% 0%)', opacity: 0.4, willChange: 'transform, clip-path' });
       gsap.set(kpiTileRefs.current, { opacity: 0, y: 14 });
       if (sparklineRef.current) gsap.set(sparklineRef.current, { drawSVG: '0%' });
 

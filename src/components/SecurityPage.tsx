@@ -314,7 +314,7 @@ function AuditLogsTable({ companyId }: { companyId: string }) {
     setLoading(false);
   }, [companyId, page, filter]);
 
-  useEffect(() => { if (companyId) load(); }, [load]);
+  useEffect(() => { if (companyId) load(); }, [load, companyId]);
 
   return (
     <Panel>
@@ -406,7 +406,7 @@ function SecurityLogsTable({ companyId }: { companyId: string }) {
     setLoading(false);
   }, [companyId, page, severityFilter]);
 
-  useEffect(() => { if (companyId) load(); }, [load]);
+  useEffect(() => { if (companyId) load(); }, [load, companyId]);
 
   return (
     <Panel>
@@ -478,11 +478,22 @@ function SecurityLogsTable({ companyId }: { companyId: string }) {
   );
 }
 
-// ── Section: Active Sessions (visual) ────────────────────────────────────────
+// ── Section: Active Sessions ─────────────────────────────────────────────────
 
 function ActiveSessions() {
-  const { user, profile } = useAuth();
-  const sessionStart = new Date(Date.now() - Math.random() * 3600000).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const { user, profile, session } = useAuth();
+
+  // `last_sign_in_at` do próprio usuário no Supabase Auth, e o vencimento real do token.
+  // Antes o horário de início era `Date.now() - Math.random() * 3600000`: um número
+  // inventado a cada render, numa tela de segurança — o pior lugar possível para um dado
+  // falso, porque é exatamente onde alguém vai olhar para decidir se houve acesso
+  // indevido. Sem o dado, não mostra nada em vez de preencher.
+  const startedAt = user?.last_sign_in_at
+    ? new Date(user.last_sign_in_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null;
+  const expiresAt = session?.expires_at
+    ? new Date(session.expires_at * 1000).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null;
 
   return (
     <Panel>
@@ -500,7 +511,11 @@ function ActiveSessions() {
               <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
               <div>
                 <p className="text-fg text-sm font-semibold">{profile?.email ?? user?.email}</p>
-                <p className="text-fg-subtle text-xs">Sessão atual · Iniciada {sessionStart}</p>
+                <p className="text-fg-subtle text-xs">
+                  Sessão atual
+                  {startedAt && ` · Último acesso ${startedAt}`}
+                  {expiresAt && ` · Expira ${expiresAt}`}
+                </p>
               </div>
             </div>
             <Badge variant="neutral">Atual</Badge>

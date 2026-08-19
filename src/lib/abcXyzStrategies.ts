@@ -2,7 +2,7 @@
 // Conteúdo estático (mesmo padrão de academyContent.ts) — as 9 combinações não mudam por
 // empresa, só o texto explicativo de cada uma.
 
-import type { AbcXyzCombo } from './supabase';
+import type { AbcXyzCombo } from './domainTypes';
 
 export interface AbcXyzStrategy {
   combo: AbcXyzCombo;

@@ -29,7 +29,7 @@ import {
   STATUS_LABEL, STATUS_COLOR, STATUS_DOT, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR,
   ALL_STATUSES, MARKETPLACES, formatFullDate,
 } from '../lib/fullManagerTypes';
-import { Panel, PanelSection } from './ui';
+import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Button, Modal } from './ui';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -68,29 +68,24 @@ const ConfirmDialog: React.FC<{
   onConfirm: () => void;
   onCancel: () => void;
 }> = ({ title, message, confirmLabel = 'Confirmar', danger, onConfirm, onCancel }) => (
-  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-    <div className="bg-surface-2 rounded-2xl shadow-2xl max-w-sm w-full p-6">
-      <div className="flex items-start gap-3 mb-4">
-        <div className={`flex-shrink-0 p-2 rounded-xl ${danger ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
-          <AlertTriangle size={20} className={danger ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} />
-        </div>
-        <div>
-          <h3 className="font-bold text-fg text-base">{title}</h3>
-          <p className="text-sm text-fg-muted mt-1">{message}</p>
-        </div>
+  <Modal open onClose={onCancel} title={title} maxWidth="max-w-sm">
+    <div className="flex items-start gap-3">
+      <div className={`flex-shrink-0 p-2 rounded-xl ${danger ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
+        <AlertTriangle size={20} className={danger ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} />
       </div>
-      <div className="flex gap-2 justify-end">
-        <button onClick={onCancel}
-          className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
-          Cancelar
-        </button>
-        <button onClick={onConfirm}
-          className={`px-4 py-2 rounded-lg text-sm font-bold text-white transition ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
-          {confirmLabel}
-        </button>
-      </div>
+      <p className="text-sm text-fg-muted">{message}</p>
     </div>
-  </div>
+    <div className="flex gap-2 justify-end mt-5">
+      <button onClick={onCancel}
+        className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+        Cancelar
+      </button>
+      <button onClick={onConfirm}
+        className={`px-4 py-2 rounded-lg text-sm font-bold text-white transition ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
+        {confirmLabel}
+      </button>
+    </div>
+  </Modal>
 );
 
 // ── Status selector dropdown ──────────────────────────────────────────────────
@@ -175,43 +170,33 @@ const EditOperationForm: React.FC<{
   );
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="bg-surface-2 rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h3 className="font-bold text-fg text-lg">Editar Operação</h3>
-            <p className="text-xs text-fg-subtle mt-0.5">FULL #{op.full_number}</p>
-          </div>
-          <button onClick={onClose} className="text-fg-subtle hover:text-fg-muted p-1.5 rounded-lg hover:bg-surface-3">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="space-y-3">
-          {field('Número Full', 'full_number')}
-          {field('Marketplace', 'marketplace', 'text', { options: [...MARKETPLACES] })}
-          {field('Responsável', 'responsible')}
-          {field('Data Agendada', 'scheduled_date', 'date')}
-          {field('Horário Agendado', 'scheduled_time', 'time')}
-          {field('Status', 'status', 'text', { options: ALL_STATUSES })}
-          <div>
-            <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1">Observações</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3}
-              className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
-          </div>
-        </div>
-        <div className="flex gap-2 mt-5 justify-end">
-          <button onClick={onClose} disabled={saving}
-            className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
-            Cancelar
-          </button>
-          <button onClick={handleSave} disabled={saving || !form.full_number.trim()}
-            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
-            {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-            Salvar
-          </button>
+    <Modal open onClose={onClose} title="Editar Operação" maxWidth="max-w-lg">
+      <p className="text-xs text-fg-subtle -mt-3 mb-4">FULL #{op.full_number}</p>
+      <div className="space-y-3">
+        {field('Número Full', 'full_number')}
+        {field('Marketplace', 'marketplace', 'text', { options: [...MARKETPLACES] })}
+        {field('Responsável', 'responsible')}
+        {field('Data Agendada', 'scheduled_date', 'date')}
+        {field('Horário Agendado', 'scheduled_time', 'time')}
+        {field('Status', 'status', 'text', { options: ALL_STATUSES })}
+        <div>
+          <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1">Observações</label>
+          <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3}
+            className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
         </div>
       </div>
-    </div>
+      <div className="flex gap-2 mt-5 justify-end">
+        <button onClick={onClose} disabled={saving}
+          className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+          Cancelar
+        </button>
+        <button onClick={handleSave} disabled={saving || !form.full_number.trim()}
+          className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+          {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+          Salvar
+        </button>
+      </div>
+    </Modal>
   );
 };
 
@@ -253,83 +238,77 @@ const ItemsPanel: React.FC<{
   const ITEM_STATUSES = ['found', 'picked', 'skipped', 'no_location', 'insufficient_stock', 'not_found', 'picking_error'] as const;
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="bg-surface-2 rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-edge flex-shrink-0">
-          <div>
-            <h3 className="font-bold text-fg">Itens — FULL #{op.full_number}</h3>
-            <p className="text-xs text-fg-subtle">{items.length} item(ns) · {op.marketplace}</p>
-          </div>
-          <button onClick={onClose} className="text-fg-subtle hover:text-fg-muted p-1.5 rounded-lg hover:bg-surface-3">
-            <X size={18} />
-          </button>
-        </div>
+    <Modal open onClose={onClose} title={`Itens — FULL #${op.full_number}`} maxWidth="max-w-3xl">
+      <p className="text-xs text-fg-subtle -mt-3 mb-4">{items.length} item(ns) · {op.marketplace}</p>
 
-        <div className="overflow-y-auto flex-1">
-          {loading ? (
-            <div className="flex items-center justify-center py-12 gap-2 text-fg-subtle">
-              <RefreshCw size={18} className="animate-spin" />Carregando itens...
-            </div>
-          ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-fg-subtle">
-              <Package size={40} className="mb-2 opacity-30" />
-              <p className="text-sm">Nenhum item nesta operação.</p>
-            </div>
-          ) : (
-            <div className="overflow-x-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-surface-3 border-b border-edge sticky top-0">
-                <tr>
-                  {['Produto', 'SKU', 'Local', 'Req.', 'Sep.', 'Status', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-edge/60">
-                {items.map(item => (
-                  <tr key={item.id} className="hover:bg-surface-3 transition">
-                    <td className="px-4 py-2.5 max-w-[180px]">
-                      <p className="font-medium text-fg text-xs truncate">{item.product_name || '—'}</p>
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-fg-subtle whitespace-nowrap">{item.sku || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-fg-muted whitespace-nowrap">{item.location || '—'}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="font-mono font-bold text-fg-muted text-xs">{item.quantity_requested}</span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <input
-                        type="number" min="0" max={item.quantity_requested + 999}
-                        value={item.quantity_picked}
-                        onChange={e => updateQty(item.id, Number(e.target.value))}
-                        onBlur={e => supabase.from('full_operation_items').update({ quantity_picked: Number(e.target.value) }).eq('id', item.id)}
-                        className="w-14 text-center px-1 py-1 border border-edge rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-accent/40"
-                      />
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <select
-                        value={item.status}
-                        disabled={updatingId === item.id}
-                        onChange={e => updateItemStatus(item.id, e.target.value)}
-                        className="text-xs border border-edge rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent/40 bg-surface-2 cursor-pointer"
-                      >
-                        {ITEM_STATUSES.map(s => (
-                          <option key={s} value={s}>{ITEM_STATUS_LABEL[s]}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {updatingId === item.id && <RefreshCw size={13} className="animate-spin text-fg-subtle" />}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-            </div>
-          )}
+      {loading ? (
+        <div className="flex items-center justify-center py-12 gap-2 text-fg-subtle">
+          <RefreshCw size={18} className="animate-spin" />Carregando itens...
         </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-fg-subtle">
+          <Package size={40} className="mb-2 opacity-30" />
+          <p className="text-sm">Nenhum item nesta operação.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto overflow-y-auto max-h-[55vh]">
+          <Table>
+            <Thead className="sticky top-0">
+              <Tr>
+                <Th>Produto</Th>
+                <Th>SKU</Th>
+                <Th>Local</Th>
+                <Th className="text-center">Req.</Th>
+                <Th>Sep.</Th>
+                <Th>Status</Th>
+                <Th />
+              </Tr>
+            </Thead>
+            <tbody className="divide-y divide-edge/60">
+              {items.map(item => (
+                <Tr key={item.id}>
+                  <Td className="max-w-[180px]">
+                    <p className="font-medium text-fg text-xs truncate">{item.product_name || '—'}</p>
+                  </Td>
+                  <Td className="font-mono text-xs text-fg-subtle whitespace-nowrap">{item.sku || '—'}</Td>
+                  <Td className="text-xs text-fg-muted whitespace-nowrap">{item.location || '—'}</Td>
+                  <Td className="text-center">
+                    <span className="font-mono font-bold text-fg-muted text-xs">{item.quantity_requested}</span>
+                  </Td>
+                  <Td>
+                    <input
+                      type="number" min="0" max={item.quantity_requested + 999}
+                      value={item.quantity_picked}
+                      onChange={e => updateQty(item.id, Number(e.target.value))}
+                      onBlur={e => supabase.from('full_operation_items').update({ quantity_picked: Number(e.target.value) }).eq('id', item.id)}
+                      className="w-14 text-center px-1 py-1 border border-edge rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-accent/40"
+                    />
+                  </Td>
+                  <Td>
+                    <select
+                      value={item.status}
+                      disabled={updatingId === item.id}
+                      onChange={e => updateItemStatus(item.id, e.target.value)}
+                      className="text-xs border border-edge rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent/40 bg-surface-2 cursor-pointer"
+                    >
+                      {ITEM_STATUSES.map(s => (
+                        <option key={s} value={s}>{ITEM_STATUS_LABEL[s]}</option>
+                      ))}
+                    </select>
+                  </Td>
+                  <Td>
+                    {updatingId === item.id && <RefreshCw size={13} className="animate-spin text-fg-subtle" />}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
 
-        <div className="px-6 py-4 border-t border-edge flex justify-between items-center flex-shrink-0">
-          <div className="flex gap-3 text-xs text-fg-subtle">
+      {!loading && items.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-edge flex flex-wrap justify-between items-center gap-3">
+          <div className="flex flex-wrap gap-3 text-xs text-fg-subtle">
             {['picked', 'skipped', 'not_found', 'no_location', 'insufficient_stock'].map(s => {
               const count = items.filter(i => i.status === s).length;
               if (!count) return null;
@@ -340,13 +319,10 @@ const ItemsPanel: React.FC<{
               );
             })}
           </div>
-          <button onClick={onClose}
-            className="px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition">
-            Fechar
-          </button>
+          <Button size="sm" onClick={onClose}>Fechar</Button>
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 };
 
@@ -495,7 +471,7 @@ const FullAdminPanel: React.FC = () => {
 
   const SortIcon: React.FC<{ field: SortField }> = ({ field }) =>
     sortField === field
-      ? <ArrowUpDown size={12} className="text-emerald-400" />
+      ? <ArrowUpDown size={12} className="text-accent" />
       : <ArrowUpDown size={12} className="text-fg-subtle opacity-40" />;
 
   return (
@@ -527,7 +503,7 @@ const FullAdminPanel: React.FC = () => {
       )}
 
       {/* Header banner */}
-      <div className="bg-red-500/5 border border-red-500/20 rounded-2xl p-5 flex items-center justify-between gap-4">
+      <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
           <div className="p-2.5 bg-red-500/10 rounded-xl">
             <ShieldAlert size={22} className="text-red-600 dark:text-red-400" />
@@ -565,142 +541,141 @@ const FullAdminPanel: React.FC = () => {
         </PanelSection>
       </Panel>
 
-      {/* Filters */}
-      <div className="bg-surface-2 border border-edge rounded-xl p-4">
-        <div className="flex flex-wrap gap-3 items-end">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Buscar</label>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-              <input
-                type="text"
-                placeholder="Número FULL, responsável, marketplace..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
-              />
+      {/* Filters + table — one panel, not stacked boxes */}
+      <Panel>
+        <PanelSection>
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* Search */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Buscar</label>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <input
+                  type="text"
+                  placeholder="Número FULL, responsável, marketplace..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                />
+              </div>
             </div>
-          </div>
-          {/* Status filter */}
-          <div className="w-40">
-            <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Status</label>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as FullStatus | 'all')}
-              className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
-              <option value="all">Todos</option>
-              {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-            </select>
-          </div>
-          {/* Marketplace filter */}
-          <div className="w-44">
-            <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Marketplace</label>
-            <select value={filterMarketplace} onChange={e => setFilterMarketplace(e.target.value)}
-              className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
-              <option value="all">Todos</option>
-              {MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          {/* Export */}
-          <button onClick={exportCSV}
-            className="flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition">
-            <Download size={14} />
-            <span className="hidden sm:inline">Exportar CSV</span>
-          </button>
-        </div>
-        {(searchQuery || filterStatus !== 'all' || filterMarketplace !== 'all') && (
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-xs text-fg-subtle">{filtered.length} de {operations.length} operações</span>
-            <button onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterMarketplace('all'); }}
-              className="text-xs text-fg-subtle hover:text-fg flex items-center gap-1 underline underline-offset-2">
-              <X size={10} />Limpar filtros
+            {/* Status filter */}
+            <div className="w-40">
+              <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Status</label>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as FullStatus | 'all')}
+                className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
+                <option value="all">Todos</option>
+                {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+              </select>
+            </div>
+            {/* Marketplace filter */}
+            <div className="w-44">
+              <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Marketplace</label>
+              <select value={filterMarketplace} onChange={e => setFilterMarketplace(e.target.value)}
+                className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
+                <option value="all">Todos</option>
+                {MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {/* Export */}
+            <button onClick={exportCSV}
+              className="flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition">
+              <Download size={14} />
+              <span className="hidden sm:inline">Exportar CSV</span>
             </button>
           </div>
-        )}
-      </div>
+          {(searchQuery || filterStatus !== 'all' || filterMarketplace !== 'all') && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs text-fg-subtle">{filtered.length} de {operations.length} operações</span>
+              <button onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterMarketplace('all'); }}
+                className="text-xs text-fg-subtle hover:text-fg flex items-center gap-1 underline underline-offset-2">
+                <X size={10} />Limpar filtros
+              </button>
+            </div>
+          )}
+        </PanelSection>
 
-      {/* Table */}
-      <div className="bg-surface-2 border border-edge rounded-xl  overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-3 border-b border-edge">
-              <tr>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('full_number')} className="flex items-center gap-1 text-xs font-semibold text-fg-subtle uppercase hover:text-fg transition">
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>
+                  <button onClick={() => toggleSort('full_number')} className="flex items-center gap-1 hover:text-fg transition">
                     FULL # <SortIcon field="full_number" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase">Marketplace</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase">Responsável</th>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('scheduled_date')} className="flex items-center gap-1 text-xs font-semibold text-fg-subtle uppercase hover:text-fg transition">
+                </Th>
+                <Th>Marketplace</Th>
+                <Th>Responsável</Th>
+                <Th>
+                  <button onClick={() => toggleSort('scheduled_date')} className="flex items-center gap-1 hover:text-fg transition">
                     Data <SortIcon field="scheduled_date" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('status')} className="flex items-center gap-1 text-xs font-semibold text-fg-subtle uppercase hover:text-fg transition">
+                </Th>
+                <Th>
+                  <button onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-fg transition">
                     Status <SortIcon field="status" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-fg-subtle uppercase">SKU / Pcs</th>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 text-xs font-semibold text-fg-subtle uppercase hover:text-fg transition">
+                </Th>
+                <Th className="text-center">SKU / Pcs</Th>
+                <Th>
+                  <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 hover:text-fg transition">
                     Criado <SortIcon field="created_at" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-fg-subtle uppercase">Ações</th>
-              </tr>
-            </thead>
+                </Th>
+                <Th className="text-right">Ações</Th>
+              </Tr>
+            </Thead>
             <tbody className="divide-y divide-edge/60">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
+                <Tr>
+                  <Td colSpan={8} className="py-12 text-center">
                     <div className="flex items-center justify-center gap-2 text-fg-subtle">
                       <RefreshCw size={18} className="animate-spin" />Carregando operações...
                     </div>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-fg-subtle text-sm">
+                <Tr>
+                  <Td colSpan={8} className="py-12 text-center text-fg-subtle text-sm">
                     Nenhuma operação encontrada.
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ) : filtered.map(op => (
-                <tr key={op.id} className="hover:bg-surface-3 transition">
+                <Tr key={op.id}>
                   {/* FULL # */}
-                  <td className="px-4 py-3">
+                  <Td>
                     <div>
                       <p className="font-bold text-fg text-sm">{op.full_number}</p>
                       {op.notes && (
                         <p className="text-xs text-fg-subtle mt-0.5 max-w-[120px] truncate" title={op.notes}>{op.notes}</p>
                       )}
                     </div>
-                  </td>
+                  </Td>
                   {/* Marketplace */}
-                  <td className="px-4 py-3 text-fg-muted text-xs font-medium">{op.marketplace}</td>
+                  <Td className="text-fg-muted text-xs font-medium">{op.marketplace}</Td>
                   {/* Responsible */}
-                  <td className="px-4 py-3 text-fg-muted text-xs">{op.responsible || '—'}</td>
+                  <Td className="text-fg-muted text-xs">{op.responsible || '—'}</Td>
                   {/* Date */}
-                  <td className="px-4 py-3 text-xs text-fg-subtle whitespace-nowrap">{formatFullDate(op.scheduled_date, op.scheduled_time)}</td>
+                  <Td className="text-xs text-fg-subtle whitespace-nowrap">{formatFullDate(op.scheduled_date, op.scheduled_time)}</Td>
                   {/* Status — inline change */}
-                  <td className="px-4 py-3">
+                  <Td>
                     <StatusSelector
                       current={op.status}
                       options={NEXT_STATUS[op.status]}
                       loading={updatingStatusId === op.id}
                       onSelect={s => updateStatus(op, s)}
                     />
-                  </td>
+                  </Td>
                   {/* SKU / Pieces */}
-                  <td className="px-4 py-3 text-center">
+                  <Td className="text-center">
                     <span className="font-mono text-xs text-fg-muted">{op.total_sku} / {op.total_pieces}</span>
-                  </td>
+                  </Td>
                   {/* Created */}
-                  <td className="px-4 py-3 text-xs text-fg-subtle whitespace-nowrap">
+                  <Td className="text-xs text-fg-subtle whitespace-nowrap">
                     {new Date(op.created_at).toLocaleDateString('pt-BR')}
-                  </td>
+                  </Td>
                   {/* Actions */}
-                  <td className="px-4 py-3">
+                  <Td>
                     <div className="flex items-center justify-end gap-1">
                       {/* View items */}
                       <button
@@ -745,22 +720,22 @@ const FullAdminPanel: React.FC = () => {
                         <Trash2 size={15} />
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
         {!loading && filtered.length > 0 && (
-          <div className="px-4 py-3 border-t border-edge bg-surface-3 flex items-center justify-between text-xs text-fg-subtle">
+          <PanelSection padding="sm" className="flex items-center justify-between text-xs text-fg-subtle bg-surface-3">
             <span>{filtered.length} operação(ões) exibida(s)</span>
             <span>
               {filtered.reduce((s, o) => s + o.total_sku, 0)} SKUs ·{' '}
               {filtered.reduce((s, o) => s + o.total_pieces, 0)} peças no total
             </span>
-          </div>
+          </PanelSection>
         )}
-      </div>
+      </Panel>
     </div>
   );
 };

@@ -46,7 +46,7 @@ export function Navbar({ onLogin, onSignup }: NavbarProps) {
   };
 
   return (
-    <nav ref={navRef} className="fixed top-0 inset-x-0 z-50 border-b border-transparent">
+    <nav ref={navRef} className="safe-top fixed top-0 inset-x-0 z-50 border-b border-transparent">
       <div className="max-w-6xl mx-auto px-6 h-16 flex items-center justify-between">
         <button onClick={() => scrollTo('#top')} className="flex items-center gap-2.5">
           <Logo size={28} />

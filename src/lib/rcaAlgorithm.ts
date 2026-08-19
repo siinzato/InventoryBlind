@@ -4,7 +4,7 @@
 // recorrência e agrupamentos por dimensão. Mantém o mesmo espírito de riskAlgorithm.ts/
 // cbcAlgorithm.ts — pontuação/estatística isolada da camada de acesso a dados.
 
-import type { RcaCauseCategory, RcaRecord } from './supabase';
+import type { RcaCauseCategory, RcaRecord } from './domainTypes';
 
 export const CAUSE_CATEGORIES: { value: RcaCauseCategory; label: string }[] = [
   { value: 'recebimento', label: 'Recebimento' },

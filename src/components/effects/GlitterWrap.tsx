@@ -197,10 +197,28 @@ export function GlitterWrap({ className = '', speedRef }: GlitterWrapProps) {
       drawFrame(deltaSec);
       rafRef.current = requestAnimationFrame(loop);
     };
+
+    // Pause the rAF loop while the Hero has scrolled out of view — this canvas
+    // never unmounts on its own, so without this it burns CPU/battery for the
+    // whole rest of the page visit.
+    const io = new IntersectionObserver(([entry]) => {
+      if (entry.isIntersecting) {
+        if (rafRef.current == null) {
+          lastT = performance.now();
+          rafRef.current = requestAnimationFrame(loop);
+        }
+      } else if (rafRef.current != null) {
+        cancelAnimationFrame(rafRef.current);
+        rafRef.current = null;
+      }
+    });
+    io.observe(container);
+
     rafRef.current = requestAnimationFrame(loop);
 
     return () => {
       if (rafRef.current != null) cancelAnimationFrame(rafRef.current);
+      io.disconnect();
       ro.disconnect();
     };
   }, [tier, speedRef]);

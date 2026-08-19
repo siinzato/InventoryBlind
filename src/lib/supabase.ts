@@ -1,4 +1,16 @@
 import { createClient } from '@supabase/supabase-js';
+import type {
+  BrandData, RcaSourceModule, RcaCauseCategory, RcaFiveWhysTriggerType, RcaFiveWhysStatus, RcaRecord,
+  AbcClass, XyzClass, AbcXyzCombo, BlindAIPriority, BlindAILineRanking,
+} from './domainTypes';
+
+// Tipos de domínio puros (BrandData, tipos de RCA/ABC-XYZ/BlindAI) vivem em domainTypes.ts
+// — importados aqui (para uso nas interfaces abaixo) e reexportados (para que nenhum
+// import existente em outros arquivos precise mudar).
+export type {
+  BrandData, RcaSourceModule, RcaCauseCategory, RcaFiveWhysTriggerType, RcaFiveWhysStatus, RcaRecord,
+  AbcClass, XyzClass, AbcXyzCombo, BlindAIPriority, BlindAILineRanking,
+};
 
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
@@ -10,16 +22,6 @@ if (!supabaseUrl || !supabaseAnonKey) {
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 // Types
-export interface BrandData {
-  id: string;
-  brand: string;
-  total_sku: number;
-  done_sku: number;
-  divergences: number;
-  order_index: number;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface TopVenda {
   id: string;
@@ -470,10 +472,6 @@ export interface RiskCompanySummary {
   baixo_count: number;
 }
 
-// Classificação ABC+XYZ Types
-export type AbcClass = 'A' | 'B' | 'C';
-export type XyzClass = 'X' | 'Y' | 'Z';
-export type AbcXyzCombo = 'AX' | 'AY' | 'AZ' | 'BX' | 'BY' | 'BZ' | 'CX' | 'CY' | 'CZ';
 
 export interface ProductAbcXyzClassification {
   id: string;
@@ -558,49 +556,6 @@ export interface WarehouseOptimizationHistoryEntry {
   event: string;
   meters_saved: number;
   recorded_at: string;
-}
-
-// Root Cause Analysis (RCA) Types
-export type RcaSourceModule = 'import_count' | 'full_operation' | 'nfe_receiving';
-export type RcaCauseCategory =
-  | 'recebimento'
-  | 'armazenagem'
-  | 'picking'
-  | 'separacao'
-  | 'expedicao'
-  | 'inventario'
-  | 'furto_perda'
-  | 'avaria'
-  | 'cadastro'
-  | 'conversao_unidade'
-  | 'erro_operacional'
-  | 'sistema_integracao'
-  | 'sem_causa_identificada'
-  | 'outro';
-export type RcaFiveWhysTriggerType = 'sku' | 'cause_category';
-export type RcaFiveWhysStatus = 'open' | 'completed';
-
-export interface RcaRecord {
-  id: string;
-  company_id: string;
-  source_module: RcaSourceModule;
-  source_item_id: string;
-  product_id: string | null;
-  sku: string | null;
-  product_name: string | null;
-  location: string | null;
-  operator_user_id: string | null;
-  operator_name: string | null;
-  supplier_name: string | null;
-  supplier_cnpj: string | null;
-  divergence_qty: number;
-  cause_category: RcaCauseCategory;
-  custom_cause_label: string | null;
-  notes: string | null;
-  classified_by: string | null;
-  classified_by_email: string | null;
-  occurred_at: string;
-  created_at: string;
 }
 
 export interface RcaEvidence {

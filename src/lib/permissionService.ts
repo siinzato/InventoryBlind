@@ -132,6 +132,21 @@ export function canManageUsers(role: Role | string | undefined): boolean {
   return hasPermission(role, 'users.manage');
 }
 
+/** Quem pode criar, editar, ativar e executar automações.
+ *
+ *  Mesma lista que as policies de escrita de `automations` exigem (migration 051) e
+ *  que a Edge Function verifica na execução manual. Existe para a UI não oferecer um
+ *  controle que o banco recusaria — não é a barreira, e removê-la não mudaria quem
+ *  consegue de fato alterar uma automação.
+ *
+ *  Não passa por `hasPermission` porque não há permissão 'automations.*' no mapa, e
+ *  inventar uma aqui sugeriria uma checagem no servidor que não a lê. Ler
+ *  `counting.approve` seria pior: uma automação pode enviar webhook e alterar
+ *  responsável, o que não é aprovar contagem. */
+export function canManageAutomations(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
 /** Who may operate an integration — configure a connection, paste a credential,
  *  trigger a sync, send approved adjustments to the ERP.
  *

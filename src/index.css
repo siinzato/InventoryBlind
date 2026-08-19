@@ -90,6 +90,16 @@ html, body {
   --fg-subtle: 139 147 162;
   --accent: 30 95 191;
   --accent-strong: 18 60 130;
+
+  /* Sidebar "rail" — the deep-navy icon strip, fixed brand identity like the
+     Landing's ink/mist/enterprise scale (not a new arbitrary color: derived
+     from the same enterprise-900/700 already declared in tailwind.config.js).
+     Rail stays dark in both themes; only its depth shifts per theme, same as
+     the reference. */
+  --rail: 10 38 71;          /* enterprise-900 #0A2647 */
+  --rail-active: 18 59 110;  /* enterprise-700 #123B6E */
+  --rail-fg: 255 255 255;
+  --rail-fg-muted: 154 176 209;
 }
 
 .dark {
@@ -104,6 +114,12 @@ html, body {
   --fg-subtle: 100 108 122;
   --accent: 62 123 224;
   --accent-strong: 127 179 245;
+
+  /* Deeper than the light theme's rail, per spec — still the same navy family. */
+  --rail: 6 20 38;           /* ~#061426 */
+  --rail-active: 14 42 78;   /* ~#0E2A4E */
+  --rail-fg: 255 255 255;
+  --rail-fg-muted: 130 150 181;
 }
 
 /* Authenticated-app typography scale — one shared set of sizes/weights

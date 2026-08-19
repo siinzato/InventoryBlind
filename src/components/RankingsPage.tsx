@@ -18,6 +18,7 @@ import {
   Target,
 } from 'lucide-react';
 import { downloadFile } from '../lib/productImportUtils';
+import type { UserProductivityStats } from '../lib/supabase';
 import {
   Page, PageHeader, Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button,
   Input, SegmentedControl, Stat, StatRow, StatCell, type SegmentedOption,
@@ -34,12 +35,6 @@ interface BrandRow {
   status: string;
 }
 
-interface OpCapa {
-  nome: string;
-  valor: string;
-  resp: string;
-}
-
 interface TopVenda {
   id: string;
   produto: string;
@@ -52,7 +47,7 @@ interface RankingsPageProps {
   onBack: () => void;
   brandsData: BrandRow[];
   topVendas: TopVenda[];
-  opCapas: OpCapa[];
+  operatorStats: UserProductivityStats[];
   melhores: { nome: string; valor: string }[];
   piores: { nome: string; valor: string }[];
   inProgress: BrandRow[];
@@ -121,7 +116,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
   onBack,
   brandsData,
   topVendas,
-  opCapas,
+  operatorStats,
   melhores,
   piores,
   inProgress,
@@ -223,15 +218,17 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
 
   // ---- OPERADORES DATA ----
   const operadoresData = useMemo(() => {
-    let data = [...opCapas];
-    if (search) data = data.filter(r =>
-      r.nome.toLowerCase().includes(search.toLowerCase()) ||
-      r.resp.toLowerCase().includes(search.toLowerCase())
-    );
-    if (sort.field === 'nome') data.sort((a, b) => sort.dir === 'asc' ? a.nome.localeCompare(b.nome) : b.nome.localeCompare(a.nome));
-    if (sort.field === 'resp') data.sort((a, b) => sort.dir === 'asc' ? a.resp.localeCompare(b.resp) : b.resp.localeCompare(a.resp));
+    let data = operatorStats.filter(o => o.contagens > 0);
+    if (search) data = data.filter(r => (r.name || '').toLowerCase().includes(search.toLowerCase()));
+    if (sort.field === 'nome') data.sort((a, b) => sort.dir === 'asc' ? (a.name || '').localeCompare(b.name || '') : (b.name || '').localeCompare(a.name || ''));
+    if (sort.field === 'valor') {
+      data.sort((a, b) => sort.dir === 'asc'
+        ? (a.acuracidade_media ?? 0) - (b.acuracidade_media ?? 0)
+        : (b.acuracidade_media ?? 0) - (a.acuracidade_media ?? 0));
+    }
+    if (!sort.field) data.sort((a, b) => (b.acuracidade_media ?? 0) - (a.acuracidade_media ?? 0));
     return data;
-  }, [opCapas, search, sort]);
+  }, [operatorStats, search, sort]);
 
   // ---- VENDAS DATA ----
   const vendasData = useMemo(() => {
@@ -276,8 +273,10 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
       header = 'Linha/Marca;Progresso;Concluidos;Total SKU;Divergencias';
       rows = (andamentoData as typeof andamentoData).map(r => `${r.brand};${r.progress.toFixed(1)}%;${r.doneSku};${r.totalSku};${r.divergences}`);
     } else if (activeTab === 'operadores') {
-      header = 'Linha/Marca;Operador;Acuracidade';
-      rows = (operadoresData as typeof operadoresData).map(r => `${r.nome};${r.resp};${r.valor}`);
+      header = 'Operador;SKUs Contados;Contagens;Divergencias Reais;Acuracidade';
+      rows = (operadoresData as typeof operadoresData).map(r =>
+        `${r.name || '—'};${r.skus_contados};${r.contagens};${r.divergencias_reais};${r.acuracidade_media !== null ? r.acuracidade_media.toFixed(1) + '%' : ''}`
+      );
     } else if (activeTab === 'vendas') {
       header = 'Produto;SKU;Vendas';
       rows = (vendasData as typeof vendasData).map(r => `${r.produto};${r.sku};${r.vendas}`);
@@ -291,7 +290,9 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
   const melhorLinha = melhores[0];
   const piorLinha = piores[0];
   const maiorDiv = [...brandsData].sort((a, b) => b.divergences - a.divergences)[0];
-  const melhorOp = opCapas.find(o => o.valor !== 'Andamento' && o.valor !== '');
+  const melhorOp = [...operatorStats]
+    .filter(o => o.contagens > 0 && o.acuracidade_media !== null)
+    .sort((a, b) => (b.acuracidade_media ?? 0) - (a.acuracidade_media ?? 0))[0];
 
   return (
     <div className="min-h-screen bg-surface">
@@ -358,7 +359,12 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                 />
               </StatCell>
               <StatCell>
-                <Stat label="Melhor Operador" value={melhorOp?.valor ?? '—'} context={melhorOp?.resp} icon={<Users />} />
+                <Stat
+                  label="Melhor Operador"
+                  value={melhorOp ? `${melhorOp.acuracidade_media?.toFixed(1)}%` : '—'}
+                  context={melhorOp?.name ?? undefined}
+                  icon={<Users />}
+                />
               </StatCell>
             </StatRow>
           </PanelSection>
@@ -559,28 +565,34 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({
                 <Thead>
                   <Tr>
                     <Th className="cursor-pointer select-none" onClick={() => handleSort('nome')}>
-                      <span className="flex items-center gap-1">Linha / Marca <SortIcon field="nome" /></span>
+                      <span className="flex items-center gap-1">Operador <SortIcon field="nome" /></span>
                     </Th>
-                    <Th className="text-center cursor-pointer select-none" onClick={() => handleSort('resp')}>
-                      <span className="flex items-center justify-center gap-1">Operador <SortIcon field="resp" /></span>
+                    <Th className="text-center">SKUs Contados</Th>
+                    <Th className="text-center">Contagens</Th>
+                    <Th className="text-center">Divergências Reais</Th>
+                    <Th className="text-right cursor-pointer select-none" onClick={() => handleSort('valor')}>
+                      <span className="flex items-center justify-end gap-1">Acuracidade <SortIcon field="valor" /></span>
                     </Th>
-                    <Th className="text-right">Acuracidade</Th>
                   </Tr>
                 </Thead>
                 <tbody>
-                  {(pagedData as typeof operadoresData).map((row, i) => (
-                    <Tr key={i}>
-                      <Td className="font-medium">{row.nome}</Td>
-                      <Td className="text-center">
-                        <span className="inline-flex items-center justify-center gap-1.5 text-sm font-medium text-fg-muted">
+                  {(pagedData as typeof operadoresData).map((row) => (
+                    <Tr key={row.user_id}>
+                      <Td className="font-medium">
+                        <span className="inline-flex items-center gap-1.5">
                           <Users size={12} className="text-fg-subtle" />
-                          {row.resp}
+                          {row.name || '—'}
                         </span>
                       </Td>
-                      <Td numeric>
-                        {row.valor === 'Andamento'
-                          ? <span className="text-overline">Em Andamento</span>
-                          : <span className="font-semibold text-fg">{row.valor}</span>
+                      <Td numeric className="text-center text-fg-muted">{row.skus_contados}</Td>
+                      <Td numeric className="text-center text-fg-muted">{row.contagens}</Td>
+                      <Td numeric className="text-center">
+                        <span className={metricTone(row.divergencias_reais > 0)}>{row.divergencias_reais}</span>
+                      </Td>
+                      <Td numeric className="text-right">
+                        {row.acuracidade_media !== null
+                          ? <span className="font-semibold text-fg">{row.acuracidade_media.toFixed(1)}%</span>
+                          : <span className="text-overline">—</span>
                         }
                       </Td>
                     </Tr>

@@ -52,6 +52,20 @@ export interface LocalFisico {
   descricao: string;
 }
 
+/** A marca como o Dashboard a carrega de inventory_brands — a entrada do heatmap.
+ *
+ *  heatmapUtils.ts já importava este nome deste arquivo, mas ele nunca foi declarado
+ *  aqui (erro de tipo preexistente na linha 3 de heatmapUtils). Declarado agora porque
+ *  buildHeatmapAreas depende dele. */
+export interface BrandData {
+  id: string;
+  brand: string;
+  total_sku: number;
+  done_sku: number;
+  divergences: number;
+  updated_at?: string;
+}
+
 export interface HeatmapFilters {
   status: StatusFilter;
   marca: string;

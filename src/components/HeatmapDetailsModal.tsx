@@ -2,10 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import {
-  X,
   MapPin,
-  Package,
-  CheckCircle,
   AlertTriangle,
   Clock,
   User,
@@ -19,7 +16,6 @@ import {
   FileDown,
   RefreshCcw,
   Flag,
-  TrendingUp,
   Activity,
 } from 'lucide-react';
 import type { HeatmapArea, LocalFisico } from '../lib/heatmapTypes';
@@ -35,7 +31,7 @@ import {
   getRiskLevelColor,
   generateDiagnosis,
 } from '../lib/heatmapUtils';
-import { Panel, PanelSection } from './ui';
+import { Modal, Panel, PanelSection, Badge } from './ui';
 
 interface HeatmapDetailsModalProps {
   area: HeatmapArea | null;
@@ -135,53 +131,25 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
   };
 
   return (
-    <div className="fixed inset-0 flex items-center justify-center p-4" style={{ zIndex: 'var(--z-modal)' }}>
-      {/* Backdrop */}
-      <div
-        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
-        style={{ zIndex: 'var(--z-modal-backdrop)' }}
-        onClick={onClose}
-      />
-
-      {/* Modal */}
-      <div className="relative bg-surface border border-edge rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-hidden flex flex-col">
-        {/* Header */}
-        <div className={`${bgClass} border-b-2 p-5`}>
-          <div className="flex items-start justify-between">
-            <div className="flex items-center gap-3">
-              <div className="p-2 bg-surface-2/60 rounded-lg relative">
-                <MapPin size={24} className={textClass} />
-                {area.marcadoRecontagem && (
-                  <div className="absolute -top-1 -right-1 w-4 h-4 bg-accent rounded-full flex items-center justify-center">
-                    <RefreshCcw size={10} className="text-white" />
-                  </div>
-                )}
-              </div>
-              <div>
-                <h3 className="text-xl font-bold text-fg">{area.nome}</h3>
-                <div className="flex items-center gap-2 mt-1">
-                  <Tag size={14} className="text-fg-subtle" />
-                  <span className="text-sm text-fg-subtle">{area.marcaNome}</span>
-                  <span className={`text-xs px-2 py-0.5 rounded-full bg-surface-2/60 ${textClass} font-medium`}>
-                    {area.tipo.toUpperCase()}
-                  </span>
-                </div>
-              </div>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 rounded-lg hover:bg-surface-2/60 transition"
-            >
-              <X size={24} className="text-fg-muted" />
-            </button>
-          </div>
+    <Modal open={isOpen} onClose={onClose} title={area.nome} maxWidth="max-w-lg">
+      {/* Identification: brand + type + recount state — was the full-bleed criticality header band */}
+      <div className="flex items-center justify-between gap-3 mb-6">
+        <div className="flex items-center gap-2">
+          <Tag size={14} className="text-fg-subtle" />
+          <span className="text-sm text-fg-subtle">{area.marcaNome}</span>
+          <Badge variant="neutral">{area.tipo.toUpperCase()}</Badge>
         </div>
+        {area.marcadoRecontagem && (
+          <Badge variant="accent">
+            <RefreshCcw size={12} />
+            Recontagem
+          </Badge>
+        )}
+      </div>
 
-        {/* Content */}
-        <div className="flex-1 overflow-y-auto p-5">
-          {/* Risk Score Section */}
-          {area.progresso > 0 && (
-            <div className="mb-6">
+      {/* Risk Score Section */}
+      {area.progresso > 0 && (
+        <div className="mb-6">
               <div className="flex items-center justify-between mb-3">
                 <h4 className="font-semibold text-fg-muted flex items-center gap-2">
                   <AlertOctagon size={18} className="text-fg-subtle" />
@@ -476,52 +444,48 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
               </div>
             )}
           </div>
-        </div>
 
-        {/* Footer Actions */}
-        <div className="border-t border-edge p-4 bg-surface-3">
-          <div className="flex flex-col sm:flex-row gap-2">
-            <button
-              onClick={() => onToggleRecontagem(area.id)}
-              className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
-                area.marcadoRecontagem
-                  ? 'bg-accent text-white hover:bg-accent-strong'
-                  : 'bg-surface-2 border-2 border-accent/40 text-accent hover:bg-accent/10'
-              }`}
-            >
-              <RefreshCcw size={18} />
-              {area.marcadoRecontagem ? 'Remover da Fila' : 'Marcar para Recontagem'}
-            </button>
-            <button
-              onClick={() => onExportReport(area)}
-              className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 text-fg rounded-lg font-medium hover:bg-edge transition"
-            >
-              <FileDown size={18} />
-              Exportar Relatório
-            </button>
-          </div>
-        </div>
-
-        {/* Edit Footer */}
-        {editMode && (
-          <div className="border-t border-edge p-4 bg-surface-3 flex justify-between">
-            <button
-              onClick={handleCancel}
-              className="px-4 py-2 text-fg-muted hover:bg-edge rounded-lg transition"
-            >
-              Cancelar
-            </button>
-            <button
-              onClick={handleSave}
-              disabled={!hasChanges}
-              className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-strong transition disabled:opacity-50 disabled:cursor-not-allowed"
-            >
-              <Save size={18} />
-              Salvar alterações
-            </button>
-          </div>
-        )}
+      {/* Footer Actions */}
+      <div className="flex flex-col sm:flex-row gap-2 pt-4 border-t border-edge">
+        <button
+          onClick={() => onToggleRecontagem(area.id)}
+          className={`flex-1 flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg font-medium transition ${
+            area.marcadoRecontagem
+              ? 'bg-accent text-white hover:bg-accent-strong'
+              : 'bg-surface-2 border-2 border-accent/40 text-accent hover:bg-accent/10'
+          }`}
+        >
+          <RefreshCcw size={18} />
+          {area.marcadoRecontagem ? 'Remover da Fila' : 'Marcar para Recontagem'}
+        </button>
+        <button
+          onClick={() => onExportReport(area)}
+          className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-surface-3 text-fg rounded-lg font-medium hover:bg-edge transition"
+        >
+          <FileDown size={18} />
+          Exportar Relatório
+        </button>
       </div>
-    </div>
+
+      {/* Edit Footer */}
+      {editMode && (
+        <div className="flex justify-between mt-4 pt-4 border-t border-edge">
+          <button
+            onClick={handleCancel}
+            className="px-4 py-2 text-fg-muted hover:bg-edge rounded-lg transition"
+          >
+            Cancelar
+          </button>
+          <button
+            onClick={handleSave}
+            disabled={!hasChanges}
+            className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-strong transition disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            <Save size={18} />
+            Salvar alterações
+          </button>
+        </div>
+      )}
+    </Modal>
   );
 };

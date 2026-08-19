@@ -16,8 +16,13 @@ export function AppHeader({ onOpenMobileNav, left, right, className = '' }: AppH
     // bg-surface-2, not bg-surface: the header is chrome and belongs with the
     // sidebar rail, while `surface` is now the recessed canvas the content
     // panels sit on. Chrome frame light, canvas recessed, panels light again.
+    // A altura cresce com o inset em vez de só ganhar padding: com
+    // `apple-mobile-web-app-status-bar-style: black-translucent` + `viewport-fit=cover`
+    // a webview começa em y=0, embaixo da barra de status. Só padding empurraria o
+    // conteúdo para fora das 4rem e cortaria os controles. No desktop o inset é 0, então
+    // isto resolve exatamente para `h-16` e nada muda.
     <header
-      className={`h-16 flex items-center gap-3 px-4 md:px-7 border-b border-edge/70 bg-surface-2 flex-shrink-0 ${className}`}
+      className={`h-[calc(4rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] flex items-center gap-3 px-4 md:px-7 border-b border-edge/70 bg-surface-2 flex-shrink-0 ${className}`}
     >
       {onOpenMobileNav && (
         <button

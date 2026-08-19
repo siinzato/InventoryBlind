@@ -71,6 +71,7 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>;
   retryAuth: () => void;
   linkToAZ: () => Promise<void>;
+  createCompany: (companyName: string, userName?: string) => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
 }
 
@@ -78,6 +79,25 @@ const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AZ_COMPANY_ID = '00000000-0000-0000-0000-000000000001';
 const AUTH_TIMEOUT_MS = 8000;
+
+// Set by AuthPage's signup form right before calling supabase.auth.signUp(),
+// consumed once inside runAuthSequence on the very next profile load for this
+// user. This has to live in the ONE authoritative auth sequence rather than
+// as a second, separate RPC call fired from AuthPage after signUp() resolves:
+// two independent async paths both trying to set `view` after signup race,
+// and whichever finishes last always wins — confirmed live, the background
+// sequence (triggered by the same SIGNED_IN event) finished after AuthPage's
+// own call and overwrote the correct post-onboarding view with a stale,
+// pre-onboarding snapshot it had already read.
+let pendingCompanyOnboarding: { companyName: string; userName?: string } | null = null;
+
+export function setPendingCompanyOnboarding(companyName: string, userName?: string) {
+  pendingCompanyOnboarding = { companyName, userName };
+}
+
+export function clearPendingCompanyOnboarding() {
+  pendingCompanyOnboarding = null;
+}
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -96,11 +116,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const mountedRef    = useRef(true);
   const timeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef    = useRef(false); // prevents concurrent profile loads
+  const authLoadingRef = useRef(authLoading); // live value for the one-shot timeout effect below
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  useEffect(() => {
+    authLoadingRef.current = authLoading;
+  }, [authLoading]);
 
   // ── Fetch profile + company ────────────────────────────────────────────────
   const doLoadProfile = useCallback(async (u: User): Promise<Profile | null> => {
@@ -190,8 +215,26 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfileLoading(true);
 
     try {
-      const prof = await doLoadProfile(u);
+      let prof = await doLoadProfile(u);
       if (!mountedRef.current) return;
+
+      if (prof && !prof.company_id && pendingCompanyOnboarding) {
+        const { companyName, userName } = pendingCompanyOnboarding;
+        pendingCompanyOnboarding = null;
+        try {
+          const { data, error } = await supabase.rpc('create_company_onboarding', {
+            p_company_name: companyName,
+            p_user_name: userName ?? null,
+          });
+          if (!error && data?.[0]?.out_company_id) {
+            prof = { ...prof, company_id: data[0].out_company_id, role: 'owner' };
+          } else if (import.meta.env.DEV) {
+            console.error('[Auth] create_company_onboarding failed:', error?.message);
+          }
+        } catch (onboardErr) {
+          if (import.meta.env.DEV) console.error('[Auth] create_company_onboarding threw:', onboardErr);
+        }
+      }
 
       setProfile(prof);
 
@@ -227,7 +270,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     // Hard timeout so authLoading never stays true forever
     timeoutRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
-      if (authLoading) {
+      if (authLoadingRef.current) {
         if (import.meta.env.DEV) console.warn('[Auth] Timeout reached');
         setAuthLoading(false);
         setAuthError('O carregamento demorou demais. Verifique sua conexão.');
@@ -260,6 +303,16 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         });
         return;
       }
+
+      // TOKEN_REFRESHED fires on every background session revalidation —
+      // including regaining tab focus, since Supabase re-checks the session
+      // on visibilitychange — with the same still-valid user. session/user
+      // state is already updated above; re-running the full profile/company/
+      // workspace resolution here would force `view` back through
+      // resolveView's workspace-selector gate even though the user is
+      // already settled in 'app'. That is what caused the workspace
+      // selector to reappear on tab-switch-and-return.
+      if (event === 'TOKEN_REFRESHED') return;
 
       // User exists — defer DB queries so JWT is committed first
       const capturedUser = s.user;
@@ -352,6 +405,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await runAuthSequence(user);
   }, [user, runAuthSequence]);
 
+  // ── createCompany — onboarding for a brand-new, company-less user ─────────
+  const createCompany = useCallback(async (companyName: string, userName?: string) => {
+    if (!user) throw new Error('No authenticated user');
+
+    const { error } = await supabase.rpc('create_company_onboarding', {
+      p_company_name: companyName,
+      p_user_name: userName ?? null,
+    });
+
+    if (error) throw new Error(error.message);
+
+    loadingRef.current = false;
+    await runAuthSequence(user);
+  }, [user, runAuthSequence]);
+
   // ── switchCompany ─────────────────────────────────────────────────────────
   const switchCompany = useCallback(async (targetCompanyId: string) => {
     if (!user) return;
@@ -389,6 +457,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshProfile,
     retryAuth,
     linkToAZ,
+    createCompany,
     switchCompany,
   };
 

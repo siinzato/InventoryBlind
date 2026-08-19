@@ -2,8 +2,9 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { SafeDropdown } from './SafeDropdown';
+import { Modal } from './ui';
 import {
-  Plus, Calendar, RefreshCw, X, Check, Pencil, AlertTriangle,
+  Plus, Calendar, RefreshCw, Check, Pencil, AlertTriangle,
   Package, User, Clock,
 } from 'lucide-react';
 import type { FullOperation, FullStatus } from '../lib/fullManagerTypes';
@@ -124,80 +125,74 @@ const AgendaModal: React.FC<{
   };
 
   return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/50 p-4" onClick={e => e.target === e.currentTarget && onClose()}>
-      <div className="bg-surface-2 rounded-2xl shadow-2xl w-full max-w-lg max-h-[90vh] overflow-y-auto">
-        <div className="px-6 py-5 border-b border-edge flex items-center justify-between">
-          <h2 className="font-bold text-fg text-lg">{initial ? 'Editar Agendamento' : 'Novo Agendamento'}</h2>
-          <button onClick={onClose} className="text-fg-subtle hover:text-fg-muted"><X size={20} /></button>
+    <Modal open onClose={onClose} title={initial ? 'Editar Agendamento' : 'Novo Agendamento'} maxWidth="max-w-lg">
+      <form onSubmit={handleSubmit} className="space-y-4">
+        <div className="grid grid-cols-2 gap-3">
+          <div className="col-span-2">
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Número do FULL *</label>
+            <input value={form.full_number} onChange={e => set('full_number', e.target.value)} required
+              placeholder="Ex: 803458905"
+              className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Marketplace</label>
+            <select value={form.marketplace} onChange={e => set('marketplace', e.target.value)}
+              className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
+              {MARKETPLACES.map(m => <option key={m}>{m}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Status</label>
+            <select value={form.status} onChange={e => set('status', e.target.value as FullStatus)}
+              className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
+              {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Data</label>
+            <input type="date" value={form.scheduled_date} onChange={e => set('scheduled_date', e.target.value)}
+              className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Horário</label>
+            <input type="time" value={form.scheduled_time} onChange={e => set('scheduled_time', e.target.value)}
+              className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Responsável</label>
+            <input value={form.responsible} onChange={e => set('responsible', e.target.value)}
+              placeholder="Nome do responsável"
+              className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">SKUs previstos</label>
+            <input type="number" min="0" value={form.total_sku} onChange={e => set('total_sku', e.target.value)}
+              className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Peças previstas</label>
+            <input type="number" min="0" value={form.total_pieces} onChange={e => set('total_pieces', e.target.value)}
+              className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Observações</label>
+            <textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)}
+              className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
+          </div>
         </div>
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4">
-          <div className="grid grid-cols-2 gap-3">
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Número do FULL *</label>
-              <input value={form.full_number} onChange={e => set('full_number', e.target.value)} required
-                placeholder="Ex: 803458905"
-                className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Marketplace</label>
-              <select value={form.marketplace} onChange={e => set('marketplace', e.target.value)}
-                className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
-                {MARKETPLACES.map(m => <option key={m}>{m}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Status</label>
-              <select value={form.status} onChange={e => set('status', e.target.value as FullStatus)}
-                className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
-                {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Data</label>
-              <input type="date" value={form.scheduled_date} onChange={e => set('scheduled_date', e.target.value)}
-                className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Horário</label>
-              <input type="time" value={form.scheduled_time} onChange={e => set('scheduled_time', e.target.value)}
-                className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Responsável</label>
-              <input value={form.responsible} onChange={e => set('responsible', e.target.value)}
-                placeholder="Nome do responsável"
-                className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">SKUs previstos</label>
-              <input type="number" min="0" value={form.total_sku} onChange={e => set('total_sku', e.target.value)}
-                className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
-            </div>
-            <div>
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Peças previstas</label>
-              <input type="number" min="0" value={form.total_pieces} onChange={e => set('total_pieces', e.target.value)}
-                className="w-full px-3 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Observações</label>
-              <textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)}
-                className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
-            </div>
-          </div>
-          <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={saving}
-              className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
-              {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
-              {initial ? 'Salvar alterações' : 'Criar agendamento'}
-            </button>
-            <button type="button" onClick={onClose}
-              className="px-4 py-2.5 border border-edge text-fg-muted rounded-lg text-sm font-semibold hover:bg-surface-3 transition">
-              Cancelar
-            </button>
-          </div>
-        </form>
-      </div>
-    </div>
+        <div className="flex gap-3 pt-2">
+          <button type="submit" disabled={saving}
+            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+            {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
+            {initial ? 'Salvar alterações' : 'Criar agendamento'}
+          </button>
+          <button type="button" onClick={onClose}
+            className="px-4 py-2.5 border border-edge text-fg-muted rounded-lg text-sm font-semibold hover:bg-surface-3 transition">
+            Cancelar
+          </button>
+        </div>
+      </form>
+    </Modal>
   );
 };
 

@@ -216,6 +216,7 @@ export async function startSession(sessionId: string): Promise<void> {
 }
 
 export async function registerCount(params: {
+  companyId: string;
   itemId: string;
   mode: CountMode;
   quantity: number;
@@ -223,6 +224,7 @@ export async function registerCount(params: {
   idempotencyKey: string;
 }): Promise<number> {
   const entry: QueuedCount = {
+    companyId: params.companyId,
     itemId: params.itemId,
     mode: params.mode,
     quantity: params.quantity,
@@ -269,8 +271,8 @@ export async function flagFoundElsewhere(params: { itemId: string; foundLocation
 }
 
 /** Retries every locally-queued count with its original idempotency key. Call on reconnect. */
-export async function flushPendingCounts(): Promise<{ flushed: number; stillPending: number }> {
-  const pending = listPending();
+export async function flushPendingCounts(companyId: string): Promise<{ flushed: number; stillPending: number }> {
+  const pending = listPending(companyId);
   let flushed = 0;
   for (const entry of pending) {
     try {
@@ -288,7 +290,7 @@ export async function flushPendingCounts(): Promise<{ flushed: number; stillPend
       // Still offline or a real error — leave it queued, try again next flush.
     }
   }
-  return { flushed, stillPending: listPending().length };
+  return { flushed, stillPending: listPending(companyId).length };
 }
 
 export async function finalizeSession(sessionId: string): Promise<string> {

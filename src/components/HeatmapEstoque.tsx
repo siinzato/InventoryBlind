@@ -1,15 +1,18 @@
 // Main Heatmap Component
 
-import React, { useState, useMemo, useCallback } from 'react';
-import { Grid3X3, List, BarChart3, Map, RefreshCw, AlertTriangle, FileDown, Download } from 'lucide-react';
+import React, { useState, useMemo, useCallback, useEffect } from 'react';
+// `Map as MapIcon`: o ícone homônimo sombreava o Map nativo, e o estado de detalhes por
+// marca é um Map de verdade.
+import { Grid3X3, List, BarChart3, Map as MapIcon, RefreshCw, AlertTriangle, FileDown, Download } from 'lucide-react';
 import type { HeatmapArea, HeatmapFilters, ViewMode } from '../lib/heatmapTypes';
 import {
   filterHeatmapAreas,
   calculateHeatmapStats,
-  generateMockHeatmapData,
+  buildHeatmapAreas,
   getTopCriticalAreas,
   calculateRiskScore,
 } from '../lib/heatmapUtils';
+import { getBrandCountDetails, type BrandCountDetail } from '../lib/heatmapService';
 import { HeatmapFiltersComponent } from './HeatmapFilters';
 import { HeatmapLegend } from './HeatmapLegend';
 import { HeatmapCard } from './HeatmapCard';
@@ -26,6 +29,7 @@ interface HeatmapEstoqueProps {
     divergences: number;
     updated_at?: string;
   }>;
+  companyId: string;
   onRequestAdminAccess: () => void;
   isAdmin: boolean;
   onLogout: () => void;
@@ -41,6 +45,7 @@ const defaultFilters: HeatmapFilters = {
 
 export const HeatmapEstoque: React.FC<HeatmapEstoqueProps> = ({
   brandsData,
+  companyId,
   onRequestAdminAccess,
   isAdmin,
   onLogout,
@@ -49,15 +54,27 @@ export const HeatmapEstoque: React.FC<HeatmapEstoqueProps> = ({
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [selectedArea, setSelectedArea] = useState<HeatmapArea | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [areas, setAreas] = useState<HeatmapArea[]>(() => generateMockHeatmapData(brandsData));
+  /** Edições locais do modal (locais físicos, recontagem). `null` = ainda não editado,
+   *  e nesse caso as áreas vêm direto das marcas + contagens reais. */
+  const [areas, setAreas] = useState<HeatmapArea[] | null>(null);
+  /** Responsável, SKUs divergentes e locais reais, por marca. */
+  const [details, setDetails] = useState<Map<string, BrandCountDetail>>(new Map());
 
-  // Generate heatmap data from brands
-  const heatmapAreas = useMemo(() => {
-    if (areas.length === 0 && brandsData.length > 0) {
-      return generateMockHeatmapData(brandsData);
-    }
-    return areas;
-  }, [brandsData, areas]);
+  useEffect(() => {
+    let cancelled = false;
+    getBrandCountDetails(companyId).then(loaded => {
+      if (!cancelled) setDetails(loaded);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [companyId]);
+
+  // Áreas derivadas das marcas reais + o que foi realmente contado.
+  const heatmapAreas = useMemo(
+    () => areas ?? buildHeatmapAreas(brandsData, details),
+    [areas, brandsData, details]
+  );
 
   // Filter and sort areas
   const filteredAreas = useMemo(() => {
@@ -105,17 +122,19 @@ export const HeatmapEstoque: React.FC<HeatmapEstoqueProps> = ({
 
   // Handle save locais fisicos
   const handleSaveLocais = useCallback((areaId: string, locais: Array<{ id: string; nome: string; descricao: string }>) => {
-    setAreas(prev => prev.map(area => {
+    // `prev ?? heatmapAreas`: a primeira edição parte das áreas derivadas dos dados
+    // reais, e não de um array vazio.
+    setAreas(prev => (prev ?? heatmapAreas).map(area => {
       if (area.id === areaId) {
         return { ...area, locaisFisicos: locais };
       }
       return area;
     }));
-  }, []);
+  }, [heatmapAreas]);
 
   // Toggle recontagem
   const handleToggleRecontagem = useCallback((areaId: string) => {
-    setAreas(prev => prev.map(area => {
+    setAreas(prev => (prev ?? heatmapAreas).map(area => {
       if (area.id === areaId) {
         return { ...area, marcadoRecontagem: !area.marcadoRecontagem };
       }
@@ -128,7 +147,7 @@ export const HeatmapEstoque: React.FC<HeatmapEstoqueProps> = ({
       }
       return prev;
     });
-  }, []);
+  }, [heatmapAreas]);
 
   // Export report
   const handleExportReport = useCallback((area: HeatmapArea) => {
@@ -189,10 +208,11 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
     URL.revokeObjectURL(url);
   }, []);
 
-  // Refresh data
+  // Refresh data — descarta as edições locais e recarrega as contagens do banco.
   const handleRefresh = useCallback(() => {
-    setAreas(generateMockHeatmapData(brandsData));
-  }, [brandsData]);
+    setAreas(null);
+    void getBrandCountDetails(companyId).then(setDetails);
+  }, [companyId]);
 
   // Count areas marked for recount
   const areasParaRecontagem = useMemo(() => {
@@ -204,7 +224,7 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
       {/* Header */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-6">
         <div className="flex items-center gap-3">
-          <Map size={24} className="text-accent flex-shrink-0" />
+          <MapIcon size={24} className="text-accent flex-shrink-0" />
           <div>
             <h1 className="text-display">Heatmap do Estoque</h1>
             <p className="text-sm text-fg-muted mt-1">Visualize a saúde do seu estoque com score de risco inteligente</p>

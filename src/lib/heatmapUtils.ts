@@ -1,6 +1,7 @@
 // Heatmap Utilities
 
 import type { HeatmapArea, HeatmapStats, CriticalityLevel, HeatmapFilters, BrandData, RiskLevel, RiskDiagnosis } from './heatmapTypes';
+import type { BrandCountDetail } from './heatmapService';
 
 // Calculate progress percentage
 export const calculateProgress = (concluidos: number, totalSku: number): number => {
@@ -327,28 +328,37 @@ export const calculateHeatmapStats = (areas: HeatmapArea[]): HeatmapStats => {
   };
 };
 
-// Generate mock heatmap data from brands
-export const generateMockHeatmapData = (brands: BrandData[]): HeatmapArea[] => {
-  return brands.map((brand, index) => {
+/** Monta as áreas do heatmap a partir das marcas reais.
+ *
+ *  Substituiu generateMockHeatmapData, que fabricava responsável, SKUs divergentes e
+ *  locais físicos a partir do ÍNDICE da marca no array — nomes de uma lista fixa
+ *  (Ana/João/Maria…), SKUs `SKU-ABC-1000` e endereços `Rua A / Vão 2` que nunca
+ *  existiram no banco. As métricas sempre foram reais; o que estava inventado era a
+ *  atribuição ao redor delas, que é justamente o que alguém usa para decidir com quem
+ *  falar e onde ir recontar.
+ *
+ *  `details` vem de heatmapService.getBrandCountDetails. Marca sem contagem registrada
+ *  fica com os campos vazios — a tela já trata isso ("Não definido", listas escondidas),
+ *  que é a leitura correta de "ainda não foi contado". */
+export const buildHeatmapAreas = (
+  brands: BrandData[],
+  details?: Map<string, BrandCountDetail>
+): HeatmapArea[] => {
+  return brands.map(brand => {
     const concluidos = brand.done_sku;
     const totalSku = brand.total_sku;
     const divergencias = brand.divergences;
     const progresso = calculateProgress(concluidos, totalSku);
     const acuracidade = calculateAccuracy(concluidos, divergencias);
-
-    const locaisFisicos: { id: string; nome: string; descricao: string }[] = [];
-
-    // Generate mock physical locations based on brand
-    const ruas = ['A', 'B', 'C', 'D'];
-    const ruaBase = ruas[index % ruas.length];
-    const vao = Math.floor(index / 2) + 1;
-
-    const tipos = ['linha', 'rua', 'vao', 'setor', 'excesso'] as const;
+    const detail = details?.get(brand.id);
 
     return {
       id: `area-${brand.id}`,
       nome: brand.brand,
-      tipo: tipos[index % tipos.length],
+      // Uma área do heatmap é uma MARCA, não um endereço do armazém. O tipo ciclava
+      // entre linha/rua/vão/setor/excesso pelo índice, o que rotulava a mesma marca de
+      // forma diferente só por ter mudado de posição na lista.
+      tipo: 'setor',
       marcaId: brand.id,
       marcaNome: brand.brand,
       totalSku,
@@ -356,17 +366,11 @@ export const generateMockHeatmapData = (brands: BrandData[]): HeatmapArea[] => {
       divergencias,
       acuracidade: parseFloat(acuracidade.toFixed(1)),
       progresso: parseFloat(progresso.toFixed(1)),
-      responsavel: ['Ana', 'João', 'Maria', 'Carlos', 'Pedro', 'Lucia'][index % 6],
-      ultimaAtualizacao: brand.updated_at || new Date().toISOString(),
-      observacoes: '',
-      produtosDivergentes: divergencias > 0
-        ? Array(Math.min(divergencias, 5)).fill(0).map((_, i) => `SKU-${brand.brand.slice(0, 3).toUpperCase()}-${1000 + i}`)
-        : [],
-      locaisFisicos: locaisFisicos.length > 0 ? locaisFisicos : [
-        { id: `lf-${brand.id}-1`, nome: `Rua ${ruaBase}`, descricao: `Corredor principal, vao ${vao}` },
-        { id: `lf-${brand.id}-2`, nome: `Vão ${vao}`, descricao: `Altura: 3 prateleiras` },
-        { id: `lf-${brand.id}-3`, nome: `Prateleira ${vao + 1}`, descricao: `Estoque de reserva` }
-      ]
+      responsavel: detail?.responsavel ?? '',
+      ultimaAtualizacao: detail?.ultimaAtualizacao || brand.updated_at || '',
+      observacoes: detail?.observacoes ?? '',
+      produtosDivergentes: detail?.produtosDivergentes ?? [],
+      locaisFisicos: detail?.locaisFisicos ?? [],
     };
   });
 };

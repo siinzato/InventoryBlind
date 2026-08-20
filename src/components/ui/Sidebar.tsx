@@ -170,7 +170,11 @@ export function Sidebar({ groups, header, footer, collapsed = false, onToggleCol
               return (
                 <div key={group.id}>
                   {group.sectionLabel && (
-                    <p className="text-overline px-3 mt-6 mb-2 truncate">{group.sectionLabel}</p>
+                    // Wraps instead of truncating: a caption has vertical room to spare, and
+                    // wrapping guarantees the full text is always readable — no single-line
+                    // width math that a long label ("Operação Inteligente", "Aprendizado e
+                    // Gestão") can end up right at the edge of.
+                    <p className="text-overline px-3 mt-6 mb-2 leading-snug">{group.sectionLabel}</p>
                   )}
 
                   <button

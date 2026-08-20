@@ -6,9 +6,15 @@
 # Authenticated endpoints — JWT verification ON (the default).
 npx supabase functions deploy integration-sync
 npx supabase functions deploy integration-stock-write
+npx supabase functions deploy nfe-fetch-by-key
 
 # Webhook endpoint — JWT verification OFF, and this flag is REQUIRED.
 npx supabase functions deploy integration-webhook --no-verify-jwt
+
+# Configurações Avançadas — chamador externo (chave de API) ou cron
+# (segredo próprio), nunca um JWT do Supabase. JWT verification OFF em ambos.
+npx supabase functions deploy public-api --no-verify-jwt
+npx supabase functions deploy webhook-dispatch --no-verify-jwt
 ```
 
 ### What each one does
@@ -18,6 +24,9 @@ npx supabase functions deploy integration-webhook --no-verify-jwt
 | `integration-sync` | Provider → InventoryBlind | Reads stock, maps, applies the conflict policy. Refuses outbound with a 409 pointing here. |
 | `integration-stock-write` | InventoryBlind → Provider | The **only** path that changes an ERP balance. Sends approved adjustments, one at a time, each re-guarded against a freshly read balance. |
 | `integration-webhook` | Provider → InventoryBlind | Verifies, records, enqueues. Never syncs inline. |
+| `nfe-fetch-by-key` | InventoryBlind → provedor de NF-e (Meu Danfe) | Busca a NF-e pela chave de acesso e devolve o XML puro; a importação em si (parsing, vínculo produto-a-produto, criação do registro) roda no client, pelo mesmo caminho da importação manual (`importNfeXml`). |
+| `public-api` | Terceiro → InventoryBlind | Configurações Avançadas > API. Autentica por chave de API (hash SHA-256, nunca texto puro); único endpoint real desta v1: `GET /stock?sku=` devolve saldo/local do produto, escopado pela empresa da própria chave. |
+| `webhook-dispatch` | InventoryBlind → Terceiro | Configurações Avançadas > Webhooks. Consome `company_webhook_deliveries` pelo cron a cada minuto, assina HMAC-SHA256, entrega com a mesma defesa SSRF (DNS + IP fixado) de `automation-run`, no máximo 3 tentativas. |
 
 `integration-stock-write` is the sensitive one. Three properties worth keeping in
 mind before changing it:
@@ -72,6 +81,20 @@ service-role key must be set. It is used for exactly one query — reading
 `integration_credentials` — and never for the data path, because `service_role`
 bypasses RLS.
 
+`nfe-fetch-by-key` reads `SUPABASE_URL`/`SUPABASE_ANON_KEY` (platform-injected,
+same as every other user-authenticated function) plus `MEUDANFE_API_KEY` —
+the Meu Danfe (api.meudanfe.com.br/v2) API key, function-only secret, never a
+`VITE_*` client env var. Set it with:
+
+```bash
+npx supabase secrets set MEUDANFE_API_KEY=<sua-chave>
+```
+
+`public-api` e `webhook-dispatch` não precisam de nenhum secret novo: só
+`SUPABASE_URL`/`SUPABASE_SERVICE_ROLE_KEY` (platform-injected). O segredo do
+cron de `webhook-dispatch` (`company_webhook_cron_secret`) vive só no Vault,
+gerado pela migration 064 — nunca um env var de função.
+
 ## Scheduling
 
 Active. Migration 046 installed `pg_cron` and registered three jobs:
@@ -81,6 +104,7 @@ Active. Migration 046 installed `pg_cron` and registered three jobs:
 | `integration-enqueue-due-syncs` | `*/5 * * * *` | Creates a pending sync run for every connection whose interval has elapsed. |
 | `integration-reap-stuck-jobs` | `*/15 * * * *` | Releases runs stuck in `running` past 30 minutes. Without it, one dead worker blocks that connection forever. |
 | `integration-prune-webhook-payloads` | `17 3 * * *` | Drops processed webhook bodies after 7 days. The hash and event id stay, so replay protection still covers old deliveries. |
+| `company-webhook-dispatch-pending` | `* * * * *` | Migration 064. Only calls `webhook-dispatch` when a delivery is actually due — no-op otherwise. |
 
 The per-connection cadence lives in `integration_connections.sync_interval_minutes`;
 the 5-minute job is only how often we look at the clock.

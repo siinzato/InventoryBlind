@@ -10,12 +10,21 @@
  * See supabase/migrations/20260811120000_038_company_onboarding_rpc.sql.
  */
 
-import React, { useState, useRef } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { Eye, EyeOff, ArrowLeft, ArrowRight, Check, Mail, Lock, User, Building2, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { useAuth, setPendingCompanyOnboarding, clearPendingCompanyOnboarding } from '../lib/auth';
+import {
+  useAuth,
+  setPendingCompanyOnboarding,
+  clearPendingCompanyOnboarding,
+  setPendingSignupEmail,
+  getPendingSignupEmail,
+  clearPendingSignupEmail,
+} from '../lib/auth';
 import { LogoMark } from './landing/landingUi';
 import { motion, MagneticButton, useReducedMotion } from './landing/landingMotion';
+import { LEGAL_ROUTES } from '../lib/legal/legalRoutes';
+import { recordAcceptance } from '../lib/legal/legalService';
 import { useGSAP, gsap } from './landing/landingScroll';
 
 // ── Shared input component ────────────────────────────────────────────────────
@@ -54,6 +63,53 @@ const Input: React.FC<{
       {suffix && <div className="absolute right-3 top-1/2 -translate-y-1/2">{suffix}</div>}
     </div>
     {error && <p className="mt-1.5 text-xs text-red-400 flex items-center gap-1"><AlertCircle size={11} />{error}</p>}
+  </div>
+);
+
+const GoogleIcon: React.FC = () => (
+  <svg viewBox="0 0 24 24" width="17" height="17" aria-hidden="true">
+    <path fill="#4285F4" d="M21.6 12.23c0-.71-.06-1.4-.18-2.07H12v3.92h5.38a4.6 4.6 0 0 1-2 3.02v2.54h3.24c1.9-1.75 2.98-4.32 2.98-7.41Z" />
+    <path fill="#34A853" d="M12 22c2.7 0 4.97-.9 6.63-2.43l-3.24-2.54c-.9.6-2.05.96-3.39.96-2.61 0-4.82-1.76-5.61-4.13H3.04v2.62A10 10 0 0 0 12 22Z" />
+    <path fill="#FBBC05" d="M6.39 13.86A6.02 6.02 0 0 1 6.08 12c0-.65.11-1.28.31-1.86V7.52H3.04A10 10 0 0 0 2 12c0 1.61.38 3.14 1.04 4.48l3.35-2.62Z" />
+    <path fill="#EA4335" d="M12 6.01c1.47 0 2.79.5 3.83 1.5l2.87-2.87A9.61 9.61 0 0 0 12 2a10 10 0 0 0-8.96 5.52l3.35 2.62C7.18 7.77 9.39 6.01 12 6.01Z" />
+  </svg>
+);
+
+const GoogleAuthButton: React.FC<{ label?: string }> = ({ label = 'Continuar com Google' }) => {
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleGoogle = async () => {
+    setError('');
+    setLoading(true);
+    const { error: oauthError } = await supabase.auth.signInWithOAuth({
+      provider: 'google',
+      options: { redirectTo: window.location.origin },
+    });
+
+    if (oauthError) {
+      setError('Não foi possível conectar ao Google. Tente novamente.');
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div>
+      <button type="button" onClick={handleGoogle} disabled={loading}
+        className="w-full flex items-center justify-center gap-3 px-5 py-3.5 bg-white hover:bg-zinc-100 disabled:opacity-60 text-zinc-800 border border-zinc-200 rounded-xl font-semibold text-sm transition">
+        {loading ? <RefreshCw size={17} className="animate-spin" /> : <GoogleIcon />}
+        {loading ? 'Abrindo Google...' : label}
+      </button>
+      {error && <p className="mt-2 text-center text-xs text-red-400">{error}</p>}
+    </div>
+  );
+};
+
+const AuthDivider: React.FC = () => (
+  <div className="flex items-center gap-3 my-5" aria-hidden="true">
+    <div className="h-px flex-1 bg-ink-700" />
+    <span className="text-[11px] uppercase tracking-wider text-mist-400/60">ou</span>
+    <div className="h-px flex-1 bg-ink-700" />
   </div>
 );
 
@@ -293,18 +349,36 @@ const LoginScreen: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </MagneticButton>
             </form>
 
+            <AuthDivider />
+            <GoogleAuthButton />
+
             <p className="text-center text-sm text-mist-400 mt-6">
               Ainda não possui acesso?{' '}
               <button onClick={() => setView('signup')} className="text-enterprise-400 hover:text-enterprise-300 font-semibold transition">
                 Criar conta →
               </button>
             </p>
+
+            <LegalLinks />
           </div>
         </div>
       </div>
     </div>
   );
 };
+
+/** Termos e Privacidade acessíveis a partir da autenticação, sem login. */
+const LegalLinks: React.FC = () => (
+  <p className="mt-6 text-center text-xs text-mist-400/70">
+    <a href={LEGAL_ROUTES.terms} className="underline hover:text-mist-100">
+      Termos de Uso
+    </a>
+    {' · '}
+    <a href={LEGAL_ROUTES.privacy} className="underline hover:text-mist-100">
+      Política de Privacidade
+    </a>
+  </p>
+);
 
 // ── Signup ────────────────────────────────────────────────────────────────────
 
@@ -327,6 +401,9 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const [loading, setLoading] = useState(false);
   const [errors, setErrors] = useState<Record<string, string>>({});
   const [globalError, setGlobalError] = useState('');
+  // Nunca começa marcado. O aceite é registrado no banco depois que a sessão
+  // existe (ver o comentário em handleSignup).
+  const [acceptedTerms, setAcceptedTerms] = useState(false);
 
   const validate = () => {
     const e: Record<string, string> = {};
@@ -335,6 +412,7 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (!email.trim() || !/^[^@]+@[^@]+\.[^@]+$/.test(email)) e.email = 'E-mail inválido.';
     if (password.length < 6) e.password = 'Senha deve ter ao menos 6 caracteres.';
     if (password !== confirm) e.confirm = 'As senhas não coincidem.';
+    if (!acceptedTerms) e.terms = 'É necessário aceitar os Termos de Uso para criar a conta.';
     return e;
   };
 
@@ -360,16 +438,20 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       // handle_new_user creates a company-less profile (role='viewer') —
       // company_id/role in metadata are ignored by design, so we don't send
       // them here.
-      const { error: signupErr } = await supabase.auth.signUp({
+      setPendingSignupEmail(email.trim());
+
+      const { data: signupData, error: signupErr } = await supabase.auth.signUp({
         email: email.trim(),
         password,
         options: {
-          data: { name: name.trim() },
+          emailRedirectTo: `${window.location.origin}/?flow=email-confirmation`,
+          data: { name: name.trim(), company_name: company.trim() },
         },
       });
 
       if (signupErr) {
         clearPendingCompanyOnboarding();
+        clearPendingSignupEmail();
         if (signupErr.message.includes('already registered')) {
           setGlobalError('Este e-mail já está cadastrado. Faça login ou recupere sua senha.');
         } else {
@@ -378,10 +460,33 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         return;
       }
 
-      // No setView here — onAuthStateChange's runAuthSequence (triggered by
-      // this same signUp() call) creates the company and resolves the view.
+      // Aceite legal: só pode ser gravado com sessão ativa, porque a RPC
+      // resolve o usuário por auth.uid() e a RLS depende dele.
+      //
+      // Com confirmação de e-mail ligada (o caso normal aqui) o signUp NÃO
+      // devolve sessão, então não há como registrar agora. Isso é tratado, não
+      // ignorado: o LegalAcceptanceGate pede o aceite no primeiro acesso
+      // autenticado. O cadastro não fica pela metade em nenhum dos caminhos.
+      //
+      // Quando a sessão já vem (confirmação desligada), registra aqui para a
+      // pessoa não ver o pedido duas vezes. Best-effort de propósito: falhar o
+      // cadastro por causa do registro do aceite seria pior — a conta já existe,
+      // e o gate cobre a pendência.
+      if (signupData.session) {
+        try {
+          await recordAcceptance();
+        } catch (acceptErr) {
+          console.warn('[Legal] Aceite será solicitado no primeiro acesso:', acceptErr);
+        }
+      }
+
+      // With confirmation enabled Supabase intentionally returns no session;
+      // show the confirmation screen and keep onboarding in sessionStorage so
+      // it survives the redirect/reload caused by the email link.
+      if (!signupData.session) setView('confirm-email');
     } catch (err: unknown) {
       clearPendingCompanyOnboarding();
+      clearPendingSignupEmail();
       setGlobalError(err instanceof Error ? err.message : 'Erro ao criar conta.');
     } finally {
       setLoading(false);
@@ -466,6 +571,48 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
                 placeholder="Repita a senha" autoComplete="new-password" error={errors.confirm}
                 icon={<Lock size={15} />} />
 
+              {/* Aceite explícito, obrigatório e nunca pré-marcado. Substitui o
+                  aviso passivo que havia aqui, cujos links eram href="#". */}
+              <label className="flex items-start gap-3 text-xs leading-relaxed text-mist-300">
+                <input
+                  type="checkbox"
+                  checked={acceptedTerms}
+                  onChange={e => setAcceptedTerms(e.target.checked)}
+                  disabled={loading}
+                  aria-invalid={Boolean(errors.terms)}
+                  aria-describedby={errors.terms ? 'signup-terms-error' : undefined}
+                  className="mt-0.5 h-4 w-4 shrink-0 rounded border-mist-500/40 bg-ink-900 text-enterprise-500 focus:ring-2 focus:ring-enterprise-500/40"
+                />
+                <span>
+                  Li e aceito os{' '}
+                  <a
+                    href={LEGAL_ROUTES.terms}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-mist-100"
+                  >
+                    Termos de Uso
+                  </a>{' '}
+                  e declaro que tive acesso à{' '}
+                  <a
+                    href={LEGAL_ROUTES.privacy}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="underline hover:text-mist-100"
+                  >
+                    Política de Privacidade
+                  </a>
+                  .
+                </span>
+              </label>
+              <div aria-live="polite">
+                {errors.terms && (
+                  <p id="signup-terms-error" className="text-xs text-red-400">
+                    {errors.terms}
+                  </p>
+                )}
+              </div>
+
               <MagneticButton
                 type="submit"
                 disabled={loading}
@@ -480,10 +627,13 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </MagneticButton>
             </form>
 
-            <p className="text-xs text-mist-400/70 text-center mt-5 leading-relaxed">
-              Ao criar uma conta você concorda com os <a href="#" className="underline hover:text-mist-100">Termos de Uso</a> e a{' '}
-              <a href="#" className="underline hover:text-mist-100">Política de Privacidade</a>.
-            </p>
+            <AuthDivider />
+            {/* O cadastro por Google não passa por este formulário, então não
+                mostra o checkbox. O aceite dessas contas é pedido no primeiro
+                acesso pelo LegalAcceptanceGate — nenhuma conta entra sem aceite. */}
+            <GoogleAuthButton label="Cadastrar com Google" />
+
+            <LegalLinks />
 
             <p className="text-center text-sm text-mist-400 mt-5">
               Já possui uma conta?{' '}
@@ -511,7 +661,7 @@ const ForgotView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
     if (!email.trim()) { setError('Informe seu e-mail.'); return; }
     setLoading(true);
     const { error: err } = await supabase.auth.resetPasswordForEmail(email.trim(), {
-      redirectTo: `${window.location.origin}`,
+      redirectTo: `${window.location.origin}/?flow=password-recovery`,
     });
     setLoading(false);
     if (err) setError(err.message);
@@ -557,19 +707,128 @@ const ForgotView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   );
 };
 
+// ── Update Password ───────────────────────────────────────────────────────────
+
+const UpdatePasswordView: React.FC = () => {
+  const { setView, signOut } = useAuth();
+  const [password, setPassword] = useState('');
+  const [confirm, setConfirm] = useState('');
+  const [showPw, setShowPw] = useState(false);
+  const [loading, setLoading] = useState(false);
+  const [success, setSuccess] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleUpdate = async (event: React.FormEvent) => {
+    event.preventDefault();
+    setError('');
+
+    if (password.length < 8) {
+      setError('A nova senha deve ter ao menos 8 caracteres.');
+      return;
+    }
+    if (password !== confirm) {
+      setError('As senhas não coincidem.');
+      return;
+    }
+
+    setLoading(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    setLoading(false);
+
+    if (updateError) {
+      setError(updateError.message);
+      return;
+    }
+
+    setSuccess(true);
+  };
+
+  const goToLogin = async () => {
+    await signOut();
+    setView('login');
+  };
+
+  if (success) return (
+    <div className="text-center">
+      <div className="w-16 h-16 bg-emerald-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+        <Check size={28} className="text-emerald-400" />
+      </div>
+      <h2 className="text-xl font-bold text-mist-100 mb-2">Senha atualizada!</h2>
+      <p className="text-mist-400 text-sm mb-6">Sua nova senha já pode ser usada para entrar.</p>
+      <MagneticButton onClick={goToLogin}
+        className="w-full py-3.5 rounded-xl font-bold text-sm">
+        Ir para o login
+      </MagneticButton>
+    </div>
+  );
+
+  return (
+    <div>
+      <h2 className="text-2xl font-bold text-mist-100 mb-1">Criar nova senha</h2>
+      <p className="text-mist-400 text-sm mb-7">Escolha uma senha diferente da anterior.</p>
+      {error && (
+        <div className="flex items-start gap-2 p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-sm text-red-400 mb-5">
+          <AlertCircle size={15} className="flex-shrink-0 mt-0.5" />{error}
+        </div>
+      )}
+      <form onSubmit={handleUpdate} className="space-y-4">
+        <Input label="Nova senha" type={showPw ? 'text' : 'password'} value={password} onChange={setPassword}
+          placeholder="Mínimo 8 caracteres" autoComplete="new-password"
+          suffix={
+            <button type="button" onClick={() => setShowPw(value => !value)} className="text-mist-400 hover:text-mist-100 transition">
+              {showPw ? <EyeOff size={16} /> : <Eye size={16} />}
+            </button>
+          }
+        />
+        <Input label="Confirmar nova senha" type={showPw ? 'text' : 'password'} value={confirm} onChange={setConfirm}
+          placeholder="Repita a nova senha" autoComplete="new-password" />
+        <MagneticButton type="submit" disabled={loading}
+          className="w-full flex items-center justify-center gap-2 py-3.5 disabled:opacity-60 rounded-xl font-bold text-sm">
+          {loading ? <RefreshCw size={16} className="animate-spin" /> : 'Salvar nova senha'}
+        </MagneticButton>
+        <button type="button" onClick={goToLogin} disabled={loading}
+          className="w-full text-mist-400 hover:text-mist-100 disabled:opacity-60 text-sm transition">
+          Cancelar e voltar ao login
+        </button>
+      </form>
+    </div>
+  );
+};
+
 // ── Email Confirmation ────────────────────────────────────────────────────────
 
 const ConfirmEmailView: React.FC = () => {
   const { user, signOut } = useAuth();
+  const pendingEmail = user?.email ?? getPendingSignupEmail();
   const [resent, setResent] = useState(false);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
+  const [cooldown, setCooldown] = useState(0);
+
+  useEffect(() => {
+    if (cooldown <= 0) return;
+    const timer = window.setTimeout(() => setCooldown(value => value - 1), 1000);
+    return () => window.clearTimeout(timer);
+  }, [cooldown]);
 
   const resend = async () => {
-    if (!user?.email) return;
+    if (!pendingEmail || cooldown > 0) return;
+    setError('');
     setLoading(true);
-    await supabase.auth.resend({ type: 'signup', email: user.email });
+    const { error: resendError } = await supabase.auth.resend({
+      type: 'signup',
+      email: pendingEmail,
+      options: { emailRedirectTo: `${window.location.origin}/?flow=email-confirmation` },
+    });
     setLoading(false);
+
+    if (resendError) {
+      setError(resendError.message);
+      return;
+    }
+
     setResent(true);
+    setCooldown(60);
   };
 
   return (
@@ -581,22 +840,22 @@ const ConfirmEmailView: React.FC = () => {
       <p className="text-mist-400 text-sm mb-2">
         Enviamos um link de confirmação para
       </p>
-      <p className="text-mist-100 font-semibold text-sm mb-6">{user?.email}</p>
+      <p className="text-mist-100 font-semibold text-sm mb-6">{pendingEmail || 'seu endereço de e-mail'}</p>
       <p className="text-mist-400/80 text-xs mb-8">
         Clique no link no e-mail para ativar sua conta.<br />
         Verifique também a pasta de spam.
       </p>
-      {resent ? (
+      {error && <p className="text-red-400 text-xs mb-4">{error}</p>}
+      {resent && (
         <div className="flex items-center justify-center gap-2 text-emerald-400 text-sm mb-4">
           <Check size={14} /> E-mail reenviado!
         </div>
-      ) : (
-        <button onClick={resend} disabled={loading}
-          className="flex items-center justify-center gap-2 text-mist-400 hover:text-mist-100 text-sm transition mb-4 mx-auto">
-          {loading ? <RefreshCw size={14} className="animate-spin" /> : null}
-          Reenviar e-mail de confirmação
-        </button>
       )}
+      <button onClick={resend} disabled={loading || cooldown > 0 || !pendingEmail}
+        className="flex items-center justify-center gap-2 text-mist-400 hover:text-mist-100 disabled:text-mist-400/40 text-sm transition mb-4 mx-auto">
+        {loading ? <RefreshCw size={14} className="animate-spin" /> : null}
+        {cooldown > 0 ? `Reenviar em ${cooldown}s` : 'Reenviar e-mail de confirmação'}
+      </button>
       <button onClick={signOut} className="text-xs text-mist-400/60 hover:text-mist-400 transition">
         Sair e usar outra conta
       </button>
@@ -649,6 +908,7 @@ const AuthPage: React.FC = () => {
         {/* Card */}
         <div className="bg-ink-800/80 backdrop-blur border border-ink-700 rounded-2xl p-8 shadow-2xl">
           {isConfirm && <ConfirmEmailView />}
+          {!isConfirm && view === 'update-password' && <UpdatePasswordView />}
           {!isConfirm && view === 'forgot' && <ForgotView onBack={() => setView('login')} />}
         </div>
       </motion.div>

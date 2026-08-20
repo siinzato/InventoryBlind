@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, PlayCircle, BarChart3 } from 'lucide-react';
+import { Plus, PlayCircle, BarChart3, Archive } from 'lucide-react';
 import { Panel, PanelSection, Button, Badge, Table, Thead, Tr, Th, Td, Input, Select } from '../ui';
 import { useAuth } from '../../lib/auth';
 import { listDistinctLocations } from '../../lib/physicalCount/locationAddressing';
@@ -8,12 +8,15 @@ import {
   createSession,
   startSession,
   listSessions,
+  listArchivedSessions,
   fetchCompanyProducts,
   resolveProductsInRange,
   createRecountSession,
   listPendingRecountEvents,
 } from '../../lib/physicalCount/physicalCountService';
+import { canManageSessionHistory } from '../../lib/physicalCount/physicalCountAdmin';
 import { logAuditEvent } from '../../lib/auditLogService';
+import { PhysicalCountSessionAdminActions } from './PhysicalCountSessionAdminActions';
 import { PhysicalCountSessionView } from './PhysicalCountSessionView';
 import { PhysicalCountResultPanel } from './PhysicalCountResultPanel';
 import { PhysicalCountApprovalPanel } from './PhysicalCountApprovalPanel';
@@ -55,6 +58,20 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
   // sozinhas. Sem isto, uma recontagem gerada pelo servidor apareceria como uma
   // sessão qualquer e a equipe descobriria trabalho novo sem saber de onde veio.
   const [recountEvents, setRecountEvents] = useState<RecountEvent[]>([]);
+  // Confirmação visual das ações administrativas. Some sozinha: é um aviso de
+  // "deu certo", não uma informação que a pessoa precise reler.
+  const [adminNotice, setAdminNotice] = useState<string | null>(null);
+  // Falha ao CARREGAR a tela, que é coisa diferente de "não há dados". Sem esta
+  // distinção, qualquer erro numa das leituras deixava sessions e products
+  // vazios e a tela afirmava "esta empresa ainda não tem nenhum produto
+  // cadastrado" — uma conclusão sobre o estoque do cliente quando o que houve
+  // foi uma consulta que não voltou.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Arquivados: carregado só quando alguém abre a área, porque é consulta extra
+  // que a grande maioria das visitas à tela não precisa.
+  const [showArchived, setShowArchived] = useState(false);
+  const [archived, setArchived] = useState<PhysicalCountSession[] | null>(null);
+  const [archivedError, setArchivedError] = useState<string | null>(null);
 
   const [warehouse, setWarehouse] = useState('');
   const [area, setArea] = useState('');
@@ -69,6 +86,7 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
 
   const refresh = () => {
     setLoading(true);
+    setLoadError(null);
     Promise.all([
       listSessions(companyId),
       fetchCompanyProducts(companyId),
@@ -81,6 +99,9 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
         setProducts(p);
         setRecountEvents(events);
       })
+      .catch(err => {
+        setLoadError(err instanceof Error ? err.message : 'Falha ao carregar as contagens desta empresa.');
+      })
       .finally(() => setLoading(false));
   };
 
@@ -88,6 +109,34 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
     refresh();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
+
+  useEffect(() => {
+    if (adminNotice == null) return;
+    const timer = window.setTimeout(() => setAdminNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [adminNotice]);
+
+  /** Autorização do banco (pc_admin_*) espelhada na tela só para decidir o que
+   *  mostrar. Esconder botão não é barreira: as RPCs revalidam papel e empresa. */
+  const canManageHistory = canManageSessionHistory(profile?.role);
+
+  const loadArchived = () => {
+    setArchivedError(null);
+    listArchivedSessions(companyId)
+      .then(setArchived)
+      .catch(err => {
+        // Antes da migration ser aplicada a RPC/coluna não existe. Mostrar a
+        // falha aqui é melhor do que uma lista vazia que parece "nada arquivado".
+        setArchivedError(err instanceof Error ? err.message : 'Não foi possível carregar os arquivados.');
+        setArchived([]);
+      });
+  };
+
+  const toggleArchived = () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (next && archived == null) loadArchived();
+  };
 
   /** Sessões que nasceram da avaliação automática. Só as `created` entram — uma
    *  avaliação ignorada ou falha não produziu sessão nenhuma para marcar. */
@@ -330,17 +379,25 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
               className="sm:col-span-2"
             />
           </div>
-          {scopeAvailability === 'no_products' && (
+          {/* Enquanto houver falha de leitura, nenhuma conclusão sobre o
+              cadastro do cliente é confiável — a tela diz o que aconteceu de
+              verdade em vez de acusar o estoque de estar vazio. */}
+          {loadError && (
+            <p className="mt-3 text-sm text-red-600 dark:text-red-400">
+              Não foi possível carregar os dados desta tela: {loadError}
+            </p>
+          )}
+          {!loadError && scopeAvailability === 'no_products' && (
             <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
               Esta empresa ainda não tem nenhum produto cadastrado. Se você esperava ver produtos aqui, confira se a empresa certa está selecionada no seletor de workspace.
             </p>
           )}
-          {scopeAvailability === 'no_locations' && (
+          {!loadError && scopeAvailability === 'no_locations' && (
             <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
               Esta empresa tem {products.length} produto(s) cadastrado(s), mas nenhum com o campo Localização preenchido. Cadastre a localização dos produtos (edição do produto ou importação de planilha) antes de iniciar uma contagem física.
             </p>
           )}
-          {scopeAvailability === 'ok' && (
+          {!loadError && scopeAvailability === 'ok' && (
             <>
               <div className="mt-3 max-h-40 overflow-y-auto rounded-lg border border-edge">
                 {matched.length === 0 ? (
@@ -371,7 +428,17 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
 
       <Panel>
         <PanelSection>
-          <h2 className="text-sm font-semibold text-fg">Sessões</h2>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-fg">Sessões</h2>
+            {canManageHistory && (
+              <Button variant="ghost" size="sm" onClick={toggleArchived}>
+                <Archive size={14} /> {showArchived ? 'Ocultar arquivados' : 'Ver arquivados'}
+              </Button>
+            )}
+          </div>
+          <div aria-live="polite">
+            {adminNotice && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{adminNotice}</p>}
+          </div>
         </PanelSection>
         <div className="overflow-x-auto">
           <Table>
@@ -391,7 +458,14 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
                   <Td colSpan={6}>Carregando…</Td>
                 </Tr>
               )}
-              {!loading && sessions.length === 0 && (
+              {!loading && loadError && (
+                <Tr>
+                  <Td colSpan={6} className="text-red-600 dark:text-red-400">
+                    Não foi possível carregar o histórico de sessões.
+                  </Td>
+                </Tr>
+              )}
+              {!loading && !loadError && sessions.length === 0 && (
                 <Tr>
                   <Td colSpan={6} className="text-fg-muted">
                     Nenhuma sessão criada ainda.
@@ -427,17 +501,32 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
                     </Badge>
                   </Td>
                   <Td>
-                    <Button variant="ghost" size="sm" onClick={() => handleOpenSession(session)}>
-                      {session.status === 'in_progress' ? (
-                        <>
-                          <PlayCircle size={14} /> Continuar
-                        </>
-                      ) : (
-                        <>
-                          <BarChart3 size={14} /> Ver
-                        </>
+                    {/* Sem `justify-*`: o botão de abrir a sessão continua na
+                        mesma posição de antes (a célula é alinhada à esquerda),
+                        e o menu apenas o acompanha. */}
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenSession(session)}>
+                        {session.status === 'in_progress' ? (
+                          <>
+                            <PlayCircle size={14} /> Continuar
+                          </>
+                        ) : (
+                          <>
+                            <BarChart3 size={14} /> Ver
+                          </>
+                        )}
+                      </Button>
+                      {canManageHistory && (
+                        <PhysicalCountSessionAdminActions
+                          session={session}
+                          statusLabel={STATUS_LABEL[session.status]}
+                          onDone={message => {
+                            setAdminNotice(message);
+                            refresh();
+                          }}
+                        />
                       )}
-                    </Button>
+                    </div>
                   </Td>
                 </Tr>
               ))}
@@ -445,6 +534,76 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
           </Table>
         </div>
       </Panel>
+
+      {canManageHistory && showArchived && (
+        <Panel>
+          <PanelSection>
+            <h2 className="text-sm font-semibold text-fg">Sessões arquivadas</h2>
+            <p className="mt-1 text-xs text-fg-muted">
+              Removidas do histórico, mas nada foi apagado: contagens, eventos e recontagens continuam
+              guardados. Restaurar devolve a sessão à lista acima.
+            </p>
+          </PanelSection>
+          <div className="overflow-x-auto">
+            <Table>
+              <Thead>
+                <Tr>
+                  <Th>Faixa</Th>
+                  <Th>Depósito</Th>
+                  <Th>Contagem</Th>
+                  <Th>Itens</Th>
+                  <Th>Motivo da remoção</Th>
+                  <Th />
+                </Tr>
+              </Thead>
+              <tbody>
+                {archived == null && (
+                  <Tr>
+                    <Td colSpan={6}>Carregando…</Td>
+                  </Tr>
+                )}
+                {archivedError && (
+                  <Tr>
+                    <Td colSpan={6} className="text-red-600 dark:text-red-400">
+                      {archivedError}
+                    </Td>
+                  </Tr>
+                )}
+                {archived != null && !archivedError && archived.length === 0 && (
+                  <Tr>
+                    <Td colSpan={6} className="text-fg-muted">
+                      Nenhuma sessão arquivada.
+                    </Td>
+                  </Tr>
+                )}
+                {(archived ?? []).map(session => (
+                  <Tr key={session.id}>
+                    <Td>
+                      {session.streetFrom} → {session.streetTo}
+                    </Td>
+                    <Td>{session.warehouse ?? '—'}</Td>
+                    <Td>{session.countNumber}ª contagem</Td>
+                    <Td className="tabular-nums">{session.totalItems}</Td>
+                    <Td className="max-w-xs text-fg-muted">{session.deletionReason ?? '—'}</Td>
+                    <Td>
+                      <PhysicalCountSessionAdminActions
+                        session={session}
+                        statusLabel={STATUS_LABEL[session.status]}
+                        mode="archived"
+                        onDone={message => {
+                          setAdminNotice(message);
+                          refresh();
+                          loadArchived();
+                        }}
+                      />
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        </Panel>
+      )}
     </div>
   );
 }

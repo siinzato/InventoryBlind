@@ -47,6 +47,7 @@ export type AuthView =
   | 'login'
   | 'signup'
   | 'forgot'
+  | 'update-password'
   | 'confirm-email'
   | 'link-company'
   | 'complete-profile'
@@ -89,14 +90,41 @@ const AUTH_TIMEOUT_MS = 8000;
 // sequence (triggered by the same SIGNED_IN event) finished after AuthPage's
 // own call and overwrote the correct post-onboarding view with a stale,
 // pre-onboarding snapshot it had already read.
-let pendingCompanyOnboarding: { companyName: string; userName?: string } | null = null;
+const PENDING_ONBOARDING_KEY = 'inventoryblind.pending-company-onboarding';
+const PENDING_EMAIL_KEY = 'inventoryblind.pending-email';
+
+function readPendingCompanyOnboarding(): { companyName: string; userName?: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = sessionStorage.getItem(PENDING_ONBOARDING_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+let pendingCompanyOnboarding: { companyName: string; userName?: string } | null = readPendingCompanyOnboarding();
 
 export function setPendingCompanyOnboarding(companyName: string, userName?: string) {
   pendingCompanyOnboarding = { companyName, userName };
+  sessionStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(pendingCompanyOnboarding));
 }
 
 export function clearPendingCompanyOnboarding() {
   pendingCompanyOnboarding = null;
+  sessionStorage.removeItem(PENDING_ONBOARDING_KEY);
+}
+
+export function setPendingSignupEmail(email: string) {
+  sessionStorage.setItem(PENDING_EMAIL_KEY, email);
+}
+
+export function getPendingSignupEmail(): string {
+  return sessionStorage.getItem(PENDING_EMAIL_KEY) ?? '';
+}
+
+export function clearPendingSignupEmail() {
+  sessionStorage.removeItem(PENDING_EMAIL_KEY);
 }
 
 // ── Provider ──────────────────────────────────────────────────────────────────
@@ -117,6 +145,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const timeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef    = useRef(false); // prevents concurrent profile loads
   const authLoadingRef = useRef(authLoading); // live value for the one-shot timeout effect below
+  const recoveryModeRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -220,7 +249,6 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       if (prof && !prof.company_id && pendingCompanyOnboarding) {
         const { companyName, userName } = pendingCompanyOnboarding;
-        pendingCompanyOnboarding = null;
         try {
           const { data, error } = await supabase.rpc('create_company_onboarding', {
             p_company_name: companyName,
@@ -228,6 +256,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
           });
           if (!error && data?.[0]?.out_company_id) {
             prof = { ...prof, company_id: data[0].out_company_id, role: 'owner' };
+            clearPendingCompanyOnboarding();
+            clearPendingSignupEmail();
           } else if (import.meta.env.DEV) {
             console.error('[Auth] create_company_onboarding failed:', error?.message);
           }
@@ -286,8 +316,29 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(s);
       setUser(s?.user ?? null);
 
+      // A recovery link creates a temporary session. Keep it on the password
+      // form instead of resolving the normal workspace/app route.
+      if (event === 'PASSWORD_RECOVERY' && s?.user) {
+        recoveryModeRef.current = true;
+        loadingRef.current = false;
+        setProfileLoading(false);
+        setAuthLoading(false);
+        setAuthError(null);
+        setView('update-password');
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        return;
+      }
+
+      // updateUser emits USER_UPDATED; recovery remains active until sign-out.
+      if (recoveryModeRef.current && s?.user) {
+        setAuthLoading(false);
+        setView('update-password');
+        return;
+      }
+
       if (!s?.user) {
         // Signed out or no session
+        recoveryModeRef.current = false;
         setProfile(null);
         setCompany(null);
         setCompanies([]);
@@ -298,7 +349,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Go to landing unless already on an auth sub-page
         setView(curr => {
-          const authPages: AuthView[] = ['login', 'signup', 'forgot', 'confirm-email'];
+          const authPages: AuthView[] = ['login', 'signup', 'forgot', 'update-password', 'confirm-email'];
           return authPages.includes(curr) ? curr : 'landing';
         });
         return;
@@ -331,6 +382,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── signOut ────────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     loadingRef.current = false;
+    recoveryModeRef.current = false;
     await supabase.auth.signOut();
     if (!mountedRef.current) return;
     setProfile(null);

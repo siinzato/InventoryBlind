@@ -50,11 +50,35 @@ export type AuditAction =
   | 'audit.count_approved'
   | 'audit.statistical_run'
   | 'physical_count.session_started'
+  // Gravadas pelo próprio banco, dentro de pc_admin_update_session /
+  // pc_admin_delete_session (migration 059) — não por logAuditEvent. Estão aqui
+  // porque a tela de auditoria lê `action` por este tipo.
+  | 'physical_count.session_updated'
+  | 'physical_count.session_deleted'
+  | 'physical_count.session_restored'
+  | 'physical_count.session_hard_deleted'
+  | 'physical_count.session_reopened'
+  // NF-e / Entradas (migration 062). Gravadas pelo banco, dentro das RPCs
+  // nfe_admin_* e de nfe_reopen_conference. A nota nunca é editada — uma
+  // correção de quantidade é um evento novo, não uma reescrita.
+  | 'nfe.invoice_archived'
+  | 'nfe.invoice_restored'
+  | 'nfe.invoice_hard_deleted'
+  | 'nfe.count_corrected'
+  | 'nfe.conference_reopened'
   | 'physical_count.finalized'
   | 'physical_count.recount_created'
   | 'physical_count.approved'
   | 'physical_count.erp_sync_attempted'
-  | 'tools.inventoryfull_download_started';
+  | 'tools.inventoryfull_download_started'
+  // Configurações Avançadas — Chaves de API e Webhooks (migrations 063-065).
+  | 'apikey.created'
+  | 'apikey.revoked'
+  | 'webhook.created'
+  | 'webhook.updated'
+  | 'webhook.deleted'
+  | 'webhook.secret_rotated'
+  | 'webhook.test_sent';
 
 interface LogParams {
   companyId: string;

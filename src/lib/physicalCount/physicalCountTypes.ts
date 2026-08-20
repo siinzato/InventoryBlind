@@ -31,6 +31,12 @@ export interface PhysicalCountSession {
   createdBy: string | null;
   createdAt: string;
   updatedAt: string;
+  /** Exclusão lógica (migration 059): preenchido, a sessão sai do histórico
+   *  visível e deixa de aceitar qualquer operação. Nada é apagado — itens,
+   *  eventos e recontagens continuam gravados. */
+  deletedAt: string | null;
+  deletedBy: string | null;
+  deletionReason: string | null;
 }
 
 export interface PhysicalCountItem {

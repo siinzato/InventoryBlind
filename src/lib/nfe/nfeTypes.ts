@@ -53,6 +53,7 @@ export interface NfeInvoice {
   supplier_cnpj: string | null;
   status: InvoiceStatus;
   total_items: number;
+  raw_xml: string | null;
   created_by: string | null;
   started_at: string | null;
   started_by: string | null;
@@ -60,6 +61,16 @@ export interface NfeInvoice {
   finished_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Arquivamento (migration 062). Preenchido, a nota sai do histórico visível e
+   *  não aceita mais escrita nenhuma — o trigger nfe_invoices_guard_archived
+   *  recusa. Nada é apagado: itens, eventos e XML continuam gravados.
+   *
+   *  Opcional no tipo de propósito: `select('*')` não devolve estas colunas
+   *  enquanto a migration não for aplicada, e o resto da tela precisa continuar
+   *  funcionando. Ver isArchived()/filterActive() em lib/admin/recordAdmin.ts. */
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
 }
 
 export interface NfeInvoiceItem {

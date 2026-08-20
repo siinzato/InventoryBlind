@@ -1,9 +1,12 @@
 import { useCallback, useEffect, useState } from 'react';
 import {
-  ArrowLeft, Plus, Loader2, FileText, Search, ChevronRight, AlertCircle,
+  ArrowLeft, Plus, Loader2, FileText, Search, ChevronRight, AlertCircle, Archive,
 } from 'lucide-react';
 import type { NfeInvoice } from '../../lib/nfe/nfeTypes';
-import { listInvoices } from '../../lib/nfe/nfeService';
+import { listArchivedInvoices, listInvoices } from '../../lib/nfe/nfeService';
+import { canAdministerRecords } from '../../lib/admin/recordAdmin';
+import { useAuth } from '../../lib/auth';
+import { NfeInvoiceAdminActions } from './NfeInvoiceAdminActions';
 import { NFeImportView } from './NFeImportView';
 import { NFePreparationView } from './NFePreparationView';
 import { NFeCountingView } from './NFeCountingView';
@@ -19,13 +22,47 @@ function viewForStatus(inv: NfeInvoice): View {
   return 'report';
 }
 
-export default function NFeConferencePage({ onBack }: { onBack: () => void }) {
+interface Props {
+  onBack: () => void;
+  /** Id de uma nota recém-transferida pela ferramenta "Consulta e Download de
+   *  XML/NFe" — abre direto nela em vez da lista. */
+  initialInvoiceId?: string;
+  onConsumedInitialInvoice?: () => void;
+}
+
+export default function NFeConferencePage({ onBack, initialInvoiceId, onConsumedInitialInvoice }: Props) {
   const [view, setView] = useState<View>('list');
   const [invoices, setInvoices] = useState<NfeInvoice[]>([]);
   const [selected, setSelected] = useState<NfeInvoice | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [search, setSearch] = useState('');
+  // Controles administrativos (owner/admin). A autorização real está nas RPCs
+  // nfe_admin_*; isto só decide o que a tela mostra.
+  const { profile } = useAuth();
+  const canManageRecords = canAdministerRecords(profile?.role);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [showArchived, setShowArchived] = useState(false);
+  const [archived, setArchived] = useState<NfeInvoice[] | null>(null);
+  const [archivedError, setArchivedError] = useState<string | null>(null);
+
+  const loadArchived = useCallback(async () => {
+    setArchivedError(null);
+    try {
+      setArchived(await listArchivedInvoices());
+    } catch (err) {
+      // Antes da migration 062 a coluna não existe. Dizer a falha é melhor do
+      // que uma lista vazia, que se leria como "nada arquivado".
+      setArchivedError(err instanceof Error ? err.message : 'Não foi possível carregar as notas arquivadas.');
+      setArchived([]);
+    }
+  }, []);
+
+  const toggleArchived = () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (next && archived == null) void loadArchived();
+  };
 
   const loadList = useCallback(async () => {
     setLoading(true);
@@ -40,6 +77,21 @@ export default function NFeConferencePage({ onBack }: { onBack: () => void }) {
   }, []);
 
   useEffect(() => { loadList(); }, [loadList]);
+
+  useEffect(() => {
+    if (!initialInvoiceId) return;
+    let cancelled = false;
+    (async () => {
+      const inv = await refresh(initialInvoiceId);
+      if (!cancelled && inv) {
+        setSelected(inv);
+        setView(viewForStatus(inv));
+      }
+      onConsumedInitialInvoice?.();
+    })();
+    return () => { cancelled = true; };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialInvoiceId]);
 
   function open(inv: NfeInvoice) {
     setSelected(inv);
@@ -94,9 +146,20 @@ export default function NFeConferencePage({ onBack }: { onBack: () => void }) {
       <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm text-fg-muted">Importe uma NF-e e realize a contagem cega dos itens recebidos.</p>
-          <Button onClick={() => setView('import')}>
-            <Plus size={16} /> Nova conferência
-          </Button>
+          <div className="flex items-center gap-2">
+            {canManageRecords && (
+              <Button variant="ghost" onClick={toggleArchived}>
+                <Archive size={16} /> {showArchived ? 'Ocultar arquivadas' : 'Ver arquivadas'}
+              </Button>
+            )}
+            <Button onClick={() => setView('import')}>
+              <Plus size={16} /> Nova conferência
+            </Button>
+          </div>
+        </div>
+
+        <div aria-live="polite">
+          {notice && <p className="text-sm text-emerald-600 dark:text-emerald-400">{notice}</p>}
         </div>
 
         <div className="relative">
@@ -125,10 +188,55 @@ export default function NFeConferencePage({ onBack }: { onBack: () => void }) {
         ) : (
           <div className="space-y-2">
             {filtered.map((inv) => (
-              <button
+              // A linha era um único <button>. Virou <div> com o botão por
+              // dentro porque o menu administrativo é um botão, e botão dentro
+              // de botão é HTML inválido. As classes de fundo/borda/hover foram
+              // para o <div>, então a aparência é a mesma de antes.
+              <div
                 key={inv.id}
-                onClick={() => open(inv)}
-                className="w-full flex items-center gap-3 bg-surface-2 rounded-xl border border-edge p-4 text-left hover:bg-surface-3/40 transition-colors"
+                className="w-full flex items-center gap-3 bg-surface-2 rounded-xl border border-edge p-4 hover:bg-surface-3/40 transition-colors"
+              >
+                <button onClick={() => open(inv)} className="flex min-w-0 flex-1 items-center gap-3 text-left">
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-fg text-sm">NF {inv.invoice_number ?? '—'}</span>
+                      <span className="text-fg-subtle">·</span>
+                      <span className="text-sm text-fg-muted truncate">{inv.supplier_name ?? 'Fornecedor não informado'}</span>
+                    </div>
+                    <p className="text-caption mt-0.5">
+                      {inv.total_items} item(ns) · Emissão {formatDate(inv.issue_date)} · Importada {formatDate(inv.created_at)}
+                    </p>
+                  </div>
+                  <InvoiceStatusBadge status={inv.status} />
+                  <ChevronRight size={18} className="text-fg-subtle flex-shrink-0" />
+                </button>
+                {canManageRecords && (
+                  <NfeInvoiceAdminActions
+                    invoice={inv}
+                    onDone={(message) => { setNotice(message); loadList(); }}
+                  />
+                )}
+              </div>
+            ))}
+          </div>
+        )}
+
+        {canManageRecords && showArchived && (
+          <div className="space-y-2 pt-2">
+            <h2 className="text-sm font-semibold text-fg">Notas arquivadas</h2>
+            <p className="text-caption">
+              Removidas da lista, mas nada foi apagado: XML, itens e eventos de contagem continuam
+              guardados. Restaurar devolve a nota à lista acima.
+            </p>
+            {archivedError && <p className="text-sm text-red-600 dark:text-red-400">{archivedError}</p>}
+            {archived == null && !archivedError && <p className="text-caption">Carregando…</p>}
+            {archived != null && archived.length === 0 && !archivedError && (
+              <p className="text-caption">Nenhuma nota arquivada.</p>
+            )}
+            {(archived ?? []).map((inv) => (
+              <div
+                key={inv.id}
+                className="w-full flex items-center gap-3 bg-surface-2 rounded-xl border border-edge p-4"
               >
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2 flex-wrap">
@@ -137,12 +245,16 @@ export default function NFeConferencePage({ onBack }: { onBack: () => void }) {
                     <span className="text-sm text-fg-muted truncate">{inv.supplier_name ?? 'Fornecedor não informado'}</span>
                   </div>
                   <p className="text-caption mt-0.5">
-                    {inv.total_items} item(ns) · Emissão {formatDate(inv.issue_date)} · Importada {formatDate(inv.created_at)}
+                    {inv.total_items} item(ns) · Motivo: {inv.deletion_reason ?? '—'}
                   </p>
                 </div>
                 <InvoiceStatusBadge status={inv.status} />
-                <ChevronRight size={18} className="text-fg-subtle flex-shrink-0" />
-              </button>
+                <NfeInvoiceAdminActions
+                  invoice={inv}
+                  mode="archived"
+                  onDone={(message) => { setNotice(message); loadList(); loadArchived(); }}
+                />
+              </div>
             ))}
           </div>
         )}

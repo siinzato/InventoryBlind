@@ -20,6 +20,34 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-20-configuracoes-avancadas',
+    date: '2026-08-20',
+    category: 'novidade',
+    title: 'Configurações Avançadas: API, Webhooks e Logs',
+    description: 'Quem administra a conta agora pode criar chaves de API para integrar sistemas externos, configurar webhooks que avisam automaticamente quando uma contagem é finalizada ou aprovada, e consultar o histórico de ações da empresa com filtros e exportação em CSV.',
+  },
+  {
+    id: '2026-08-20-controles-administrativos',
+    date: '2026-08-20',
+    category: 'novidade',
+    title: 'Controles administrativos e área de arquivados',
+    description: 'Quem administra a conta pode remover contagens e notas do histórico informando o motivo, e restaurá-las depois na nova área de Arquivados. Nada é apagado: quantidades, notas e o XML continuam guardados. Reabrir uma contagem ou conferência passa a ser exclusivo de quem administra a conta.',
+  },
+  {
+    id: '2026-08-20-importar-nfe-por-chave',
+    date: '2026-08-20',
+    category: 'novidade',
+    title: 'Consulta e download de XML/NFe pela chave de acesso',
+    description: 'Nova ferramenta em Ferramentas: cole a chave de acesso de 44 dígitos da NF-e para buscar a nota automaticamente. O XML é baixado e a nota já é transferida para a Conferência por NF-e, sem precisar do arquivo manualmente.',
+  },
+  {
+    id: '2026-08-20-gerenciar-sessoes-contagem',
+    date: '2026-08-20',
+    category: 'novidade',
+    title: 'Gerenciar as sessões da Contagem Física Digital',
+    description: 'Na lista de sessões, quem administra a conta pode corrigir o depósito, a área e a observação de uma contagem, ou tirá-la do histórico informando o motivo. As quantidades contadas continuam guardadas.',
+  },
+  {
     id: '2026-08-19-diagnostico-operacao',
     date: '2026-08-19',
     category: 'novidade',

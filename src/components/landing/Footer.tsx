@@ -1,4 +1,5 @@
 import { Logo } from './landingUi';
+import { LEGAL_ROUTES } from '../../lib/legal/legalRoutes';
 
 interface FooterProps {
   onLogin: () => void;
@@ -59,8 +60,17 @@ export function Footer({ onLogin, onSignup }: FooterProps) {
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto mt-12 pt-6 border-t border-ink-700 text-xs text-mist-400">
-        © {new Date().getFullYear()} InventoryBlind. Todos os direitos reservados.
+      <div className="max-w-6xl mx-auto mt-12 pt-6 border-t border-ink-700 flex flex-col gap-3 text-xs text-mist-400 sm:flex-row sm:items-center sm:justify-between">
+        <p>© {new Date().getFullYear()} InventoryBlind. Todos os direitos reservados.</p>
+        {/* Links reais, públicos, sem login. Ver src/lib/legal/legalRoutes.ts. */}
+        <nav className="flex items-center gap-4">
+          <a href={LEGAL_ROUTES.terms} className="hover:text-mist-100 transition-colors">
+            Termos de Uso
+          </a>
+          <a href={LEGAL_ROUTES.privacy} className="hover:text-mist-100 transition-colors">
+            Política de Privacidade
+          </a>
+        </nav>
       </div>
     </footer>
   );

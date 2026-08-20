@@ -12,6 +12,13 @@ import type {
 } from './nfeTypes';
 import { parseNfeXml } from './nfeXmlParser';
 import {
+  buildCountCorrectionRpcArgs,
+  buildInvoiceReasonRpcArgs,
+  filterActiveInvoices,
+  filterArchivedInvoices,
+  isInvoiceArchived,
+} from './nfeAdmin';
+import {
   buildProductLookups,
   collectItemCodes,
   resolveAssociation,
@@ -218,15 +225,35 @@ export async function importNfeXml(xml: string): Promise<ImportResult> {
 
 // ── Read ───────────────────────────────────────────────────────────────────
 
+/** O histórico visível: notas não arquivadas.
+ *
+ *  O filtro é aplicado no RESULTADO, nunca dentro da query. Um
+ *  `.is('deleted_at', null)` aqui referencia uma coluna que só existe depois da
+ *  migration 062; contra um banco sem ela o PostgREST devolve erro e a tela
+ *  inteira cai. Pré-migration `deleted_at` chega `undefined`, o que conta como
+ *  nota ativa, e o comportamento é idêntico ao de antes desta funcionalidade. */
 export async function listInvoices(): Promise<NfeInvoice[]> {
   const { data, error } = await supabase
     .from('nfe_invoices')
     .select('*')
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []) as NfeInvoice[];
+  return filterActiveInvoices((data ?? []) as NfeInvoice[]);
 }
 
+/** As notas arquivadas, para a área de Arquivados. Pré-migration volta vazia,
+ *  que é a resposta correta. */
+export async function listArchivedInvoices(): Promise<NfeInvoice[]> {
+  const { data, error } = await supabase
+    .from('nfe_invoices')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return filterArchivedInvoices((data ?? []) as NfeInvoice[]);
+}
+
+/** Uma nota arquivada devolve `null`, como uma que não existe — nenhuma tela
+ *  deve conseguir abrir pelo id o que saiu do histórico. */
 export async function getInvoice(id: string): Promise<NfeInvoice | null> {
   const { data, error } = await supabase
     .from('nfe_invoices')
@@ -234,7 +261,9 @@ export async function getInvoice(id: string): Promise<NfeInvoice | null> {
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
-  return (data as NfeInvoice) ?? null;
+  if (!data) return null;
+  const invoice = data as NfeInvoice;
+  return isInvoiceArchived(invoice) ? null : invoice;
 }
 
 export async function getInvoiceItems(invoiceId: string): Promise<NfeInvoiceItem[]> {
@@ -299,4 +328,46 @@ export async function finalizeConference(invoiceId: string): Promise<string> {
 export async function reopenConference(invoiceId: string): Promise<void> {
   const { error } = await supabase.rpc('nfe_reopen_conference', { p_invoice_id: invoiceId });
   if (error) throw error;
+}
+
+// ── Controles administrativos (migration 062) ────────────────────────────────
+//
+// Todas revalidam papel (owner/admin), empresa e estado no servidor. O papel e a
+// empresa NÃO são enviados daqui. A nota nunca é editada: chave, número, série,
+// emitente, valores e XML são documento fiscal.
+
+/** Remove a nota do histórico visível. Nada é apagado. */
+export async function archiveInvoiceAdmin(invoiceId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('nfe_admin_archive_invoice', buildInvoiceReasonRpcArgs(invoiceId, reason));
+  if (error) throw error;
+}
+
+export async function restoreInvoiceAdmin(invoiceId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('nfe_admin_restore_invoice', buildInvoiceReasonRpcArgs(invoiceId, reason));
+  if (error) throw error;
+}
+
+/** Exclusão física — o banco só aceita nota `not_started`, sem nenhum evento de
+ *  contagem e sem nenhum item já conferido. O XML vai junto, e é por isso que a
+ *  condição é tão estreita. */
+export async function hardDeleteDraftInvoiceAdmin(invoiceId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc(
+    'nfe_admin_hard_delete_draft_invoice',
+    buildInvoiceReasonRpcArgs(invoiceId, reason)
+  );
+  if (error) throw error;
+}
+
+/** Corrige uma quantidade conferida numa nota já finalizada.
+ *
+ *  Não sobrescreve o log: entra uma linha nova em nfe_count_events com valor
+ *  anterior, valor novo, motivo e autor, e o status do item e da nota são
+ *  recalculados. Devolve a quantidade gravada. */
+export async function correctCountAdmin(itemId: string, quantity: number, reason: string): Promise<number> {
+  const { data, error } = await supabase.rpc(
+    'nfe_admin_correct_count',
+    buildCountCorrectionRpcArgs(itemId, quantity, reason)
+  );
+  if (error) throw error;
+  return Number(data);
 }

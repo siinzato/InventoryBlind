@@ -39,9 +39,6 @@ import {
   Smartphone,
   ScanLine,
   LayoutDashboard,
-  DollarSign,
-  Receipt,
-  PieChart,
   Gauge,
   ClipboardCheck,
   ClipboardList,
@@ -66,7 +63,8 @@ import {
   SearchCheck,
   BookOpen,
   ArrowRight,
-  HelpCircle
+  HelpCircle,
+  FileSearch
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -79,6 +77,7 @@ import { CountManagementCenter } from './components/counting/CountManagementCent
 import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
+import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
 import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations } from './lib/permissionService';
 import type { DrillTarget } from './lib/intelligence/contracts';
 import { usePWAInstall } from './lib/usePWAInstall';
@@ -111,10 +110,12 @@ const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'
 const AutomationsPage = React.lazy(() => import('./components/automation/AutomationsPage').then(m => ({ default: m.AutomationsPage })));
 // Diagnóstico da operação — opcional, nunca no caminho crítico da autenticação.
 const OperationDiagnostic = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.OperationDiagnostic })));
+const PrivacyLegalPage = React.lazy(() => import('./components/legal/PrivacyLegalPage').then(m => ({ default: m.PrivacyLegalPage })));
 const DiagnosticInvite = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.DiagnosticInvite })));
 // Lazy: pulls the intelligence engines and only renders on the dashboard tab.
 const ErpIntelligenceSection = React.lazy(() => import('./components/intelligence/ErpIntelligenceSection').then(m => ({ default: m.ErpIntelligenceSection })));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
+const NFeXmlLookupPage = React.lazy(() => import('./components/nfe/NFeXmlLookupPage'));
 const ProductivityTab = React.lazy(() => import('./components/productivity/ProductivityTab').then(m => ({ default: m.ProductivityTab })));
 const AcademyRouter = React.lazy(() => import('./components/academy/AcademyRouter').then(m => ({ default: m.AcademyRouter })));
 const CBCDashboardPage = React.lazy(() => import('./components/cbc/CBCDashboardPage').then(m => ({ default: m.CBCDashboardPage })));
@@ -128,6 +129,9 @@ const BlindScorePage = React.lazy(() => import('./components/analytics/BlindScor
 const InventoryHealthPage = React.lazy(() => import('./components/analytics/InventoryHealthPage').then(m => ({ default: m.InventoryHealthPage })));
 const IaInsightsPage = React.lazy(() => import('./components/analytics/IaInsightsPage').then(m => ({ default: m.IaInsightsPage })));
 const AuditsAnalyticsPage = React.lazy(() => import('./components/analytics/AuditsAnalyticsPage').then(m => ({ default: m.AuditsAnalyticsPage })));
+const ApiKeysPage = React.lazy(() => import('./components/settings/ApiKeysPage').then(m => ({ default: m.ApiKeysPage })));
+const WebhooksPage = React.lazy(() => import('./components/settings/WebhooksPage').then(m => ({ default: m.WebhooksPage })));
+const LogsPage = React.lazy(() => import('./components/settings/LogsPage').then(m => ({ default: m.LogsPage })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -171,6 +175,9 @@ function AppContent() {
   const { user, profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
+  // Transferência da ferramenta "Consulta e Download de XML/NFe" pra Conferência
+  // por NF-e: guarda o id da nota recém-encontrada só até a página consumir.
+  const [nfePendingInvoiceId, setNfePendingInvoiceId] = useState<string | null>(null);
 
   // ── Diagnóstico da operação ───────────────────────────────────────────────
   // Lido do metadata do próprio usuário, que o AuthProvider já carregou — nenhuma
@@ -723,6 +730,7 @@ function AppContent() {
       id: 'tools-group',
       label: 'Ferramentas',
       items: [
+        { id: 'nfe-xml-lookup',  label: 'Consulta e Download de XML/NFe', icon: <FileSearch />, onClick: () => { setActiveTab('nfe-xml-lookup'); setMobileOpen(false); }, active: activeTab === 'nfe-xml-lookup' },
         { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
         { id: 'full-manager',    label: 'Full Manager',         icon: <ClipboardCheck />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
         { id: 'inventoryfull',   label: 'InventoryFull',        icon: <Monitor />, onClick: () => { setActiveTab('inventoryfull'); setMobileOpen(false); },     active: activeTab === 'inventoryfull' },
@@ -746,6 +754,9 @@ function AppContent() {
         // Entrada permanente: quem já usava o sistema antes do diagnóstico existir
         // acha por aqui, e quem já respondeu pode refazer quando a operação mudar.
         { id: 'diagnostico', label: 'Diagnóstico da operação', icon: <ClipboardList />, onClick: () => { setActiveTab('diagnostico'); setMobileOpen(false); }, active: activeTab === 'diagnostico' },
+        // Visível para todo papel: são os documentos e os direitos do próprio
+        // usuário, não uma função administrativa.
+        { id: 'legal', label: 'Privacidade e Legal', icon: <ShieldCheck />, onClick: () => { setActiveTab('legal'); setMobileOpen(false); }, active: activeTab === 'legal' },
       ],
     },
     {
@@ -772,24 +783,17 @@ function AppContent() {
       ],
     },
     {
-      id: 'financeiro-group',
-      label: 'Financeiro',
-      sectionLabel: 'Em breve',
-      locked: true,
-      items: [
-        { id: 'financeiro-contas',      label: 'Contas a Pagar',         icon: <Receipt />,    onClick: () => {}, active: false, locked: true },
-        { id: 'financeiro-relatorios',  label: 'Relatórios Financeiros', icon: <PieChart />,   onClick: () => {}, active: false, locked: true },
-        { id: 'financeiro-custos',      label: 'Centro de Custos',       icon: <DollarSign />, onClick: () => {}, active: false, locked: true },
-      ],
-    },
-    {
+      // Destravado por papel (mesmo mecanismo de group.locked já usado em
+      // Integrações/Financeiro) em vez de travado fixo: quem administra a
+      // conta (owner/admin) vê os 3 itens funcionais; os demais veem o grupo
+      // com cadeado, igual a qualquer outro grupo bloqueado.
       id: 'config-avancada-group',
       label: 'Configurações Avançadas',
-      locked: true,
+      locked: !canManageUsers(profile?.role),
       items: [
-        { id: 'config-api',         label: 'API',         icon: <Code2 />,    onClick: () => {}, active: false, locked: true },
-        { id: 'config-webhooks',    label: 'Webhooks',    icon: <Webhook />,  onClick: () => {}, active: false, locked: true },
-        { id: 'config-logs',        label: 'Logs',        icon: <FileText />, onClick: () => {}, active: false, locked: true },
+        { id: 'config-api',      label: 'API',      icon: <Code2 />,    onClick: () => { setActiveTab('config-api'); setMobileOpen(false); },      active: activeTab === 'config-api' },
+        { id: 'config-webhooks', label: 'Webhooks', icon: <Webhook />,  onClick: () => { setActiveTab('config-webhooks'); setMobileOpen(false); }, active: activeTab === 'config-webhooks' },
+        { id: 'config-logs',     label: 'Logs',      icon: <FileText />, onClick: () => { setActiveTab('config-logs'); setMobileOpen(false); },     active: activeTab === 'config-logs' },
       ],
     },
   ];
@@ -1899,6 +1903,23 @@ function AppContent() {
           </React.Suspense>
         )}
 
+        {/* CONFIGURAÇÕES AVANÇADAS: API / WEBHOOKS / LOGS — restrito a owner/admin (ver group.locked em navGroups) */}
+        {activeTab === 'config-api' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ApiKeysPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-webhooks' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <WebhooksPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-logs' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <LogsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
         {/* ABA I.B ACADEMY */}
         {activeTab === 'academy' && profile && (
           <React.Suspense fallback={<PageLoader />}>
@@ -1919,7 +1940,7 @@ function AppContent() {
 
       {/* ABA RANKINGS COMPLETOS - rendered as full page, outside overflow container */}
       {activeTab === 'rankings' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <RankingsPage
             onBack={() => setActiveTab('dashboard')}
@@ -1936,7 +1957,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: GERADOR DE ETIQUETAS */}
       {activeTab === 'label-generator' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <LabelGeneratorPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1945,7 +1966,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: FULL MANAGER */}
       {activeTab === 'full-manager' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <FullManagerPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1954,7 +1975,7 @@ function AppContent() {
 
       {/* FERRAMENTAS: INVENTORYFULL (app desktop — apresentação e download) */}
       {activeTab === 'inventoryfull' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <InventoryFullPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1963,16 +1984,35 @@ function AppContent() {
 
       {/* CONFERÊNCIA CEGA POR NF-E */}
       {activeTab === 'nfe-conference' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
-          <NFeConferencePage onBack={() => setActiveTab('dashboard')} />
+          <NFeConferencePage
+            onBack={() => setActiveTab('dashboard')}
+            initialInvoiceId={nfePendingInvoiceId ?? undefined}
+            onConsumedInitialInvoice={() => setNfePendingInvoiceId(null)}
+          />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* FERRAMENTAS: CONSULTA E DOWNLOAD DE XML/NFE */}
+      {activeTab === 'nfe-xml-lookup' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <NFeXmlLookupPage
+            onBack={() => setActiveTab('dashboard')}
+            onTransferToConference={(invoiceId) => {
+              setNfePendingInvoiceId(invoiceId);
+              setActiveTab('nfe-conference');
+            }}
+          />
           </React.Suspense>
         </div>
       )}
 
       {/* GERENCIAMENTO DE USUÁRIOS */}
       {activeTab === 'users' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <UserManagementPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -1984,7 +2024,7 @@ function AppContent() {
           definição: sair a qualquer momento devolve ao dashboard, e o rascunho local
           guarda o que já foi respondido. */}
       {activeTab === 'diagnostico' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <OperationDiagnostic
             initial={diagnosticRecord}
@@ -1995,11 +2035,20 @@ function AppContent() {
         </div>
       )}
 
+      {/* PRIVACIDADE E LEGAL. Mesma moldura em overlay das demais telas cheias. */}
+      {activeTab === 'legal' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+            <PrivacyLegalPage />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* AGENTES E AUTOMAÇÕES.
           A tela é legível para qualquer papel; criar, editar e ativar é restrito, e o
           gate espelha a policy da 051 para não oferecer controle que o banco recusa. */}
       {activeTab === 'automacoes' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <AutomationsPage
             canManage={canManageAutomations(profile?.role)}
@@ -2014,7 +2063,7 @@ function AppContent() {
           manager). The function refuses anyone else regardless, so this only keeps
           the screen from offering buttons that would come back 403. */}
       {activeTab === 'integracoes' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           {canSyncIntegrations(profile?.role) ? (
             <IntegrationsPage onBack={() => setActiveTab('dashboard')} />
@@ -2027,7 +2076,7 @@ function AppContent() {
 
       {/* CENTRAL DE SEGURANÇA */}
       {activeTab === 'security' && (
-        <div className="fixed inset-0 md:left-[calc(15rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <SecurityPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
@@ -2533,7 +2582,7 @@ export default function App() {
       </React.Suspense>
     );
   }
-  if (view === 'login' || view === 'signup' || view === 'forgot' || view === 'confirm-email') return <AuthPage />;
+  if (view === 'login' || view === 'signup' || view === 'forgot' || view === 'update-password' || view === 'confirm-email') return <AuthPage />;
 
   // Auth still initializing (session check in progress)
   if (authLoading) return <ProfileLoadingOverlay />;
@@ -2558,7 +2607,17 @@ export default function App() {
   // Só dispara na troca: quando `view` vira 'app' o companyId já está resolvido, então
   // não há remontagem extra na entrada. O activeTab volta para o dashboard, que é o
   // correto — a aba aberta descrevia o contexto da empresa anterior.
-  if (view === 'app') return <AppContent key={companyId} />;
+  // O aceite é exigido depois de a sessão existir e antes do sistema aparecer.
+  // Fica AQUI, e não dentro de AppContent, para valer para qualquer empresa
+  // selecionada — e porque o `key={companyId}` remontaria o gate a cada troca de
+  // workspace, repetindo a verificação sem necessidade.
+  if (view === 'app') {
+    return (
+      <LegalAcceptanceGate>
+        <AppContent key={companyId} />
+      </LegalAcceptanceGate>
+    );
+  }
 
   // Absolute fallback
   return (

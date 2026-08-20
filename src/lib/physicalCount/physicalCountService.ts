@@ -3,6 +3,16 @@
 
 import { supabase } from '../supabase';
 import { listDistinctLocations, resolveProductsInLocationRange } from './locationAddressing';
+import {
+  buildSessionAdminRpcArgs,
+  buildSessionDeletionRpcArgs,
+  buildSessionHardDeleteRpcArgs,
+  buildSessionRestoreRpcArgs,
+  filterArchivedSessions,
+  filterVisibleSessions,
+  isSessionVisibleInHistory,
+  type SessionAdminFields,
+} from './physicalCountAdmin';
 import { dequeue, enqueue, listPending, type QueuedCount } from './offlineQueue';
 import { DEFAULT_RECOUNT_SETTINGS, type RecountSettings, type RecountThresholdType } from './recountPolicy';
 import type {
@@ -40,6 +50,9 @@ function mapSession(row: Record<string, unknown>): PhysicalCountSession {
     createdBy: (row.created_by as string | null) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
+    deletedAt: (row.deleted_at as string | null) ?? null,
+    deletedBy: (row.deleted_by as string | null) ?? null,
+    deletionReason: (row.deletion_reason as string | null) ?? null,
   };
 }
 
@@ -318,8 +331,74 @@ export async function approveSession(sessionId: string): Promise<void> {
   if (error) throw error;
 }
 
+// ── Gerenciamento administrativo (migration 059) ──────────────────────────────
+//
+// As duas RPCs revalidam papel (owner/admin), empresa e estado da sessão no
+// servidor. O papel do usuário NÃO é enviado daqui, e `company_id` tampouco: o
+// banco resolve os dois a partir do usuário autenticado. Esconder o menu na tela
+// é conveniência de UX, não autorização.
+
+/** Atualiza só depósito, área e observação — ver EDITABLE_SESSION_FIELDS para o
+ *  porquê de a faixa, o status e as quantidades ficarem fora. */
+export async function updateSessionAdmin(sessionId: string, fields: SessionAdminFields): Promise<void> {
+  const { error } = await supabase.rpc('pc_admin_update_session', buildSessionAdminRpcArgs(sessionId, fields));
+  if (error) throw error;
+}
+
+/** Remoção lógica: a sessão sai do histórico com autor, data e justificativa
+ *  gravados. Nenhum item, evento de contagem, evento de ERP ou registro de
+ *  recontagem é apagado. */
+export async function deleteSessionAdmin(sessionId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('pc_admin_delete_session', buildSessionDeletionRpcArgs(sessionId, reason));
+  if (error) throw error;
+}
+
+/** Devolve ao histórico uma sessão arquivada (migration 061). */
+export async function restoreSessionAdmin(sessionId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('pc_admin_restore_session', buildSessionRestoreRpcArgs(sessionId, reason));
+  if (error) throw error;
+}
+
+/** Exclusão física — o banco só aceita para rascunho sem nenhuma dependência
+ *  (nenhuma contagem registrada, nenhuma recontagem filha, nenhum evento de ERP).
+ *  Qualquer outro caso volta com a razão específica do impedimento. */
+export async function hardDeleteDraftSessionAdmin(sessionId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc(
+    'pc_admin_hard_delete_draft_session',
+    buildSessionHardDeleteRpcArgs(sessionId, reason)
+  );
+  if (error) throw error;
+}
+
+/** As sessões arquivadas, para a área de Arquivados.
+ *
+ *  Traz tudo da empresa e separa no resultado — pelo mesmo motivo de
+ *  listSessions: um filtro por `deleted_at` dentro da query quebra contra um
+ *  banco onde a migration ainda não foi aplicada. Pré-migration a lista volta
+ *  vazia, que é a resposta correta. */
+export async function listArchivedSessions(companyId: string): Promise<PhysicalCountSession[]> {
+  const { data, error } = await supabase
+    .from('physical_count_sessions')
+    .select('*')
+    .eq('company_id', companyId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return filterArchivedSessions((data ?? []).map(mapSession));
+}
+
 // ── Reads ─────────────────────────────────────────────────────────────────────
 
+/** O histórico visível: sessões não removidas.
+ *
+ *  O filtro é aplicado no resultado, NÃO na query. Um `.is('deleted_at', null)`
+ *  aqui referencia uma coluna que só existe depois da migration 059 ser
+ *  aplicada; num banco sem ela o PostgREST devolve erro, `listSessions` lança, e
+ *  o `Promise.all` da tela cai inteiro — o que apagava o histórico E a lista de
+ *  produtos de uma vez. A leitura precisa funcionar antes e depois da migration.
+ *
+ *  `select('*')` traz `deleted_at` quando a coluna existe; quando não existe,
+ *  `mapSession` resolve para `null` e toda sessão é visível, que é exatamente o
+ *  comportamento de antes desta funcionalidade. */
 export async function listSessions(companyId: string): Promise<PhysicalCountSession[]> {
   const { data, error } = await supabase
     .from('physical_count_sessions')
@@ -327,9 +406,12 @@ export async function listSessions(companyId: string): Promise<PhysicalCountSess
     .eq('company_id', companyId)
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(mapSession);
+  return filterVisibleSessions((data ?? []).map(mapSession));
 }
 
+/** Uma sessão removida devolve `null`, como uma que não existe — nenhuma tela
+ *  deve conseguir abrir pelo id o que saiu do histórico. Filtrado no resultado
+ *  pelo mesmo motivo de listSessions. */
 export async function getSession(sessionId: string): Promise<PhysicalCountSession | null> {
   const { data, error } = await supabase
     .from('physical_count_sessions')
@@ -337,7 +419,9 @@ export async function getSession(sessionId: string): Promise<PhysicalCountSessio
     .eq('id', sessionId)
     .maybeSingle();
   if (error) throw error;
-  return data ? mapSession(data) : null;
+  if (!data) return null;
+  const session = mapSession(data);
+  return isSessionVisibleInHistory(session) ? session : null;
 }
 
 /** Items for the active tablet counting screen — does NOT include erp_quantity_snapshot

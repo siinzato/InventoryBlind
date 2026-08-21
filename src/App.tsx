@@ -64,7 +64,8 @@ import {
   BookOpen,
   ArrowRight,
   HelpCircle,
-  FileSearch
+  FileSearch,
+  Barcode
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -99,6 +100,7 @@ const ImportedProductsPage = React.lazy(() => import('./components/ImportedProdu
 const ImportHistoryPage = React.lazy(() => import('./components/ImportHistoryPage').then(m => ({ default: m.ImportHistoryPage })));
 const RankingsPage = React.lazy(() => import('./components/RankingsPage').then(m => ({ default: m.RankingsPage })));
 const LabelGeneratorPage = React.lazy(() => import('./components/LabelGeneratorPage').then(m => ({ default: m.LabelGeneratorPage })));
+const BarcodeLabPage = React.lazy(() => import('./components/BarcodeLabPage').then(m => ({ default: m.BarcodeLabPage })));
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
 const InventoryFullPage = React.lazy(() => import('./components/InventoryFullPage').then(m => ({ default: m.InventoryFullPage })));
 const UserManagementPage = React.lazy(() => import('./components/UserManagementPage'));
@@ -732,6 +734,7 @@ function AppContent() {
       items: [
         { id: 'nfe-xml-lookup',  label: 'Consulta e Download de XML/NFe', icon: <FileSearch />, onClick: () => { setActiveTab('nfe-xml-lookup'); setMobileOpen(false); }, active: activeTab === 'nfe-xml-lookup' },
         { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
+        ...(hasPermission(profile?.role, 'labels.use') ? [{ id: 'barcode-lab', label: 'Códigos de Barras', icon: <Barcode />, onClick: () => { setActiveTab('barcode-lab'); setMobileOpen(false); }, active: activeTab === 'barcode-lab' }] : []),
         { id: 'full-manager',    label: 'Full Manager',         icon: <ClipboardCheck />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
         { id: 'inventoryfull',   label: 'InventoryFull',        icon: <Monitor />, onClick: () => { setActiveTab('inventoryfull'); setMobileOpen(false); },     active: activeTab === 'inventoryfull' },
       ],
@@ -1009,7 +1012,7 @@ function AppContent() {
           página acima do home indicator. */}
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none] pb-[env(safe-area-inset-bottom)]">
 
-        {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' && activeTab !== 'users' && (
+        {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'barcode-lab' && activeTab !== 'full-manager' && activeTab !== 'users' && (
           <>
 
         {/* ABA HEATMAP */}
@@ -1960,6 +1963,15 @@ function AppContent() {
         <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <LabelGeneratorPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* FERRAMENTAS: LABORATÓRIO DE CÓDIGOS DE BARRAS */}
+      {activeTab === 'barcode-lab' && hasPermission(profile?.role, 'labels.use') && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <BarcodeLabPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         </div>
       )}

@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-21-laboratorio-codigos-de-barras',
+    date: '2026-08-21',
+    category: 'novidade',
+    title: 'Laboratório de Códigos de Barras',
+    description: 'Nova ferramenta em Ferramentas > Códigos de Barras para gerar, validar e imprimir EAN-13, EAN-8, UPC-A, Code 128, ITF-14, QR Code e Data Matrix — sem precisar cadastrar nada antes. Digite o valor livremente, busque um produto do catálogo ou importe uma planilha em lote. O sistema calcula e confere o dígito verificador automaticamente, mostra uma pré-visualização em tempo real e exporta em PNG, SVG, PDF ou impressão direta, nos tamanhos 40×25mm, 100×150mm, 100×40mm ou personalizado.',
+  },
+  {
     id: '2026-08-21-contagem-manual-inicio-termino',
     date: '2026-08-21',
     category: 'melhoria',

@@ -72,5 +72,5 @@
 - Produces: a draft pull request targeting `main`.
 
 - [x] **Step 1: Inspect the final diff and confirm only synchronization files changed.**
-- [ ] **Step 2: Commit explicit paths and push `codex/notion-sync`.**
-- [ ] **Step 3: Open a draft pull request and report the remaining `NOTION_TOKEN` setup step.**
+- [x] **Step 2: Commit explicit paths and push `codex/notion-sync`.**
+- [x] **Step 3: Open a draft pull request and report the remaining `NOTION_TOKEN` setup step.**

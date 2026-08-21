@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { classifyLogOutcome, redactMetadata, logsToCsv } from '../logsService';
+import { classifyLogOutcome, redactMetadata, logsToCsv, startOfLocalDay, endOfLocalDay } from '../logsService';
 import type { AuditLog } from '../../auditLogService';
 
 describe('classifyLogOutcome', () => {
@@ -55,5 +55,23 @@ describe('logsToCsv', () => {
     const withComma: AuditLog = { ...rows[0], description: 'Nota, com vírgula e "aspas"' };
     const csv = logsToCsv([withComma]);
     expect(csv).toContain('"Nota, com vírgula e ""aspas"""');
+  });
+});
+
+describe('limites de data', () => {
+  it('o fim do dia é o último instante daquele dia no fuso local, não em UTC', () => {
+    const end = new Date(endOfLocalDay('2026-08-21'));
+    expect(end.getFullYear()).toBe(2026);
+    expect(end.getMonth()).toBe(7); // agosto
+    expect(end.getDate()).toBe(21);
+    expect(end.getHours()).toBe(23);
+    expect(end.getMinutes()).toBe(59);
+  });
+
+  it('o início do dia é a meia-noite local daquele dia', () => {
+    const start = new Date(startOfLocalDay('2026-08-21'));
+    expect(start.getDate()).toBe(21);
+    expect(start.getHours()).toBe(0);
+    expect(start.getMinutes()).toBe(0);
   });
 });

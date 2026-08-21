@@ -11,6 +11,12 @@
 // um parâmetro do chamador, então uma chave de uma empresa jamais devolve
 // dado de outra.
 //
+// Chave revogada (403) e chave expirada (401, migration 067) são recusadas
+// antes de qualquer leitura de produto.
+//
+// Erros seguem sempre o mesmo formato: { "error": <mensagem>, "code": <slug> }.
+// Nunca stack trace, mensagem de banco ou qualquer valor de segredo.
+//
 // Deploy: npx supabase functions deploy public-api --no-verify-jwt
 // (o chamador externo não tem — e nunca terá — um JWT do Supabase; a
 // autenticação é 100% pela chave de API.)
@@ -33,6 +39,13 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
+/** Erro padronizado: mensagem legível + código estável para o cliente tratar
+ *  em código. Nunca inclui stack trace, detalhe de banco ou qualquer segredo —
+ *  o motivo técnico fica só no log do servidor. */
+function fail(status: number, code: string, message: string): Response {
+  return json({ error: message, code }, status);
+}
+
 async function sha256Hex(value: string): Promise<string> {
   const digest = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(value));
   return Array.from(new Uint8Array(digest)).map(b => b.toString(16).padStart(2, '0')).join('');
@@ -40,22 +53,22 @@ async function sha256Hex(value: string): Promise<string> {
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
-  if (req.method !== 'GET') return json({ error: 'Método não suportado.' }, 405);
+  if (req.method !== 'GET') return fail(405, 'method_not_allowed', 'Método não suportado.');
 
   const url = new URL(req.url);
   if (!url.pathname.endsWith('/stock')) {
-    return json({ error: 'Rota não encontrada. Use GET /public-api/stock?sku=...' }, 404);
+    return fail(404, 'not_found', 'Rota não encontrada. Use GET /public-api/stock?sku=...');
   }
 
   const authHeader = req.headers.get('Authorization') ?? '';
   const presented = authHeader.startsWith('Bearer ') ? authHeader.slice(7).trim() : '';
   if (!presented) {
-    return json({ error: 'Chave de API ausente. Envie "Authorization: Bearer <chave>".' }, 401);
+    return fail(401, 'missing_key', 'Chave de API ausente. Envie "Authorization: Bearer <chave>".');
   }
 
   const sku = url.searchParams.get('sku')?.trim();
   if (!sku) {
-    return json({ error: 'Informe o parâmetro "sku".' }, 400);
+    return fail(400, 'missing_parameter', 'Informe o parâmetro "sku".');
   }
 
   const admin: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
@@ -67,16 +80,25 @@ Deno.serve(async (req: Request) => {
 
     const { data: keyRow, error: keyError } = await admin
       .from('api_keys')
-      .select('id, company_id, revoked_at')
+      .select('id, company_id, revoked_at, expires_at')
       .eq('key_hash', keyHash)
       .maybeSingle();
 
     if (keyError) {
       console.error('[public-api] Failed to look up API key:', keyError.message);
-      return json({ error: 'Erro ao validar a chave de API.' }, 500);
+      return fail(500, 'internal_error', 'Erro ao validar a chave de API.');
     }
-    if (!keyRow || keyRow.revoked_at) {
-      return json({ error: 'Chave de API inválida ou revogada.' }, 401);
+    // Chave desconhecida e chave revogada devolvem códigos diferentes de
+    // propósito: quem revogou a chave precisa distinguir "errei o valor" de
+    // "essa chave foi desligada". Nenhuma das duas volta a funcionar aqui.
+    if (!keyRow) {
+      return fail(401, 'invalid_key', 'Chave de API inválida.');
+    }
+    if (keyRow.revoked_at) {
+      return fail(403, 'key_revoked', 'Esta chave de API foi revogada.');
+    }
+    if (keyRow.expires_at != null && new Date(keyRow.expires_at).getTime() <= Date.now()) {
+      return fail(401, 'key_expired', 'Esta chave de API expirou.');
     }
 
     const { error: touchError } = await admin
@@ -97,10 +119,10 @@ Deno.serve(async (req: Request) => {
 
     if (productError) {
       console.error('[public-api] Failed to look up product:', productError.message);
-      return json({ error: 'Erro ao consultar o produto.' }, 500);
+      return fail(500, 'internal_error', 'Erro ao consultar o produto.');
     }
     if (!product) {
-      return json({ error: 'Produto não encontrado para este SKU.' }, 404);
+      return fail(404, 'product_not_found', 'Produto não encontrado para este SKU.');
     }
 
     return json({
@@ -110,7 +132,9 @@ Deno.serve(async (req: Request) => {
       stock_quantity: product.stock_quantity,
     });
   } catch (err) {
+    // Só o log do servidor vê o erro real; a resposta nunca carrega stack
+    // trace nem mensagem interna.
     console.error('[public-api] Unhandled error:', err);
-    return json({ error: 'Erro interno.' }, 500);
+    return fail(500, 'internal_error', 'Erro interno.');
   }
 });

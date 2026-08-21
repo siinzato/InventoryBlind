@@ -1,18 +1,17 @@
-// Configurações Avançadas > Webhooks — CRUD e disparo de teste (migration
-// 064). O segredo de assinatura só existe em texto puro no retorno de
-// createWebhook/rotateWebhookSecret — nunca é lido de volta. Toda escrita
-// passa pelas RPCs company_webhook_*, que revalidam papel/empresa/URL/eventos
-// no servidor.
+// Configurações Avançadas > Webhooks — CRUD, teste e histórico de entregas
+// (migrations 064 e 068). O segredo de assinatura só existe em texto puro no
+// retorno de createWebhook/rotateWebhookSecret — nunca é lido de volta. Toda
+// escrita passa pelas RPCs company_webhook_*, que revalidam papel/empresa/
+// URL/eventos no servidor.
 
 import { supabase } from '../supabase';
 import { logAuditEvent } from '../auditLogService';
+import type { WebhookEvent } from './webhookEvents';
 
-export type WebhookEvent = 'physical_count.finalized' | 'physical_count.approved';
+export type { WebhookEvent };
 
-export const WEBHOOK_EVENT_OPTIONS: { value: WebhookEvent; label: string }[] = [
-  { value: 'physical_count.finalized', label: 'Contagem física finalizada' },
-  { value: 'physical_count.approved', label: 'Contagem física aprovada' },
-];
+/** Espelha o teto de tentativas de `company_webhook_record_attempt` (068). */
+export const WEBHOOK_MAX_ATTEMPTS = 5;
 
 export interface CompanyWebhook {
   id: string;
@@ -22,6 +21,9 @@ export interface CompanyWebhook {
   is_active: boolean;
   created_at: string;
   updated_at: string;
+  last_delivery_at: string | null;
+  last_delivery_status: 'delivered' | 'failed' | null;
+  last_delivery_http_status: number | null;
 }
 
 export interface CompanyWebhookDelivery {
@@ -31,24 +33,32 @@ export interface CompanyWebhookDelivery {
   status: 'pending' | 'delivered' | 'failed' | 'exhausted';
   attempt_count: number;
   http_status: number | null;
+  duration_ms: number | null;
   error_message: string | null;
   created_at: string;
   delivered_at: string | null;
 }
 
+export interface WebhookTestResult {
+  ok: boolean;
+  httpStatus: number | null;
+  durationMs: number | null;
+  error: string | null;
+}
+
 export async function listWebhooks(): Promise<CompanyWebhook[]> {
   const { data, error } = await supabase
     .from('company_webhooks')
-    .select('id, name, url, events, is_active, created_at, updated_at')
+    .select('id, name, url, events, is_active, created_at, updated_at, last_delivery_at, last_delivery_status, last_delivery_http_status')
     .order('created_at', { ascending: false });
   if (error) throw error;
   return (data ?? []) as CompanyWebhook[];
 }
 
-export async function listWebhookDeliveries(webhookId: string, limit = 20): Promise<CompanyWebhookDelivery[]> {
+export async function listWebhookDeliveries(webhookId: string, limit = 25): Promise<CompanyWebhookDelivery[]> {
   const { data, error } = await supabase
     .from('company_webhook_deliveries')
-    .select('id, webhook_id, event_type, status, attempt_count, http_status, error_message, created_at, delivered_at')
+    .select('id, webhook_id, event_type, status, attempt_count, http_status, duration_ms, error_message, created_at, delivered_at')
     .eq('webhook_id', webhookId)
     .order('created_at', { ascending: false })
     .limit(limit);
@@ -66,6 +76,7 @@ export async function createWebhook(
   if (error) throw error;
   const row = Array.isArray(data) ? data[0] : data;
 
+  // Nunca o segredo — só o que identifica qual webhook foi criado.
   await logAuditEvent({
     companyId, userId, userEmail,
     action: 'webhook.created',
@@ -93,6 +104,22 @@ export async function updateWebhook(
     resourceType: 'company_webhook',
     resourceId: id,
     description: `Webhook "${input.name}" atualizado.`,
+  });
+}
+
+export async function setWebhookActive(
+  id: string, name: string, isActive: boolean,
+  companyId: string, userId: string, userEmail: string
+): Promise<void> {
+  const { error } = await supabase.rpc('company_webhook_set_active', { p_id: id, p_is_active: isActive });
+  if (error) throw error;
+
+  await logAuditEvent({
+    companyId, userId, userEmail,
+    action: isActive ? 'webhook.enabled' : 'webhook.disabled',
+    resourceType: 'company_webhook',
+    resourceId: id,
+    description: `Webhook "${name}" ${isActive ? 'ativado' : 'desativado'}.`,
   });
 }
 
@@ -128,10 +155,14 @@ export async function rotateWebhookSecret(
   return data as string;
 }
 
+/** Enfileira uma entrega de teste e pede a entrega IMEDIATA à Edge Function,
+ *  para que a tela mostre status e tempo de resposta na hora em vez de esperar
+ *  o cron. Se a entrega imediata falhar por qualquer motivo de infraestrutura,
+ *  a entrega continua na fila e o cron ainda a processa — nada se perde. */
 export async function sendWebhookTest(
   id: string, name: string, companyId: string, userId: string, userEmail: string
-): Promise<void> {
-  const { error } = await supabase.rpc('company_webhook_send_test', { p_id: id });
+): Promise<WebhookTestResult> {
+  const { data: deliveryId, error } = await supabase.rpc('company_webhook_send_test', { p_id: id });
   if (error) throw error;
 
   await logAuditEvent({
@@ -141,4 +172,25 @@ export async function sendWebhookTest(
     resourceId: id,
     description: `Disparo de teste enviado para o webhook "${name}".`,
   });
+
+  const { data, error: invokeError } = await supabase.functions.invoke('webhook-dispatch', {
+    body: { mode: 'test', delivery_id: deliveryId },
+  });
+
+  if (invokeError) {
+    return {
+      ok: false,
+      httpStatus: null,
+      durationMs: null,
+      error: 'Não foi possível concluir o teste agora. A entrega ficou na fila e será tentada automaticamente.',
+    };
+  }
+
+  const result = (data ?? {}) as { ok?: boolean; http_status?: number | null; duration_ms?: number | null; error?: string | null };
+  return {
+    ok: result.ok === true,
+    httpStatus: result.http_status ?? null,
+    durationMs: result.duration_ms ?? null,
+    error: result.error ?? null,
+  };
 }

@@ -74,8 +74,11 @@ export type AuditAction =
   // Configurações Avançadas — Chaves de API e Webhooks (migrations 063-065).
   | 'apikey.created'
   | 'apikey.revoked'
+  | 'apikey.deleted'
   | 'webhook.created'
   | 'webhook.updated'
+  | 'webhook.enabled'
+  | 'webhook.disabled'
   | 'webhook.deleted'
   | 'webhook.secret_rotated'
   | 'webhook.test_sent';

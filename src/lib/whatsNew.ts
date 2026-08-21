@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-21-webhooks-mais-eventos',
+    date: '2026-08-21',
+    category: 'novidade',
+    title: 'Webhooks avisam sobre mais momentos da contagem',
+    description: 'Além de contagem finalizada e aprovada, agora dá para ser avisado quando uma contagem é iniciada, cancelada ou termina com divergência. Os eventos aparecem organizados por categoria, com opção de selecionar todos. O botão Testar passa a mostrar na hora o código de resposta e o tempo do seu servidor, e cada webhook tem um histórico de entregas com tentativas, duração e o motivo de eventuais falhas. Entregas que falham por instabilidade são retentadas automaticamente até cinco vezes.',
+  },
+  {
+    id: '2026-08-21-chaves-api-expiracao',
+    date: '2026-08-21',
+    category: 'melhoria',
+    title: 'Chaves de API com validade e documentação completa',
+    description: 'Ao criar uma chave você pode definir uma descrição e uma validade (30 dias, 90 dias, 1 ano ou uma data escolhida) — ou deixar sem expiração, como antes. A chave completa aparece em uma tela própria, uma única vez, com aviso e botão de copiar. Chaves já revogadas podem ser excluídas da lista. A página passa a trazer a documentação da API com o endereço real da sua conta, os endpoints disponíveis, exemplos prontos para copiar e os códigos de resposta.',
+  },
+  {
     id: '2026-08-20-configuracoes-avancadas',
     date: '2026-08-20',
     category: 'novidade',

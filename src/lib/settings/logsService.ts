@@ -34,6 +34,16 @@ export interface LogsPage {
   hasMore: boolean;
 }
 
+/** `YYYY-MM-DD` → instante ISO do início daquele dia NO FUSO LOCAL. */
+export function startOfLocalDay(date: string): string {
+  return new Date(`${date}T00:00:00`).toISOString();
+}
+
+/** `YYYY-MM-DD` → instante ISO do último milissegundo daquele dia no fuso local. */
+export function endOfLocalDay(date: string): string {
+  return new Date(`${date}T23:59:59.999`).toISOString();
+}
+
 export async function listAuditLogs(
   companyId: string,
   filters: LogFilters,
@@ -47,8 +57,12 @@ export async function listAuditLogs(
     .order('created_at', { ascending: false })
     .range(page * pageSize, (page + 1) * pageSize - 1);
 
-  if (filters.dateFrom) query = query.gte('created_at', `${filters.dateFrom}T00:00:00.000Z`);
-  if (filters.dateTo) query = query.lte('created_at', `${filters.dateTo}T23:59:59.999Z`);
+  // Limites do dia no fuso de quem está olhando, não em UTC: a tabela exibe a
+  // data já convertida para o fuso local, então um `...T23:59:59.999Z` fixo
+  // fazia "Até 21/08" cortar as últimas horas do dia 21 no Brasil (UTC-3) e
+  // ainda trazer o fim do dia 20.
+  if (filters.dateFrom) query = query.gte('created_at', startOfLocalDay(filters.dateFrom));
+  if (filters.dateTo) query = query.lte('created_at', endOfLocalDay(filters.dateTo));
   if (filters.userEmail) query = query.ilike('user_email', `%${filters.userEmail}%`);
   if (filters.action) query = query.ilike('action', `%${filters.action}%`);
   if (filters.searchText) {

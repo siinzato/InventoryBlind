@@ -25,8 +25,8 @@ npx supabase functions deploy webhook-dispatch --no-verify-jwt
 | `integration-stock-write` | InventoryBlind → Provider | The **only** path that changes an ERP balance. Sends approved adjustments, one at a time, each re-guarded against a freshly read balance. |
 | `integration-webhook` | Provider → InventoryBlind | Verifies, records, enqueues. Never syncs inline. |
 | `nfe-fetch-by-key` | InventoryBlind → provedor de NF-e (Meu Danfe) | Busca a NF-e pela chave de acesso e devolve o XML puro; a importação em si (parsing, vínculo produto-a-produto, criação do registro) roda no client, pelo mesmo caminho da importação manual (`importNfeXml`). |
-| `public-api` | Terceiro → InventoryBlind | Configurações Avançadas > API. Autentica por chave de API (hash SHA-256, nunca texto puro); único endpoint real desta v1: `GET /stock?sku=` devolve saldo/local do produto, escopado pela empresa da própria chave. |
-| `webhook-dispatch` | InventoryBlind → Terceiro | Configurações Avançadas > Webhooks. Consome `company_webhook_deliveries` pelo cron a cada minuto, assina HMAC-SHA256, entrega com a mesma defesa SSRF (DNS + IP fixado) de `automation-run`, no máximo 3 tentativas. |
+| `public-api` | Terceiro → InventoryBlind | Configurações Avançadas > API. Autentica por chave de API (hash SHA-256, nunca texto puro), recusando chave revogada (403) ou expirada (401); único endpoint real: `GET /stock?sku=` devolve saldo/local do produto, escopado pela empresa da própria chave. Erros sempre no formato `{ error, code }`. |
+| `webhook-dispatch` | InventoryBlind → Terceiro | Configurações Avançadas > Webhooks. Consome `company_webhook_deliveries` pelo cron a cada minuto, assina HMAC-SHA256 de `timestamp.corpo`, entrega com a mesma defesa SSRF (DNS + IP fixado) de `automation-run`, no máximo 5 tentativas com atraso progressivo. Em `mode:'test'` entrega UMA entrega de teste na hora, autorizada pelo JWT do usuário dentro do banco (`company_webhook_claim_test_delivery`) antes de o service_role entrar em cena. |
 
 `integration-stock-write` is the sensitive one. Three properties worth keeping in
 mind before changing it:

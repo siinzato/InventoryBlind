@@ -19,19 +19,29 @@
 // direto, porque não há DNS de terceiro para forjar num endereço de loopback.
 //
 // ── Retentativas ─────────────────────────────────────────────────────────────
-// No máximo 3 tentativas por entrega (company_webhook_record_attempt,
-// migration 064), backoff curto e fixo — nunca um loop infinito.
+// No máximo 5 tentativas por entrega (company_webhook_record_attempt,
+// migration 068), com atraso progressivo (1min, 5min, 15min, 1h) — nunca um
+// loop infinito. Falha que não muda com o tempo (4xx que não seja 408/429)
+// encerra a entrega na hora em vez de gastar as cinco tentativas.
+//
+// ── Modo 'test' ──────────────────────────────────────────────────────────────
+// O botão "Testar" da tela precisa de status e tempo de resposta na hora, não
+// em até um minuto. Nesse modo a autenticação é o JWT do próprio usuário:
+// papel e empresa são revalidados dentro do banco
+// (company_webhook_claim_test_delivery), que só devolve entrega de teste
+// pendente da empresa dele — nunca uma entrega de evento real.
 
 import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const DELIVERY_TIMEOUT_MS = 10_000;
 const CLAIM_LIMIT = 20;
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'content-type, x-webhook-cron-secret',
+  'Access-Control-Allow-Headers': 'authorization, content-type, x-webhook-cron-secret',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -221,7 +231,37 @@ interface Delivery {
   attempt_count: number;
 }
 
-async function deliverOne(admin: SupabaseClient, delivery: Delivery): Promise<void> {
+interface AttemptOutcome {
+  success: boolean;
+  httpStatus: number | null;
+  durationMs: number | null;
+  error: string | null;
+  /** false = falha que não muda se tentarmos de novo. */
+  retryable: boolean;
+}
+
+/** Um 4xx quer dizer "esta requisição está errada" — repetir cinco vezes só
+ *  gera ruído dos dois lados. As exceções são 408 (timeout) e 429 (excesso de
+ *  chamadas), que são justamente falhas temporárias. 5xx e falha de rede
+ *  continuam recuperáveis. */
+function isRetryableStatus(status: number): boolean {
+  if (status === 408 || status === 429) return true;
+  return status < 400 || status >= 500;
+}
+
+async function recordAttempt(admin: SupabaseClient, deliveryId: string, outcome: AttemptOutcome): Promise<AttemptOutcome> {
+  await admin.rpc('company_webhook_record_attempt', {
+    p_delivery_id: deliveryId,
+    p_success: outcome.success,
+    p_http_status: outcome.httpStatus,
+    p_error: outcome.error,
+    p_duration_ms: outcome.durationMs,
+    p_retryable: outcome.retryable,
+  });
+  return outcome;
+}
+
+async function deliverOne(admin: SupabaseClient, delivery: Delivery): Promise<AttemptOutcome> {
   const { data: webhook, error: webhookError } = await admin
     .from('company_webhooks')
     .select('id, url, is_active')
@@ -229,24 +269,19 @@ async function deliverOne(admin: SupabaseClient, delivery: Delivery): Promise<vo
     .maybeSingle();
 
   if (webhookError || !webhook || !webhook.is_active) {
-    await admin.rpc('company_webhook_record_attempt', {
-      p_delivery_id: delivery.id,
-      p_success: false,
-      p_http_status: null,
-      p_error: !webhook ? 'Webhook não encontrado.' : 'Webhook desativado.',
+    // Webhook removido ou desligado: reentregar não muda nada.
+    return recordAttempt(admin, delivery.id, {
+      success: false, httpStatus: null, durationMs: null, retryable: false,
+      error: !webhook ? 'Webhook não encontrado.' : 'Webhook desativado.',
     });
-    return;
   }
 
   const problem = validateWebhookUrl(webhook.url);
   if (problem != null) {
-    await admin.rpc('company_webhook_record_attempt', {
-      p_delivery_id: delivery.id,
-      p_success: false,
-      p_http_status: null,
-      p_error: `URL recusada: ${problem}`,
+    return recordAttempt(admin, delivery.id, {
+      success: false, httpStatus: null, durationMs: null, retryable: false,
+      error: `URL recusada: ${problem}`,
     });
-    return;
   }
 
   const { data: secretRow, error: secretError } = await admin
@@ -256,31 +291,37 @@ async function deliverOne(admin: SupabaseClient, delivery: Delivery): Promise<vo
     .maybeSingle();
 
   if (secretError || !secretRow) {
-    await admin.rpc('company_webhook_record_attempt', {
-      p_delivery_id: delivery.id,
-      p_success: false,
-      p_http_status: null,
-      p_error: 'Segredo de assinatura não encontrado.',
+    return recordAttempt(admin, delivery.id, {
+      success: false, httpStatus: null, durationMs: null, retryable: false,
+      error: 'Segredo de assinatura não encontrado.',
     });
-    return;
   }
 
+  // Envelope padronizado — o conteúdo específico do evento fica sempre em
+  // `data`, para que um consumidor consiga tratar todos os eventos com o mesmo
+  // parser. `id` é único por entrega: é a chave de idempotência do consumidor.
+  const timestamp = Math.floor(Date.now() / 1000).toString();
   const body = JSON.stringify({
     id: delivery.id,
     event: delivery.event_type,
-    createdAt: new Date().toISOString(),
+    created_at: new Date().toISOString(),
     data: delivery.payload,
   });
-  const signature = await computeHmacHex(body, secretRow.secret);
+  // Assina timestamp + corpo: assinar só o corpo deixaria uma entrega
+  // capturada válida para sempre, já que o timestamp poderia ser trocado sem
+  // invalidar a assinatura.
+  const signature = await computeHmacHex(`${timestamp}.${body}`, secretRow.secret);
   const url = new URL(webhook.url);
 
   const headers = {
     'content-type': 'application/json',
     'x-inventoryblind-event': delivery.event_type,
-    'x-inventoryblind-delivery-id': delivery.id,
+    'x-inventoryblind-delivery': delivery.id,
+    'x-inventoryblind-timestamp': timestamp,
     'x-inventoryblind-signature': signature,
   };
 
+  const startedAt = Date.now();
   try {
     let status: number;
 
@@ -299,38 +340,102 @@ async function deliverOne(admin: SupabaseClient, delivery: Delivery): Promise<vo
     } else {
       const target = await resolveAndCheckHost(url.hostname);
       if ('problem' in target) {
-        await admin.rpc('company_webhook_record_attempt', {
-          p_delivery_id: delivery.id,
-          p_success: false,
-          p_http_status: null,
-          p_error: `URL recusada: ${target.problem}`,
+        return recordAttempt(admin, delivery.id, {
+          success: false, httpStatus: null, durationMs: Date.now() - startedAt, retryable: false,
+          error: `URL recusada: ${target.problem}`,
         });
-        return;
       }
       const pinned = await fetchWithPinnedIp({ url, ip: target.ip, headers, body, timeoutMs: DELIVERY_TIMEOUT_MS });
       status = pinned.status;
     }
 
     const success = status >= 200 && status < 300;
-    await admin.rpc('company_webhook_record_attempt', {
-      p_delivery_id: delivery.id,
-      p_success: success,
-      p_http_status: status,
-      p_error: success ? null : `HTTP ${status}`,
+    return recordAttempt(admin, delivery.id, {
+      success,
+      httpStatus: status,
+      durationMs: Date.now() - startedAt,
+      retryable: isRetryableStatus(status),
+      error: success ? null : `HTTP ${status}`,
     });
   } catch (thrown) {
-    await admin.rpc('company_webhook_record_attempt', {
-      p_delivery_id: delivery.id,
-      p_success: false,
-      p_http_status: null,
-      p_error: thrown instanceof Error ? thrown.message : 'Falha ao chamar o webhook.',
+    // Falha de rede/TLS/timeout: quase sempre temporária.
+    return recordAttempt(admin, delivery.id, {
+      success: false,
+      httpStatus: null,
+      durationMs: Date.now() - startedAt,
+      retryable: true,
+      error: thrown instanceof Error ? thrown.message : 'Falha ao chamar o webhook.',
     });
   }
+}
+
+/** Modo 'test': entrega UMA entrega de teste na hora, para a tela poder mostrar
+ *  status e tempo de resposta. Quem autoriza é o banco, com o JWT do usuário —
+ *  esta função nunca decide sozinha que a entrega pertence a quem pediu. */
+async function handleTestMode(req: Request, deliveryId: unknown): Promise<Response> {
+  if (typeof deliveryId !== 'string' || deliveryId.length === 0) {
+    return json({ error: 'Entrega de teste não informada.' }, 400);
+  }
+
+  const authHeader = req.headers.get('Authorization') ?? '';
+  if (!authHeader.startsWith('Bearer ')) {
+    return json({ error: 'Não autorizado.' }, 401);
+  }
+
+  const asUser: SupabaseClient = createClient(SUPABASE_URL, ANON_KEY, {
+    auth: { persistSession: false },
+    global: { headers: { Authorization: authHeader } },
+  });
+
+  const { data: claimed, error: claimError } = await asUser.rpc('company_webhook_claim_test_delivery', {
+    p_delivery_id: deliveryId,
+  });
+
+  if (claimError) {
+    console.error('[webhook-dispatch] Test claim rejected:', claimError.message);
+    return json({ error: 'Não foi possível iniciar o teste.' }, 403);
+  }
+
+  const delivery = ((claimed ?? []) as Delivery[])[0];
+  if (!delivery) {
+    return json({ error: 'Entrega de teste não encontrada ou já processada.' }, 404);
+  }
+
+  // Só depois de o banco confirmar a posse é que o service_role entra em cena
+  // — ele é necessário para ler o segredo de assinatura, que nenhum usuário
+  // pode ler.
+  const admin: SupabaseClient = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
+    auth: { persistSession: false },
+  });
+
+  const outcome = await deliverOne(admin, delivery);
+  return json({
+    ok: outcome.success,
+    http_status: outcome.httpStatus,
+    duration_ms: outcome.durationMs,
+    error: outcome.error,
+  });
 }
 
 Deno.serve(async (req: Request) => {
   if (req.method === 'OPTIONS') return new Response(null, { headers: CORS_HEADERS });
   if (req.method !== 'POST') return json({ error: 'Método não suportado.' }, 405);
+
+  let payload: { mode?: string; delivery_id?: unknown } = {};
+  try {
+    payload = await req.json();
+  } catch {
+    payload = {};
+  }
+
+  if (payload.mode === 'test') {
+    try {
+      return await handleTestMode(req, payload.delivery_id);
+    } catch (err) {
+      console.error('[webhook-dispatch] Unhandled error in test mode:', err);
+      return json({ error: 'Erro interno.' }, 500);
+    }
+  }
 
   const cronSecret = req.headers.get('x-webhook-cron-secret');
   if (!cronSecret) return json({ error: 'Não autorizado.' }, 401);

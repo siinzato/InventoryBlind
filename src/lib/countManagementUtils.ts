@@ -280,3 +280,80 @@ export const generateCountInsight = (metrics: CountMetrics, divergenciasReais: n
 
   return parts.length > 0 ? parts.join(' ') : 'Contagem registrada sem divergências relevantes a destacar.';
 };
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Início/término da Contagem Manual — substitui o cronômetro por seleção de
+// linha (impreciso: selecionar a linha não significa que a contagem começou).
+// O operador informa as duas datas; a duração é sempre término - início.
+// ─────────────────────────────────────────────────────────────────────────────
+
+const CLOCK_SKEW_TOLERANCE_MS = 2 * 60 * 1000;
+
+/** Valor de <input type="datetime-local"> ("YYYY-MM-DDTHH:mm") -> Date em horário local. */
+export const parseLocalDateTimeInput = (value: string): Date | null => {
+  if (!value) return null;
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+/** Date -> valor para <input type="datetime-local"> no horário local do navegador (precisão de minuto). */
+export const toLocalDateTimeInputValue = (date: Date): string => {
+  const pad = (n: number) => String(n).padStart(2, '0');
+  return `${date.getFullYear()}-${pad(date.getMonth() + 1)}-${pad(date.getDate())}T${pad(date.getHours())}:${pad(date.getMinutes())}`;
+};
+
+/** "42min" / "2h 15min" / "1d 3h 20min" — sempre arredondado ao minuto mais próximo. */
+export const formatFriendlyDuration = (ms: number): string => {
+  const totalMinutes = Math.max(0, Math.round(ms / 60000));
+  if (totalMinutes < 60) return `${totalMinutes}min`;
+  const days = Math.floor(totalMinutes / 1440);
+  const hours = Math.floor((totalMinutes % 1440) / 60);
+  const minutes = totalMinutes % 60;
+  return days > 0 ? `${days}d ${hours}h ${minutes}min` : `${hours}h ${minutes}min`;
+};
+
+export interface CountDurationResult {
+  ms: number | null;
+  label: string;
+}
+
+/** término - início. Nunca negativo: falta de data ou término < início vira uma mensagem, não um cronômetro. */
+export const computeCountDuration = (startedAt: Date | null, finishedAt: Date | null): CountDurationResult => {
+  if (!startedAt || !finishedAt) return { ms: null, label: 'Aguardando início e término' };
+  const ms = finishedAt.getTime() - startedAt.getTime();
+  if (ms < 0) return { ms: null, label: 'Término anterior ao início' };
+  return { ms, label: formatFriendlyDuration(ms) };
+};
+
+/** true quando `date` está no futuro além de uma pequena tolerância de relógio do dispositivo. */
+export const isFutureBeyondSkew = (date: Date, now: Date): boolean =>
+  date.getTime() - now.getTime() > CLOCK_SKEW_TOLERANCE_MS;
+
+export interface ManualCountTimingErrors {
+  startedAt?: string;
+  finishedAt?: string;
+}
+
+/** Validações de início/término exigidas para "Salvar e Processar" a Contagem Manual. */
+export const validateManualCountTiming = (
+  startedAt: Date | null,
+  finishedAt: Date | null,
+  now: Date
+): ManualCountTimingErrors => {
+  const errors: ManualCountTimingErrors = {};
+
+  if (!startedAt) errors.startedAt = 'Informe quando a contagem começou.';
+  if (!finishedAt) errors.finishedAt = 'Informe quando a contagem terminou.';
+
+  if (startedAt && finishedAt && finishedAt.getTime() < startedAt.getTime()) {
+    errors.finishedAt = 'O término não pode ser anterior ao início.';
+  }
+  if (startedAt && isFutureBeyondSkew(startedAt, now)) {
+    errors.startedAt = 'A data informada não pode estar no futuro.';
+  }
+  if (finishedAt && isFutureBeyondSkew(finishedAt, now)) {
+    errors.finishedAt = 'A data informada não pode estar no futuro.';
+  }
+
+  return errors;
+};

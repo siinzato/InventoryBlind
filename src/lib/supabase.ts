@@ -117,6 +117,8 @@ export interface InventoryCountRecord {
   accuracy_initial: number | null;
   accuracy_final: number | null;
   observacoes: string | null;
+  started_at: string | null;
+  finished_at: string | null;
   duration_seconds: number | null;
   created_by: string | null;
   created_at: string;

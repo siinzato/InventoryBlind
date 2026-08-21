@@ -2,7 +2,11 @@ import { useEffect, useMemo, useState } from 'react';
 import { Save, AlertTriangle, CheckCircle2 } from 'lucide-react';
 import { Panel, PanelSection, Button } from '../ui';
 import { supabase, BrandData } from '../../lib/supabase';
-import { calculateCountMetrics, generateCountInsight, shouldRecommendThirdCount } from '../../lib/countManagementUtils';
+import {
+  calculateCountMetrics, generateCountInsight, shouldRecommendThirdCount,
+  parseLocalDateTimeInput, toLocalDateTimeInputValue, computeCountDuration, validateManualCountTiming,
+  type ManualCountTimingErrors,
+} from '../../lib/countManagementUtils';
 import type { LiveCountStats } from './CountSidePanel';
 
 interface ManualCountTabProps {
@@ -26,6 +30,9 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const [divergenciasRecontadas, setDivergenciasRecontadas] = useState('');
   const [divergenciasReais, setDivergenciasReais] = useState('');
   const [observacoes, setObservacoes] = useState('');
+  const [startedAt, setStartedAt] = useState('');
+  const [finishedAt, setFinishedAt] = useState('');
+  const [timingErrors, setTimingErrors] = useState<ManualCountTimingErrors>({});
   const [saving, setSaving] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
   const [thirdCountContext, setThirdCountContext] = useState<{ brandId: string; rootId: string } | null>(null);
@@ -34,6 +41,8 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
 
   useEffect(() => {
     if (selectedBrand) setTotalSku(String(selectedBrand.total_sku));
+    // Selecionar a linha só carrega os totais/pendências — nunca inicia um
+    // cronômetro nem preenche início/término, que ficam por conta do operador.
   }, [selectedBrand?.id]);
 
   const metrics = useMemo(() => calculateCountMetrics({
@@ -41,6 +50,10 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
     divergenciasEncontradas: parseInt(divergenciasEncontradas) || 0,
     divergenciasReais: parseInt(divergenciasReais) || 0,
   }), [skusContados, divergenciasEncontradas, divergenciasReais]);
+
+  const startedDate = useMemo(() => parseLocalDateTimeInput(startedAt), [startedAt]);
+  const finishedDate = useMemo(() => parseLocalDateTimeInput(finishedAt), [finishedAt]);
+  const durationPreview = useMemo(() => computeCountDuration(startedDate, finishedDate), [startedDate, finishedDate]);
 
   useEffect(() => {
     onStatsChange({
@@ -50,9 +63,12 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
       divergencias: parseInt(divergenciasReais) || 0,
       acuracidade: metrics.accuracyFinal,
       active: !!brandId,
+      mode: 'range',
+      startedAt: startedDate ? startedDate.toISOString() : null,
+      finishedAt: finishedDate ? finishedDate.toISOString() : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brandId, totalSku, skusContados, divergenciasReais, metrics.accuracyFinal]);
+  }, [brandId, totalSku, skusContados, divergenciasReais, metrics.accuracyFinal, startedDate, finishedDate]);
 
   const resetForm = (keepBrand: boolean) => {
     if (!keepBrand) setBrandId('');
@@ -63,11 +79,19 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
     setDivergenciasRecontadas('');
     setDivergenciasReais('');
     setObservacoes('');
+    setStartedAt('');
+    setFinishedAt('');
+    setTimingErrors({});
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (saving) return;
     if (!selectedBrand || !skusContados) return;
+
+    const errors = validateManualCountTiming(startedDate, finishedDate, new Date());
+    setTimingErrors(errors);
+    if (Object.keys(errors).length > 0) return;
 
     setSaving(true);
 
@@ -108,6 +132,11 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
         accuracy_initial: metrics.accuracyInitial,
         accuracy_final: metrics.accuracyFinal,
         observacoes: observacoes || null,
+        // Validado acima: ambos garantidos não-nulos e término >= início.
+        // duration_seconds é coluna gerada pelo banco a partir destes dois —
+        // nunca enviado pelo client como fonte de verdade da duração.
+        started_at: startedDate!.toISOString(),
+        finished_at: finishedDate!.toISOString(),
       })
       .select()
       .single();
@@ -158,6 +187,43 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
                 <option key={b.id} value={b.id}>{b.brand} (Pendentes: {b.total_sku - b.done_sku})</option>
               ))}
             </select>
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label className={labelClass}>Início da contagem</label>
+              <div className="flex gap-2">
+                <input
+                  type="datetime-local"
+                  value={startedAt}
+                  onChange={e => setStartedAt(e.target.value)}
+                  className={`${inputClass} flex-1 min-w-0`}
+                />
+                <Button type="button" variant="ghost" size="sm" onClick={() => setStartedAt(toLocalDateTimeInputValue(new Date()))}>
+                  Agora
+                </Button>
+              </div>
+              {timingErrors.startedAt && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{timingErrors.startedAt}</p>}
+            </div>
+            <div>
+              <label className={labelClass}>Término da contagem</label>
+              <div className="flex gap-2">
+                <input
+                  type="datetime-local"
+                  value={finishedAt}
+                  onChange={e => setFinishedAt(e.target.value)}
+                  className={`${inputClass} flex-1 min-w-0`}
+                />
+                <Button type="button" variant="ghost" size="sm" onClick={() => setFinishedAt(toLocalDateTimeInputValue(new Date()))}>
+                  Agora
+                </Button>
+              </div>
+              {timingErrors.finishedAt && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{timingErrors.finishedAt}</p>}
+            </div>
+            <div className="sm:col-span-2">
+              <p className="text-xs text-fg-subtle">Duração calculada</p>
+              <p className="text-sm font-semibold text-fg font-mono">{durationPreview.label}</p>
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

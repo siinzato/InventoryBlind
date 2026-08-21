@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-21-contagem-manual-inicio-termino',
+    date: '2026-08-21',
+    category: 'melhoria',
+    title: 'Contagem Manual: informe início e término reais',
+    description: 'O painel ao vivo não inicia mais um cronômetro automático ao selecionar a linha — agora você informa a data e hora em que a contagem realmente começou e terminou (com um botão "Agora" para preencher rápido) e o sistema calcula a duração real. O painel mostra início, término e duração, e passa a marcar a contagem como "Não iniciada", "Em andamento" ou "Finalizada" de acordo com essas informações.',
+  },
+  {
     id: '2026-08-21-webhooks-mais-eventos',
     date: '2026-08-21',
     category: 'novidade',

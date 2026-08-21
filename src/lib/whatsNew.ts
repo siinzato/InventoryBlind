@@ -20,6 +20,34 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-21-editor-automacoes-visual',
+    date: '2026-08-21',
+    category: 'melhoria',
+    title: 'Novo visual para o editor de Agentes e Automações',
+    description: 'O editor de fluxos em Agentes e Automações ganhou uma experiência moderna: canvas com zoom e navegação livres, biblioteca de blocos pesquisável na lateral, painel de configuração ao lado do bloco selecionado (em vez de uma janela por cima da tela), desfazer/refazer, auto-organizar o fluxo e minimapa. Também passou a ser possível montar blocos de Repetição, Aguardar retorno e Consultar IA, que já existiam no motor mas não tinham como ser configurados pela tela. Automações já criadas continuam funcionando exatamente como antes — nada de regra, gatilho ou ação foi alterado, só a forma de montar o fluxo.',
+  },
+  {
+    id: '2026-08-21-sino-notificacoes-tarefas',
+    date: '2026-08-21',
+    category: 'melhoria',
+    title: 'Sino de notificações das suas tarefas',
+    description: 'Novo ícone de sino no topo da tela, ao lado de Novidades, exclusivo para avisos das suas tarefas: quando uma tarefa é atribuída a você, o prazo muda, está terminando, vence ou fica atrasada, e quando alguém comenta em uma tarefa que você acompanha. Os avisos chegam na hora, sem precisar atualizar a página, e clicar em um deles já abre a tarefa correspondente em Meu Trabalho.',
+  },
+  {
+    id: '2026-08-21-meu-trabalho-tarefas',
+    date: '2026-08-21',
+    category: 'novidade',
+    title: 'Meu Trabalho: gestão de tarefas',
+    description: 'Nova central em Ferramentas > Meu Trabalho para organizar suas tarefas do dia a dia (reposição, inventário, conferência, contagem e outras) e acompanhar as tarefas que a gestão atribuiu a você. Quatro visões: Meu Dia (o que está atrasado, para hoje e por vir), Kanban (arraste entre A fazer/Em andamento/Concluído), Agenda (por dia, semana ou mês) e, para gestores, Equipe (tarefas de todos, carga de trabalho e atribuição para um ou vários usuários). Tarefas com vários responsáveis mostram o progresso de cada um, com comentários, anexos e notificações dentro do próprio painel.',
+  },
+  {
+    id: '2026-08-21-comparador-de-planilhas',
+    date: '2026-08-21',
+    category: 'novidade',
+    title: 'Comparador de Planilhas',
+    description: 'Nova ferramenta em Ferramentas > Comparador de Planilhas para comparar duas bases (estoque físico × sistema, ERP × WMS, recebimento × NF-e, entre outras) direto do navegador, sem precisar cadastrar nada. Escolha a chave (simples ou composta, com nomes de coluna diferentes em cada planilha), mapeie os campos que quer comparar, ajuste tolerâncias e forma de tratar duplicados, e veja um painel com o que está igual, divergente, só numa das bases ou duplicado — com detalhe linha a linha e exportação em Excel, CSV e PDF.',
+  },
+  {
     id: '2026-08-21-laboratorio-codigos-de-barras',
     date: '2026-08-21',
     category: 'novidade',

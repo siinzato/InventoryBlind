@@ -232,6 +232,20 @@ html, body {
   background: rgb(var(--fg-subtle));
 }
 
+/* React Flow (editor de automações) x reset do Tailwind — a base do Tailwind
+   aplica `max-width: 100%` a todo `<svg>` (parte do reset de elementos
+   substituídos, junto com img/video/canvas). O React Flow desenha as
+   conexões dentro de um `<svg>` cujo contêiner imediato (`.react-flow__edges`)
+   é propositalmente 0×0 por design da própria lib — o SVG é quem recebe
+   `width: 100%`/`height: 100%` e se estica visualmente por cima. `max-width`
+   só afeta largura, não altura, e por isso o bug é exatamente esse: altura
+   calcula certo, largura vira 100% de 0 = 0, e a linha existe no DOM nas
+   coordenadas certas mas com largura zero — invisível. Escopado a
+   `.react-flow` para não afetar nenhum outro SVG do app. */
+.react-flow svg {
+  max-width: none;
+}
+
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;

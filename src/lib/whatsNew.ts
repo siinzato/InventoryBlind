@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-24-linhas-e-marcas',
+    date: '2026-08-24',
+    category: 'novidade',
+    title: 'Linhas e Marcas em Produtos',
+    description: 'Nova área em Produtos para organizar seu catálogo por marca e linha: cadastre marcas com responsáveis e palavras-chave, crie linhas dentro delas, e deixe o sistema sugerir automaticamente a marca/linha de cada produto pelo título — sem IA, sem custo extra. Sugestões ambíguas ficam numa fila de revisão para confirmação manual, e cada confirmação pode ensinar uma nova palavra-chave para acertar mais da próxima vez.',
+  },
+  {
     id: '2026-08-24-resumo-fechamento-linha',
     date: '2026-08-24',
     category: 'novidade',

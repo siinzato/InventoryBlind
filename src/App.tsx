@@ -136,6 +136,7 @@ const WarehouseDigitalTwinPage = React.lazy(() => import('./components/slotting/
 const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardPage').then(m => ({ default: m.RcaDashboardPage })));
 const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
 const PurchaseOrdersPage = React.lazy(() => import('./components/purchaseOrders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+const ProductBrandsPage = React.lazy(() => import('./components/productBrands/ProductBrandsPage').then(m => ({ default: m.ProductBrandsPage })));
 const KnowledgeCenterPage = React.lazy(() => import('./components/account/KnowledgeCenterPage').then(m => ({ default: m.KnowledgeCenterPage })));
 const BlindScorePage = React.lazy(() => import('./components/analytics/BlindScorePage').then(m => ({ default: m.BlindScorePage })));
 const InventoryHealthPage = React.lazy(() => import('./components/analytics/InventoryHealthPage').then(m => ({ default: m.InventoryHealthPage })));
@@ -742,6 +743,7 @@ function AppContent() {
         { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet />, onClick: () => { setActiveTab('import'); setMobileOpen(false); },          active: activeTab === 'import' },
         { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
         { id: 'products',        label: 'Produtos Importados',      icon: <Package />,         onClick: () => { setActiveTab('products'); setMobileOpen(false); },        active: activeTab === 'products' },
+        { id: 'product-brands',  label: 'Linhas e Marcas',          icon: <Tag />,             onClick: () => { setActiveTab('product-brands'); setMobileOpen(false); },  active: activeTab === 'product-brands' },
       ],
     },
     {
@@ -1064,6 +1066,13 @@ function AppContent() {
             onBack={() => setActiveTab('dashboard')}
             isAdmin={isLoggedIn}
           />
+          </React.Suspense>
+        )}
+
+        {/* ABA LINHAS E MARCAS */}
+        {activeTab === 'product-brands' && companyId && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ProductBrandsPage companyId={companyId} />
           </React.Suspense>
         )}
 

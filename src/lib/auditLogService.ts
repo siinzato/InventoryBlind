@@ -99,7 +99,16 @@ export type AuditAction =
   | 'po.closed'
   | 'po.closed_with_differences'
   | 'po.cancelled'
-  | 'po.hard_deleted';
+  | 'po.hard_deleted'
+  // Linhas e Marcas de Produtos (migration 075).
+  | 'product_brand.created'
+  | 'product_brand.updated'
+  | 'product_brand.deactivated'
+  | 'product_line.created'
+  | 'product_line.updated'
+  | 'product_line.deactivated'
+  | 'product_brand_association.confirmed'
+  | 'product_brand_association.batch_classified';
 
 interface LogParams {
   companyId: string;

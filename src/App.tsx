@@ -65,7 +65,9 @@ import {
   ArrowRight,
   HelpCircle,
   FileSearch,
-  Barcode
+  Barcode,
+  GitCompareArrows,
+  ListTodo
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -85,6 +87,8 @@ import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
 import { LogoMark } from './components/landing/landingUi';
 import { WhatsNewButton } from './components/WhatsNewPanel';
+import { TaskNotificationBell } from './components/tasks/TaskNotificationBell';
+import { useTaskNotifications } from './lib/tasks/hooks';
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
@@ -101,6 +105,8 @@ const ImportHistoryPage = React.lazy(() => import('./components/ImportHistoryPag
 const RankingsPage = React.lazy(() => import('./components/RankingsPage').then(m => ({ default: m.RankingsPage })));
 const LabelGeneratorPage = React.lazy(() => import('./components/LabelGeneratorPage').then(m => ({ default: m.LabelGeneratorPage })));
 const BarcodeLabPage = React.lazy(() => import('./components/BarcodeLabPage').then(m => ({ default: m.BarcodeLabPage })));
+const SpreadsheetComparatorPage = React.lazy(() => import('./components/SpreadsheetComparatorPage').then(m => ({ default: m.SpreadsheetComparatorPage })));
+const TasksPage = React.lazy(() => import('./components/TasksPage').then(m => ({ default: m.TasksPage })));
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
 const InventoryFullPage = React.lazy(() => import('./components/InventoryFullPage').then(m => ({ default: m.InventoryFullPage })));
 const UserManagementPage = React.lazy(() => import('./components/UserManagementPage'));
@@ -180,6 +186,11 @@ function AppContent() {
   // Transferência da ferramenta "Consulta e Download de XML/NFe" pra Conferência
   // por NF-e: guarda o id da nota recém-encontrada só até a página consumir.
   const [nfePendingInvoiceId, setNfePendingInvoiceId] = useState<string | null>(null);
+  // Mesmo padrão: o sino de notificações de tarefas (cabeçalho global) manda
+  // abrir uma tarefa específica dentro de Meu Trabalho — guarda o id só até a
+  // página consumir.
+  const [tasksPendingOpenId, setTasksPendingOpenId] = useState<string | null>(null);
+  const taskNotifications = useTaskNotifications(profile?.id);
 
   // ── Diagnóstico da operação ───────────────────────────────────────────────
   // Lido do metadata do próprio usuário, que o AuthProvider já carregou — nenhuma
@@ -732,9 +743,11 @@ function AppContent() {
       id: 'tools-group',
       label: 'Ferramentas',
       items: [
+        { id: 'tasks',           label: 'Meu Trabalho',         icon: <ListTodo />, onClick: () => { setActiveTab('tasks'); setMobileOpen(false); },         active: activeTab === 'tasks' },
         { id: 'nfe-xml-lookup',  label: 'Consulta e Download de XML/NFe', icon: <FileSearch />, onClick: () => { setActiveTab('nfe-xml-lookup'); setMobileOpen(false); }, active: activeTab === 'nfe-xml-lookup' },
         { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
         ...(hasPermission(profile?.role, 'labels.use') ? [{ id: 'barcode-lab', label: 'Códigos de Barras', icon: <Barcode />, onClick: () => { setActiveTab('barcode-lab'); setMobileOpen(false); }, active: activeTab === 'barcode-lab' }] : []),
+        { id: 'spreadsheet-comparator', label: 'Comparador de Planilhas', icon: <GitCompareArrows />, onClick: () => { setActiveTab('spreadsheet-comparator'); setMobileOpen(false); }, active: activeTab === 'spreadsheet-comparator' },
         { id: 'full-manager',    label: 'Full Manager',         icon: <ClipboardCheck />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
         { id: 'inventoryfull',   label: 'InventoryFull',        icon: <Monitor />, onClick: () => { setActiveTab('inventoryfull'); setMobileOpen(false); },     active: activeTab === 'inventoryfull' },
       ],
@@ -999,6 +1012,13 @@ function AppContent() {
           right={
             <>
               <WhatsNewButton />
+              <TaskNotificationBell
+                notifications={taskNotifications.notifications}
+                unreadCount={taskNotifications.unreadCount}
+                onMarkRead={taskNotifications.markRead}
+                onMarkAllRead={taskNotifications.markAllRead}
+                onOpenTask={(taskId) => { setTasksPendingOpenId(taskId); setActiveTab('tasks'); }}
+              />
               <ThemeToggle className="hidden md:flex" />
               {userMenu}
             </>
@@ -1049,6 +1069,24 @@ function AppContent() {
             onBack={() => setActiveTab('dashboard')}
             isAdmin={isLoggedIn}
             onRequestAdmin={() => setActiveTab('admin')}
+          />
+          </React.Suspense>
+        )}
+
+        {/* FERRAMENTAS: COMPARADOR DE PLANILHAS */}
+        {activeTab === 'spreadsheet-comparator' && (
+          <React.Suspense fallback={<PageLoader />}>
+          <SpreadsheetComparatorPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        )}
+
+        {/* FERRAMENTAS: MEU TRABALHO (TAREFAS) */}
+        {activeTab === 'tasks' && (
+          <React.Suspense fallback={<PageLoader />}>
+          <TasksPage
+            onBack={() => setActiveTab('dashboard')}
+            initialTaskId={tasksPendingOpenId ?? undefined}
+            onConsumedInitialTask={() => setTasksPendingOpenId(null)}
           />
           </React.Suspense>
         )}

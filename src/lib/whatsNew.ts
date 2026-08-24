@@ -20,6 +20,34 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-24-resumo-fechamento-linha',
+    date: '2026-08-24',
+    category: 'novidade',
+    title: 'Resumo automático ao fechar uma linha',
+    description: 'Quando os pendentes de uma linha/marca chegam a zero, o Centro de Gestão da Contagem agora monta sozinho um resumo do fechamento: reúne as observações digitadas nas contagens daquele ciclo, identifica os problemas mais comuns (saldo em excesso ou em falta, organização do vão, vão duplicado, divergência resolvida na recontagem) e mostra tudo num resumo curto, sem precisar reler cada contagem uma por uma. As categorias e palavras-chave usadas na identificação podem ser ajustadas a qualquer momento em "Gerenciar categorias", e o resumo pode ser gerado depois para linhas antigas já concluídas, ou reprocessado sempre que as categorias mudarem — sem mexer em nenhuma contagem já registrada.',
+  },
+  {
+    id: '2026-08-24-hub-integracoes',
+    date: '2026-08-24',
+    category: 'melhoria',
+    title: 'Novo Hub de Integrações',
+    description: 'A área de Integrações ganhou uma tela única: um catálogo com todos os ERPs e marketplaces (Tiny, Bling, SAP, TOTVS, Mercado Livre, Shopee, Amazon, Temu, AliExpress, Shein, Magalu, TikTok Shop e Netshoes), com busca, filtros e o status real de cada conexão. O Tiny ERP continua funcionando exatamente como antes — conexão, sincronização, fila de lançamentos e alertas —, agora com um card próprio em "Minhas integrações" mostrando se está conectado, sincronizando, com atenção ou com erro. As demais integrações aparecem como "Em breve": dá para ver o que está por vir, mas ainda não é possível conectar.',
+  },
+  {
+    id: '2026-08-24-calculadora-paletizacao',
+    date: '2026-08-24',
+    category: 'novidade',
+    title: 'Calculadora de Paletização',
+    description: 'Nova ferramenta em Ferramentas > Calculadora de Paletização: informe as medidas e o peso da caixa, escolha o palete (PBR, Europeu ou personalizado) e veja quantas caixas cabem por camada, quantas camadas, caixas por palete e quantos paletes são necessários para a quantidade total — com desenho da vista de cima, alertas de peso/altura/estabilidade excedidos e comparação entre diferentes arranjos. Também processa uma planilha inteira de uma vez (um SKU por linha) e exporta o resultado em PDF, Excel, CSV, imagem ou impressão. Tudo calculado no seu navegador, sem enviar nenhum dado para fora.',
+  },
+  {
+    id: '2026-08-24-central-de-pdfs',
+    date: '2026-08-24',
+    category: 'novidade',
+    title: 'Central de PDFs',
+    description: 'Nova ferramenta em Ferramentas > Central de PDFs para organizar seus arquivos sem sair do InventoryBlind: unir vários PDFs num só, dividir ou extrair páginas, intercalar documentos (por exemplo etiqueta + declaração), preparar etiquetas para impressoras térmicas (40×25, 100×40, 100×150 e outros tamanhos), montar folhas com várias páginas por impressão, converter imagens em PDF (e páginas de PDF em imagem) e otimizar o tamanho do arquivo. Também processa vários arquivos de uma vez, com a mesma operação aplicada em lote. Tudo roda direto no seu navegador — nenhum arquivo é enviado para fora, e nada fica salvo depois que você sai da tela. Sem precisar cadastrar nada antes.',
+  },
+  {
     id: '2026-08-21-editor-automacoes-visual',
     date: '2026-08-21',
     category: 'melhoria',

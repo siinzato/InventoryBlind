@@ -14,6 +14,10 @@ import { recomputeForProducts } from '../../lib/cbcService';
 import { recomputeRiskForProducts } from '../../lib/riskService';
 import { recomputeAbcXyzForCompany } from '../../lib/abcXyzService';
 import { RcaClassificationModal, PendingRcaItem } from '../rca/RcaClassificationModal';
+import { generateClosingReport } from '../../lib/closingReports/closingReportService';
+import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
+import { ClosingSummaryModal } from './closing/ClosingSummaryModal';
+import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete';
 
@@ -48,6 +52,11 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const [saving, setSaving] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
   const [pendingRcaItems, setPendingRcaItems] = useState<PendingRcaItem[]>([]);
+  const [closingReport, setClosingReport] = useState<ClosingReport | null>(null);
+  const [closingObservations, setClosingObservations] = useState<ClosingReportObservation[]>([]);
+  const [closingBrandName, setClosingBrandName] = useState('');
+  const [reprocessing, setReprocessing] = useState(false);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const selectedBrand = brandsData.find(b => b.id === brandId);
   const stepIdx = STEPS.findIndex(s => s.key === step);
@@ -196,9 +205,40 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
     setInsight(generateCountInsight(metrics, divergentCount, selectedBrand.brand));
     onStatsChange({ linha: selectedBrand.brand, totalSku: selectedBrand.total_sku, contados: rows.length, divergencias: divergentCount, acuracidade: metrics.accuracyFinal, active: true });
 
+    // Fechamento automático: só dispara quando os pendentes já chegaram a zero, e
+    // nunca reabre/recalcula a importação que acabou de ser confirmada acima — só lê.
+    if (newDoneSku >= selectedBrand.total_sku) {
+      generateClosingReport(companyId, selectedBrand.id, { userId: profile?.id ?? null, userEmail: profile?.email ?? null })
+        .then(result => {
+          if (result.status === 'generated' || result.status === 'already_current') {
+            setClosingBrandName(selectedBrand.brand);
+            setClosingReport(result.report);
+            setClosingObservations(result.observations);
+          } else if (result.status === 'error') {
+            console.error('Error generating closing report:', result.message);
+          }
+        })
+        .catch(err => console.error('Error generating closing report:', err));
+    }
+
     onSaved();
     setSaving(false);
     setStep('complete');
+  };
+
+  const handleReprocess = async () => {
+    if (!closingReport) return;
+    setReprocessing(true);
+    const result = await generateClosingReport(companyId, closingReport.brandId, {
+      force: true, userId: profile?.id ?? null, userEmail: profile?.email ?? null,
+    });
+    if (result.status === 'generated' || result.status === 'already_current') {
+      setClosingReport(result.report);
+      setClosingObservations(result.observations);
+    } else if (result.status === 'error') {
+      console.error('Error reprocessing closing report:', result.message);
+    }
+    setReprocessing(false);
   };
 
   const handleReset = () => {
@@ -354,6 +394,23 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
           onDone={() => setPendingRcaItems([])}
         />
       )}
+
+      <ClosingSummaryModal
+        open={!!closingReport}
+        onClose={() => setClosingReport(null)}
+        brandName={closingBrandName}
+        report={closingReport}
+        observations={closingObservations}
+        reprocessing={reprocessing}
+        onReprocess={handleReprocess}
+        onManageCategories={() => setManageCategoriesOpen(true)}
+      />
+      <ClosingCategoriesModal
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+        companyId={companyId}
+        onChanged={() => {}}
+      />
     </Panel>
   );
 }

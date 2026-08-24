@@ -8,6 +8,11 @@ import {
   type ManualCountTimingErrors,
 } from '../../lib/countManagementUtils';
 import type { LiveCountStats } from './CountSidePanel';
+import { useAuth } from '../../lib/auth';
+import { generateClosingReport } from '../../lib/closingReports/closingReportService';
+import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
+import { ClosingSummaryModal } from './closing/ClosingSummaryModal';
+import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
 
 interface ManualCountTabProps {
   brandsData: BrandData[];
@@ -21,6 +26,7 @@ const inputClass = 'w-full p-2.5 border border-edge rounded-lg focus:outline-non
 const labelClass = 'block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1';
 
 export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved, onStatsChange }: ManualCountTabProps) {
+  const { profile } = useAuth();
   const [brandId, setBrandId] = useState('');
   const [operator1, setOperator1] = useState('');
   const [operator2, setOperator2] = useState('');
@@ -36,6 +42,11 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const [saving, setSaving] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
   const [thirdCountContext, setThirdCountContext] = useState<{ brandId: string; rootId: string } | null>(null);
+  const [closingReport, setClosingReport] = useState<ClosingReport | null>(null);
+  const [closingObservations, setClosingObservations] = useState<ClosingReportObservation[]>([]);
+  const [closingBrandName, setClosingBrandName] = useState('');
+  const [reprocessing, setReprocessing] = useState(false);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const selectedBrand = brandsData.find(b => b.id === brandId);
 
@@ -154,9 +165,40 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
       setThirdCountContext(null);
     }
 
+    // Fechamento automático: só dispara quando os pendentes já chegaram a zero, e
+    // nunca reabre/recalcula a contagem que acabou de ser salva acima — só lê.
+    if (newDoneSku >= selectedBrand.total_sku) {
+      generateClosingReport(companyId, selectedBrand.id, { userId: profile?.id ?? null, userEmail: profile?.email ?? null })
+        .then(result => {
+          if (result.status === 'generated' || result.status === 'already_current') {
+            setClosingBrandName(selectedBrand.brand);
+            setClosingReport(result.report);
+            setClosingObservations(result.observations);
+          } else if (result.status === 'error') {
+            console.error('Error generating closing report:', result.message);
+          }
+        })
+        .catch(err => console.error('Error generating closing report:', err));
+    }
+
     resetForm(true);
     onSaved();
     setSaving(false);
+  };
+
+  const handleReprocess = async () => {
+    if (!closingReport) return;
+    setReprocessing(true);
+    const result = await generateClosingReport(companyId, closingReport.brandId, {
+      force: true, userId: profile?.id ?? null, userEmail: profile?.email ?? null,
+    });
+    if (result.status === 'generated' || result.status === 'already_current') {
+      setClosingReport(result.report);
+      setClosingObservations(result.observations);
+    } else if (result.status === 'error') {
+      console.error('Error reprocessing closing report:', result.message);
+    }
+    setReprocessing(false);
   };
 
   return (
@@ -295,6 +337,23 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
           </Button>
         </form>
       </PanelSection>
+
+      <ClosingSummaryModal
+        open={!!closingReport}
+        onClose={() => setClosingReport(null)}
+        brandName={closingBrandName}
+        report={closingReport}
+        observations={closingObservations}
+        reprocessing={reprocessing}
+        onReprocess={handleReprocess}
+        onManageCategories={() => setManageCategoriesOpen(true)}
+      />
+      <ClosingCategoriesModal
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+        companyId={companyId}
+        onChanged={() => {}}
+      />
     </Panel>
   );
 }

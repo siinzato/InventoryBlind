@@ -1,11 +1,17 @@
 import { useEffect, useState } from 'react';
-import { History, RefreshCw } from 'lucide-react';
-import { Panel, PanelSection, Badge } from '../ui';
-import { supabase, InventoryCountRecord } from '../../lib/supabase';
+import { History, RefreshCw, FileText } from 'lucide-react';
+import { Panel, PanelSection, Badge, Button } from '../ui';
+import { supabase, InventoryCountRecord, BrandData } from '../../lib/supabase';
+import { useAuth } from '../../lib/auth';
+import { generateClosingReport } from '../../lib/closingReports/closingReportService';
+import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
+import { ClosingSummaryModal } from './closing/ClosingSummaryModal';
+import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
 
 interface CountHistorySectionProps {
   companyId: string;
   brandsById: Map<string, string>;
+  brandsData: BrandData[];
   refreshKey: number;
 }
 
@@ -34,9 +40,46 @@ function groupByChain(records: InventoryCountRecord[]): InventoryCountRecord[][]
   return Array.from(byRoot.values()).map(chain => chain.sort((a, b) => a.count_number - b.count_number));
 }
 
-export function CountHistorySection({ companyId, brandsById, refreshKey }: CountHistorySectionProps) {
+export function CountHistorySection({ companyId, brandsById, brandsData, refreshKey }: CountHistorySectionProps) {
+  const { profile } = useAuth();
   const [records, setRecords] = useState<InventoryCountRecord[]>([]);
   const [loading, setLoading] = useState(true);
+  const [generatingBrandId, setGeneratingBrandId] = useState<string | null>(null);
+  const [closingReport, setClosingReport] = useState<ClosingReport | null>(null);
+  const [closingObservations, setClosingObservations] = useState<ClosingReportObservation[]>([]);
+  const [closingBrandName, setClosingBrandName] = useState('');
+  const [reprocessing, setReprocessing] = useState(false);
+  const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+
+  const brandsDataById = new Map(brandsData.map(b => [b.id, b]));
+
+  const handleGenerateSummary = async (brandId: string, brandName: string) => {
+    setGeneratingBrandId(brandId);
+    const result = await generateClosingReport(companyId, brandId, { userId: profile?.id ?? null, userEmail: profile?.email ?? null });
+    if (result.status === 'generated' || result.status === 'already_current') {
+      setClosingBrandName(brandName);
+      setClosingReport(result.report);
+      setClosingObservations(result.observations);
+    } else if (result.status === 'error') {
+      console.error('Error generating closing report:', result.message);
+    }
+    setGeneratingBrandId(null);
+  };
+
+  const handleReprocess = async () => {
+    if (!closingReport) return;
+    setReprocessing(true);
+    const result = await generateClosingReport(companyId, closingReport.brandId, {
+      force: true, userId: profile?.id ?? null, userEmail: profile?.email ?? null,
+    });
+    if (result.status === 'generated' || result.status === 'already_current') {
+      setClosingReport(result.report);
+      setClosingObservations(result.observations);
+    } else if (result.status === 'error') {
+      console.error('Error reprocessing closing report:', result.message);
+    }
+    setReprocessing(false);
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -82,11 +125,25 @@ export function CountHistorySection({ companyId, brandsById, refreshKey }: Count
         </PanelSection>
       )}
 
-      {!loading && chains.map(chain => (
+      {!loading && chains.map(chain => {
+        const brand = brandsDataById.get(chain[0].brand_id);
+        const isClosed = !!brand && brand.total_sku - brand.done_sku <= 0;
+        return (
         <PanelSection key={chain[0].id} padding="md">
-          <div className="flex items-center justify-between mb-2">
+          <div className="flex items-center justify-between mb-2 gap-2">
             <p className="text-sm font-semibold text-fg">{brandsById.get(chain[0].brand_id) ?? 'Linha removida'}</p>
-            <span className="text-xs text-fg-subtle">{formatDateTime(chain[0].created_at)}</span>
+            <div className="flex items-center gap-2">
+              {isClosed && brand && (
+                <Button
+                  variant="ghost" size="sm"
+                  onClick={() => handleGenerateSummary(brand.id, brand.brand)}
+                  disabled={generatingBrandId === brand.id}
+                >
+                  <FileText size={13} /> {generatingBrandId === brand.id ? 'Gerando...' : 'Gerar resumo'}
+                </Button>
+              )}
+              <span className="text-xs text-fg-subtle whitespace-nowrap">{formatDateTime(chain[0].created_at)}</span>
+            </div>
           </div>
           <div className="flex flex-wrap gap-3">
             {chain.map(rec => (
@@ -106,7 +163,25 @@ export function CountHistorySection({ companyId, brandsById, refreshKey }: Count
             ))}
           </div>
         </PanelSection>
-      ))}
+        );
+      })}
+
+      <ClosingSummaryModal
+        open={!!closingReport}
+        onClose={() => setClosingReport(null)}
+        brandName={closingBrandName}
+        report={closingReport}
+        observations={closingObservations}
+        reprocessing={reprocessing}
+        onReprocess={handleReprocess}
+        onManageCategories={() => setManageCategoriesOpen(true)}
+      />
+      <ClosingCategoriesModal
+        open={manageCategoriesOpen}
+        onClose={() => setManageCategoriesOpen(false)}
+        companyId={companyId}
+        onChanged={() => {}}
+      />
     </Panel>
   );
 }

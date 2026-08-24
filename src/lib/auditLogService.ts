@@ -81,7 +81,25 @@ export type AuditAction =
   | 'webhook.disabled'
   | 'webhook.deleted'
   | 'webhook.secret_rotated'
-  | 'webhook.test_sent';
+  | 'webhook.test_sent'
+  // Resumo de fechamento de linha/marca (migration 073).
+  | 'closing_report.generated'
+  | 'closing_report.reprocessed'
+  | 'closing_category.saved'
+  | 'closing_category.deactivated'
+  // Ordens de Compra (migration 074).
+  | 'po.created'
+  | 'po.updated'
+  | 'po.imported'
+  | 'po.linked'
+  | 'po.unlinked'
+  | 'po.deto_para_confirmed'
+  | 'po.deto_para_deactivated'
+  | 'po.allocation_adjusted'
+  | 'po.closed'
+  | 'po.closed_with_differences'
+  | 'po.cancelled'
+  | 'po.hard_deleted';
 
 interface LogParams {
   companyId: string;

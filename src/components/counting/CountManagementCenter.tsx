@@ -93,7 +93,7 @@ export function CountManagementCenter({ brandsData, companyId, onBrandsUpdated }
             </div>
           </div>
 
-          <CountHistorySection companyId={companyId} brandsById={brandsById} refreshKey={historyRefreshKey} />
+          <CountHistorySection companyId={companyId} brandsById={brandsById} brandsData={brandsData} refreshKey={historyRefreshKey} />
         </>
       )}
     </Page>

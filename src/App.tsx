@@ -46,10 +46,7 @@ import {
   BarChart3,
   ShieldAlert,
   Plug,
-  Boxes,
   Warehouse,
-  Server,
-  Database,
   Code2,
   Webhook,
   Workflow,
@@ -67,7 +64,10 @@ import {
   FileSearch,
   Barcode,
   GitCompareArrows,
-  ListTodo
+  ListTodo,
+  FileStack,
+  Grid3x3,
+  ShoppingCart
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -105,6 +105,8 @@ const ImportHistoryPage = React.lazy(() => import('./components/ImportHistoryPag
 const RankingsPage = React.lazy(() => import('./components/RankingsPage').then(m => ({ default: m.RankingsPage })));
 const LabelGeneratorPage = React.lazy(() => import('./components/LabelGeneratorPage').then(m => ({ default: m.LabelGeneratorPage })));
 const BarcodeLabPage = React.lazy(() => import('./components/BarcodeLabPage').then(m => ({ default: m.BarcodeLabPage })));
+const PdfCenterPage = React.lazy(() => import('./components/pdfCenter/PdfCenterPage').then(m => ({ default: m.PdfCenterPage })));
+const PalletCalcPage = React.lazy(() => import('./components/palletCalc/PalletCalcPage').then(m => ({ default: m.PalletCalcPage })));
 const SpreadsheetComparatorPage = React.lazy(() => import('./components/SpreadsheetComparatorPage').then(m => ({ default: m.SpreadsheetComparatorPage })));
 const TasksPage = React.lazy(() => import('./components/TasksPage').then(m => ({ default: m.TasksPage })));
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
@@ -114,6 +116,7 @@ const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
 // Integrations is lazy for the same reason every other module screen is: it pulls
 // the whole integration service and is opened by a minority of sessions.
 const IntegrationsPage = React.lazy(() => import('./components/integrations/IntegrationsPage').then(m => ({ default: m.IntegrationsPage })));
+const IntegrationsHubPage = React.lazy(() => import('./components/integrations/IntegrationsHubPage').then(m => ({ default: m.IntegrationsHubPage })));
 const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'));
 const AutomationsPage = React.lazy(() => import('./components/automation/AutomationsPage').then(m => ({ default: m.AutomationsPage })));
 // Diagnóstico da operação — opcional, nunca no caminho crítico da autenticação.
@@ -132,6 +135,7 @@ const AbcXyzDashboardPage = React.lazy(() => import('./components/abcxyz/AbcXyzD
 const WarehouseDigitalTwinPage = React.lazy(() => import('./components/slotting/WarehouseDigitalTwinPage').then(m => ({ default: m.WarehouseDigitalTwinPage })));
 const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardPage').then(m => ({ default: m.RcaDashboardPage })));
 const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
+const PurchaseOrdersPage = React.lazy(() => import('./components/purchaseOrders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
 const KnowledgeCenterPage = React.lazy(() => import('./components/account/KnowledgeCenterPage').then(m => ({ default: m.KnowledgeCenterPage })));
 const BlindScorePage = React.lazy(() => import('./components/analytics/BlindScorePage').then(m => ({ default: m.BlindScorePage })));
 const InventoryHealthPage = React.lazy(() => import('./components/analytics/InventoryHealthPage').then(m => ({ default: m.InventoryHealthPage })));
@@ -700,6 +704,7 @@ function AppContent() {
       items: [
         { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
         { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
+        { id: 'purchase-orders', label: 'Ordens de Compra',    icon: <ShoppingCart />, onClick: () => { setActiveTab('purchase-orders'); setMobileOpen(false); }, active: activeTab === 'purchase-orders' },
         { id: 'cbc',            label: 'Confidence Score',     icon: <Gauge />,       onClick: () => { setActiveTab('cbc'); setMobileOpen(false); },            active: activeTab === 'cbc' },
         { id: 'risk',           label: 'Inventário por Risco', icon: <AlertTriangle />, onClick: () => { setActiveTab('risk'); setMobileOpen(false); },         active: activeTab === 'risk' },
         { id: 'abcxyz',         label: 'Classificação ABC/XYZ', icon: <LayoutGrid />, onClick: () => { setActiveTab('abcxyz'); setMobileOpen(false); },   active: activeTab === 'abcxyz' },
@@ -748,6 +753,8 @@ function AppContent() {
         { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
         ...(hasPermission(profile?.role, 'labels.use') ? [{ id: 'barcode-lab', label: 'Códigos de Barras', icon: <Barcode />, onClick: () => { setActiveTab('barcode-lab'); setMobileOpen(false); }, active: activeTab === 'barcode-lab' }] : []),
         { id: 'spreadsheet-comparator', label: 'Comparador de Planilhas', icon: <GitCompareArrows />, onClick: () => { setActiveTab('spreadsheet-comparator'); setMobileOpen(false); }, active: activeTab === 'spreadsheet-comparator' },
+        { id: 'pdf-center',      label: 'Central de PDFs',       icon: <FileStack />, onClick: () => { setActiveTab('pdf-center'); setMobileOpen(false); },    active: activeTab === 'pdf-center' },
+        { id: 'pallet-calc',     label: 'Calculadora de Paletização', icon: <Grid3x3 />, onClick: () => { setActiveTab('pallet-calc'); setMobileOpen(false); }, active: activeTab === 'pallet-calc' },
         { id: 'full-manager',    label: 'Full Manager',         icon: <ClipboardCheck />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
         { id: 'inventoryfull',   label: 'InventoryFull',        icon: <Monitor />, onClick: () => { setActiveTab('inventoryfull'); setMobileOpen(false); },     active: activeTab === 'inventoryfull' },
       ],
@@ -785,17 +792,15 @@ function AppContent() {
       ],
     },
     {
-      // Moved above the "Em breve" divider now that Tiny ERP is live. The group is
-      // no longer locked at group level — a locked group makes every item inside it
-      // non-interactive, including the one that works — so the remaining providers
-      // carry their own locks instead.
+      // Um item só, abrindo o Hub de Integrações (catálogo + "Minhas
+      // integrações"). O fluxo de gestão do Tiny propriamente dito continua na
+      // tab 'integracoes' de sempre — o Hub só leva até ela — então nenhum
+      // destino existente (inclusive os drill-throughs do Dashboard que apontam
+      // para 'integracoes') muda de lugar.
       id: 'integracoes-group',
       label: 'Integrações',
       items: [
-        { id: 'integracoes', label: 'Tiny ERP', icon: <Boxes />, onClick: () => { setActiveTab('integracoes'); setMobileOpen(false); }, active: activeTab === 'integracoes' },
-        { id: 'integracoes-bling', label: 'Bling',     icon: <Plug />,    onClick: () => {}, active: false, locked: true },
-        { id: 'integracoes-sap',   label: 'SAP',       icon: <Server />,  onClick: () => {}, active: false, locked: true },
-        { id: 'integracoes-totvs', label: 'TOTVS',     icon: <Database />, onClick: () => {}, active: false, locked: true },
+        { id: 'integracoes-hub', label: 'Integrações', icon: <Plug />, onClick: () => { setActiveTab('integracoes-hub'); setMobileOpen(false); }, active: activeTab === 'integracoes-hub' || activeTab === 'integracoes' },
       ],
     },
     {
@@ -1032,7 +1037,7 @@ function AppContent() {
           página acima do home indicator. */}
       <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none] pb-[env(safe-area-inset-bottom)]">
 
-        {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'barcode-lab' && activeTab !== 'full-manager' && activeTab !== 'users' && (
+        {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'barcode-lab' && activeTab !== 'full-manager' && activeTab !== 'users' && activeTab !== 'pdf-center' && activeTab !== 'pallet-calc' && (
           <>
 
         {/* ABA HEATMAP */}
@@ -1916,6 +1921,13 @@ function AppContent() {
           </React.Suspense>
         )}
 
+        {/* ABA ORDENS DE COMPRA */}
+        {activeTab === 'purchase-orders' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <PurchaseOrdersPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
         {/* ANALYTICS: BLINDSCORE */}
         {activeTab === 'analytics-blindscore' && profile && (
           <React.Suspense fallback={<PageLoader />}>
@@ -2014,6 +2026,24 @@ function AppContent() {
         </div>
       )}
 
+      {/* FERRAMENTAS: CENTRAL DE PDFS */}
+      {activeTab === 'pdf-center' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <PdfCenterPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* FERRAMENTAS: CALCULADORA DE PALETIZAÇÃO */}
+      {activeTab === 'pallet-calc' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <PalletCalcPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* FERRAMENTAS: FULL MANAGER */}
       {activeTab === 'full-manager' && (
         <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
@@ -2104,6 +2134,24 @@ function AppContent() {
             canManage={canManageAutomations(profile?.role)}
             onBack={() => setActiveTab('dashboard')}
           />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* HUB DE INTEGRAÇÕES — catálogo (ERPs/marketplaces) + status real do Tiny.
+          Mesmo gate de papel da tela de gestão abaixo: navegar até o hub sem
+          poder gerenciar nada nele não ajudaria ninguém. */}
+      {activeTab === 'integracoes-hub' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          {canSyncIntegrations(profile?.role) ? (
+            <IntegrationsHubPage
+              onBack={() => setActiveTab('dashboard')}
+              onManageTiny={() => setActiveTab('integracoes')}
+            />
+          ) : (
+            <AccessDeniedPage onBack={() => setActiveTab('dashboard')} />
+          )}
           </React.Suspense>
         </div>
       )}

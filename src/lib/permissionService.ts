@@ -17,7 +17,8 @@ export type Permission =
   | 'settings.manage'
   | 'academy.manage'
   | 'counting.count'
-  | 'counting.approve';
+  | 'counting.approve'
+  | 'tasks.manage';
 
 const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
   owner: [
@@ -34,6 +35,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'settings.manage',
     'academy.manage',
     'counting.count','counting.approve',
+    'tasks.manage',
   ],
   admin: [
     'products.read','products.write',
@@ -48,6 +50,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'audit.view',
     'academy.manage',
     'counting.count','counting.approve',
+    'tasks.manage',
   ],
   manager: [
     'products.read',
@@ -58,6 +61,7 @@ const ROLE_PERMISSIONS: Record<Role, Permission[]> = {
     'reports.export',
     'academy.manage',
     'counting.count','counting.approve',
+    'tasks.manage',
   ],
   lead: [
     'products.read',

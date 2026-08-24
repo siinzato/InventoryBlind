@@ -6,6 +6,9 @@ import {
   WHATS_NEW_ENTRIES, WHATS_NEW_CATEGORY_LABEL,
   getLastSeenWhatsNewId, markWhatsNewSeen, hasUnseenWhatsNew,
 } from '../lib/whatsNew';
+import { notifyPanelOpened, registerExclusivePanel } from '../lib/exclusivePanel';
+
+const PANEL_ID = 'whats-new';
 
 const CATEGORY_BADGE_VARIANT: Record<string, 'accent' | 'neutral'> = {
   novidade: 'accent',
@@ -25,6 +28,8 @@ export function WhatsNewButton() {
     setUnseen(hasUnseenWhatsNew());
   }, []);
 
+  useEffect(() => registerExclusivePanel(PANEL_ID, () => setOpen(false)), []);
+
   useEffect(() => {
     if (!open) return;
     const latest = WHATS_NEW_ENTRIES[0]?.id;
@@ -42,7 +47,7 @@ export function WhatsNewButton() {
   return (
     <>
       <button
-        onClick={() => setOpen(true)}
+        onClick={() => { notifyPanelOpened(PANEL_ID); setOpen(true); }}
         aria-label="Novidades"
         title="Novidades"
         className="relative w-8 h-8 rounded-control flex items-center justify-center text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors"

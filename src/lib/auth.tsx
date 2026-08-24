@@ -27,6 +27,7 @@ export interface Company {
   settings: Record<string, unknown>;
   icon: string | null;
   description: string | null;
+  createdAt: string;
 }
 
 export interface CompanyMembership extends Company {
@@ -181,27 +182,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const doLoadCompany = useCallback(async (companyId: string): Promise<Company | null> => {
     const { data, error } = await supabase
       .from('companies')
-      .select('id, name, slug, plan, settings, icon, description')
+      .select('id, name, slug, plan, settings, icon, description, created_at')
       .eq('id', companyId)
       .maybeSingle();
 
     if (import.meta.env.DEV && error) console.warn('[Auth] Company error:', error.message);
     if (import.meta.env.DEV) console.log('[Auth] Company result:', data);
-    return (data ?? null) as Company | null;
+    return (data ? { ...data, createdAt: data.created_at } : null) as Company | null;
   }, []);
 
   const doLoadMemberships = useCallback(async (userId: string): Promise<CompanyMembership[]> => {
     const { data, error } = await supabase
       .from('company_members')
-      .select('last_accessed_at, companies(id, name, slug, plan, settings, icon, description)')
+      .select('last_accessed_at, companies(id, name, slug, plan, settings, icon, description, created_at)')
       .eq('user_id', userId);
 
     if (import.meta.env.DEV && error) console.warn('[Auth] Memberships error:', error.message);
 
-    const rows = (data ?? []) as unknown as { last_accessed_at: string | null; companies: Company | null }[];
+    const rows = (data ?? []) as unknown as { last_accessed_at: string | null; companies: (Omit<Company, 'createdAt'> & { created_at: string }) | null }[];
     return rows
-      .filter((r): r is { last_accessed_at: string | null; companies: Company } => !!r.companies)
-      .map(r => ({ ...r.companies, lastAccessedAt: r.last_accessed_at }));
+      .filter((r): r is { last_accessed_at: string | null; companies: Omit<Company, 'createdAt'> & { created_at: string } } => !!r.companies)
+      .map(r => ({ ...r.companies, createdAt: r.companies.created_at, lastAccessedAt: r.last_accessed_at }));
   }, []);
 
   // ── Resolve which view to show ─────────────────────────────────────────────

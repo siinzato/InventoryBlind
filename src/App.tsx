@@ -95,6 +95,9 @@ import {
 } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
 import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnosticStorage';
+import { evaluateDiagnosticEligibility } from './lib/dashboardDiagnosticRule';
+import { readBlockedFeatureInterest } from './lib/blockedFeatureInterest';
+import { MyShortcutsCard } from './components/dashboard/MyShortcutsCard';
 
 // Code-split large page components for smaller initial bundle
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -199,15 +202,34 @@ function AppContent() {
 
   // ── Diagnóstico da operação ───────────────────────────────────────────────
   // Lido do metadata do próprio usuário, que o AuthProvider já carregou — nenhuma
-  // consulta extra só para decidir se o convite aparece. Quem já respondeu (ou
-  // dispensou nesta sessão) não vê o convite; ninguém é obrigado a responder.
+  // consulta extra só para decidir se o convite aparece. Quem já respondeu não
+  // vê mais o convite; "Agora não" só vale para a sessão atual (nunca persiste),
+  // então um novo motivo (ex.: nova tentativa de função bloqueada) pode reabrir o
+  // aviso mesmo depois de dispensado. O espaço fixo do topo do dashboard nunca é
+  // do diagnóstico — é sempre "Meus Atalhos"; o diagnóstico, quando elegível,
+  // aparece como um aviso à parte (ver evaluateDiagnosticEligibility).
   const diagnosticRecord = useMemo(
     () => readCompletedDiagnostic(user?.user_metadata as Record<string, unknown> | undefined),
     [user?.user_metadata]
   );
   const [diagnosticDone, setDiagnosticDone] = useState(false);
   const [diagnosticDismissed, setDiagnosticDismissed] = useState(false);
-  const showDiagnosticInvite = diagnosticRecord == null && !diagnosticDone && !diagnosticDismissed;
+  const [dashboardProductCount, setDashboardProductCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    supabase.from('products').select('id', { count: 'exact', head: true }).then(({ count }) => {
+      if (!cancelled) setDashboardProductCount(count ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [companyId]);
+  const diagnosticEligibility = evaluateDiagnosticEligibility({
+    diagnosticCompleted: diagnosticRecord != null || diagnosticDone,
+    companyCreatedAt: company?.createdAt ?? null,
+    productCount: dashboardProductCount,
+    hasBlockedFeatureInterest: readBlockedFeatureInterest() != null,
+  });
+  const showDiagnosticInvite = diagnosticEligibility.eligible && !diagnosticDismissed;
 
   const [brandsData, setBrandsData] = useState<BrandData[]>([]);
   const [topVendas, setTopVendas] = useState<TopVenda[]>([]);
@@ -1165,8 +1187,15 @@ function AppContent() {
         {activeTab === 'dashboard' && (
           <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
 
-            {/* Convite ao diagnóstico — painel dispensável no topo do dashboard, não
-                um bloqueio na entrada. Some assim que for respondido ou dispensado. */}
+            {/* Meus Atalhos — espaço fixo do topo do dashboard, sempre, para todo
+                usuário e plano. Nunca é substituído pelo diagnóstico. */}
+            {profile?.id && (
+              <MyShortcutsCard companyId={companyId} userId={profile.id} navGroups={navGroups} />
+            )}
+
+            {/* Aviso de diagnóstico — separado de Meus Atalhos, só quando elegível
+                (workspace novo, poucos SKUs ou interesse em função bloqueada — ver
+                evaluateDiagnosticEligibility). "Agora não" vale só para esta sessão. */}
             {showDiagnosticInvite && (
               <React.Suspense fallback={null}>
                 <DiagnosticInvite

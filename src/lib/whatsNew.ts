@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-24-meus-atalhos',
+    date: '2026-08-24',
+    category: 'novidade',
+    title: 'Meus Atalhos no Dashboard',
+    description: 'O topo do Dashboard agora tem "Meus Atalhos": escolha até 5 funções do sistema (como Conferência por NF-e, Histórico de Importações ou Meu Trabalho) para acessar com um clique, na ordem que preferir. Cada pessoa configura os próprios atalhos, e eles nunca aparecem para outro usuário ou outra empresa. O convite ao Diagnóstico da Operação virou um aviso separado, que só aparece quando faz sentido (empresa nova, poucos produtos cadastrados ou quando você tenta usar um recurso de outro plano) — continua disponível a qualquer momento pelo menu.',
+  },
+  {
     id: '2026-08-24-linhas-e-marcas',
     date: '2026-08-24',
     category: 'novidade',

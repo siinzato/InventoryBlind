@@ -264,7 +264,9 @@ export const parseCSV = (content: string): { headers: string[]; rows: ProductRaw
 };
 
 // Parse a single CSV line
-const parseCSVLine = (line: string, delimiter: string): string[] => {
+// Exportada (só isso mudou aqui) para o Comparador de Planilhas reaproveitar o
+// mesmo parser em vez de duplicar a lógica de aspas/delimitador.
+export const parseCSVLine = (line: string, delimiter: string): string[] => {
   const values: string[] = [];
   let current = '';
   let inQuotes = false;

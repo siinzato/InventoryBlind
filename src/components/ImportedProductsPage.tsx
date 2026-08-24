@@ -13,6 +13,7 @@ import {
   Filter,
   ChevronLeft,
   ChevronRight,
+  Tag,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { ProductFromDB } from '../lib/productImportTypes';
@@ -27,15 +28,35 @@ import { ConfidenceBadge } from './cbc/ConfidenceBadge';
 import { ProductConfidenceModal } from './cbc/ProductConfidenceModal';
 import { RiskBadge } from './risk/RiskBadge';
 import { ClassificationBadge } from './abcxyz/ClassificationBadge';
+import { getBrandLineNameMaps, listBrands, listLines, type ProductBrand, type ProductLine } from '../lib/productBrands/productBrandService';
+import { AssignBrandLineModal } from './productBrands/AssignBrandLineModal';
+
+/** Filtro vindo de Linhas e Marcas — quando presente, a listagem é restrita à
+ *  marca/linha/pendência escolhida via join no backend (nunca no navegador). */
+export interface ProductBrandLineFilter {
+  brandId?: string;
+  lineId?: string;
+  noLine?: boolean;
+  needsReview?: boolean;
+  contextTitle: string;
+}
+
+interface AssociationEmbed { brand_id: string | null; line_id: string | null; match_status: string | null; matched_keyword: string | null }
 
 interface ImportedProductsPageProps {
   onBack: () => void;
   isAdmin: boolean;
+  /** Filtro por marca/linha vindo de Linhas e Marcas. Sem isso, a tela funciona exatamente como antes. */
+  brandFilter?: ProductBrandLineFilter;
+  /** Quando vindo de Linhas e Marcas: volta preservando o estado da tela anterior (que nunca desmonta). */
+  onBackToBrands?: () => void;
 }
 
 export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
   onBack,
   isAdmin,
+  brandFilter,
+  onBackToBrands,
 }) => {
   const [products, setProducts] = useState<ProductFromDB[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,17 +70,47 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
   const [riskByProduct, setRiskByProduct] = useState<Map<string, ProductRiskScore>>(new Map());
   const [classificationByProduct, setClassificationByProduct] = useState<Map<string, ProductAbcXyzClassification>>(new Map());
   const [selectedProduct, setSelectedProduct] = useState<ProductFromDB | null>(null);
+  const [associationByProduct, setAssociationByProduct] = useState<Map<string, AssociationEmbed>>(new Map());
+  const [brandNames, setBrandNames] = useState<Map<string, string>>(new Map());
+  const [lineNames, setLineNames] = useState<Map<string, string>>(new Map());
+  const [brands, setBrands] = useState<ProductBrand[]>([]);
+  const [lines, setLines] = useState<ProductLine[]>([]);
+  const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
+  const [showAssignModal, setShowAssignModal] = useState(false);
   const pageSize = 20;
   const { companyId, profile } = useAuth();
+
+  useEffect(() => {
+    if (!companyId) return;
+    getBrandLineNameMaps(companyId).then(({ brandNames, lineNames }) => { setBrandNames(brandNames); setLineNames(lineNames); });
+    listBrands(companyId).then(setBrands);
+    listLines(companyId).then(setLines);
+  }, [companyId]);
 
   // Load products
   const loadProducts = async () => {
     setLoading(true);
     try {
+      const needsJoinFilter = !!(brandFilter?.brandId || brandFilter?.lineId || brandFilter?.noLine || brandFilter?.needsReview);
+      const embed = needsJoinFilter
+        ? 'product_brand_associations!inner(brand_id,line_id,match_status,matched_keyword)'
+        : 'product_brand_associations(brand_id,line_id,match_status,matched_keyword)';
+
       let query = supabase
         .from('products')
-        .select('*', { count: 'exact' })
+        .select(`*, ${embed}`, { count: 'exact' })
         .order('created_at', { ascending: false });
+
+      if (brandFilter?.lineId) {
+        query = query.eq('product_brand_associations.line_id', brandFilter.lineId);
+      } else if (brandFilter?.noLine) {
+        query = query.eq('product_brand_associations.brand_id', brandFilter.brandId ?? '').is('product_brand_associations.line_id', null);
+      } else if (brandFilter?.brandId) {
+        query = query.eq('product_brand_associations.brand_id', brandFilter.brandId);
+      }
+      if (brandFilter?.needsReview) {
+        query = query.eq('product_brand_associations.match_status', 'needs_review');
+      }
 
       // Apply search filter
       if (searchTerm) {
@@ -80,10 +131,21 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
 
       if (error) throw error;
 
-      setProducts(data || []);
+      const rows = (data ?? []) as (ProductFromDB & { product_brand_associations: AssociationEmbed | AssociationEmbed[] | null })[];
+      setProducts(rows);
       setTotalProducts(count || 0);
-      if (data && data.length > 0 && companyId) {
-        const ids = data.map((p: ProductFromDB) => p.id);
+      setSelectedIds(new Set());
+
+      const assocMap = new Map<string, AssociationEmbed>();
+      for (const row of rows) {
+        const raw = row.product_brand_associations;
+        const assoc = Array.isArray(raw) ? raw[0] : raw;
+        if (assoc) assocMap.set(row.id, assoc);
+      }
+      setAssociationByProduct(assocMap);
+
+      if (rows.length > 0 && companyId) {
+        const ids = rows.map((p) => p.id);
         getConfidenceForProducts(ids, companyId).then(setConfidenceByProduct);
         getRiskForProducts(ids, companyId).then(setRiskByProduct);
         getClassificationsForProducts(ids, companyId).then(setClassificationByProduct);
@@ -100,7 +162,8 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
 
   useEffect(() => {
     loadProducts();
-  }, [currentPage, searchField]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentPage, searchField, brandFilter?.brandId, brandFilter?.lineId, brandFilter?.noLine, brandFilter?.needsReview]);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -205,11 +268,11 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
         <div>
           <button
-            onClick={onBack}
+            onClick={onBackToBrands ?? onBack}
             className="flex items-center gap-2 text-fg-muted hover:text-fg transition mb-4"
           >
             <ArrowLeft size={20} />
-            Voltar
+            {onBackToBrands ? 'Voltar para Linhas e Marcas' : 'Voltar'}
           </button>
 
           <div className="flex items-center gap-3">
@@ -217,16 +280,23 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
               <Package size={28} className="text-white" />
             </div>
             <div>
-              <h1 className="text-title">Produtos Importados</h1>
+              <h1 className="text-title">{brandFilter?.contextTitle ?? 'Produtos Importados'}</h1>
               <p className="text-fg-muted">{totalProducts} produtos cadastrados</p>
             </div>
           </div>
         </div>
 
-        <Button variant="secondary" onClick={handleExport}>
-          <Download size={16} />
-          Exportar CSV
-        </Button>
+        <div className="flex items-center gap-2">
+          {isAdmin && selectedIds.size > 0 && (
+            <Button variant="secondary" onClick={() => setShowAssignModal(true)}>
+              <Tag size={16} /> Alterar marca/linha ({selectedIds.size})
+            </Button>
+          )}
+          <Button variant="secondary" onClick={handleExport}>
+            <Download size={16} />
+            Exportar CSV
+          </Button>
+        </div>
       </div>
 
       {/* Search + Products */}
@@ -281,9 +351,20 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
               <Table>
                 <thead>
                   <tr className="border-b border-edge">
+                    {isAdmin && (
+                      <th className="px-4 py-3 w-8">
+                        <input
+                          type="checkbox"
+                          checked={products.length > 0 && selectedIds.size === products.length}
+                          onChange={(e) => setSelectedIds(e.target.checked ? new Set(products.map(p => p.id)) : new Set())}
+                        />
+                      </th>
+                    )}
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Nome</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">SKU</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">EAN</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Marca</th>
+                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Linha</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Local</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Preco</th>
                     <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Confiança</th>
@@ -294,8 +375,23 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
                   </tr>
                 </thead>
                 <tbody>
-                  {products.map((product) => (
+                  {products.map((product) => {
+                    const association = associationByProduct.get(product.id);
+                    return (
                     <Tr key={product.id}>
+                      {isAdmin && (
+                        <Td>
+                          <input
+                            type="checkbox"
+                            checked={selectedIds.has(product.id)}
+                            onChange={(e) => setSelectedIds(prev => {
+                              const next = new Set(prev);
+                              if (e.target.checked) next.add(product.id); else next.delete(product.id);
+                              return next;
+                            })}
+                          />
+                        </Td>
+                      )}
                       <Td>
                         {editingId === product.id ? (
                           <input
@@ -331,6 +427,13 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
                         ) : (
                           <span className="font-mono text-fg-muted">{product.ean || '-'}</span>
                         )}
+                      </Td>
+                      <Td>
+                        <span className="text-fg-muted">{association?.brand_id ? (brandNames.get(association.brand_id) ?? '—') : '—'}</span>
+                      </Td>
+                      <Td>
+                        <span className="text-fg-muted">{association?.line_id ? (lineNames.get(association.line_id) ?? '—') : '—'}</span>
+                        {association?.matched_keyword && <p className="text-xs text-fg-subtle">via "{association.matched_keyword}"</p>}
                       </Td>
                       <Td>
                         {editingId === product.id ? (
@@ -431,7 +534,8 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
                         )}
                       </Td>
                     </Tr>
-                  ))}
+                    );
+                  })}
                 </tbody>
               </Table>
             </div>
@@ -478,6 +582,17 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
           role={profile?.role}
           userId={profile?.id}
           userEmail={profile?.email ?? undefined}
+        />
+      )}
+
+      {showAssignModal && companyId && (
+        <AssignBrandLineModal
+          companyId={companyId}
+          productIds={Array.from(selectedIds)}
+          brands={brands}
+          lines={lines}
+          onClose={() => setShowAssignModal(false)}
+          onSaved={() => { setShowAssignModal(false); loadProducts(); }}
         />
       )}
     </div>

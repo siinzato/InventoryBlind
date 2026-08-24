@@ -169,17 +169,56 @@ export async function countProductsForLine(lineId: string): Promise<number> {
   return count ?? 0;
 }
 
-export interface ProductRef { id: string; name: string; sku: string }
-
-export async function listProductsForBrand(companyId: string, brandId: string, limit = 200): Promise<ProductRef[]> {
-  const { data, error } = await supabase
+/** Produtos com marca definida mas sem linha — usado pelo contador "Produtos sem linha". */
+export async function countProductsWithoutLineForBrand(brandId: string): Promise<number> {
+  const { count, error } = await supabase
     .from('product_brand_associations')
-    .select('products!inner(id, name, sku)')
-    .eq('company_id', companyId)
+    .select('id', { count: 'exact', head: true })
     .eq('brand_id', brandId)
-    .limit(limit);
+    .is('line_id', null);
   if (error) throw error;
-  return ((data ?? []) as unknown as { products: ProductRef }[]).map(r => r.products);
+  return count ?? 0;
+}
+
+export async function countReviewQueue(companyId: string): Promise<number> {
+  const { count, error } = await supabase
+    .from('product_brand_associations')
+    .select('id', { count: 'exact', head: true })
+    .eq('company_id', companyId)
+    .eq('match_status', 'needs_review');
+  if (error) throw error;
+  return count ?? 0;
+}
+
+/** Nomes de marca/linha por id, para a tela de produtos exibir sem precisar
+ *  embutir um segundo nível de join a cada linha da listagem. */
+export async function getBrandLineNameMaps(companyId: string): Promise<{ brandNames: Map<string, string>; lineNames: Map<string, string> }> {
+  const [brands, lines] = await Promise.all([listBrands(companyId), listLines(companyId)]);
+  return {
+    brandNames: new Map(brands.map(b => [b.id, b.name])),
+    lineNames: new Map(lines.map(l => [l.id, l.name])),
+  };
+}
+
+/** Altera a marca/linha de um ou vários produtos de uma vez — só a associação,
+ *  nunca o produto em si. Mesmo caminho de `confirmProductAssociation`, em lote. */
+export async function bulkAssignProductAssociation(
+  companyId: string, productIds: string[], brandId: string | null, lineId: string | null, userId: string, userEmail: string
+): Promise<void> {
+  if (productIds.length === 0) return;
+  const { error } = await supabase.from('product_brand_associations').upsert(
+    productIds.map(productId => ({
+      company_id: companyId, product_id: productId, brand_id: brandId, line_id: lineId,
+      match_status: 'manual' as const, matched_keyword: null, candidate_matches: [],
+      confirmed_by: userId, confirmed_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+    })),
+    { onConflict: 'product_id' }
+  );
+  if (error) throw error;
+  await logAuditEvent({
+    companyId, userId, userEmail, action: 'product_brand_association.confirmed', resourceType: 'product_brand_associations',
+    metadata: { bulk: true, count: productIds.length, brandId, lineId },
+  });
 }
 
 export async function listReviewQueue(companyId: string, limit = 100): Promise<ProductBrandAssociation[]> {

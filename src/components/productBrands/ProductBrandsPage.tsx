@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, ChevronDown, ChevronRight, RefreshCw, PlayCircle, CheckCircle2, XCircle } from 'lucide-react';
+import { Plus, ChevronDown, ChevronRight, RefreshCw, PlayCircle, CheckCircle2, XCircle, Eye } from 'lucide-react';
 import { Page, PageHeader, Panel, PanelSection, Badge, Button, Select } from '../ui';
 import { useAuth } from '../../lib/auth';
 import { hasPermission } from '../../lib/permissionService';
@@ -7,10 +7,12 @@ import { listTeamMembers } from '../../lib/tasks/taskService';
 import type { TeamMember } from '../../lib/tasks/types';
 import {
   listBrands, listLines, setBrandActive, setLineActive, countProductsForBrand, countProductsForLine,
+  countProductsWithoutLineForBrand, countReviewQueue,
   listReviewQueue, confirmProductAssociation, classifyCompanyProducts,
   type ProductBrand, type ProductLine, type ProductBrandAssociation,
 } from '../../lib/productBrands/productBrandService';
 import { BrandLineFormModal } from './BrandLineFormModal';
+import { ImportedProductsPage, type ProductBrandLineFilter } from '../ImportedProductsPage';
 
 interface ProductBrandsPageProps {
   companyId: string;
@@ -21,35 +23,40 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
   const [brands, setBrands] = useState<ProductBrand[]>([]);
   const [lines, setLines] = useState<ProductLine[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
-  const [counts, setCounts] = useState<{ brand: Map<string, number>; line: Map<string, number> }>({ brand: new Map(), line: new Map() });
+  const [counts, setCounts] = useState<{ brand: Map<string, number>; line: Map<string, number>; noLine: Map<string, number> }>({ brand: new Map(), line: new Map(), noLine: new Map() });
   const [reviewQueue, setReviewQueue] = useState<ProductBrandAssociation[]>([]);
+  const [reviewQueueTotal, setReviewQueueTotal] = useState(0);
   const [loading, setLoading] = useState(true);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const [statusFilter, setStatusFilter] = useState<'active' | 'inactive' | 'all'>('active');
   const [formModal, setFormModal] = useState<{ mode: 'brand' | 'line'; brand?: ProductBrand; line?: ProductLine; defaultBrandId?: string } | null>(null);
   const [classifying, setClassifying] = useState(false);
   const [classifyResult, setClassifyResult] = useState<string | null>(null);
+  const [productFilter, setProductFilter] = useState<ProductBrandLineFilter | null>(null);
 
   const canWrite = hasPermission(profile?.role, 'products.write');
 
   const load = async () => {
     setLoading(true);
     try {
-      const [brandsData, linesData, membersData, queue] = await Promise.all([
-        listBrands(companyId), listLines(companyId), listTeamMembers(companyId), listReviewQueue(companyId),
+      const [brandsData, linesData, membersData, queue, queueTotal] = await Promise.all([
+        listBrands(companyId), listLines(companyId), listTeamMembers(companyId), listReviewQueue(companyId), countReviewQueue(companyId),
       ]);
       setBrands(brandsData);
       setLines(linesData);
       setMembers(membersData);
       setReviewQueue(queue);
+      setReviewQueueTotal(queueTotal);
 
       const brandCounts = new Map<string, number>();
       const lineCounts = new Map<string, number>();
+      const noLineCounts = new Map<string, number>();
       await Promise.all([
         ...brandsData.map(async b => brandCounts.set(b.id, await countProductsForBrand(b.id))),
         ...linesData.map(async l => lineCounts.set(l.id, await countProductsForLine(l.id))),
+        ...brandsData.map(async b => noLineCounts.set(b.id, await countProductsWithoutLineForBrand(b.id))),
       ]);
-      setCounts({ brand: brandCounts, line: lineCounts });
+      setCounts({ brand: brandCounts, line: lineCounts, noLine: noLineCounts });
     } catch (err) {
       console.error('Error loading brands/lines:', err);
     } finally {
@@ -92,6 +99,17 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
     await confirmProductAssociation(companyId, { productId: association.productId, brandId, lineId }, profile?.id ?? '', profile?.email ?? '');
     setReviewQueue(prev => prev.filter(a => a.id !== association.id));
   };
+
+  if (productFilter) {
+    return (
+      <ImportedProductsPage
+        onBack={() => setProductFilter(null)}
+        onBackToBrands={() => setProductFilter(null)}
+        isAdmin={canWrite}
+        brandFilter={productFilter}
+      />
+    );
+  }
 
   if (loading) {
     return <Page><PanelSection padding="lg" className="text-center text-sm text-fg-subtle">Carregando...</PanelSection></Page>;
@@ -150,7 +168,16 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
                     {!brand.active && <Badge variant="warning">Inativa</Badge>}
                   </button>
                   <div className="flex items-center gap-2">
-                    <span className="text-xs text-fg-subtle">{counts.brand.get(brand.id) ?? 0} produtos</span>
+                    <button
+                      type="button"
+                      className="text-xs text-fg-subtle underline decoration-dotted hover:text-fg"
+                      onClick={() => setProductFilter({ brandId: brand.id, contextTitle: `Produtos — ${brand.name}` })}
+                    >
+                      {counts.brand.get(brand.id) ?? 0} produtos
+                    </button>
+                    <Button variant="ghost" size="sm" onClick={() => setProductFilter({ brandId: brand.id, contextTitle: `Produtos — ${brand.name}` })}>
+                      <Eye size={14} /> Ver produtos
+                    </Button>
                     {canWrite && (
                       <>
                         <Button variant="ghost" size="sm" onClick={() => setFormModal({ mode: 'line', defaultBrandId: brand.id })}>+ Linha</Button>
@@ -167,7 +194,16 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
                   <PanelSection key={line.id} padding="sm" className="pl-8 flex items-center justify-between gap-3">
                     <span className="text-sm text-fg">{line.name} {!line.active && <Badge variant="warning">Inativa</Badge>}</span>
                     <div className="flex items-center gap-2">
-                      <span className="text-xs text-fg-subtle">{counts.line.get(line.id) ?? 0} produtos</span>
+                      <button
+                        type="button"
+                        className="text-xs text-fg-subtle underline decoration-dotted hover:text-fg"
+                        onClick={() => setProductFilter({ lineId: line.id, contextTitle: `Produtos — ${brand.name} / ${line.name}` })}
+                      >
+                        {counts.line.get(line.id) ?? 0} produtos
+                      </button>
+                      <Button variant="ghost" size="sm" onClick={() => setProductFilter({ lineId: line.id, contextTitle: `Produtos — ${brand.name} / ${line.name}` })}>
+                        <Eye size={14} /> Ver produtos
+                      </Button>
                       {canWrite && (
                         <>
                           <Button variant="ghost" size="sm" onClick={() => setFormModal({ mode: 'line', line })}>Editar</Button>
@@ -179,6 +215,23 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
                     </div>
                   </PanelSection>
                 ))}
+                {isOpen && (
+                  <PanelSection padding="sm" className="pl-8 flex items-center justify-between gap-3">
+                    <span className="text-sm text-fg-muted">Produtos sem linha</span>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        className="text-xs text-fg-subtle underline decoration-dotted hover:text-fg"
+                        onClick={() => setProductFilter({ brandId: brand.id, noLine: true, contextTitle: `Produtos — ${brand.name} / Sem linha` })}
+                      >
+                        {counts.noLine.get(brand.id) ?? 0} produtos
+                      </button>
+                      <Button variant="ghost" size="sm" onClick={() => setProductFilter({ brandId: brand.id, noLine: true, contextTitle: `Produtos — ${brand.name} / Sem linha` })}>
+                        <Eye size={14} /> Ver produtos
+                      </Button>
+                    </div>
+                  </PanelSection>
+                )}
                 {isOpen && brandLines.length === 0 && (
                   <PanelSection padding="sm" className="pl-8 text-xs text-fg-subtle">Nenhuma linha cadastrada.</PanelSection>
                 )}
@@ -189,7 +242,14 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
       )}
 
       <Panel>
-        <PanelSection padding="md"><p className="text-title">Revisar sugestões ({reviewQueue.length})</p></PanelSection>
+        <PanelSection padding="md" className="flex items-center justify-between">
+          <p className="text-title">Revisar sugestões ({reviewQueueTotal})</p>
+          {reviewQueueTotal > 0 && (
+            <Button variant="ghost" size="sm" onClick={() => setProductFilter({ needsReview: true, contextTitle: 'Produtos — Pendentes de revisão' })}>
+              <Eye size={14} /> Ver produtos
+            </Button>
+          )}
+        </PanelSection>
         {reviewQueue.length === 0 && <PanelSection padding="lg" className="text-center text-sm text-fg-subtle">Nenhum item aguardando revisão.</PanelSection>}
         {reviewQueue.map(association => (
           <PanelSection key={association.id} padding="md" className="space-y-2">

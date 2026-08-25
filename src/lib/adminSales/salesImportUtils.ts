@@ -188,13 +188,17 @@ export interface SalesImportPreview {
 
 // Valida e calcula faturamento quando só há quantidade+preço unitário — nunca bloqueia o restante
 // do arquivo por causa de uma linha ruim ou de um SKU não reconhecido (isso é sinalizado à parte).
-export const validateAndBuildSalesRows = (rows: SalesRow[]): SalesImportPreview => {
+// fallbackDate cobre relatórios agregados sem coluna de data por linha (ex: export padrão de
+// vendas do Tiny: Produto/Código (SKU)/Quantidade/Valor/Frete/Total, sem data) — o usuário informa
+// a data de referência do relatório no wizard e ela é aplicada a toda linha sem data própria.
+export const validateAndBuildSalesRows = (rows: SalesRow[], fallbackDate?: string | null): SalesImportPreview => {
   const valid: ValidatedSalesRow[] = [];
   const errors: SalesRowError[] = [];
   const warnings: string[] = [];
+  const parsedFallbackDate = fallbackDate ? parseDate(fallbackDate) : null;
 
   rows.forEach((row, idx) => {
-    const saleDate = parseDate(row.data);
+    const saleDate = parseDate(row.data) ?? parsedFallbackDate;
     if (!saleDate) {
       errors.push({ rowIndex: idx, message: 'Data ausente ou inválida.' });
       return;

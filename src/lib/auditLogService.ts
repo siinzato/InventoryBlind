@@ -110,7 +110,9 @@ export type AuditAction =
   | 'product_line.updated'
   | 'product_line.deactivated'
   | 'product_brand_association.confirmed'
-  | 'product_brand_association.batch_classified';
+  | 'product_brand_association.batch_classified'
+  // Curva ABC (migration 078).
+  | 'abc_curve.published';
 
 interface LogParams {
   companyId: string;

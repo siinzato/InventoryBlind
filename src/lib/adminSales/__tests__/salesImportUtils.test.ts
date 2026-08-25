@@ -64,6 +64,22 @@ describe('validateAndBuildSalesRows', () => {
     expect(errors[0].message).toMatch(/faturamento total ou preço unitário/i);
   });
 
+  it('usa a data de referência (fallback) quando o arquivo não tem coluna de data — caso do relatório do Tiny', () => {
+    const { valid, errors } = validateAndBuildSalesRows([
+      { sku: 'OUT-TCGCM25-BRASIL', produto: 'Copo Vibe Outlet', quantidade: 2, faturamento: 49.07 },
+    ], '2026-08-25');
+    expect(errors).toHaveLength(0);
+    expect(valid[0].saleDate).toBe('2026-08-25');
+  });
+
+  it('sem coluna de data e sem fallback informado, a linha continua sendo rejeitada', () => {
+    const { valid, errors } = validateAndBuildSalesRows([
+      { sku: 'SKU1', produto: 'Produto 1', quantidade: 1, faturamento: 10 },
+    ]);
+    expect(valid).toHaveLength(0);
+    expect(errors[0].message).toMatch(/data/i);
+  });
+
   it('produto sem SKU não bloqueia a importação — vira aviso, continua "não associado"', () => {
     const { valid, warnings, errors } = validateAndBuildSalesRows([
       { data: '2026-08-01', produto: 'Produto Sem SKU', quantidade: 2, faturamento: 20 },

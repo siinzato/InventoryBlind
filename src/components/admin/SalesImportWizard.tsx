@@ -37,14 +37,15 @@ export function SalesImportWizard({ companyId, userId, userEmail, onClose, onImp
   const [headers, setHeaders] = useState<string[]>([]);
   const [rawRows, setRawRows] = useState<SalesRow[]>([]);
   const [mapping, setMapping] = useState<SalesColumnMapping>({ data: null, sku: null, produto: null, quantidade: null, precoUnitario: null, faturamento: null });
+  const [referenceDate, setReferenceDate] = useState('');
   const [saveProfileName, setSaveProfileName] = useState('');
   const [result, setResult] = useState<{ imported: number; unmatched: number } | null>(null);
 
   const preview = useMemo(() => {
     if (step !== 'preview' && step !== 'importing' && step !== 'done') return null;
     const mapped = applySalesColumnMapping(rawRows, mapping);
-    return validateAndBuildSalesRows(mapped);
-  }, [step, rawRows, mapping]);
+    return validateAndBuildSalesRows(mapped, mapping.data ? null : referenceDate);
+  }, [step, rawRows, mapping, referenceDate]);
 
   const handleFileSelected = async (selected: File) => {
     setError(null);
@@ -55,6 +56,7 @@ export function SalesImportWizard({ companyId, userId, userEmail, onClose, onImp
     }
 
     setFile(selected);
+    setReferenceDate('');
     const hash = await computeFileHash(selected);
     setFileHash(hash);
 
@@ -151,9 +153,24 @@ export function SalesImportWizard({ companyId, userId, userEmail, onClose, onImp
                 </div>
               ))}
             </div>
+            {!mapping.data && (
+              <div className="space-y-2 rounded-lg bg-amber-500/10 p-3">
+                <div className="flex items-center gap-2 text-sm text-amber-700 dark:text-amber-400">
+                  <AlertTriangle size={16} />
+                  Nenhuma coluna de data foi encontrada (comum no relatório de vendas do Tiny, que soma
+                  o período por produto sem data por linha). Informe a data de referência deste relatório:
+                </div>
+                <input
+                  type="date" value={referenceDate} onChange={e => setReferenceDate(e.target.value)}
+                  className="w-48 p-2 border border-edge rounded-lg bg-surface text-fg text-sm"
+                />
+              </div>
+            )}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-              <Button onClick={() => setStep('preview')}>Ver prévia <ArrowRight size={14} /></Button>
+              <Button onClick={() => setStep('preview')} disabled={!mapping.data && !referenceDate}>
+                Ver prévia <ArrowRight size={14} />
+              </Button>
             </div>
           </div>
         )}

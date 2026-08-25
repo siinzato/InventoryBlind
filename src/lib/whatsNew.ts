@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-25-curva-abc',
+    date: '2026-08-25',
+    category: 'novidade',
+    title: 'Curva ABC em Produtos',
+    description: 'Nova área em Produtos → Curva ABC: importe suas planilhas de vendas, preços/custos e (opcionalmente) estoque para ver automaticamente o giro, o faturamento e o lucro bruto de cada produto, classificados em curvas A/B/C, com recomendações comerciais e de reposição. É só análise: nada aqui altera o estoque ou os inventários do sistema. A opção de conectar direto com o Tiny, Bling, TOTVS ou SAP já aparece reservada na tela, marcada como "Em breve".',
+  },
+  {
+    id: '2026-08-25-importar-vendas-tiny-sem-data',
+    date: '2026-08-25',
+    category: 'correcao',
+    title: 'Importação de vendas agora aceita o relatório do Tiny sem coluna de data',
+    description: 'O relatório de vendas exportado do Tiny normalmente não traz uma data por linha (ele soma as vendas de um período por produto). Ao importar um arquivo assim, o assistente agora pede a data de referência do relatório e aplica ela a todas as linhas, em vez de rejeitar o arquivo inteiro por falta de data.',
+  },
+  {
     id: '2026-08-25-painel-administrativo',
     date: '2026-08-25',
     category: 'melhoria',

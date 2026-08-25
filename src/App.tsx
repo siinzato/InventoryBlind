@@ -136,6 +136,7 @@ const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardP
 const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
 const PurchaseOrdersPage = React.lazy(() => import('./components/purchaseOrders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
 const ProductBrandsPage = React.lazy(() => import('./components/productBrands/ProductBrandsPage').then(m => ({ default: m.ProductBrandsPage })));
+const AbcCurvePage = React.lazy(() => import('./components/abcCurve/AbcCurvePage').then(m => ({ default: m.AbcCurvePage })));
 const KnowledgeCenterPage = React.lazy(() => import('./components/account/KnowledgeCenterPage').then(m => ({ default: m.KnowledgeCenterPage })));
 const BlindScorePage = React.lazy(() => import('./components/analytics/BlindScorePage').then(m => ({ default: m.BlindScorePage })));
 const InventoryHealthPage = React.lazy(() => import('./components/analytics/InventoryHealthPage').then(m => ({ default: m.InventoryHealthPage })));
@@ -593,6 +594,7 @@ function AppContent() {
         { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
         { id: 'products',        label: 'Produtos Importados',      icon: <Package />,         onClick: () => { setActiveTab('products'); setMobileOpen(false); },        active: activeTab === 'products' },
         { id: 'product-brands',  label: 'Linhas e Marcas',          icon: <Tag />,             onClick: () => { setActiveTab('product-brands'); setMobileOpen(false); },  active: activeTab === 'product-brands' },
+        { id: 'abc-curve',       label: 'Curva ABC',                icon: <BarChart3 />,       onClick: () => { setActiveTab('abc-curve'); setMobileOpen(false); },       active: activeTab === 'abc-curve' },
       ],
     },
     {
@@ -922,6 +924,13 @@ function AppContent() {
         {activeTab === 'product-brands' && companyId && (
           <React.Suspense fallback={<PageLoader />}>
             <ProductBrandsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
+        {/* ABA CURVA ABC */}
+        {activeTab === 'abc-curve' && companyId && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AbcCurvePage companyId={companyId} />
           </React.Suspense>
         )}
 

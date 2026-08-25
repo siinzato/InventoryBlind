@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-25-painel-administrativo',
+    date: '2026-08-25',
+    category: 'melhoria',
+    title: 'Painel Administrativo reorganizado',
+    description: 'O Painel Administrativo ganhou uma nova organização em áreas: Visão Geral, Vendas e Integrações, KPIs, Inventários e Dados, e uma Zona de Perigo separada e recolhida para o Arquivar e Resetar Inventário (agora com confirmação por frase digitada e justificativa obrigatória). O Top 10 de Vendas deixou de ser editado manualmente: agora ele é calculado automaticamente a partir de planilhas de vendas importadas (.csv, .xls ou .xlsx), com detecção automática de colunas, prévia antes de confirmar e histórico de importações. O card de "Gerenciamento de Marcas/Linhas" saiu do Painel Administrativo — a área de marcas e linhas de produto continua em Produtos → Linhas e Marcas, sem nenhuma alteração.',
+  },
+  {
     id: '2026-08-24-meus-atalhos',
     date: '2026-08-24',
     category: 'novidade',

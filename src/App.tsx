@@ -11,19 +11,14 @@ import {
   MinusCircle,
   Lock,
   LogOut,
-  Edit,
   Target,
   Zap,
   Users,
   Calendar,
   BarChart2,
   Plus,
-  Trash2,
   Loader2,
-  Archive,
-  RotateCcw,
   History,
-  Eye,
   Bot,
   MessageCircle,
   Send,
@@ -114,6 +109,7 @@ const SpreadsheetComparatorPage = React.lazy(() => import('./components/Spreadsh
 const TasksPage = React.lazy(() => import('./components/TasksPage').then(m => ({ default: m.TasksPage })));
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
 const InventoryFullPage = React.lazy(() => import('./components/InventoryFullPage').then(m => ({ default: m.InventoryFullPage })));
+const AdminDashboardPage = React.lazy(() => import('./components/admin/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
 const UserManagementPage = React.lazy(() => import('./components/UserManagementPage'));
 const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
 // Integrations is lazy for the same reason every other module screen is: it pulls
@@ -240,7 +236,6 @@ function AppContent() {
   const [error, setError] = useState<string | null>(null);
 
   const [showAddBrandModal, setShowAddBrandModal] = useState(false);
-  const [showAddKPIModal, setShowAddKPIModal] = useState(false);
 
   const isLoggedIn = canManageUsers(profile?.role);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -269,23 +264,11 @@ function AppContent() {
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandTotalSku, setNewBrandTotalSku] = useState('');
 
-  const [newKPI, setNewKPI] = useState<Omit<CustomKPI, 'id' | 'order_index' | 'created_at' | 'updated_at'>>({
-    titulo: '',
-    valor: '',
-    unidade: '',
-    variacao: '',
-    tipo_variacao: 'up',
-    cor_icone: 'blue'
-  });
-
   // History states
   const [snapshots, setSnapshots] = useState<InventorySnapshot[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<InventorySnapshot | null>(null);
   const [snapshotBrands, setSnapshotBrands] = useState<InventoryBrandHistory[]>([]);
-  const [resetProgress, setResetProgress] = useState(false);
-  const [inventoryStartDate, setInventoryStartDate] = useState<string | null>(null);
 
   // Load data from Supabase
   useEffect(() => {
@@ -312,15 +295,6 @@ function AppContent() {
         setTopVendas(vendasRes.data || []);
         setCustomKPIs(kpisRes.data || []);
         setOperatorStats(operatorStatsRes);
-
-        // Set inventory start date from oldest brand creation
-        if (brandsRes.data && brandsRes.data.length > 0) {
-          const oldestDate = brandsRes.data.reduce((min, b) => {
-            const created = new Date(b.created_at);
-            return created < min ? created : min;
-          }, new Date());
-          setInventoryStartDate(oldestDate.toISOString());
-        }
 
         setError(null);
       } catch (err) {
@@ -351,119 +325,6 @@ function AppContent() {
       loadSnapshots();
     }
   }, [companyId, loadSnapshots]);
-
-  // Archive current inventory and reset
-  const handleResetInventory = async (inventoryName: string, notes: string) => {
-    setResetProgress(true);
-
-    try {
-      // Calculate current stats
-      const totalSku = brandsData.reduce((sum, b) => sum + b.total_sku, 0);
-      const totalDone = brandsData.reduce((sum, b) => sum + b.done_sku, 0);
-      const totalDivergences = brandsData.reduce((sum, b) => sum + b.divergences, 0);
-      const progress = totalSku > 0 ? (totalDone / totalSku) * 100 : 0;
-      const accuracy = totalDone > 0 ? ((totalDone - totalDivergences) / totalDone) * 100 : 0;
-
-      // Create snapshot
-      const { data: snapshotData, error: snapshotError } = await supabase
-        .from('inventory_snapshots')
-        .insert({
-          company_id: companyId,
-          name: inventoryName,
-          start_date: inventoryStartDate || new Date().toISOString(),
-          end_date: new Date().toISOString(),
-          total_sku: totalSku,
-          total_done: totalDone,
-          total_divergences: totalDivergences,
-          progress,
-          accuracy,
-          status: 'completed',
-          notes
-        })
-        .select()
-        .single();
-
-      if (snapshotError || !snapshotData) throw snapshotError || new Error('Failed to create snapshot');
-
-      const snapshotId = snapshotData.id;
-
-      // Archive brands
-      const brandHistoryData = brandsData.map(b => {
-        const bProgress = b.total_sku > 0 ? (b.done_sku / b.total_sku) * 100 : 0;
-        const bAccuracy = b.done_sku > 0 ? ((b.done_sku - b.divergences) / b.done_sku) * 100 : null;
-        return {
-          snapshot_id: snapshotId,
-          brand: b.brand,
-          total_sku: b.total_sku,
-          done_sku: b.done_sku,
-          divergences: b.divergences,
-          progress: bProgress,
-          accuracy: bAccuracy,
-          status: bProgress >= 100 ? 'CONCLUÍDO' : 'ANDAMENTO'
-        };
-      });
-
-      await supabase.from('inventory_brand_history').insert(brandHistoryData);
-
-      // Archive KPIs
-      const kpiHistoryData = customKPIs.map(k => ({
-        snapshot_id: snapshotId,
-        titulo: k.titulo,
-        valor: k.valor,
-        unidade: k.unidade,
-        variacao: k.variacao,
-        tipo_variacao: k.tipo_variacao,
-        cor_icone: k.cor_icone
-      }));
-
-      if (kpiHistoryData.length > 0) {
-        await supabase.from('inventory_kpi_history').insert(kpiHistoryData);
-      }
-
-      // Archive Top Vendas
-      const topVendasHistoryData = topVendas.map(v => ({
-        snapshot_id: snapshotId,
-        produto: v.produto,
-        sku: v.sku,
-        vendas: v.vendas,
-        order_index: v.order_index
-      }));
-
-      if (topVendasHistoryData.length > 0) {
-        await supabase.from('inventory_top_vendas_history').insert(topVendasHistoryData);
-      }
-
-      // Reset brands data (keep brands but reset counts)
-      const resetData = brandsData.map(b => ({
-        id: b.id,
-        done_sku: 0,
-        divergences: 0,
-        updated_at: new Date().toISOString()
-      }));
-
-      for (const brand of resetData) {
-        await supabase
-          .from('inventory_brands')
-          .update({ done_sku: 0, divergences: 0, updated_at: new Date().toISOString() })
-          .eq('id', brand.id);
-      }
-
-      // Update local state
-      setBrandsData(prev => prev.map(b => ({ ...b, done_sku: 0, divergences: 0 })));
-      setInventoryStartDate(new Date().toISOString());
-
-      // Reload snapshots
-      await loadSnapshots();
-
-      setShowResetModal(false);
-      alert('Inventário arquivado e resetado com sucesso!');
-    } catch (err) {
-      console.error('Error resetting inventory:', err);
-      alert('Erro ao arquivar o inventário. Tente novamente.');
-    } finally {
-      setResetProgress(false);
-    }
-  };
 
   // View snapshot details
   const handleViewSnapshot = async (snapshot: InventorySnapshot) => {
@@ -604,37 +465,13 @@ function AppContent() {
     setShowAddBrandModal(false);
   };
 
-  const handleUpdateTopVenda = useCallback(async (index: number, field: keyof TopVenda, value: string) => {
-    const item = topVendas[index];
-    if (!item) return;
-
-    const { error } = await supabase
-      .from('top_vendas')
-      .update({ [field]: value, updated_at: new Date().toISOString() })
-      .eq('id', item.id);
-
-    if (error) {
-      console.error('Error updating venda:', error);
-      return;
-    }
-
-    setTopVendas(prev => {
-      const newVendas = [...prev];
-      newVendas[index] = { ...newVendas[index], [field]: value };
-      return newVendas;
-    });
-  }, [topVendas]);
-
-  const handleAddKPI = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newKPI.titulo || !newKPI.valor) return;
-
+  const handleAddKPI = async (kpi: Omit<CustomKPI, 'id' | 'order_index' | 'created_at' | 'updated_at'>) => {
     const maxOrder = Math.max(0, ...customKPIs.map(k => k.order_index));
 
     const { data, error } = await supabase
       .from('custom_kpis')
       .insert({
-        ...newKPI,
+        ...kpi,
         company_id: companyId,
         order_index: maxOrder + 1
       })
@@ -648,16 +485,6 @@ function AppContent() {
     if (data) {
       setCustomKPIs([...customKPIs, data[0]]);
     }
-
-    setNewKPI({
-      titulo: '',
-      valor: '',
-      unidade: '',
-      variacao: '',
-      tipo_variacao: 'up',
-      cor_icone: 'blue'
-    });
-    setShowAddKPIModal(false);
   };
 
   const handleDeleteKPI = async (id: string) => {
@@ -1471,208 +1298,37 @@ function AppContent() {
 
         {/* ABA ADMIN */}
         {activeTab === 'admin' && (
-          <div className="max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
+          <div>
             {!isLoggedIn ? (
-              <Panel className="max-w-md mx-auto mt-6">
-                <PanelSection padding="lg" className="text-center">
-                  <Lock size={32} className="mx-auto mb-3 text-fg-subtle" />
-                  <h2 className="text-title">Acesso Restrito</h2>
-                  <p className="text-fg-muted text-sm mt-2">Esta área é restrita a administradores e proprietários.</p>
-                  <p className="text-caption mt-3">Perfil atual: {profile?.role ?? '—'}</p>
-                </PanelSection>
-              </Panel>
-            ) : (
-              // PAINEL ADMINISTRATIVO
-              <div className="space-y-8">
-                <div>
-                  <h2 className="text-title flex items-center gap-2">
-                    <Edit size={18} className="text-fg-subtle" /> Painel Administrativo
-                  </h2>
-                  <p className="text-caption mt-1">Altere parâmetros do sistema e dados gerenciais.</p>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Edição Top Vendas */}
-                  <Panel>
-                    <PanelSection padding="sm">
-                      <h3 className="text-title">Editar Top 10 Vendas</h3>
-                    </PanelSection>
-                    <PanelSection className="overflow-x-auto">
-                       <table className="w-full text-xs text-left">
-                         <thead>
-                           <tr className="border-b border-edge">
-                             <th className="pb-2 font-medium text-fg-subtle uppercase tracking-wide">Produto</th>
-                             <th className="pb-2 font-medium text-fg-subtle uppercase tracking-wide">SKU</th>
-                             <th className="pb-2 text-right font-medium text-fg-subtle uppercase tracking-wide">Vendas</th>
-                           </tr>
-                         </thead>
-                         <tbody>
-                           {topVendas.map((item, idx) => (
-                             <tr key={item.id} className="border-b border-edge/60 last:border-0">
-                               <td className="py-2 pr-2"><input type="text" className="w-full border border-edge rounded px-2 py-1 text-xs bg-surface focus:outline-none focus:ring-2 focus:ring-accent/40" value={item.produto} onChange={(e) => handleUpdateTopVenda(idx, 'produto', e.target.value)} /></td>
-                               <td className="py-2 pr-2"><input type="text" className="w-full border border-edge rounded px-2 py-1 text-xs font-mono bg-surface focus:outline-none focus:ring-2 focus:ring-accent/40" value={item.sku} onChange={(e) => handleUpdateTopVenda(idx, 'sku', e.target.value)} /></td>
-                               <td className="py-2"><input type="text" className="w-full border border-edge rounded px-2 py-1 text-xs text-right font-semibold bg-surface focus:outline-none focus:ring-2 focus:ring-accent/40" value={item.vendas} onChange={(e) => handleUpdateTopVenda(idx, 'vendas', e.target.value)} /></td>
-                             </tr>
-                           ))}
-                         </tbody>
-                       </table>
-                    </PanelSection>
-                  </Panel>
-
-                  {/* Edição Linhas */}
-                  <Panel className="flex flex-col">
-                     <PanelSection padding="sm">
-                       <h3 className="text-title">Gerenciamento de Marcas / Linhas</h3>
-                     </PanelSection>
-                     <PanelSection className="flex-1 flex flex-col justify-center items-center text-center">
-                        <Package size={32} className="text-fg-subtle mb-3"/>
-                        <p className="text-sm text-fg-muted mb-4">Para adicionar uma nova linha ao controle do inventário principal, clique no botão abaixo.</p>
-                        <button
-                          onClick={() => setShowAddBrandModal(true)}
-                          className="bg-accent hover:bg-accent-strong text-white font-semibold py-3 px-6 rounded-lg transition w-full"
-                        >
-                          + Cadastrar Nova Linha no Estoque
-                        </button>
-                     </PanelSection>
-                  </Panel>
-                </div>
-
-                {/* Gerenciamento de KPIs */}
-                <Panel>
-                  <PanelSection padding="sm">
-                    <h3 className="text-title flex items-center gap-2">
-                      <Target size={16} className="text-fg-subtle" />
-                      Gerenciamento de KPIs e Indicadores
-                    </h3>
-                  </PanelSection>
-                  <PanelSection>
-                    <div className="divide-y divide-edge mb-4">
-                      {customKPIs.map((kpi) => (
-                        <div key={kpi.id} className="flex items-center justify-between gap-3 py-3 group">
-                          <div className="min-w-0">
-                            <p className="text-caption uppercase">{kpi.titulo}</p>
-                            <p className="text-lg font-semibold text-fg mt-1">{kpi.valor} <span className="text-sm font-normal text-fg-muted">{kpi.unidade}</span></p>
-                            <p className="text-caption mt-1 truncate">{kpi.variacao}</p>
-                          </div>
-                          <button
-                            onClick={() => handleDeleteKPI(kpi.id)}
-                            className="text-fg-subtle hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity flex-shrink-0"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => setShowAddKPIModal(true)}
-                      className="w-full bg-accent hover:bg-accent-strong text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
-                    >
-                      <Plus size={18} />
-                      Adicionar Novo KPI
-                    </button>
+              <div className="max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
+                <Panel className="max-w-md mx-auto mt-6">
+                  <PanelSection padding="lg" className="text-center">
+                    <Lock size={32} className="mx-auto mb-3 text-fg-subtle" />
+                    <h2 className="text-title">Acesso Restrito</h2>
+                    <p className="text-fg-muted text-sm mt-2">Esta área é restrita a administradores e proprietários.</p>
+                    <p className="text-caption mt-3">Perfil atual: {profile?.role ?? '—'}</p>
                   </PanelSection>
                 </Panel>
-
-                {/* Reset e Histórico de Inventários */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Reset de Inventário */}
-                  <Panel>
-                    <PanelSection padding="sm">
-                      <h3 className="text-title flex items-center gap-2">
-                        <RotateCcw size={16} className="text-fg-subtle" />
-                        Reset de Inventário
-                      </h3>
-                    </PanelSection>
-                    <PanelSection>
-                      <p className="text-sm text-fg-muted mb-4">
-                        Ao resetar, o inventário atual será arquivado com todos os dados de progresso, acuracidade e divergências.
-                        As contagens serão zeradas para iniciar um novo ciclo.
-                      </p>
-                      <div className="bg-amber-500/10 rounded-lg p-3 mb-4">
-                        <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">
-                          Os dados serão salvos permanentemente no histórico e poderão ser consultados a qualquer momento.
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setShowResetModal(true)}
-                        disabled={resetProgress}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-semibold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {resetProgress ? (
-                          <>
-                            <Loader2 size={18} className="animate-spin" />
-                            Arquivando...
-                          </>
-                        ) : (
-                          <>
-                            <Archive size={18} />
-                            Arquivar e Resetar Inventário
-                          </>
-                        )}
-                      </button>
-                    </PanelSection>
-                  </Panel>
-
-                  {/* Histórico de Inventários */}
-                  <Panel>
-                    <PanelSection padding="sm">
-                      <h3 className="text-title flex items-center gap-2">
-                        <History size={16} className="text-fg-subtle" />
-                        Histórico de Inventários
-                      </h3>
-                    </PanelSection>
-                    <PanelSection className="overflow-y-auto" style={{ maxHeight: '400px' }}>
-                      {snapshots.length === 0 ? (
-                        <p className="text-sm text-fg-subtle text-center py-4">
-                          Nenhum inventário arquivado ainda.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {snapshots.map((snapshot) => (
-                            <div
-                              key={snapshot.id}
-                              className="bg-surface-3 rounded-lg p-3 hover:bg-edge/60 transition cursor-pointer"
-                              onClick={() => handleViewSnapshot(snapshot)}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-semibold text-fg text-sm">{snapshot.name}</p>
-                                  <p className="text-caption mt-1">
-                                    {new Date(snapshot.end_date).toLocaleDateString('pt-BR', {
-                                      day: '2-digit',
-                                      month: 'long',
-                                      year: 'numeric'
-                                    })}
-                                  </p>
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewSnapshot(snapshot);
-                                    setShowHistoryModal(true);
-                                  }}
-                                  className="text-accent hover:text-accent-strong text-xs font-medium flex items-center gap-1"
-                                >
-                                  <Eye size={14} />
-                                  Ver
-                                </button>
-                              </div>
-                              <div className="flex gap-4 mt-2 text-xs text-fg-muted">
-                                <span>
-                                  Progresso: <span className="font-semibold text-fg">{snapshot.progress.toFixed(1)}%</span>
-                                </span>
-                                <span>
-                                  Acuracidade: <span className="font-semibold text-fg">{snapshot.accuracy.toFixed(1)}%</span>
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </PanelSection>
-                  </Panel>
-                </div>
               </div>
+            ) : (
+              <React.Suspense fallback={<PageLoader />}>
+                <AdminDashboardPage
+                  role={profile?.role}
+                  companyId={companyId ?? ''}
+                  companyName={company?.name ?? null}
+                  companyCreatedAt={company?.createdAt ?? null}
+                  userId={profile?.id ?? ''}
+                  userEmail={profile?.email ?? ''}
+                  globais={globais}
+                  customKPIs={customKPIs}
+                  onAddKPI={handleAddKPI}
+                  onDeleteKPI={handleDeleteKPI}
+                  snapshots={snapshots}
+                  onViewSnapshot={(snapshot) => { handleViewSnapshot(snapshot); setShowHistoryModal(true); }}
+                  onResetComplete={() => { loadSnapshots(); setBrandsData(prev => prev.map(b => ({ ...b, done_sku: 0, divergences: 0 }))); }}
+                  onAddInventoryLine={() => setShowAddBrandModal(true)}
+                />
+              </React.Suspense>
             )}
           </div>
         )}
@@ -2219,11 +1875,12 @@ function AppContent() {
         </div>
       )}
 
-      {/* MODAL ADICIONAR MARCA/LINHA */}
-      <Modal open={showAddBrandModal} onClose={() => setShowAddBrandModal(false)} title="Nova Linha/Marca" maxWidth="max-w-md">
+      {/* MODAL NOVA LINHA DE CONTAGEM (controle de progresso do inventário — não é
+          marca/linha de catálogo; essa vive em Produtos → Linhas e Marcas) */}
+      <Modal open={showAddBrandModal} onClose={() => setShowAddBrandModal(false)} title="Nova Linha de Contagem" maxWidth="max-w-md">
         <form onSubmit={handleAddBrand} className="space-y-4">
           <div>
-            <label className="block text-sm font-medium text-fg mb-1">Nome da Linha / Marca</label>
+            <label className="block text-sm font-medium text-fg mb-1">Nome da Linha (controle de inventário)</label>
             <input
               type="text" required value={newBrandName} onChange={e => setNewBrandName(e.target.value)}
               className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
@@ -2240,143 +1897,6 @@ function AppContent() {
           </div>
           <button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent-strong transition mt-2">
             Cadastrar Linha
-          </button>
-        </form>
-      </Modal>
-
-      {/* MODAL ADICIONAR KPI */}
-      <Modal open={showAddKPIModal} onClose={() => setShowAddKPIModal(false)} title="Novo KPI / Indicador" maxWidth="max-w-md">
-        <form onSubmit={handleAddKPI} className="space-y-4">
-          <div>
-            <label className="block text-sm font-medium text-fg mb-1">Título do KPI</label>
-            <input
-              type="text" required value={newKPI.titulo} onChange={e => setNewKPI({...newKPI, titulo: e.target.value})}
-              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
-              placeholder="Ex: Taxa de Aprovação"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">Valor</label>
-              <input
-                type="text" required value={newKPI.valor} onChange={e => setNewKPI({...newKPI, valor: e.target.value})}
-                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
-                placeholder="Ex: 95.5"
-              />
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">Unidade</label>
-              <input
-                type="text" value={newKPI.unidade} onChange={e => setNewKPI({...newKPI, unidade: e.target.value})}
-                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
-                placeholder="Ex: %"
-              />
-            </div>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-fg mb-1">Variação / Descrição</label>
-            <input
-              type="text" value={newKPI.variacao} onChange={e => setNewKPI({...newKPI, variacao: e.target.value})}
-              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
-              placeholder="Ex: +5% vs mês anterior"
-            />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">Tipo de Variação</label>
-              <select
-                value={newKPI.tipo_variacao}
-                onChange={e => setNewKPI({...newKPI, tipo_variacao: e.target.value as 'up' | 'down' | 'neutral'})}
-                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
-              >
-                <option value="up">Subiu (↑)</option>
-                <option value="down">Caiu (↓)</option>
-                <option value="neutral">Neutro</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-sm font-medium text-fg mb-1">Cor do Ícone</label>
-              <select
-                value={newKPI.cor_icone}
-                onChange={e => setNewKPI({...newKPI, cor_icone: e.target.value as 'blue' | 'red' | 'amber' | 'emerald'})}
-                className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
-              >
-                <option value="blue">Azul</option>
-                <option value="red">Vermelho</option>
-                <option value="amber">Âmbar</option>
-                <option value="emerald">Verde</option>
-              </select>
-            </div>
-          </div>
-          <button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent-strong transition mt-2 flex items-center justify-center gap-2">
-            <Plus size={18} />
-            Cadastrar KPI
-          </button>
-        </form>
-      </Modal>
-
-      {/* MODAL RESET DE INVENTÁRIO */}
-      <Modal open={showResetModal} onClose={() => setShowResetModal(false)} title="Arquivar e Resetar Inventário" maxWidth="max-w-md">
-        <form onSubmit={(e) => {
-          e.preventDefault();
-          const form = e.target as HTMLFormElement;
-          const formData = new FormData(form);
-          handleResetInventory(
-            formData.get('name') as string,
-            formData.get('notes') as string
-          );
-        }} className="space-y-4">
-          <div className="bg-red-500/10 rounded-lg p-3">
-            <p className="text-sm text-red-700 dark:text-red-400">
-              Esta ação irá arquivar o inventário atual com todos os dados e iniciar um novo ciclo.
-              <strong> Os dados das marcas serão mantidos, mas as contagens serão zeradas.</strong>
-            </p>
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-fg mb-1">Nome do Inventário Arquivado</label>
-            <input
-              type="text"
-              name="name"
-              required
-              defaultValue={`Inventário ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`}
-              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 bg-surface text-fg"
-              placeholder="Ex: Inventário Junho 2026"
-            />
-          </div>
-          <div>
-            <label className="block text-sm font-medium text-fg mb-1">Observações (opcional)</label>
-            <textarea
-              name="notes"
-              rows={3}
-              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-red-500/40 bg-surface text-fg resize-none"
-              placeholder="Ex: Inventário finalizado com sucesso..."
-            />
-          </div>
-          <div className="bg-surface-3 rounded-lg p-3">
-            <p className="text-xs text-fg-muted mb-2 font-medium">Resumo do Inventário Atual:</p>
-            <div className="grid grid-cols-2 gap-2 text-xs text-fg-muted">
-              <span>Total SKUs: <strong className="text-fg">{globais.totalSku}</strong></span>
-              <span>Contabilizados: <strong className="text-fg">{globais.totalDone}</strong></span>
-              <span>Divergências: <strong className="text-fg">{globais.totalDiv}</strong></span>
-              <span>Acuracidade: <strong className="text-fg">{globais.acuracidade.toFixed(1)}%</strong></span>
-            </div>
-          </div>
-          <button
-            type="submit"
-            disabled={resetProgress}
-            className="w-full bg-red-600 text-white font-semibold py-3 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
-          >
-            {resetProgress ? (
-              <>
-                <Loader2 size={18} className="animate-spin" />
-                Processando...
-              </>
-            ) : (
-              <>
-                <Archive size={18} />
-                Confirmar Arquivamento e Reset
-              </>
-            )}
           </button>
         </form>
       </Modal>

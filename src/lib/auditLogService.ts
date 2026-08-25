@@ -5,6 +5,8 @@ export type AuditAction =
   | 'logout'
   | 'products.import'
   | 'products.delete'
+  | 'sales_import.completed'
+  | 'sales_import.failed'
   | 'inventory.create'
   | 'inventory.reset'
   | 'inventory.count'

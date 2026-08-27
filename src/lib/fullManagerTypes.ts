@@ -72,11 +72,15 @@ export const STATUS_LABEL: Record<FullStatus, string> = {
   cancelled: 'Cancelado',
 };
 
+// Só as 5 cores semânticas do Badge (§5/§18) — "picking" e "checking" eram
+// laranja/roxo antes, cores fora da paleta aprovada usadas só para variar
+// visualmente entre 7 status, não por significado real. Os dois são etapas
+// de trabalho em andamento, mesmo registro que "scheduled" (accent).
 export const STATUS_COLOR: Record<FullStatus, string> = {
   scheduled: 'bg-accent/10 text-accent border-accent/20',
   preparing: 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/20',
-  picking: 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20',
-  checking: 'bg-purple-500/10 text-purple-700 dark:text-purple-400 border-purple-500/20',
+  picking: 'bg-accent/10 text-accent border-accent/20',
+  checking: 'bg-accent/10 text-accent border-accent/20',
   ready: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/20',
   completed: 'bg-surface-3 text-fg-muted border-edge',
   cancelled: 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/20',
@@ -85,8 +89,8 @@ export const STATUS_COLOR: Record<FullStatus, string> = {
 export const STATUS_DOT: Record<FullStatus, string> = {
   scheduled: 'bg-accent',
   preparing: 'bg-amber-500',
-  picking: 'bg-orange-500',
-  checking: 'bg-purple-500',
+  picking: 'bg-accent',
+  checking: 'bg-accent',
   ready: 'bg-emerald-500',
   completed: 'bg-fg-subtle',
   cancelled: 'bg-red-500',
@@ -102,10 +106,13 @@ export const ITEM_STATUS_LABEL: Record<FullItemStatus, string> = {
   picking_error: 'Erro',
 };
 
+// accent em vez de laranja (fora da paleta aprovada, §5/§23) — várias linhas
+// com status diferentes aparecem juntas numa lista de picking, então
+// insufficient_stock precisa continuar distinguível de no_location (âmbar).
 export const ITEM_STATUS_COLOR: Record<FullItemStatus, string> = {
   found: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
   no_location: 'bg-amber-500/10 text-amber-700 dark:text-amber-400',
-  insufficient_stock: 'bg-orange-500/10 text-orange-700 dark:text-orange-400',
+  insufficient_stock: 'bg-accent/10 text-accent',
   not_found: 'bg-red-500/10 text-red-700 dark:text-red-400',
   picked: 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400',
   skipped: 'bg-surface-3 text-fg-muted',

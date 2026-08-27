@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { AlertTriangle } from 'lucide-react';
-import { Panel, PanelSection, Badge, Button } from '../ui';
+import { Panel, PanelSection, Badge, Button, Stat, StatRow, StatCell } from '../ui';
 import { getCrossCheckData, approveCount } from '../../lib/auditCrossCheckService';
 import type { CountChain, CrossCheckSummary } from '../../lib/auditCrossCheckAlgorithm';
 
@@ -11,10 +11,10 @@ interface CrossCheckPanelProps {
   canEdit: boolean;
 }
 
-function reliabilityVariant(score: number): 'success' | 'warning' | 'danger' {
-  if (score >= 70) return 'success';
+function reliabilityTone(score: number): 'default' | 'warning' | 'critical' {
+  if (score >= 70) return 'default';
   if (score >= 40) return 'warning';
-  return 'danger';
+  return 'critical';
 }
 
 /** Rastreabilidade contagem→recontagem→aprovação: reconstrói as cadeias a partir de
@@ -50,14 +50,19 @@ export function CrossCheckPanel({ companyId, userId, userEmail, canEdit }: Cross
   return (
     <div className="space-y-4">
       <Panel>
-        <PanelSection padding="md" className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div><p className="text-xs text-fg-subtle">% Recontagens</p><p className="text-sm font-semibold text-fg">{summary.pctRecontagens.toFixed(0)}%</p></div>
-          <div><p className="text-xs text-fg-subtle">% Auditorias independentes</p><p className="text-sm font-semibold text-fg">{summary.pctAuditoriasIndependentes.toFixed(0)}%</p></div>
-          <div><p className="text-xs text-fg-subtle">% Aprovadas</p><p className="text-sm font-semibold text-fg">{summary.pctAprovadas.toFixed(0)}%</p></div>
-          <div>
-            <p className="text-xs text-fg-subtle">Índice de confiabilidade</p>
-            <Badge variant={reliabilityVariant(summary.reliabilityIndex)}>{summary.reliabilityIndex.toFixed(0)}/100</Badge>
-          </div>
+        <PanelSection padding="md">
+          <StatRow>
+            <StatCell><Stat label="% Recontagens" value={`${summary.pctRecontagens.toFixed(0)}%`} /></StatCell>
+            <StatCell><Stat label="% Auditorias independentes" value={`${summary.pctAuditoriasIndependentes.toFixed(0)}%`} /></StatCell>
+            <StatCell><Stat label="% Aprovadas" value={`${summary.pctAprovadas.toFixed(0)}%`} /></StatCell>
+            <StatCell>
+              <Stat
+                label="Índice de confiabilidade"
+                value={`${summary.reliabilityIndex.toFixed(0)}/100`}
+                valueTone={reliabilityTone(summary.reliabilityIndex)}
+              />
+            </StatCell>
+          </StatRow>
         </PanelSection>
       </Panel>
 

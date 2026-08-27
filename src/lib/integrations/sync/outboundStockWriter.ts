@@ -55,6 +55,10 @@ export interface ApprovedAdjustment {
    *  when absent — an approval timestamp is a real upper bound on how old the
    *  reading can be. */
   observed_at?: string | null;
+  /** Where the adjustment came from ('physical_count', 'reverse_logistics', ...).
+   *  Optional — only origins that need origin-specific side effects (alerting)
+   *  need to select it. */
+  origin?: string;
 }
 
 /** Why an adjustment could not become a write, before the guard even ran. */

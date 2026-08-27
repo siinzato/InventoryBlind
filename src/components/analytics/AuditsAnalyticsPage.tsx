@@ -70,9 +70,9 @@ export function AuditsAnalyticsPage({ companyId }: AuditsAnalyticsPageProps) {
                     <Tr key={s.id}>
                       <Td>{new Date(s.createdAt).toLocaleDateString('pt-BR')}</Td>
                       <Td>{s.countNumber === 1 ? '1ª contagem' : s.countNumber === 2 ? 'Recontagem' : '3ª contagem'}</Td>
-                      <Td>{s.skusContados} / {s.totalSku}</Td>
-                      <Td className={s.divergenciasReais > 0 ? 'text-amber-600 dark:text-amber-400' : undefined}>{s.divergenciasReais}</Td>
-                      <Td className="tabular-nums">{s.accuracy !== null ? `${s.accuracy.toFixed(1)}%` : '—'}</Td>
+                      <Td numeric>{s.skusContados} / {s.totalSku}</Td>
+                      <Td numeric className={s.divergenciasReais > 0 ? 'text-amber-600 dark:text-amber-400' : undefined}>{s.divergenciasReais}</Td>
+                      <Td numeric>{s.accuracy !== null ? `${s.accuracy.toFixed(1)}%` : '—'}</Td>
                       <Td>{s.operator ?? '—'}</Td>
                       <Td>{s.approved ? <Badge variant="success">Sim</Badge> : <Badge variant="neutral">Não</Badge>}</Td>
                     </Tr>
@@ -102,9 +102,9 @@ export function AuditsAnalyticsPage({ companyId }: AuditsAnalyticsPageProps) {
                     {data.worstSessions.map(s => (
                       <Tr key={s.id}>
                         <Td>{new Date(s.createdAt).toLocaleDateString('pt-BR')}</Td>
-                        <Td>{s.divergenciasReais}</Td>
-                        <Td>{s.skusContados}</Td>
-                        <Td className="tabular-nums text-amber-600 dark:text-amber-400">{((s.divergenciasReais / s.skusContados) * 100).toFixed(1)}%</Td>
+                        <Td numeric>{s.divergenciasReais}</Td>
+                        <Td numeric>{s.skusContados}</Td>
+                        <Td numeric className="text-amber-600 dark:text-amber-400">{((s.divergenciasReais / s.skusContados) * 100).toFixed(1)}%</Td>
                       </Tr>
                     ))}
                   </tbody>

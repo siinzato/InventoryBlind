@@ -13,8 +13,7 @@ import { buildOutputFilename } from '../../lib/pdfCenter/filenames';
 import { PdfCenterError } from '../../lib/pdfCenter/types';
 import type { PdfCenterPrefs } from '../../lib/pdfCenter/pdfCenterPrefs';
 import { ResultPreviewModal, type PreviewOutput } from './ResultPreviewModal';
-import { ToastStack } from './ToastStack';
-import { useToasts } from './useToasts';
+import { ToastStack, useToasts } from '../ui';
 
 interface QueuedImage {
   id: string;

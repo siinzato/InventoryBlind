@@ -25,12 +25,15 @@ interface MyDayViewProps {
 
 type IndicatorFilter = 'overdue' | 'due_soon' | 'blocked' | 'in_progress' | 'done_on_time' | 'today' | null;
 
-const INDICATOR_META: { key: Exclude<IndicatorFilter, null>; label: string; tone: string }[] = [
-  { key: 'overdue', label: 'Atrasadas', tone: 'text-red-600 dark:text-red-400' },
-  { key: 'due_soon', label: 'Vencem em breve', tone: 'text-amber-600 dark:text-amber-400' },
-  { key: 'blocked', label: 'Bloqueadas', tone: 'text-red-600 dark:text-red-400' },
-  { key: 'in_progress', label: 'Em execução', tone: 'text-accent' },
-  { key: 'done_on_time', label: 'Concluídas no prazo', tone: 'text-emerald-600 dark:text-emerald-400' },
+// `alertWhenPositive`: destaque (marcador discreto) só aparece quando o valor é > 0 —
+// zero nunca é colorido. "Em execução" e "No prazo" são sempre neutros (não são exceções
+// operacionais). Um único tom de alerta (âmbar) evita o "arco-íris semântico".
+const INDICATOR_META: { key: Exclude<IndicatorFilter, 'today' | null>; label: string; alertWhenPositive: boolean }[] = [
+  { key: 'overdue', label: 'Atrasadas', alertWhenPositive: true },
+  { key: 'due_soon', label: 'Vencem em breve', alertWhenPositive: true },
+  { key: 'blocked', label: 'Bloqueadas', alertWhenPositive: true },
+  { key: 'in_progress', label: 'Em execução', alertWhenPositive: false },
+  { key: 'done_on_time', label: 'No prazo', alertWhenPositive: false },
 ];
 
 export const MyDayView: React.FC<MyDayViewProps> = ({
@@ -83,20 +86,35 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
 
   return (
     <div className="space-y-4">
-      {/* Indicadores operacionais — todos clicáveis, filtram a listagem abaixo */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-        {INDICATOR_META.map(m => (
-          <button key={m.key} onClick={() => setFilter(f => (f === m.key ? null : m.key))}
-            className={`bg-surface-2 rounded-xl border p-3 text-center transition ${filter === m.key ? 'border-accent ring-1 ring-accent/40' : 'border-edge hover:border-accent/40'}`}>
-            <p className={`text-xl font-bold ${m.tone}`}>{indicators[m.key === 'due_soon' ? 'dueSoon' : m.key === 'in_progress' ? 'inProgress' : m.key === 'done_on_time' ? 'doneOnTime' : m.key]}</p>
-            <p className="text-xs text-fg-subtle">{m.label}</p>
+      {/* Indicadores operacionais — uma única faixa, todos clicáveis, filtram a listagem
+          abaixo. Uma faixa (não seis cards): um container, um radius discreto, divisores
+          internos fazem a separação em vez de fundo/borda por métrica. */}
+      <div className="rounded-lg border border-edge bg-surface-2 overflow-hidden">
+        <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 divide-x divide-y sm:divide-y-0 divide-edge">
+          {INDICATOR_META.map(m => {
+            const value = indicators[m.key === 'due_soon' ? 'dueSoon' : m.key === 'in_progress' ? 'inProgress' : m.key === 'done_on_time' ? 'doneOnTime' : m.key];
+            const alert = m.alertWhenPositive && value > 0;
+            return (
+              <button key={m.key} onClick={() => setFilter(f => (f === m.key ? null : m.key))}
+                className={`text-left px-4 py-3 transition-colors hover:bg-surface-3/50 ${filter === m.key ? 'bg-surface-3/70' : ''}`}>
+                <p className="text-label">{m.label}</p>
+                <p className="font-display text-xl font-semibold tabular-nums mt-1 text-fg flex items-center gap-1.5">
+                  {value}
+                  {alert && (
+                    <span className="w-1.5 h-1.5 rounded-full bg-amber-500 dark:bg-amber-400 flex-shrink-0" aria-hidden="true" />
+                  )}
+                  {alert && <span className="sr-only">— requer atenção</span>}
+                </p>
+              </button>
+            );
+          })}
+          <button onClick={() => setFilter(f => (f === 'today' ? null : 'today'))}
+            className={`text-left px-4 py-3 transition-colors hover:bg-surface-3/50 ${filter === 'today' ? 'bg-surface-3/70' : ''}`}>
+            <p className="text-label">Conclusão hoje</p>
+            <p className="font-display text-xl font-semibold tabular-nums mt-1 text-fg">{indicators.progressPct}%</p>
+            <p className="text-caption mt-0.5">{indicators.todayDone} de {indicators.todayTotal}</p>
           </button>
-        ))}
-        <button onClick={() => setFilter(f => (f === 'today' ? null : 'today'))}
-          className={`bg-surface-2 rounded-xl border p-3 text-center transition ${filter === 'today' ? 'border-accent ring-1 ring-accent/40' : 'border-edge hover:border-accent/40'}`}>
-          <p className="text-xl font-bold text-fg">{indicators.progressPct}%</p>
-          <p className="text-xs text-fg-subtle">{indicators.todayDone} de {indicators.todayTotal} hoje</p>
-        </button>
+        </div>
       </div>
 
       {filter ? (

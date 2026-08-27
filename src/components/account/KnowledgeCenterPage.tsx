@@ -3,7 +3,7 @@ import {
   Rocket, ClipboardList, ShieldCheck, BrainCircuit, Plug, GraduationCap, HelpCircle, Building2,
   Search, ChevronDown, ArrowRight, LayoutGrid, MapPin, ListChecks, ClipboardCheck, EyeOff, X,
 } from 'lucide-react';
-import { Panel, PanelSection, Badge } from '../ui';
+import { Page, PageHeader, Panel, PanelSection, Badge, Input } from '../ui';
 import { KB_CATEGORIES, PRODUCT_FAQ, ABOUT_CONTENT, type KbArticle } from '../../lib/knowledgeBaseContent';
 import { PILARES, KNOWLEDGE_FAQ, type KnowledgeEntry } from '../../lib/academyContent';
 
@@ -26,14 +26,6 @@ const SPECIAL_TILES: { id: SpecialTileId; label: string; description: string; ic
   { id: 'faq', label: 'Perguntas Frequentes', description: 'Respostas diretas para as dúvidas mais comuns.', icon: HelpCircle },
   { id: 'sobre', label: 'Sobre o InventoryBlind', description: 'Nossa visão, a metodologia e o problema que resolvemos.', icon: Building2 },
 ];
-
-function TileIconSquare({ Icon }: { Icon: typeof Rocket }) {
-  return (
-    <div className="w-10 h-10 rounded-xl bg-accent/10 text-accent flex items-center justify-center flex-shrink-0">
-      <Icon size={18} />
-    </div>
-  );
-}
 
 function ArticleRow({ article }: { article: KbArticle }) {
   return (
@@ -93,21 +85,19 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
   };
 
   return (
-    <div className="max-w-5xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
-      <div className="max-w-2xl">
-        <h1 className="text-2xl font-semibold text-fg tracking-tight">Central de Conhecimento InventoryBlind</h1>
-        <p className="text-sm text-fg-muted mt-2 leading-relaxed">
-          Aprenda a utilizar todos os recursos da plataforma, entenda metodologias de inventário inteligente e maximize a confiabilidade do seu estoque.
-        </p>
-      </div>
+    <Page>
+      <PageHeader
+        title="Central de Conhecimento InventoryBlind"
+        description="Aprenda a utilizar todos os recursos da plataforma, entenda metodologias de inventário inteligente e maximize a confiabilidade do seu estoque."
+      />
 
       <div className="relative max-w-xl">
-        <Search size={16} className="absolute left-3.5 top-1/2 -translate-y-1/2 text-fg-subtle pointer-events-none" />
-        <input
+        <Input
+          icon={<Search size={16} />}
           value={search}
           onChange={e => { setSearch(e.target.value); setActiveId(null); }}
           placeholder="Pesquisar dúvidas, tutoriais e recursos..."
-          className="w-full pl-10 pr-10 py-3 bg-surface-2 border border-edge rounded-xl text-sm text-fg placeholder-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40 focus:border-accent transition-colors"
+          className="pr-10"
         />
         {search && (
           <button onClick={() => setSearch('')} className="absolute right-3 top-1/2 -translate-y-1/2 text-fg-subtle hover:text-fg">
@@ -157,7 +147,7 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
                     active ? 'border-accent bg-accent/5' : 'border-edge bg-surface-2 hover:border-accent/40 hover:bg-surface-3'
                   }`}
                 >
-                  <TileIconSquare Icon={Icon} />
+                  <Icon size={20} className="text-accent" />
                   <div>
                     <p className="font-semibold text-fg text-sm">{cat.label}</p>
                     <p className="text-xs text-fg-muted mt-1 leading-relaxed">{cat.description}</p>
@@ -178,7 +168,7 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
                     active ? 'border-accent bg-accent/5' : 'border-edge bg-surface-2 hover:border-accent/40 hover:bg-surface-3'
                   }`}
                 >
-                  <TileIconSquare Icon={Icon} />
+                  <Icon size={20} className="text-accent" />
                   <div>
                     <p className="font-semibold text-fg text-sm">{tile.label}</p>
                     <p className="text-xs text-fg-muted mt-1 leading-relaxed">{tile.description}</p>
@@ -245,6 +235,6 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
           )}
         </>
       )}
-    </div>
+    </Page>
   );
 }

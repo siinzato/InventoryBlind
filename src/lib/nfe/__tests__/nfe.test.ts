@@ -169,6 +169,118 @@ describe('parseNfeXml', () => {
     expect(() => parseNfeXml('<root><foo/></root>')).toThrow(NfeParseError);
     expect(() => parseNfeXml('')).toThrow(NfeParseError);
   });
+
+  it('extracts finNFe (purposeCode) and the referenced original NF-e key (NFref/refNFe), used by Logística Reversa', () => {
+    const devolucaoNfe = `<?xml version="1.0"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe><infNFe Id="NFe35240112345678000190550010000000021000000021">
+    <ide>
+      <nNF>456</nNF><serie>1</serie><finNFe>4</finNFe>
+      <NFref><refNFe>35240112345678000190550010000000011000000010</refNFe></NFref>
+    </ide>
+    <emit><CNPJ>98765432000199</CNPJ><xNome>Cliente Devolvendo</xNome></emit>
+    <det nItem="1"><prod><cProd>ABC001</cProd><xProd>Caneta Azul</xProd><uCom>UN</uCom><qCom>2</qCom></prod></det>
+  </infNFe></NFe>
+</nfeProc>`;
+    const nfe = parseNfeXml(devolucaoNfe);
+    expect(nfe.purposeCode).toBe('4');
+    expect(nfe.referencedInvoiceKey).toBe('35240112345678000190550010000000011000000010');
+  });
+
+  it('purposeCode/referencedInvoiceKey são null quando a NF-e não referencia nenhuma nota original', () => {
+    const nfe = parseNfeXml(singleItemNfe);
+    expect(nfe.purposeCode).toBeNull();
+    expect(nfe.referencedInvoiceKey).toBeNull();
+  });
+
+  it('extrai destinatário (nome, CNPJ ou CPF) e informações complementares, quando presentes', () => {
+    const withDest = `<?xml version="1.0"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe><infNFe Id="NFe35240112345678000190550010000000031000000031">
+    <ide><nNF>789</nNF><serie>1</serie></ide>
+    <emit><CNPJ>12345678000190</CNPJ><xNome>Fornecedor Alpha</xNome></emit>
+    <dest><CNPJ>98765432000199</CNPJ><xNome>Cliente Devolvendo LTDA</xNome></dest>
+    <det nItem="1"><prod><cProd>ABC001</cProd><xProd>Caneta Azul</xProd><uCom>UN</uCom><qCom>2</qCom></prod></det>
+    <infAdic><infCpl>Devolução referente ao pedido 5521 — produto com defeito de fábrica.</infCpl></infAdic>
+  </infNFe></NFe>
+</nfeProc>`;
+    const nfe = parseNfeXml(withDest);
+    expect(nfe.destName).toBe('Cliente Devolvendo LTDA');
+    expect(nfe.destCnpj).toBe('98765432000199');
+    expect(nfe.destCpf).toBeNull();
+    expect(nfe.additionalInfo).toBe('Devolução referente ao pedido 5521 — produto com defeito de fábrica.');
+  });
+
+  it('destinatário pessoa física usa CPF em vez de CNPJ', () => {
+    const withCpfDest = `<?xml version="1.0"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNFe Id="NFe35240112345678000190550010000000041000000041">
+  <ide><nNF>111</nNF><serie>1</serie></ide>
+  <emit><CNPJ>12345678000190</CNPJ><xNome>Fornecedor Alpha</xNome></emit>
+  <dest><CPF>11122233344</CPF><xNome>Maria Consumidora</xNome></dest>
+  <det nItem="1"><prod><cProd>ABC001</cProd><xProd>Caneta Azul</xProd><uCom>UN</uCom><qCom>1</qCom></prod></det>
+</infNFe></NFe>`;
+    const nfe = parseNfeXml(withCpfDest);
+    expect(nfe.destName).toBe('Maria Consumidora');
+    expect(nfe.destCnpj).toBeNull();
+    expect(nfe.destCpf).toBe('11122233344');
+  });
+
+  it('destName/destCnpj/destCpf/additionalInfo são null quando a NF-e não os declara', () => {
+    const nfe = parseNfeXml(singleItemNfe);
+    expect(nfe.destName).toBeNull();
+    expect(nfe.destCnpj).toBeNull();
+    expect(nfe.destCpf).toBeNull();
+    expect(nfe.additionalInfo).toBeNull();
+  });
+
+  it('extrai o lote (rastro/nLote) do item quando presente, usando o primeiro lote informado', () => {
+    const withLote = `<?xml version="1.0"?>
+<NFe xmlns="http://www.portalfiscal.inf.br/nfe"><infNFe Id="NFe35240112345678000190550010000000051000000051">
+  <ide><nNF>222</nNF><serie>1</serie></ide>
+  <emit><CNPJ>12345678000190</CNPJ><xNome>Fornecedor Alpha</xNome></emit>
+  <det nItem="1"><prod>
+    <cProd>ABC001</cProd><xProd>Remédio X</xProd><uCom>CX</uCom><qCom>4</qCom>
+    <rastro><nLote>L2024-01</nLote><qLote>4</qLote></rastro>
+  </prod></det>
+</infNFe></NFe>`;
+    const nfe = parseNfeXml(withLote);
+    expect(nfe.items[0].lotNumber).toBe('L2024-01');
+  });
+
+  it('lotNumber é null quando o item não declara rastro', () => {
+    const nfe = parseNfeXml(singleItemNfe);
+    expect(nfe.items[0].lotNumber).toBeNull();
+  });
+
+  it('extrai evidências do intermediador (indIntermed, infIntermed/CNPJ, infIntermed/idCadIntTran) e xPed/nItemPed do item, usadas pelo resolvedor de canal de origem', () => {
+    const withIntermed = `<?xml version="1.0"?>
+<nfeProc xmlns="http://www.portalfiscal.inf.br/nfe">
+  <NFe><infNFe Id="NFe35240112345678000190550010000000061000000061">
+    <ide><nNF>333</nNF><serie>1</serie><indIntermed>1</indIntermed></ide>
+    <emit><CNPJ>12345678000190</CNPJ><xNome>Fornecedor Alpha</xNome></emit>
+    <det nItem="1"><prod>
+      <cProd>ABC001</cProd><xProd>Caneta Azul</xProd><uCom>UN</uCom><qCom>1</qCom>
+      <xPed>2000001234567890</xPed><nItemPed>1</nItemPed>
+    </prod></det>
+    <infIntermed><CNPJ>03007331000141</CNPJ><idCadIntTran>GOCASE123</idCadIntTran></infIntermed>
+  </infNFe></NFe>
+</nfeProc>`;
+    const nfe = parseNfeXml(withIntermed);
+    expect(nfe.indIntermed).toBe('1');
+    expect(nfe.intermediaryCnpj).toBe('03007331000141');
+    expect(nfe.intermediaryIdCadIntTran).toBe('GOCASE123');
+    expect(nfe.items[0].externalOrderRef).toBe('2000001234567890');
+    expect(nfe.items[0].externalOrderItemRef).toBe('1');
+  });
+
+  it('indIntermed/intermediaryCnpj/intermediaryIdCadIntTran/externalOrderRef são null quando a NF-e não declara intermediador (a maioria não declara)', () => {
+    const nfe = parseNfeXml(singleItemNfe);
+    expect(nfe.indIntermed).toBeNull();
+    expect(nfe.intermediaryCnpj).toBeNull();
+    expect(nfe.intermediaryIdCadIntTran).toBeNull();
+    expect(nfe.items[0].externalOrderRef).toBeNull();
+    expect(nfe.items[0].externalOrderItemRef).toBeNull();
+  });
 });
 
 // ── Association priority ─────────────────────────────────────────────────────

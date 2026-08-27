@@ -111,7 +111,7 @@ export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) 
     <div className="min-h-screen bg-surface">
       <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition text-sm font-medium">
+          <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-control transition text-sm font-medium">
             <ArrowLeft size={16} /><span className="hidden sm:inline">Voltar</span>
           </button>
           <span className="text-sm font-semibold text-fg">InventoryFull</span>
@@ -155,9 +155,9 @@ export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) 
         <Panel>
           <PanelSection padding="lg">
             <p className="text-section mb-4">Como funciona</p>
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
               {HOW_IT_WORKS.map((step, i) => (
-                <div key={step.title} className="p-4 rounded-container border border-edge bg-surface-2">
+                <div key={step.title}>
                   <span className="text-caption font-semibold text-accent">Passo {i + 1}</span>
                   <p className="text-sm font-semibold text-fg mt-1">{step.title}</p>
                   <p className="text-sm text-fg-muted mt-1">{step.description}</p>
@@ -174,9 +174,7 @@ export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) 
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               {BENEFITS.map(b => (
                 <div key={b.title} className="flex items-start gap-3">
-                  <span className="flex-shrink-0 w-9 h-9 rounded-control bg-accent/10 text-accent flex items-center justify-center">
-                    <b.icon size={17} />
-                  </span>
+                  <b.icon size={18} className="flex-shrink-0 mt-0.5 text-accent" />
                   <div>
                     <p className="text-sm font-semibold text-fg">{b.title}</p>
                     <p className="text-sm text-fg-muted mt-0.5">{b.description}</p>

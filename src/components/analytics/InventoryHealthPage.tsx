@@ -109,7 +109,7 @@ export function InventoryHealthPage({ companyId }: InventoryHealthPageProps) {
                 <Thead><Tr><Th>SKU</Th><Th>Ocorrências</Th></Tr></Thead>
                 <tbody>
                   {drill.rows.slice(0, 100).map(r => (
-                    <Tr key={r.key}><Td className="font-mono text-xs">{r.label}</Td><Td>{r.count}</Td></Tr>
+                    <Tr key={r.key}><Td numeric>{r.label}</Td><Td numeric>{r.count}</Td></Tr>
                   ))}
                 </tbody>
               </Table>
@@ -126,10 +126,10 @@ export function InventoryHealthPage({ companyId }: InventoryHealthPageProps) {
                 <tbody>
                   {drill.rows.map(r => (
                     <Tr key={r.product_id}>
-                      <Td className="font-mono text-xs">{r.product_sku}</Td>
+                      <Td numeric>{r.product_sku}</Td>
                       <Td className="truncate max-w-[220px]">{r.product_name}</Td>
                       <Td>{r.abc_xyz_class}</Td>
-                      <Td className="tabular-nums">{r.value_moved.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</Td>
+                      <Td numeric>{r.value_moved.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' })}</Td>
                     </Tr>
                   ))}
                 </tbody>

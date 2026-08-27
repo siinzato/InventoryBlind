@@ -12,7 +12,7 @@ import {
 import { supabase } from '../lib/supabase';
 import type { ImportHistoryRecord } from '../lib/productImportTypes';
 import { formatDateTime, formatFileSize, downloadFile } from '../lib/productImportUtils';
-import { Panel, PanelSection, Badge, Button } from './ui';
+import { Page, PageHeader, Panel, PanelSection, Badge, Button } from './ui';
 
 interface ImportHistoryPageProps {
   onBack: () => void;
@@ -77,27 +77,17 @@ export const ImportHistoryPage: React.FC<ImportHistoryPageProps> = ({
   };
 
   return (
-    <div className="min-h-screen bg-surface p-6 md:p-8">
-      {/* Header */}
-      <div className="mb-8">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-fg-muted hover:text-fg transition mb-4"
-        >
-          <ArrowLeft size={20} />
-          Voltar
-        </button>
-
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-accent rounded-xl">
-            <History size={28} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-title">Historico de Importacoes</h1>
-            <p className="text-fg-muted">{history.length} importacoes realizadas</p>
-          </div>
-        </div>
-      </div>
+    <Page>
+      <PageHeader
+        title="Histórico de Importações"
+        description={`${history.length} importações realizadas`}
+        actions={
+          <Button variant="ghost" onClick={onBack}>
+            <ArrowLeft size={16} />
+            Voltar
+          </Button>
+        }
+      />
 
       {/* History List */}
       <Panel>
@@ -190,6 +180,6 @@ export const ImportHistoryPage: React.FC<ImportHistoryPageProps> = ({
           ))
         )}
       </Panel>
-    </div>
+    </Page>
   );
 };

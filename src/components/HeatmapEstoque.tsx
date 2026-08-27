@@ -18,7 +18,7 @@ import { HeatmapLegend } from './HeatmapLegend';
 import { HeatmapCard } from './HeatmapCard';
 import { HeatmapDetailsModal } from './HeatmapDetailsModal';
 import { HeatmapStatsComponent } from './HeatmapStats';
-import { Badge, Button, Card } from './ui';
+import { Badge, Button, Card, Panel, PanelSection } from './ui';
 
 interface HeatmapEstoqueProps {
   brandsData: Array<{
@@ -257,43 +257,40 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
       {/* Stats Summary */}
       <HeatmapStatsComponent stats={stats} />
 
-      {/* Top Critical Areas Alert */}
+      {/* Top Critical Areas Alert — o texto e o score de cada área já
+          comunicam a gravidade; não precisa de ícone gigante nem de fundo
+          colorido cobrindo o painel inteiro (§3/§7). */}
       {topCriticalAreas.length > 0 && topCriticalAreas[0] && calculateRiskScore(topCriticalAreas[0]) >= 60 && (
-        <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-4 mb-6">
-          <div className="flex items-center gap-3 mb-3">
-            <div className="p-2 bg-red-500/10 rounded-lg">
-              <AlertTriangle size={20} className="text-red-600 dark:text-red-400" />
+        <Panel className="mb-6">
+          <PanelSection>
+            <div className="flex items-center gap-2 mb-3">
+              <AlertTriangle size={14} className="text-fg-subtle" />
+              <div>
+                <h4 className="text-section">Top 5 áreas mais críticas</h4>
+                <p className="text-xs text-fg-subtle">Requerem atenção imediata</p>
+              </div>
             </div>
-            <div>
-              <h4 className="font-bold text-red-700 dark:text-red-400">Top 5 Áreas Mais Críticas</h4>
-              <p className="text-sm text-red-600 dark:text-red-400">Requerem atenção imediata</p>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
+              {topCriticalAreas.slice(0, 5).map((area, idx) => {
+                const score = calculateRiskScore(area);
+                return (
+                  <button
+                    key={area.id}
+                    onClick={() => handleAreaClick(area)}
+                    className="rounded-control p-3 text-left border border-edge hover:bg-surface-3/40 transition"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-xs text-fg-subtle">#{idx + 1}</span>
+                      <Badge variant={score >= 81 ? 'danger' : 'warning'}>{score}</Badge>
+                    </div>
+                    <p className="font-medium text-fg text-sm truncate">{area.nome}</p>
+                    <p className="text-xs text-fg-subtle">{area.divergencias} div.</p>
+                  </button>
+                );
+              })}
             </div>
-          </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-2">
-            {topCriticalAreas.slice(0, 5).map((area, idx) => {
-              const score = calculateRiskScore(area);
-              return (
-                <button
-                  key={area.id}
-                  onClick={() => handleAreaClick(area)}
-                  className="bg-surface-2 rounded-lg p-3 text-left border border-red-500/20 hover:border-red-500/40 transition"
-                >
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-xs text-fg-subtle">#{idx + 1}</span>
-                    <span className={`text-xs font-bold px-2 py-0.5 rounded ${
-                      score >= 81 ? 'bg-red-600 text-white' :
-                      score >= 61 ? 'bg-orange-500 text-white' : 'bg-amber-500 text-white'
-                    }`}>
-                      {score}
-                    </span>
-                  </div>
-                  <p className="font-medium text-fg text-sm truncate">{area.nome}</p>
-                  <p className="text-xs text-fg-subtle">{area.divergencias} div.</p>
-                </button>
-              );
-            })}
-          </div>
-        </div>
+          </PanelSection>
+        </Panel>
       )}
 
       {/* Filters */}
@@ -347,13 +344,11 @@ GERADO EM: ${new Date().toLocaleString('pt-BR')}
         </div>
       ) : (
         <div className="space-y-3">
-          <div className="bg-orange-500/10 border-2 border-orange-500/20 rounded-xl p-4 mb-4">
-            <div className="flex items-center gap-2">
-              <BarChart3 size={20} className="text-orange-600 dark:text-orange-400" />
-              <div>
-                <h4 className="font-bold text-orange-700 dark:text-orange-400">Ranking por Score de Risco</h4>
-                <p className="text-sm text-orange-600 dark:text-orange-400">Top 10 áreas com maior risco</p>
-              </div>
+          <div className="flex items-center gap-2 mb-4">
+            <BarChart3 size={16} className="text-fg-subtle" />
+            <div>
+              <h4 className="text-section">Ranking por Score de Risco</h4>
+              <p className="text-xs text-fg-subtle">Top 10 áreas com maior risco</p>
             </div>
           </div>
           {topCriticalAreas.map((area, index) => (

@@ -86,6 +86,9 @@ export function parseNfeXml(xml: string): ParsedNfe {
 
   const ide = infNFe.ide ?? {};
   const emit = infNFe.emit ?? {};
+  const dest = infNFe.dest ?? {};
+  const infAdic = infNFe.infAdic ?? {};
+  const infIntermed = infNFe.infIntermed ?? {};
 
   const detRaw = toArray(infNFe.det);
   if (detRaw.length === 0) {
@@ -97,6 +100,10 @@ export function parseNfeXml(xml: string): ParsedNfe {
     const prod = det?.prod;
     if (!prod) return;
     const ean = resolveItemEan(prod.cEAN, prod.cEANTrib);
+    // rastro pode ser objeto único ou array (vários lotes do mesmo item) — usa o
+    // primeiro. A maioria dos itens não declara rastro; nesse caso fica null.
+    const rastroList = toArray(prod.rastro);
+    const lotNumber = asString((rastroList[0] as { nLote?: unknown } | undefined)?.nLote);
     items.push({
       lineNumber: Number(asString(det['@_nItem']) ?? idx + 1),
       nfeCode: asString(prod.cProd) ?? '',
@@ -107,12 +114,22 @@ export function parseNfeXml(xml: string): ParsedNfe {
       totalValue: asNumber(prod.vProd),
       ean: ean.original,
       eanNormalized: ean.normalized,
+      lotNumber,
+      externalOrderRef: asString(prod.xPed),
+      externalOrderItemRef: asString(prod.nItemPed),
     });
   });
 
   if (items.length === 0) {
     throw new NfeParseError('Nenhum item com dados de produto (prod) foi encontrado na NF-e.');
   }
+
+  // NFref pode aparecer como objeto único ou array (múltiplas notas referenciadas);
+  // usa a primeira refNFe encontrada — é a chave da nota original de uma devolução.
+  const nfRefList = toArray(ide.NFref);
+  const referencedInvoiceKey = nfRefList
+    .map((r: unknown) => asString((r as { refNFe?: unknown } | null)?.refNFe))
+    .find((k): k is string => !!k) ?? null;
 
   return {
     invoiceKey,
@@ -121,6 +138,15 @@ export function parseNfeXml(xml: string): ParsedNfe {
     issueDate: asString(ide.dhEmi) ?? asString(ide.dEmi),
     supplierName: asString(emit.xNome),
     supplierCnpj: asString(emit.CNPJ),
+    destName: asString(dest.xNome),
+    destCnpj: asString(dest.CNPJ),
+    destCpf: asString(dest.CPF),
+    additionalInfo: asString(infAdic.infCpl),
     items,
+    purposeCode: asString(ide.finNFe),
+    referencedInvoiceKey,
+    indIntermed: asString(ide.indIntermed),
+    intermediaryCnpj: asString(infIntermed.CNPJ),
+    intermediaryIdCadIntTran: asString(infIntermed.idCadIntTran),
   };
 }

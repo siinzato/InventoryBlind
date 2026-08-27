@@ -19,7 +19,7 @@ import { supabase } from '../lib/supabase';
 import type { ProductFromDB } from '../lib/productImportTypes';
 import type { ProductConfidenceScore, ProductRiskScore, ProductAbcXyzClassification } from '../lib/supabase';
 import { formatPrice, formatDateTime, downloadFile, exportProductsToCSV } from '../lib/productImportUtils';
-import { Panel, PanelSection, Button, Table, Tr, Td } from './ui';
+import { Page, PageHeader, Panel, PanelSection, Button, Table, Thead, Tr, Th, Td } from './ui';
 import { useAuth } from '../lib/auth';
 import { getConfidenceForProducts } from '../lib/cbcService';
 import { getRiskForProducts } from '../lib/riskService';
@@ -263,41 +263,28 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
   const totalPages = Math.ceil(totalProducts / pageSize);
 
   return (
-    <div className="min-h-screen bg-surface p-6 md:p-8">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-8">
-        <div>
-          <button
-            onClick={onBackToBrands ?? onBack}
-            className="flex items-center gap-2 text-fg-muted hover:text-fg transition mb-4"
-          >
-            <ArrowLeft size={20} />
-            {onBackToBrands ? 'Voltar para Linhas e Marcas' : 'Voltar'}
-          </button>
-
-          <div className="flex items-center gap-3">
-            <div className="p-3 bg-accent rounded-xl">
-              <Package size={28} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-title">{brandFilter?.contextTitle ?? 'Produtos Importados'}</h1>
-              <p className="text-fg-muted">{totalProducts} produtos cadastrados</p>
-            </div>
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2">
-          {isAdmin && selectedIds.size > 0 && (
-            <Button variant="secondary" onClick={() => setShowAssignModal(true)}>
-              <Tag size={16} /> Alterar marca/linha ({selectedIds.size})
+    <Page>
+      <PageHeader
+        title={brandFilter?.contextTitle ?? 'Produtos Importados'}
+        description={`${totalProducts} produtos cadastrados`}
+        actions={
+          <>
+            <Button variant="ghost" onClick={onBackToBrands ?? onBack}>
+              <ArrowLeft size={16} />
+              {onBackToBrands ? 'Voltar para Linhas e Marcas' : 'Voltar'}
             </Button>
-          )}
-          <Button variant="secondary" onClick={handleExport}>
-            <Download size={16} />
-            Exportar CSV
-          </Button>
-        </div>
-      </div>
+            {isAdmin && selectedIds.size > 0 && (
+              <Button variant="secondary" onClick={() => setShowAssignModal(true)}>
+                <Tag size={16} /> Alterar marca/linha ({selectedIds.size})
+              </Button>
+            )}
+            <Button variant="secondary" onClick={handleExport}>
+              <Download size={16} />
+              Exportar CSV
+            </Button>
+          </>
+        }
+      />
 
       {/* Search + Products */}
       <Panel>
@@ -349,31 +336,31 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
           <>
             <div className="overflow-x-auto border-t border-edge">
               <Table>
-                <thead>
-                  <tr className="border-b border-edge">
+                <Thead>
+                  <Tr>
                     {isAdmin && (
-                      <th className="px-4 py-3 w-8">
+                      <Th className="w-8">
                         <input
                           type="checkbox"
                           checked={products.length > 0 && selectedIds.size === products.length}
                           onChange={(e) => setSelectedIds(e.target.checked ? new Set(products.map(p => p.id)) : new Set())}
                         />
-                      </th>
+                      </Th>
                     )}
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Nome</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">SKU</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">EAN</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Marca</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Linha</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Local</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Preco</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Confiança</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Risco</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">ABC/XYZ</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Atualizado</th>
-                    <th className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase tracking-wide">Acoes</th>
-                  </tr>
-                </thead>
+                    <Th>Nome</Th>
+                    <Th className="text-right">SKU</Th>
+                    <Th>EAN</Th>
+                    <Th>Marca</Th>
+                    <Th>Linha</Th>
+                    <Th>Local</Th>
+                    <Th className="text-right">Preço</Th>
+                    <Th>Confiança</Th>
+                    <Th>Risco</Th>
+                    <Th>ABC/XYZ</Th>
+                    <Th>Atualizado</Th>
+                    <Th>Ações</Th>
+                  </Tr>
+                </Thead>
                 <tbody>
                   {products.map((product) => {
                     const association = associationByProduct.get(product.id);
@@ -404,16 +391,16 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
                           <span className="text-fg">{product.name}</span>
                         )}
                       </Td>
-                      <Td>
+                      <Td numeric>
                         {editingId === product.id ? (
                           <input
                             type="text"
                             value={editData.sku || ''}
                             onChange={(e) => setEditData({ ...editData, sku: e.target.value })}
-                            className="w-full px-2 py-1 bg-surface-3 border border-edge rounded text-sm font-mono text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
+                            className="w-full px-2 py-1 bg-surface-3 border border-edge rounded text-sm font-mono text-fg text-right focus:outline-none focus:ring-2 focus:ring-accent/40"
                           />
                         ) : (
-                          <span className="font-mono text-fg">{product.sku}</span>
+                          product.sku
                         )}
                       </Td>
                       <Td>
@@ -447,17 +434,17 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
                           <span className="text-fg-muted">{product.location || '-'}</span>
                         )}
                       </Td>
-                      <Td>
+                      <Td numeric>
                         {editingId === product.id ? (
                           <input
                             type="number"
                             step="0.01"
                             value={editData.price || ''}
                             onChange={(e) => setEditData({ ...editData, price: e.target.value ? parseFloat(e.target.value) : null })}
-                            className="w-20 px-2 py-1 bg-surface-3 border border-edge rounded text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40"
+                            className="w-20 px-2 py-1 bg-surface-3 border border-edge rounded text-sm text-fg text-right focus:outline-none focus:ring-2 focus:ring-accent/40"
                           />
                         ) : (
-                          <span className="text-fg">{formatPrice(product.price)}</span>
+                          formatPrice(product.price)
                         )}
                       </Td>
                       <Td>
@@ -595,6 +582,6 @@ export const ImportedProductsPage: React.FC<ImportedProductsPageProps> = ({
           onSaved={() => { setShowAssignModal(false); loadProducts(); }}
         />
       )}
-    </div>
+    </Page>
   );
 };

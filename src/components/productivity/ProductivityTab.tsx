@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { User, Users } from 'lucide-react';
-import { Page, PageHeader, Panel, PanelSection } from '../ui';
+import { Page, PageHeader, Panel, PanelSection, SegmentedControl } from '../ui';
 import { UserProductivityStats } from '../../lib/supabase';
 import { getMyProductivity, computeCompetencyLevels } from '../../lib/productivityService';
 import { getAchievementProgress, checkAndUnlockAchievements } from '../../lib/achievementService';
@@ -60,20 +60,15 @@ export function ProductivityTab({ userId, userEmail, companyId, role }: Producti
       <PageHeader title="Produtividade" description="Acompanhe sua evolução, conquistas e desempenho." />
 
       {canViewTeam && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => setMode('mine')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${mode === 'mine' ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'}`}
-          >
-            <User size={16} /> Minha Produtividade
-          </button>
-          <button
-            onClick={() => setMode('team')}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg text-sm font-medium border transition-colors ${mode === 'team' ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge'}`}
-          >
-            <Users size={16} /> Visão de Gestor
-          </button>
-        </div>
+        <SegmentedControl
+          label="Visão de produtividade"
+          value={mode}
+          onChange={setMode}
+          options={[
+            { value: 'mine', label: 'Minha Produtividade', icon: User },
+            { value: 'team', label: 'Visão de Gestor', icon: Users },
+          ]}
+        />
       )}
 
       {mode === 'team' && canViewTeam ? (

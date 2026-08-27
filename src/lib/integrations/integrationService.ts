@@ -29,6 +29,7 @@ import type {
 // table this client cannot read.
 const CONNECTION_COLUMNS = `
   id, company_id, provider_key, display_name, external_account_id, status,
+  fiscal_entity_id,
   configuration, sync_direction, stock_source_of_truth, auto_sync_enabled,
   sync_interval_minutes, sync_cursor, credentials_set_at, credential_hint,
   last_sync_at, last_successful_sync_at, last_error, last_error_at,
@@ -42,6 +43,7 @@ interface ConnectionRow {
   display_name: string;
   external_account_id: string | null;
   status: ConnectionStatus;
+  fiscal_entity_id: string | null;
   configuration: Record<string, unknown> | null;
   sync_direction: SyncDirection;
   stock_source_of_truth: boolean;
@@ -66,6 +68,7 @@ function toConnection(row: ConnectionRow): IntegrationConnection {
     displayName: row.display_name,
     externalAccountId: row.external_account_id,
     status: row.status,
+    fiscalEntityId: row.fiscal_entity_id,
     configuration: row.configuration ?? {},
     syncDirection: row.sync_direction,
     stockSourceOfTruth: row.stock_source_of_truth,
@@ -160,6 +163,11 @@ export interface UpdateConnectionInput {
   stockSourceOfTruth?: boolean;
   autoSyncEnabled?: boolean;
   syncIntervalMinutes?: number | null;
+  fiscalEntityId?: string | null;
+  /** Identificador da conta no provedor (ex.: idCadIntTran de um vendedor
+   *  Mercado Livre). Gravado manualmente pelo admin ou memorizado quando o
+   *  usuário confirma o canal de origem de uma devolução — nunca inventado. */
+  externalAccountId?: string | null;
   configuration?: Record<string, unknown>;
 }
 
@@ -174,6 +182,8 @@ export async function updateConnection(
   if (input.stockSourceOfTruth !== undefined) patch.stock_source_of_truth = input.stockSourceOfTruth;
   if (input.autoSyncEnabled !== undefined) patch.auto_sync_enabled = input.autoSyncEnabled;
   if (input.syncIntervalMinutes !== undefined) patch.sync_interval_minutes = input.syncIntervalMinutes;
+  if (input.fiscalEntityId !== undefined) patch.fiscal_entity_id = input.fiscalEntityId;
+  if (input.externalAccountId !== undefined) patch.external_account_id = input.externalAccountId;
   if (input.configuration !== undefined) patch.configuration = input.configuration;
 
   const { data, error } = await supabase

@@ -48,10 +48,12 @@ function StatGrid({ items }: { items: StatItem[] }) {
 }
 
 export const HeatmapStatsComponent: React.FC<HeatmapStatsProps> = ({ stats }) => {
+  // Mesma escala de 4 cores de getRiskLevelColor (heatmapUtils.ts) — sem
+  // laranja, fora da paleta aprovada (§5/§23).
   const riskColor =
     stats.mediaGeracaoRisco >= 60 ? 'text-red-700 dark:text-red-400' :
-    stats.mediaGeracaoRisco >= 40 ? 'text-orange-700 dark:text-orange-400' :
-    stats.mediaGeracaoRisco >= 20 ? 'text-amber-700 dark:text-amber-400' :
+    stats.mediaGeracaoRisco >= 40 ? 'text-amber-700 dark:text-amber-400' :
+    stats.mediaGeracaoRisco >= 20 ? 'text-accent' :
     'text-emerald-700 dark:text-emerald-400';
 
   const accuracyColor =
@@ -85,7 +87,7 @@ export const HeatmapStatsComponent: React.FC<HeatmapStatsProps> = ({ stats }) =>
       value: stats.maiorPontoRisco || 'Nenhum',
       subtitle: 'Ponto crítico atual',
       icon: TrendingDown,
-      valueClassName: 'text-orange-700 dark:text-orange-400',
+      valueClassName: 'text-amber-700 dark:text-amber-400',
       isText: true,
     },
   ];

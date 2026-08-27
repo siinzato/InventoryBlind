@@ -9,7 +9,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, Check, Loader2, RotateCcw } from 'lucide-react';
-import { Badge, Button, Page, PageHeader, Panel, PanelSection } from '../ui';
+import { Badge, Button, Notice, Page, PageHeader, Panel, PanelSection } from '../ui';
 import { WHATSAPP_PLANS_URL } from '../landing/landingUi';
 import {
   DIAGNOSTIC_STEPS,
@@ -311,10 +311,10 @@ function ResultView({
       />
 
       {saveFailed && (
-        <div className="rounded-container border border-amber-500/30 bg-amber-500/5 px-4 py-3 text-sm text-amber-700 dark:text-amber-400">
+        <Notice tone="warning">
           Não foi possível salvar as respostas agora. A recomendação abaixo continua
           válida, e você pode refazer o diagnóstico depois.
-        </div>
+        </Notice>
       )}
 
       <Panel>

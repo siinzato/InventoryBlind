@@ -24,9 +24,10 @@ import { jsPDF } from 'jspdf';
 import {
   ArrowLeft, Search, Printer, Download, Tag, Package,
   AlertTriangle, X, CheckSquare, Square, RefreshCw, Layers,
-  CheckCircle2, AlertCircle, RotateCcw,
+  CheckCircle2, RotateCcw,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ToastStack, useToasts } from './ui';
 import ShelfLabel100x40, {
   SHELF_FONT_DEFAULTS,
 } from './ShelfLabel100x40';
@@ -39,11 +40,7 @@ import type { ExcessFontSettings } from './ExcessLabel100x150';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type LabelType = 'shelf' | 'excess';
-type ToastType = 'success' | 'error' | 'info';
-interface Toast { id: number; message: string; type: ToastType }
 interface DbProduct extends LabelProduct { id: string; price: number | null }
-
-let _tid = 0;
 
 // ── localStorage persistence ─────────────────────────────────────────────────
 
@@ -238,7 +235,7 @@ interface LabelGeneratorPageProps {
 
 export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }) => {
   const [mode, setMode] = useState<'single' | 'batch'>('single');
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const { toasts, toast } = useToasts();
 
   // Font settings — loaded from localStorage on mount
   const [shelfFonts, setShelfFonts] = useState<ShelfFontSettings>(SHELF_FONT_DEFAULTS);
@@ -278,12 +275,6 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
   useEffect(() => { savePrefs(shelfFonts, excessFonts); }, [shelfFonts, excessFonts]);
 
   // ── Helpers ───────────────────────────────────────────────────────────
-  const toast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = ++_tid;
-    setToasts(p => [...p, { id, message, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4500);
-  }, []);
-
   const updateShelf = (key: keyof ShelfFontSettings, val: number) =>
     setShelfFonts(f => ({ ...f, [key]: val }));
 
@@ -454,16 +445,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
         </div>
       )}
 
-      {/* TOASTS */}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
-        {toasts.map(t => (
-          <div key={t.id} className={`flex items-center gap-2 px-4 py-3 rounded-container shadow-panel text-sm font-semibold max-w-xs pointer-events-auto ${
-            t.type === 'success' ? 'bg-emerald-600 text-white' : t.type === 'error' ? 'bg-red-600 text-white' : 'bg-surface-2 text-fg border border-edge'}`}>
-            {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : null}
-            {t.message}
-          </div>
-        ))}
-      </div>
+      <ToastStack toasts={toasts} />
 
       {/* HEADER */}
       <div className="sticky top-0 z-50 bg-surface border-b border-edge">
@@ -542,13 +524,13 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                     </h2>
                     <button onClick={handleClear} className="text-fg-subtle hover:text-fg-muted"><X size={16} /></button>
                   </div>
-                  <div className="p-2.5 bg-surface-3 rounded-lg mb-2">
+                  <div className="mb-3">
                     <p className="text-xs text-fg-subtle font-semibold uppercase mb-0.5">Nome</p>
                     <p className="font-bold text-fg text-sm">{product.name}</p>
                   </div>
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-edge">
                     {[['SKU', product.sku], ['EAN', product.ean || '—'], ['Local', product.location || '—']].map(([l, v]) => (
-                      <div key={l} className="p-2.5 bg-surface-3 rounded-lg min-w-0">
+                      <div key={l} className="min-w-0">
                         <p className="text-xs text-fg-subtle font-semibold uppercase mb-0.5">{l}</p>
                         <p className="font-mono font-bold text-fg text-xs truncate">{v}</p>
                       </div>

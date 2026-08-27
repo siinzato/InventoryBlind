@@ -15,7 +15,6 @@ import {
   AlertOctagon,
   FileDown,
   RefreshCcw,
-  Flag,
   Activity,
 } from 'lucide-react';
 import type { HeatmapArea, LocalFisico } from '../lib/heatmapTypes';
@@ -28,7 +27,6 @@ import {
   calculateRiskScore,
   getRiskLevel,
   getRiskLevelLabel,
-  getRiskLevelColor,
   generateDiagnosis,
 } from '../lib/heatmapUtils';
 import { Modal, Panel, PanelSection, Badge } from './ui';
@@ -69,7 +67,6 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
   const riskScore = calculateRiskScore(area);
   const riskLevel = getRiskLevel(riskScore);
   const riskLabel = getRiskLevelLabel(riskLevel);
-  const riskColorClass = getRiskLevelColor(riskLevel);
   const diagnosis = useMemo(() => generateDiagnosis(area), [area]);
 
   const handleStartEdit = () => {
@@ -147,44 +144,35 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
         )}
       </div>
 
-      {/* Risk Score Section */}
+      {/* Risk Score Section — o rótulo de risco (badge) já comunica gravidade;
+          não precisa também de um card cheio de cor + número gigante + badge
+          pulsante repetindo o mesmo sinal (§3/§17). "Marcado para recontagem"
+          já aparece no cabeçalho acima, então não se repete aqui. */}
       {area.progresso > 0 && (
-        <div className="mb-6">
-              <div className="flex items-center justify-between mb-3">
-                <h4 className="font-semibold text-fg-muted flex items-center gap-2">
-                  <AlertOctagon size={18} className="text-fg-subtle" />
-                  Score de Risco
-                </h4>
-                {area.marcadoRecontagem && (
-                  <span className="flex items-center gap-1 px-3 py-1 bg-accent/10 text-accent rounded-full text-sm font-medium">
-                    <RefreshCcw size={14} />
-                    Marcado para recontagem
-                  </span>
-                )}
-              </div>
+        <Panel className="mb-6">
+          <PanelSection>
+            <div className="flex items-center justify-between mb-3">
+              <h4 className="text-section flex items-center gap-2">
+                <AlertOctagon size={14} className="text-fg-subtle" />
+                Score de risco
+              </h4>
+              <Badge variant={
+                riskLevel === 'critical' ? 'danger'
+                : riskLevel === 'high' ? 'warning'
+                : riskLevel === 'medium' ? 'accent'
+                : riskLevel === 'low' ? 'success'
+                : 'neutral'
+              }>
+                {riskLabel}
+              </Badge>
+            </div>
 
-              <div className={`rounded-xl p-4 border-2 ${riskColorClass}`}>
-                <div className="flex items-center justify-between mb-3">
-                  <div className="flex items-center gap-3">
-                    <div className="text-4xl font-bold">
-                      {riskScore}
-                    </div>
-                    <div>
-                      <div className="text-sm font-bold">
-                        {riskLabel.toUpperCase()}
-                      </div>
-                      <div className="text-caption">de 0 a 100</div>
-                    </div>
-                  </div>
-                  {(riskLevel === 'critical' || riskLevel === 'high') && (
-                    <div className="flex items-center gap-1 px-3 py-1 bg-red-600 text-white rounded-full text-sm font-bold animate-pulse">
-                      <Flag size={14} />
-                      PRIORIDADE
-                    </div>
-                  )}
-                </div>
+            <div className="flex items-baseline gap-2 mb-1">
+              <span className="text-display">{riskScore}</span>
+              <span className="text-caption">de 0 a 100</span>
+            </div>
 
-                {/* Risk Factors */}
+            {/* Risk Factors */}
                 {diagnosis.factors.length > 0 && (
                   <div className="border-t border-edge/60 pt-3 mt-3">
                     <p className="text-caption mb-2">Fatores de risco:</p>
@@ -204,11 +192,11 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                     </div>
                   </div>
                 )}
-              </div>
-            </div>
-          )}
+          </PanelSection>
+        </Panel>
+      )}
 
-          {/* Automatic Diagnosis */}
+      {/* Automatic Diagnosis */}
           {area.progresso > 0 && (
             <div className="mb-6">
               <h4 className="font-semibold text-fg-muted flex items-center gap-2 mb-3">
@@ -308,7 +296,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                       className={`h-full ${
                         area.acuracidade >= 90 ? 'bg-emerald-500' :
                         area.acuracidade >= 70 ? 'bg-amber-500' :
-                        area.acuracidade >= 50 ? 'bg-orange-500' : 'bg-red-500'
+                        area.acuracidade >= 50 ? 'bg-accent' : 'bg-red-500'
                       } transition-all`}
                       style={{ width: `${Math.min(area.acuracidade, 100)}%` }}
                     />

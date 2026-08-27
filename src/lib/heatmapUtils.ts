@@ -51,13 +51,17 @@ export const getRiskLevelLabel = (level: RiskLevel): string => {
   }
 };
 
-// Get risk level color class
+// Get risk level color class. Só as cores semânticas aprovadas (§5/§23) — antes
+// "high" usava laranja, fora da paleta. Mesmo mapeamento de RiskBadge.tsx
+// (crítico=danger/vermelho, alto=warning/âmbar, médio=accent/azul, baixo=
+// success/verde), que já resolve um problema equivalente de 4 níveis sem
+// precisar de uma 5ª cor.
 export const getRiskLevelColor = (level: RiskLevel): string => {
   switch (level) {
     case 'none': return 'bg-surface-3 text-fg-muted border-edge';
     case 'low': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
-    case 'medium': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
-    case 'high': return 'bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/30';
+    case 'medium': return 'bg-accent/10 text-accent border-accent/30';
+    case 'high': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
     case 'critical': return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30';
   }
 };
@@ -70,8 +74,8 @@ export const getRiskGradient = (level: RiskLevel): string => {
   switch (level) {
     case 'none': return 'bg-surface-2 border-edge';
     case 'low': return 'bg-emerald-500/[0.07] border-emerald-500/20';
-    case 'medium': return 'bg-amber-500/[0.07] border-amber-500/20';
-    case 'high': return 'bg-orange-500/[0.07] border-orange-500/20';
+    case 'medium': return 'bg-accent/[0.07] border-accent/20';
+    case 'high': return 'bg-amber-500/[0.07] border-amber-500/20';
     case 'critical': return 'bg-red-500/[0.07] border-red-500/25';
   }
 };
@@ -187,12 +191,16 @@ export const getCriticalityLevel = (area: HeatmapArea): CriticalityLevel => {
   }
 };
 
-// Get background color class based on criticality
+// Get background color class based on criticality. "danger" (risco médio,
+// abaixo de "critical") agrupado com "warning" em âmbar — laranja não é uma
+// cor aprovada (§5/§23), e reservar o vermelho só para "critical" (o nível
+// mais grave) preserva a distinção que mais importa: o pior caso continua
+// visualmente único.
 export const getCriticalityBgClass = (level: CriticalityLevel): string => {
   switch (level) {
     case 'success': return 'bg-emerald-500/10 border-emerald-500/30';
     case 'warning': return 'bg-amber-500/10 border-amber-500/30';
-    case 'danger': return 'bg-orange-500/10 border-orange-500/30';
+    case 'danger': return 'bg-amber-500/10 border-amber-500/30';
     case 'critical': return 'bg-red-500/10 border-red-500/30';
     case 'neutral': return 'bg-surface-3 border-edge';
     default: return 'bg-surface-3 border-edge';
@@ -204,7 +212,7 @@ export const getCriticalityTextClass = (level: CriticalityLevel): string => {
   switch (level) {
     case 'success': return 'text-emerald-700 dark:text-emerald-400';
     case 'warning': return 'text-amber-700 dark:text-amber-400';
-    case 'danger': return 'text-orange-700 dark:text-orange-400';
+    case 'danger': return 'text-amber-700 dark:text-amber-400';
     case 'critical': return 'text-red-700 dark:text-red-400';
     case 'neutral': return 'text-fg-muted';
     default: return 'text-fg-muted';
@@ -216,7 +224,7 @@ export const getProgressBgClass = (level: CriticalityLevel): string => {
   switch (level) {
     case 'success': return 'bg-emerald-500';
     case 'warning': return 'bg-amber-500';
-    case 'danger': return 'bg-orange-500';
+    case 'danger': return 'bg-amber-500';
     case 'critical': return 'bg-red-500';
     case 'neutral': return 'bg-fg-subtle';
     default: return 'bg-fg-subtle';

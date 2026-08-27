@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Panel, PanelSection, Badge } from '../ui';
+import { Panel, PanelSection, Badge, Input, Select, Stat, StatRow, StatCell } from '../ui';
 import { listAuditableBrands, getHistoricalProductivity, type AuditableBrand } from '../../lib/auditSimulationService';
 import { simulateCount } from '../../lib/auditSimulationEngine';
 
@@ -7,7 +7,6 @@ interface InventorySimulationPanelProps {
   companyId: string;
 }
 
-const inputClass = 'w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg';
 const labelClass = 'block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1';
 
 /** Simulador "what-if" antes de abrir uma contagem: usa SKUs reais da linha selecionada
@@ -67,17 +66,17 @@ export function InventorySimulationPanel({ companyId }: InventorySimulationPanel
         <PanelSection padding="md" className="grid grid-cols-1 md:grid-cols-4 gap-3">
           <div>
             <label className={labelClass}>Linha de inventário</label>
-            <select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className={inputClass}>
+            <Select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className="w-full">
               {brands.map(b => <option key={b.id} value={b.id}>{b.brand} ({b.total_sku} SKUs)</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelClass}>Operadores (simulação)</label>
-            <input type="number" min={1} value={numOperators} onChange={e => setNumOperators(Math.max(1, Number(e.target.value)))} className={inputClass} />
+            <Input type="number" min={1} value={numOperators} onChange={e => setNumOperators(Math.max(1, Number(e.target.value)))} />
           </div>
           <div>
             <label className={labelClass}>Produtividade (SKUs/h por operador)</label>
-            <input type="number" min={1} value={productivity} onChange={e => setProductivity(Math.max(1, Number(e.target.value)))} className={inputClass} />
+            <Input type="number" min={1} value={productivity} onChange={e => setProductivity(Math.max(1, Number(e.target.value)))} />
             {historicalProductivity ? (
               <p className="text-xs text-fg-subtle mt-1">Histórico da empresa: {historicalProductivity.toFixed(1)} SKUs/h</p>
             ) : (
@@ -86,11 +85,11 @@ export function InventorySimulationPanel({ companyId }: InventorySimulationPanel
           </div>
           <div>
             <label className={labelClass}>Custo por hora/operador (R$)</label>
-            <input type="number" min={0} step={0.5} value={costPerHour} onChange={e => setCostPerHour(Math.max(0, Number(e.target.value)))} className={inputClass} />
+            <Input type="number" min={0} step={0.5} value={costPerHour} onChange={e => setCostPerHour(Math.max(0, Number(e.target.value)))} />
           </div>
           <div>
             <label className={labelClass}>Horas por jornada de trabalho</label>
-            <input type="number" min={1} max={24} value={hoursPerWorkday} onChange={e => setHoursPerWorkday(Math.max(1, Number(e.target.value)))} className={inputClass} />
+            <Input type="number" min={1} max={24} value={hoursPerWorkday} onChange={e => setHoursPerWorkday(Math.max(1, Number(e.target.value)))} />
           </div>
         </PanelSection>
       </Panel>
@@ -98,14 +97,14 @@ export function InventorySimulationPanel({ companyId }: InventorySimulationPanel
       <Panel>
         <PanelSection padding="md">
           <p className="text-section mb-3">Estimativas para {selectedBrand?.brand} ({totalSkus} SKUs)</p>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-            <div><p className="text-xs text-fg-subtle">Tempo estimado</p><p className="text-sm font-semibold text-fg">{estimate.wallClockHours.toFixed(1)} h</p></div>
-            <div><p className="text-xs text-fg-subtle">Horas de trabalho (total)</p><p className="text-sm font-semibold text-fg">{estimate.totalWorkHours.toFixed(1)} h-pessoa</p></div>
-            <div><p className="text-xs text-fg-subtle">Dias úteis previstos</p><p className="text-sm font-semibold text-fg">{estimate.workdaysNeeded.toFixed(1)} dia(s)</p></div>
-            <div><p className="text-xs text-fg-subtle">Custo estimado</p><p className="text-sm font-semibold text-fg">R$ {estimate.estimatedCost.toFixed(2)}</p></div>
-            <div><p className="text-xs text-fg-subtle">Produtividade média esperada</p><p className="text-sm font-semibold text-fg">{estimate.productivityPerOperator.toFixed(1)} SKUs/h</p></div>
-            <div><p className="text-xs text-fg-subtle">Data prevista de conclusão</p><p className="text-sm font-semibold text-fg">{new Date(estimate.expectedCompletionDate).toLocaleDateString('pt-BR')}</p></div>
-          </div>
+          <StatRow className="sm:grid-cols-3">
+            <StatCell><Stat label="Tempo estimado" value={`${estimate.wallClockHours.toFixed(1)} h`} /></StatCell>
+            <StatCell><Stat label="Horas de trabalho (total)" value={`${estimate.totalWorkHours.toFixed(1)} h-pessoa`} /></StatCell>
+            <StatCell><Stat label="Dias úteis previstos" value={`${estimate.workdaysNeeded.toFixed(1)} dia(s)`} /></StatCell>
+            <StatCell><Stat label="Custo estimado" value={`R$ ${estimate.estimatedCost.toFixed(2)}`} /></StatCell>
+            <StatCell><Stat label="Produtividade média esperada" value={`${estimate.productivityPerOperator.toFixed(1)} SKUs/h`} /></StatCell>
+            <StatCell><Stat label="Data prevista de conclusão" value={new Date(estimate.expectedCompletionDate).toLocaleDateString('pt-BR')} /></StatCell>
+          </StatRow>
           <div className="mt-4 pt-4 border-t border-edge">
             <Badge variant="accent">Quantidade ideal de operadores para concluir em 1 dia útil: {idealOperatorsForOneDay}</Badge>
           </div>

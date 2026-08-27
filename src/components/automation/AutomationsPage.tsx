@@ -13,7 +13,7 @@ import {
   Trash2,
   Workflow as WorkflowIcon,
 } from 'lucide-react';
-import { Badge, Button, Page, PageHeader, Panel, PanelSection, SegmentedControl, Table, Td, Th, Thead, Tr } from '../ui';
+import { Badge, Button, Notice, Page, PageHeader, Panel, PanelSection, SegmentedControl, Table, Td, Th, Thead, Tr } from '../ui';
 import {
   createAutomation,
   deleteAutomation,
@@ -143,15 +143,7 @@ export function AutomationsPage({ canManage, onBack }: Props) {
       />
 
       {message && (
-        <div
-          className={`rounded-container border px-4 py-3 text-sm ${
-            message.tone === 'ok'
-              ? 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400'
-              : 'border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400'
-          }`}
-        >
-          {message.text}
-        </div>
+        <Notice tone={message.tone === 'ok' ? 'success' : 'danger'}>{message.text}</Notice>
       )}
 
       {notifications.length > 0 && (
@@ -439,11 +431,7 @@ function TemplatesPanel({
 
   return (
     <div className="space-y-4">
-      {failure && (
-        <div className="rounded-container border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-600 dark:text-red-400">
-          {failure}
-        </div>
-      )}
+      {failure && <Notice tone="danger">{failure}</Notice>}
 
       <Panel>
         <PanelSection>

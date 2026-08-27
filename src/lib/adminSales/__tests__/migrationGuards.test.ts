@@ -57,3 +57,46 @@ describe('migration 077 — vendas e zona de perigo', () => {
     expect(MIGRATION_077).not.toMatch(/DROP TABLE|TRUNCATE|DELETE FROM/i);
   });
 });
+
+const MIGRATION_079 =
+  MIGRATIONS[
+    Object.keys(MIGRATIONS).find(p => p.includes('079_admin_top10_config')) ?? ''
+  ] ?? '';
+
+describe('migration 079 — configuração do Top 10', () => {
+  it('existe e não está vazia', () => {
+    expect(MIGRATION_079.length).toBeGreaterThan(0);
+  });
+
+  it('isola admin_top10_config por empresa em todas as policies', () => {
+    const policyBlocks = MIGRATION_079.match(/CREATE POLICY[^;]+;/g) ?? [];
+    expect(policyBlocks.length).toBeGreaterThan(0);
+    for (const block of policyBlocks) {
+      expect(block).toContain('company_id::text = get_my_company_id()');
+    }
+  });
+
+  it('uma linha por empresa — UNIQUE(company_id)', () => {
+    expect(MIGRATION_079).toMatch(/UNIQUE\s*\(company_id\)/);
+  });
+
+  it('abc_analysis_id impede exclusão silenciosa da análise em uso (ON DELETE RESTRICT)', () => {
+    expect(MIGRATION_079).toMatch(/abc_analysis_id uuid REFERENCES abc_curve_analyses\(id\) ON DELETE RESTRICT/);
+  });
+
+  it('critério do ranking automático não inclui margem percentual', () => {
+    const rankingCheck = MIGRATION_079.match(/ranking_metric text CHECK \(([^)]+)\)/);
+    expect(rankingCheck).not.toBeNull();
+    expect(rankingCheck?.[1]).not.toMatch(/margin|margem/i);
+  });
+
+  it('não escreve nem altera tabelas do Inventário ou da Curva ABC', () => {
+    expect(MIGRATION_079).not.toMatch(/UPDATE (products|inventory_\w+|physical_count_\w+|abc_curve_\w+)/i);
+    expect(MIGRATION_079).not.toMatch(/ALTER TABLE (products|inventory_\w+|physical_count_\w+|abc_curve_\w+)/i);
+    expect(MIGRATION_079).not.toMatch(/INSERT INTO (products|inventory_\w+|physical_count_\w+|abc_curve_\w+)/i);
+  });
+
+  it('não faz DROP/TRUNCATE/DELETE FROM em nenhuma tabela', () => {
+    expect(MIGRATION_079).not.toMatch(/DROP TABLE|TRUNCATE|DELETE FROM/i);
+  });
+});

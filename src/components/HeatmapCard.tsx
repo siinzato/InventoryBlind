@@ -15,6 +15,7 @@ import {
   getRiskLevelColor,
   getRiskGradient,
 } from '../lib/heatmapUtils';
+import { Badge } from './ui';
 
 interface HeatmapCardProps {
   area: HeatmapArea;
@@ -29,8 +30,8 @@ interface HeatmapCardProps {
 const RISK_SCORE_TEXT_CLASS: Record<RiskLevel, string> = {
   none: 'text-fg-subtle',
   low: 'text-emerald-600 dark:text-emerald-400',
-  medium: 'text-amber-600 dark:text-amber-400',
-  high: 'text-orange-600 dark:text-orange-400',
+  medium: 'text-accent',
+  high: 'text-amber-600 dark:text-amber-400',
   critical: 'text-red-600 dark:text-red-400',
 };
 
@@ -63,20 +64,18 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
             pulsing alarm on a grid of cards competes with the data. */}
         {showPriorityBadge && (
           <div className="absolute top-2 right-2">
-            <span className="flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-red-600 text-white rounded-full">
-              <Flag size={12} />
-              PRIORIDADE
-            </span>
+            <Badge variant="danger">
+              <Flag size={12} className="mr-1 inline" />PRIORIDADE
+            </Badge>
           </div>
         )}
 
         {/* Recontagem Badge */}
         {area.marcadoRecontagem && (
           <div className="absolute top-2 left-2">
-            <span className="flex items-center gap-1 px-2 py-1 text-xs font-medium bg-accent text-white rounded-full">
-              <AlertOctagon size={12} />
-              Recontagem
-            </span>
+            <Badge variant="accent">
+              <AlertOctagon size={12} className="mr-1 inline" />Recontagem
+            </Badge>
           </div>
         )}
 
@@ -163,32 +162,22 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
         onClick={() => onClick(area)}
         className={`w-full ${riskGradient} border rounded-container p-5 text-left transition-colors hover:bg-surface-3/40 focus:outline-none focus:ring-2 focus:ring-accent/40 flex items-center gap-4 relative`}
       >
-        {/* Priority Badge */}
+        {/* Priority Badge — mesmo Badge compartilhado, estático (o vermelho já
+            é o sinal, sem pulso competindo com o dado — ver comentário da
+            grid view abaixo). */}
         {showPriorityBadge && (
-          <span className="absolute top-2 right-2 flex items-center gap-1 px-2 py-1 text-xs font-semibold bg-red-600 text-white rounded-full">
-            <Flag size={12} />
-            PRIORIDADE
-          </span>
-        )}
-
-        <div className="flex-shrink-0">
-          <div className={`w-12 h-12 rounded-lg ${progressBg} flex items-center justify-center relative`}>
-            <MapPin size={28} className="text-white" />
-            {isHighRisk && (
-              <div className="absolute -top-1 -right-1 w-4 h-4 bg-red-600 rounded-full flex items-center justify-center animate-pulse">
-                <AlertOctagon size={10} className="text-white" />
-              </div>
-            )}
+          <div className="absolute top-2 right-2">
+            <Badge variant="danger">
+              <Flag size={12} className="mr-1 inline" />PRIORIDADE
+            </Badge>
           </div>
-        </div>
+        )}
 
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2 mb-1">
             <span className="font-bold text-fg">{area.nome}</span>
             {area.marcadoRecontagem && (
-              <span className="px-2 py-0.5 text-xs font-medium bg-accent text-white rounded-full">
-                Recontagem
-              </span>
+              <Badge variant="accent">Recontagem</Badge>
             )}
             <span className={`text-xs px-2 py-0.5 rounded-full bg-surface-2/70 ${textClass}`}>
               {area.tipo.toUpperCase()}

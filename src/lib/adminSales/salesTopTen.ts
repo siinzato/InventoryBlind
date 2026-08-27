@@ -87,3 +87,86 @@ export function computeTopTen(
   const filtered = filterRecordsByPeriod(records, range);
   return aggregateTopTen(filtered, metric, limit);
 }
+
+// ── Top 10 automático pela Curva ABC ────────────────────────────────────────
+// Regra única de ranking: consumida tanto pela prévia de configuração quanto pelo bloco
+// exibido no painel, para nunca divergir. Nunca recalcula faturamento/quantidade/lucro bruto —
+// só ordena valores já persistidos pela Curva ABC.
+
+export type AbcRankingMetric = 'revenue' | 'quantity' | 'gross_profit';
+
+export interface AbcSnapshotInput {
+  sku: string;
+  productId: string | null;
+  productName: string | null;
+  revenue: number;
+  quantity: number;
+  grossProfit: number | null;
+}
+
+export interface AutomaticTopTenEntry {
+  position: number;
+  sku: string;
+  productId: string;
+  productName: string;
+  revenue: number;
+  quantity: number;
+  grossProfit: number | null;
+}
+
+export interface AutomaticTopTenResult {
+  entries: AutomaticTopTenEntry[];
+  ignoredForMissingMetric: number;
+  ignoredForNoCatalogMatch: number;
+}
+
+// Prioriza productId já vinculado; cai para SKU normalizado (trim + upper) só quando não há
+// vínculo. `resolvedProductIdBySku` deve vir de uma correspondência exata já escopada por
+// empresa (nunca aproximada por nome) — ver matchProductIds em abcCurveService.
+function resolveCatalogProductId(snapshot: AbcSnapshotInput, resolvedProductIdBySku: Map<string, string>): string | null {
+  if (snapshot.productId) return snapshot.productId;
+  return resolvedProductIdBySku.get(snapshot.sku.trim().toUpperCase()) ?? null;
+}
+
+export function resolveAutomaticTopTen(
+  snapshots: AbcSnapshotInput[],
+  metric: AbcRankingMetric,
+  resolvedProductIdBySku: Map<string, string>,
+  limit = 10
+): AutomaticTopTenResult {
+  let ignoredForMissingMetric = 0;
+  let ignoredForNoCatalogMatch = 0;
+
+  const metricValue = (s: AbcSnapshotInput): number | null => {
+    if (metric === 'revenue') return s.revenue;
+    if (metric === 'quantity') return s.quantity;
+    return s.grossProfit;
+  };
+
+  const eligible: { snapshot: AbcSnapshotInput; productId: string; value: number }[] = [];
+  for (const snapshot of snapshots) {
+    const value = metricValue(snapshot);
+    if (value === null || value === undefined || Number.isNaN(value)) { ignoredForMissingMetric++; continue; }
+    const productId = resolveCatalogProductId(snapshot, resolvedProductIdBySku);
+    if (!productId) { ignoredForNoCatalogMatch++; continue; }
+    eligible.push({ snapshot, productId, value });
+  }
+
+  eligible.sort((a, b) => {
+    if (b.value !== a.value) return b.value - a.value;
+    if (b.snapshot.revenue !== a.snapshot.revenue) return b.snapshot.revenue - a.snapshot.revenue;
+    return a.snapshot.sku.localeCompare(b.snapshot.sku, 'pt-BR');
+  });
+
+  const entries: AutomaticTopTenEntry[] = eligible.slice(0, limit).map((e, idx) => ({
+    position: idx + 1,
+    sku: e.snapshot.sku,
+    productId: e.productId,
+    productName: e.snapshot.productName ?? e.snapshot.sku,
+    revenue: e.snapshot.revenue,
+    quantity: e.snapshot.quantity,
+    grossProfit: e.snapshot.grossProfit,
+  }));
+
+  return { entries, ignoredForMissingMetric, ignoredForNoCatalogMatch };
+}

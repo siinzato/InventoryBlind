@@ -11,7 +11,7 @@
  */
 
 import React, { useEffect, useState, useRef } from 'react';
-import { Eye, EyeOff, ArrowLeft, ArrowRight, Check, Mail, Lock, User, Building2, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
+import { Eye, EyeOff, ArrowLeft, ArrowRight, Check, Mail, Lock, User, Building2, Ticket, ShieldCheck, AlertCircle, RefreshCw } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import {
   useAuth,
@@ -20,7 +20,10 @@ import {
   setPendingSignupEmail,
   getPendingSignupEmail,
   clearPendingSignupEmail,
+  setPendingInviteCode,
+  clearPendingInviteCode,
 } from '../lib/auth';
+import { normalizeInviteCode, isInviteCodeFormatValid } from '../lib/invitations/inviteCodeRules';
 import { LogoMark } from './landing/landingUi';
 import { motion, MagneticButton, useReducedMotion } from './landing/landingMotion';
 import { LEGAL_ROUTES } from '../lib/legal/legalRoutes';
@@ -390,10 +393,14 @@ const SIGNUP_STEPS: { title: string; detail: string }[] = [
   { title: 'Diagnóstico da operação', detail: 'Opcional, indica o plano adequado ao seu volume.' },
 ];
 
+type SignupMode = 'create' | 'join';
+
 const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const { setView } = useAuth();
+  const [mode, setMode] = useState<SignupMode>('create');
   const [name, setName] = useState('');
   const [company, setCompany] = useState('');
+  const [inviteCode, setInviteCode] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
@@ -408,7 +415,8 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
   const validate = () => {
     const e: Record<string, string> = {};
     if (!name.trim()) e.name = 'Informe seu nome.';
-    if (!company.trim()) e.company = 'Informe o nome da empresa.';
+    if (mode === 'create' && !company.trim()) e.company = 'Informe o nome da empresa.';
+    if (mode === 'join' && !isInviteCodeFormatValid(inviteCode)) e.inviteCode = 'Informe o código de convite (8 caracteres) que o administrador te enviou.';
     if (!email.trim() || !/^[^@]+@[^@]+\.[^@]+$/.test(email)) e.email = 'E-mail inválido.';
     if (password.length < 6) e.password = 'Senha deve ter ao menos 6 caracteres.';
     if (password !== confirm) e.confirm = 'As senhas não coincidem.';
@@ -425,15 +433,19 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
 
     setLoading(true);
     try {
-      // Hand the company name off to auth.tsx's runAuthSequence — it runs
-      // create_company_onboarding() itself, right after loading this user's
-      // (company-less) profile, then resolves `view` from the result. That
-      // keeps company-creation and view-resolution in the same sequence: a
+      // Hand company creation OR invite-code redemption off to auth.tsx's
+      // runAuthSequence — it runs the matching RPC itself, right after loading this
+      // user's (company-less) profile, then resolves `view` from the result. That
+      // keeps company-resolution and view-resolution in the same sequence: a
       // second, independent call from here raced the background sequence
       // triggered by the same signUp() and lost (confirmed live — the
       // background pass finished last and overwrote the correct view with
       // a stale, pre-onboarding snapshot).
-      setPendingCompanyOnboarding(company.trim(), name.trim());
+      if (mode === 'create') {
+        setPendingCompanyOnboarding(company.trim(), name.trim());
+      } else {
+        setPendingInviteCode(normalizeInviteCode(inviteCode));
+      }
 
       // handle_new_user creates a company-less profile (role='viewer') —
       // company_id/role in metadata are ignored by design, so we don't send
@@ -445,12 +457,13 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
         password,
         options: {
           emailRedirectTo: `${window.location.origin}/?flow=email-confirmation`,
-          data: { name: name.trim(), company_name: company.trim() },
+          data: mode === 'create' ? { name: name.trim(), company_name: company.trim() } : { name: name.trim() },
         },
       });
 
       if (signupErr) {
         clearPendingCompanyOnboarding();
+        clearPendingInviteCode();
         clearPendingSignupEmail();
         if (signupErr.message.includes('already registered')) {
           setGlobalError('Este e-mail já está cadastrado. Faça login ou recupere sua senha.');
@@ -486,6 +499,7 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
       if (!signupData.session) setView('confirm-email');
     } catch (err: unknown) {
       clearPendingCompanyOnboarding();
+      clearPendingInviteCode();
       clearPendingSignupEmail();
       setGlobalError(err instanceof Error ? err.message : 'Erro ao criar conta.');
     } finally {
@@ -551,11 +565,29 @@ const SignupView: React.FC<{ onBack: () => void }> = ({ onBack }) => {
               </div>
             )}
 
+            {/* Alterna entre criar uma empresa nova (padrão) e entrar numa empresa existente com o
+                código de convite que o administrador gerou em Usuários (migration 082). */}
+            <div className="flex gap-2 mb-5 p-1 bg-ink-900 border border-ink-700 rounded-xl">
+              <button type="button" onClick={() => setMode('create')}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${mode === 'create' ? 'bg-enterprise-500 text-white' : 'text-mist-400 hover:text-mist-100'}`}>
+                Criar minha empresa
+              </button>
+              <button type="button" onClick={() => setMode('join')}
+                className={`flex-1 py-2 rounded-lg text-xs font-semibold transition ${mode === 'join' ? 'bg-enterprise-500 text-white' : 'text-mist-400 hover:text-mist-100'}`}>
+                Tenho um código de convite
+              </button>
+            </div>
+
             <form onSubmit={handleSignup} className="space-y-4">
               <Input label="Nome" value={name} onChange={setName} placeholder="João Silva"
                 autoComplete="name" error={errors.name} icon={<User size={15} />} />
-              <Input label="Empresa" value={company} onChange={setCompany} placeholder="Minha Empresa Ltda"
-                error={errors.company} icon={<Building2 size={15} />} />
+              {mode === 'create' ? (
+                <Input label="Empresa" value={company} onChange={setCompany} placeholder="Minha Empresa Ltda"
+                  error={errors.company} icon={<Building2 size={15} />} />
+              ) : (
+                <Input label="Código de Convite" value={inviteCode} onChange={v => setInviteCode(v.toUpperCase())}
+                  placeholder="Ex.: AB3DFGHJ" error={errors.inviteCode} icon={<Ticket size={15} />} />
+              )}
               <Input label="E-mail" type="email" value={email} onChange={setEmail} placeholder="seu@email.com"
                 autoComplete="email" error={errors.email} icon={<Mail size={15} />} />
               <Input label="Senha" type={showPw ? 'text' : 'password'} value={password} onChange={setPassword}

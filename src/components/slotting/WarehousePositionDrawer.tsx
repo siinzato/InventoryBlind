@@ -103,7 +103,12 @@ export function WarehousePositionDrawer({ open, onClose, companyId, cell, status
             animate={{ x: 0 }}
             exit={{ x: '100%' }}
             transition={{ duration: 0.25, ease: 'easeOut' }}
-            className="absolute right-0 top-0 z-10 h-full w-full max-w-sm bg-surface border-l border-edge shadow-overlay overflow-y-auto"
+            // Painel acima do backdrop pela mesma escala de tokens que o backdrop usa —
+            // mesmo motivo documentado em Modal.tsx: um z-10 do Tailwind perde para o
+            // --z-modal-backdrop (3000) do backdrop, que é irmão no mesmo contexto de
+            // empilhamento, e todo clique no painel caía no backdrop (que fecha).
+            style={{ zIndex: 'var(--z-modal)' }}
+            className="absolute right-0 top-0 h-full w-full max-w-sm bg-surface border-l border-edge shadow-overlay overflow-y-auto"
           >
             <div className="flex items-center justify-between px-6 py-4 border-b border-edge">
               <h2 className="text-base font-semibold text-fg flex items-center gap-2">

@@ -168,3 +168,43 @@ export function canSyncIntegrations(role: Role | string | undefined): boolean {
 export function canWrite(role: Role | string | undefined): boolean {
   return hasPermission(role, 'inventory.write');
 }
+
+/** Quem pode aprovar o retorno de um item devolvido ao estoque vendável ou o
+ *  descarte definitivo — as duas decisões de Logística Reversa que a RPC
+ *  `return_items_decide_destination` (migration 083) também exige owner/admin/
+ *  manager para aceitar, então a tela nunca oferece um botão que o banco recusaria.
+ *
+ *  Não passa por `hasPermission` pelo mesmo motivo de `canManageAutomations`: não
+ *  há uma permissão `'returns.*'` no mapa, e inventar uma aqui sugeriria uma
+ *  checagem no servidor que não é essa (a checagem real é o `get_my_role()` dentro
+ *  da própria RPC). */
+export function canApproveReturnDestination(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
+/** Quem pode configurar checklists, grades de condição, regras de sugestão de
+ *  destinação e as configurações de aprovação da Logística Reversa (Fase 2) —
+ *  mesmo nível de `canApproveReturnDestination`, mesmo motivo de não passar por
+ *  `hasPermission` (não há permissão `'returns.*'` no mapa). */
+export function canConfigureReturnRules(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
+/** Quem pode decidir (aprovar/rejeitar) um pedido de aprovação de Logística
+ *  Reversa — mesmo gate de `return_items_decide_approval` (migration 084). */
+export function canApproveReturnRequest(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
+/** Quem pode criar/atualizar ordens de assistência técnica e recondicionamento —
+ *  mesmo nível operacional de conferência/inspeção da Fase 1 (owner/admin/manager/
+ *  lead/counter), mirror do gate de `return_service_orders_transition_status`. */
+export function canManageServiceOrders(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager' || role === 'lead' || role === 'counter';
+}
+
+/** Quem pode liberar um hold de quarentena — mesmo gate de
+ *  `return_items_release_quarantine` (migration 084). */
+export function canReleaseQuarantine(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}

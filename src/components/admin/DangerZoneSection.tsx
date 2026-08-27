@@ -4,7 +4,7 @@
 
 import { useState } from 'react';
 import { ChevronDown, ChevronRight, ShieldAlert, Archive, Loader2 } from 'lucide-react';
-import { Panel, PanelSection, Button, Textarea } from '../ui';
+import { Panel, PanelSection, Button, Textarea, Stat, StatRow, StatCell } from '../ui';
 import { canAccessDangerZone, validateDangerZoneForm, RESET_CONFIRMATION_PHRASE } from '../../lib/adminSales/dangerZone';
 import { resetInventoryTransactional } from '../../lib/adminSales/salesService';
 
@@ -64,18 +64,18 @@ export function DangerZoneSection({ role, totalSku, totalDone, totalDivergences,
 
       {expanded && (
         <PanelSection padding="md" className="border-t border-edge">
-          <div className="bg-red-500/10 rounded-lg p-3 mb-4 text-sm text-red-700 dark:text-red-400">
+          <p className="text-sm text-red-700 dark:text-red-400 mb-4">
             Arquivar e resetar encerra o ciclo atual: o inventário inteiro (progresso, acuracidade,
             divergências, KPIs e top vendas) é salvo permanentemente no histórico, e as contagens de
             todas as marcas voltam a zero para começar um novo ciclo. Esta ação não pode ser desfeita.
-          </div>
+          </p>
 
-          <div className="grid grid-cols-2 gap-2 text-xs text-fg-muted mb-4 bg-surface-3 rounded-lg p-3">
-            <span>Total SKUs: <strong className="text-fg">{totalSku}</strong></span>
-            <span>Contabilizados: <strong className="text-fg">{totalDone}</strong></span>
-            <span>Divergências: <strong className="text-fg">{totalDivergences}</strong></span>
-            <span>Acuracidade: <strong className="text-fg">{accuracy.toFixed(1)}%</strong></span>
-          </div>
+          <StatRow className="grid-cols-2 mb-4">
+            <StatCell><Stat label="Total SKUs" value={totalSku} /></StatCell>
+            <StatCell><Stat label="Contabilizados" value={totalDone} /></StatCell>
+            <StatCell><Stat label="Divergências" value={totalDivergences} /></StatCell>
+            <StatCell><Stat label="Acuracidade" value={`${accuracy.toFixed(1)}%`} /></StatCell>
+          </StatRow>
 
           <form onSubmit={handleSubmit} className="space-y-4">
             <div>

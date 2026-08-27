@@ -75,6 +75,14 @@ interface AuthContextValue {
   linkToAZ: () => Promise<void>;
   createCompany: (companyName: string, userName?: string) => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
+  /** Erro de um código de convite pendente (definido no cadastro) que falhou ao ser resolvido
+   *  automaticamente em runAuthSequence — mostrado em LinkCompanyScreen junto com o formulário
+   *  manual de código, para nunca cair silenciosamente em "criar empresa". */
+  inviteCodeError: string | null;
+  clearInviteCodeError: () => void;
+  /** Entrada manual de código em LinkCompanyScreen — mesmo caminho usado pelo código pendente do
+   *  cadastro, só que disparado pelo próprio usuário em vez de automaticamente. */
+  joinByInviteCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -128,6 +136,32 @@ export function clearPendingSignupEmail() {
   sessionStorage.removeItem(PENDING_EMAIL_KEY);
 }
 
+// Mesmo mecanismo de pendingCompanyOnboarding acima, para o modo "tenho um código de convite" do
+// cadastro (migration 082): guardado antes do signUp(), sobrevive ao redirect da confirmação de
+// e-mail, consumido uma vez dentro de runAuthSequence.
+const PENDING_INVITE_CODE_KEY = 'inventoryblind.pending-invite-code';
+
+function readPendingInviteCode(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return sessionStorage.getItem(PENDING_INVITE_CODE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+let pendingInviteCode: string | null = readPendingInviteCode();
+
+export function setPendingInviteCode(code: string) {
+  pendingInviteCode = code;
+  sessionStorage.setItem(PENDING_INVITE_CODE_KEY, code);
+}
+
+export function clearPendingInviteCode() {
+  pendingInviteCode = null;
+  sessionStorage.removeItem(PENDING_INVITE_CODE_KEY);
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -141,6 +175,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [profileLoading, setProfileLoading]   = useState(false);
   const [authError, setAuthError]             = useState<string | null>(null);
   const [view, setView]                       = useState<AuthView>('landing');
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
 
   const mountedRef    = useRef(true);
   const timeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -246,6 +281,54 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
     try {
       let prof = await doLoadProfile(u);
+      if (!mountedRef.current) return;
+
+      // Resolve any invitation pending for this user's email (migration 080,
+      // company_invitations/accept_pending_invitations) BEFORE resolveView decides between the app
+      // and the company onboarding screen — same reasoning as the pendingCompanyOnboarding block
+      // right below: the membership has to exist before the redirect decision, not after. Runs on
+      // every authenticated sequence (not only when company_id is null) so a user who already has
+      // a company still picks up an invite to a SECOND company; the RPC is a cheap index lookup and
+      // a no-op when there is nothing pending for that email.
+      if (prof) {
+        try {
+          const { data: accepted, error: acceptErr } = await supabase.rpc('accept_pending_invitations');
+          if (import.meta.env.DEV && acceptErr) console.warn('[Auth] accept_pending_invitations error:', acceptErr.message);
+          const activated = accepted?.some((r: { out_activated: boolean }) => r.out_activated);
+          if (!prof.company_id && activated) {
+            // Re-fetch instead of hand-patching: the RPC also sets role and
+            // must_change_password server-side, and patching only company_id here would leave a
+            // stale role ('viewer') in the client's copy of the profile.
+            prof = await doLoadProfile(u);
+          }
+        } catch (acceptThrow) {
+          if (import.meta.env.DEV) console.error('[Auth] accept_pending_invitations threw:', acceptThrow);
+        }
+      }
+      if (!mountedRef.current) return;
+
+      // A signup-time invite code (migration 082, "tenho um código de convite" em SignupView) is
+      // resolved here too, before pendingCompanyOnboarding — same ordering reasoning as the
+      // invitation block above. Unlike that block, a failed code must NOT be swallowed: showing
+      // "criar empresa" without any indication the code failed would be exactly the silent
+      // fallback this whole fix exists to avoid, so the message survives in inviteCodeError for
+      // LinkCompanyScreen to display.
+      if (prof && !prof.company_id && pendingInviteCode) {
+        const code = pendingInviteCode;
+        try {
+          const { data: joined, error: joinErr } = await supabase.rpc('join_company_by_invite_code', { p_code: code });
+          if (joinErr) {
+            setInviteCodeError(joinErr.message || 'Código de convite inválido.');
+          } else if (joined?.[0]?.out_activated) {
+            prof = await doLoadProfile(u);
+          }
+          clearPendingInviteCode();
+        } catch (joinThrow) {
+          if (import.meta.env.DEV) console.error('[Auth] join_company_by_invite_code threw:', joinThrow);
+          setInviteCodeError('Não foi possível validar o código de convite. Tente novamente.');
+          clearPendingInviteCode();
+        }
+      }
       if (!mountedRef.current) return;
 
       if (prof && !prof.company_id && pendingCompanyOnboarding) {
@@ -473,6 +556,23 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await runAuthSequence(user);
   }, [user, runAuthSequence]);
 
+  // ── joinByInviteCode — manual fallback on LinkCompanyScreen (migration 082) ───────────────
+  // Same RPC the signup-time pending code resolves automatically in runAuthSequence; this is the
+  // path for someone who already has an account (or whose signup-time code failed) typing a code
+  // directly.
+  const joinByInviteCode = useCallback(async (code: string) => {
+    if (!user) throw new Error('No authenticated user');
+
+    const { error } = await supabase.rpc('join_company_by_invite_code', { p_code: code });
+    if (error) throw new Error(error.message);
+
+    setInviteCodeError(null);
+    loadingRef.current = false;
+    await runAuthSequence(user);
+  }, [user, runAuthSequence]);
+
+  const clearInviteCodeError = useCallback(() => setInviteCodeError(null), []);
+
   // ── switchCompany ─────────────────────────────────────────────────────────
   const switchCompany = useCallback(async (targetCompanyId: string) => {
     if (!user) return;
@@ -512,6 +612,9 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     linkToAZ,
     createCompany,
     switchCompany,
+    inviteCodeError,
+    clearInviteCodeError,
+    joinByInviteCode,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

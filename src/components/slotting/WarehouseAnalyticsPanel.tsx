@@ -1,16 +1,15 @@
 import { useEffect, useState } from 'react';
-import { Panel, PanelSection, Badge, ListRow } from '../ui';
+import { Panel, PanelSection, Badge, ListRow, StatRow, StatCell, Stat } from '../ui';
 import { listRecords } from '../../lib/rcaService';
 import { groupByDimension, type DimensionBucket } from '../../lib/rcaAlgorithm';
 import { getMatrixCounts } from '../../lib/abcXyzService';
 import { getCompanySummary, type CBCCompanySummaryRow } from '../../lib/cbcService';
 import type { AbcXyzCombo } from '../../lib/supabase';
+import { ClassificationMatrix } from '../abcxyz/ClassificationMatrix';
 
 interface WarehouseAnalyticsPanelProps {
   companyId: string;
 }
-
-const COMBOS: AbcXyzCombo[] = ['AX', 'AY', 'AZ', 'BX', 'BY', 'BZ', 'CX', 'CY', 'CZ'];
 
 /** Consolida três leituras já existentes (RCA agrupado por endereço, matriz ABC/XYZ,
  *  resumo CBC) numa única aba — nenhuma fórmula nova, só composição de dados já
@@ -59,23 +58,18 @@ export function WarehouseAnalyticsPanel({ companyId }: WarehouseAnalyticsPanelPr
       <Panel>
         <PanelSection padding="md">
           <p className="text-section mb-3">Matriz ABC/XYZ</p>
-          <div className="grid grid-cols-3 gap-2">
-            {COMBOS.map(combo => (
-              <div key={combo} className="rounded-lg bg-surface-3 p-3 text-center">
-                <p className="text-xs text-fg-subtle mb-1">{combo}</p>
-                <p className="text-sm font-semibold text-fg">{matrix?.[combo]?.count ?? 0}</p>
-              </div>
-            ))}
-          </div>
+          {matrix && <ClassificationMatrix counts={matrix} selected={null} onSelect={() => {}} />}
         </PanelSection>
       </Panel>
 
       <Panel>
-        <PanelSection padding="md" className="grid grid-cols-2 md:grid-cols-4 gap-4">
-          <div><p className="text-xs text-fg-subtle">Confidence Médio</p><p className="text-sm font-semibold text-fg">{cbcSummary ? Math.round(cbcSummary.avg_confidence) : 0}%</p></div>
-          <div><p className="text-xs text-fg-subtle">SKUs Avaliados</p><p className="text-sm font-semibold text-fg">{cbcSummary?.total_scored ?? 0}</p></div>
-          <div><p className="text-xs text-fg-subtle">Atrasados</p><p className="text-sm font-semibold text-fg">{cbcSummary?.overdue_count ?? 0}</p></div>
-          <div><p className="text-xs text-fg-subtle">Devidos essa semana</p><p className="text-sm font-semibold text-fg">{cbcSummary?.due_this_week_count ?? 0}</p></div>
+        <PanelSection padding="md">
+          <StatRow>
+            <StatCell><Stat label="Confidence Médio" value={`${cbcSummary ? Math.round(cbcSummary.avg_confidence) : 0}%`} /></StatCell>
+            <StatCell><Stat label="SKUs Avaliados" value={cbcSummary?.total_scored ?? 0} /></StatCell>
+            <StatCell><Stat label="Atrasados" value={cbcSummary?.overdue_count ?? 0} /></StatCell>
+            <StatCell><Stat label="Devidos essa semana" value={cbcSummary?.due_this_week_count ?? 0} /></StatCell>
+          </StatRow>
         </PanelSection>
       </Panel>
     </div>

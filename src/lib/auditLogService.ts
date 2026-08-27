@@ -7,6 +7,7 @@ export type AuditAction =
   | 'products.delete'
   | 'sales_import.completed'
   | 'sales_import.failed'
+  | 'top10_config.updated'
   | 'inventory.create'
   | 'inventory.reset'
   | 'inventory.count'
@@ -15,6 +16,9 @@ export type AuditAction =
   | 'label.download'
   | 'report.export'
   | 'user.invite'
+  | 'user.invite_accepted'
+  | 'company.invite_code_generated'
+  | 'company.invite_code_joined'
   | 'user.role_change'
   | 'user.remove'
   | 'erp.token_change'
@@ -112,7 +116,55 @@ export type AuditAction =
   | 'product_brand_association.confirmed'
   | 'product_brand_association.batch_classified'
   // Curva ABC (migration 078).
-  | 'abc_curve.published';
+  | 'abc_curve.published'
+  // Logística Reversa — recebimento, conferência, inspeção e destinação (migration 083).
+  | 'reverse_logistics.received'
+  | 'reverse_logistics.item_registered'
+  | 'reverse_logistics.status_changed'
+  | 'reverse_logistics.item_inspected'
+  | 'reverse_logistics.destination_decided'
+  | 'reverse_logistics.cancelled'
+  // Logística Reversa — Fase 2: checklists configuráveis, grades, aprovações, assistência
+  // técnica/recondicionamento, quarentena, lote (migration 084).
+  | 'reverse_logistics.checklist_template_created'
+  | 'reverse_logistics.checklist_template_updated'
+  | 'reverse_logistics.condition_grade_created'
+  | 'reverse_logistics.condition_grade_updated'
+  | 'reverse_logistics.destination_rule_created'
+  | 'reverse_logistics.destination_rule_updated'
+  | 'reverse_logistics.approval_requested'
+  | 'reverse_logistics.approval_approved'
+  | 'reverse_logistics.approval_rejected'
+  | 'reverse_logistics.service_order_created'
+  | 'reverse_logistics.service_order_status_changed'
+  | 'reverse_logistics.quarantine_hold_created'
+  | 'reverse_logistics.quarantine_released'
+  | 'reverse_logistics.batch_action_applied'
+  // Logística Reversa — sincronização de restock com o Olist Tiny e localização por XML de
+  // NF-e (migrations 085/086). A sincronização com o ERP não ganhou uma ação própria: ela
+  // é registrada como metadado adicional (erpSyncAdjustmentId) do já existente
+  // 'reverse_logistics.destination_decided'.
+  | 'reverse_logistics.nfe_xml_return_created'
+  // Empresas fiscais (CNPJ) do workspace (migration 087). A maior parte destas ações é
+  // gravada pelo próprio banco, dentro das RPCs fiscal_entities_* — 'settings.change'
+  // não serviria porque essas mudanças precisam do próprio CNPJ/empresa no metadata,
+  // não só de um rótulo genérico de configuração. Vínculo/desvínculo de integração é
+  // gravado pelo client (IntegrationsPage), já que a escrita em si é direta via RLS.
+  | 'fiscal_entity.created'
+  | 'fiscal_entity.updated'
+  | 'fiscal_entity.cnpj_changed'
+  | 'fiscal_entity.default_changed'
+  | 'fiscal_entity.archived'
+  | 'fiscal_entity.restored'
+  | 'fiscal_entity.integration_linked'
+  | 'fiscal_entity.integration_unlinked'
+  | 'fiscal_entity.channel_mapping_confirmed'
+  // Gerenciamento administrativo de sessões (migration 093). Gravadas pelo próprio
+  // banco, dentro das RPCs admin_revoke_session / admin_revoke_user_sessions /
+  // owner_revoke_company_sessions — nunca pelo client.
+  | 'security.session_revoked'
+  | 'security.user_sessions_revoked'
+  | 'security.company_sessions_revoked';
 
 interface LogParams {
   companyId: string;

@@ -65,6 +65,29 @@ export interface IntegrationProvider {
 
 export type ConnectionStatus = 'pending' | 'active' | 'inactive' | 'error' | 'revoked';
 
+/** Convenção única de status→variante/rótulo — era definida só dentro de
+ *  IntegrationsPage.tsx e cada outra tela que precisava mostrar o mesmo
+ *  `ConnectionStatus` (FiscalEntitiesPage, IntegrationsHubPage) reimplementava
+ *  por conta própria, divergindo em cor/rótulo para o mesmo dado (§18/§24). */
+export const CONNECTION_STATUS_VARIANT: Record<ConnectionStatus, 'neutral' | 'success' | 'warning' | 'danger'> = {
+  active: 'success',
+  // Estado padrão de uma conexão que ninguém terminou de configurar. Neutro,
+  // não colorido: a maioria das conexões começa aqui, e uma tela cheia de
+  // pills âmbar treinaria o operador a ignorar a cor.
+  pending: 'neutral',
+  inactive: 'neutral',
+  error: 'danger',
+  revoked: 'danger',
+};
+
+export const CONNECTION_STATUS_LABEL: Record<ConnectionStatus, string> = {
+  active: 'Ativa',
+  pending: 'Aguardando credencial',
+  inactive: 'Inativa',
+  error: 'Com erro',
+  revoked: 'Revogada',
+};
+
 /** Per connection, because the source of truth is not universal: one company's
  *  ERP owns stock and only pushes to marketplaces, another's marketplace is
  *  authoritative for its own listings. */
@@ -80,6 +103,10 @@ export interface IntegrationConnection {
   displayName: string;
   externalAccountId: string | null;
   status: ConnectionStatus;
+  /** Empresa fiscal (CNPJ) do workspace a que esta conexão pertence — null
+   *  em conexões antigas, criadas antes do vínculo existir ("Configuração
+   *  pendente" na UI). */
+  fiscalEntityId: string | null;
   configuration: Record<string, unknown>;
   syncDirection: SyncDirection;
   stockSourceOfTruth: boolean;

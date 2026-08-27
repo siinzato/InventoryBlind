@@ -8,7 +8,7 @@ import { getInvoiceItems, registerCount, finalizeConference } from '../../lib/nf
 import { supabase } from '../../lib/supabase';
 import { normalizeEan, buildEanIndex } from '../../lib/nfe/nfeEanUtils';
 import { formatQty } from './nfeUi';
-import { Card, Button, Modal } from '../ui';
+import { Card, Button, Modal, Input, Notice, SegmentedControl, StatRow, StatCell, Stat } from '../ui';
 import { useAuth } from '../../lib/auth';
 import { RcaClassificationModal, PendingRcaItem } from '../rca/RcaClassificationModal';
 
@@ -224,33 +224,27 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
       </Card>
 
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 text-red-700 dark:text-red-400">
-          <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
-          <p className="text-sm font-medium">{error}</p>
-        </div>
+        <Notice tone="danger">
+          <span className="flex items-start gap-2">
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" /> {error}
+          </span>
+        </Notice>
       )}
 
       {/* Filters + search */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 bg-surface-3 rounded-lg p-1">
-          {([['all', 'Todos'], ['pending', 'Pendentes'], ['done', 'Conferidos']] as [Filter, string][]).map(([f, label]) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${filter === f ? 'bg-surface-2 text-fg shadow-control' : 'text-fg-muted hover:text-fg'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar item..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-edge bg-surface text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
-          />
+        <SegmentedControl
+          label="Filtro de itens"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'Todos' },
+            { value: 'pending', label: 'Pendentes' },
+            { value: 'done', label: 'Conferidos' },
+          ]}
+        />
+        <div className="flex-1 min-w-[180px]">
+          <Input icon={<Search size={15} />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar item..." />
         </div>
       </div>
 
@@ -295,7 +289,7 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
         </div>
       )}
 
-      <div className="sticky bottom-0 bg-gradient-to-t from-surface via-surface to-transparent pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+      <div className="sticky bottom-0 bg-surface border-t border-edge pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
         <Button onClick={() => setShowFinalize(true)} className="w-full">
           <Flag size={18} /> Finalizar Conferência
         </Button>
@@ -327,14 +321,22 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
       </Modal>
 
       <Modal open={showFinalize} onClose={() => setShowFinalize(false)} title="Finalizar conferência?" maxWidth="max-w-md">
-        <div className="grid grid-cols-3 gap-2 text-center">
-          <Mini label="SKUs" value={items.length} />
-          <Mini label="Conferidos" value={doneCount} tone="emerald" />
-          <Mini label="Não conferidos" value={items.length - doneCount} tone={items.length - doneCount > 0 ? 'amber' : 'neutral'} />
+        <StatRow>
+          <StatCell><Stat label="SKUs" value={items.length} /></StatCell>
+          <StatCell><Stat label="Conferidos" value={doneCount} valueTone="positive" /></StatCell>
+          <StatCell>
+            <Stat
+              label="Não conferidos"
+              value={items.length - doneCount}
+              valueTone={items.length - doneCount > 0 ? 'warning' : 'default'}
+            />
+          </StatCell>
+        </StatRow>
+        <div className="mt-4">
+          <Notice tone="warning">
+            Ao finalizar, as quantidades da nota serão reveladas e comparadas com a contagem física. Esta ação encerra a conferência.
+          </Notice>
         </div>
-        <p className="mt-4 text-sm text-amber-700 dark:text-amber-400 bg-amber-500/10 rounded-lg p-3">
-          Ao finalizar, as quantidades da nota serão reveladas e comparadas com a contagem física. Esta ação encerra a conferência.
-        </p>
         {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
         <div className="mt-4 flex gap-2">
           <Button variant="secondary" onClick={() => setShowFinalize(false)} className="flex-1">Cancelar</Button>
@@ -355,16 +357,6 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
           onDone={() => { setPendingRcaItems([]); onFinalized(); }}
         />
       )}
-    </div>
-  );
-}
-
-function Mini({ label, value, tone = 'neutral' }: { label: string; value: number; tone?: 'neutral' | 'emerald' | 'amber' }) {
-  const color = tone === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : tone === 'amber' ? 'text-amber-600 dark:text-amber-400' : 'text-fg';
-  return (
-    <div className="px-2 py-2 rounded-lg bg-surface-3">
-      <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-caption">{label}</p>
     </div>
   );
 }

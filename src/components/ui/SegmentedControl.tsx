@@ -61,7 +61,7 @@ export function SegmentedControl<T extends string>({
             type="button"
             onClick={() => onChange(option.value)}
             aria-pressed={selected}
-            className={`flex min-h-[36px] flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-[0.4rem] px-3 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-[44px] ${
+            className={`flex min-h-[36px] flex-shrink-0 items-center justify-center gap-1.5 whitespace-nowrap rounded-control px-3 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-[44px] ${
               width === 'full' ? 'flex-1' : ''
             } ${
               selected

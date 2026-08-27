@@ -29,8 +29,11 @@ function deriveLiveStatus(connection: IntegrationConnection, isRunning: boolean)
   return 'attention'; // pending | inactive — configurada, mas aguardando ação
 }
 
+// "connected" é o mesmo estado que IntegrationsPage.tsx chama de "Ativa"
+// (CONNECTION_STATUS_LABEL.active) — mesmo rótulo aqui, para não mostrar duas
+// palavras diferentes para a mesma conexão em duas telas (§18).
 const LIVE_STATUS_LABEL: Record<LiveStatus, string> = {
-  connected: 'Conectada',
+  connected: 'Ativa',
   syncing: 'Sincronizando',
   attention: 'Atenção',
   error: 'Erro',

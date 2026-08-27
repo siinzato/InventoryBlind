@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Panel, PanelSection, Badge, Button } from '../ui';
+import { Panel, PanelSection, Badge, Button, Select, Stat, StatRow, StatCell } from '../ui';
 import { listImportedCountRecords, getImportItems, drawSample, logStatisticalAuditRun } from '../../lib/statisticalAuditService';
 import { computeSamplingPlan, evaluateSample, INSPECTION_LEVEL_LABEL, COMMON_AQL_OPTIONS, type InspectionLevel } from '../../lib/statisticalAuditAlgorithm';
 import type { InventoryCountRecord, InventoryCountImportItem } from '../../lib/supabase';
@@ -10,7 +10,6 @@ interface StatisticalAuditPanelProps {
   userEmail: string;
 }
 
-const inputClass = 'w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg';
 const labelClass = 'block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1';
 
 /** Auditoria por amostragem (ISO 2859-1 / ANSI Z1.4) sobre uma contagem já importada — usa
@@ -76,21 +75,21 @@ export function StatisticalAuditPanel({ companyId, userId, userEmail }: Statisti
         <PanelSection padding="md" className="grid grid-cols-1 md:grid-cols-3 gap-3">
           <div>
             <label className={labelClass}>Contagem importada</label>
-            <select value={selectedRecordId} onChange={e => setSelectedRecordId(e.target.value)} className={inputClass}>
+            <Select value={selectedRecordId} onChange={e => setSelectedRecordId(e.target.value)} className="w-full">
               {records.map(r => <option key={r.id} value={r.id}>{new Date(r.created_at).toLocaleDateString('pt-BR')} — {r.skus_contados} SKUs</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelClass}>Nível de inspeção</label>
-            <select value={inspectionLevel} onChange={e => setInspectionLevel(e.target.value as InspectionLevel)} className={inputClass}>
+            <Select value={inspectionLevel} onChange={e => setInspectionLevel(e.target.value as InspectionLevel)} className="w-full">
               {(['I', 'II', 'III'] as InspectionLevel[]).map(l => <option key={l} value={l}>{INSPECTION_LEVEL_LABEL[l]}</option>)}
-            </select>
+            </Select>
           </div>
           <div>
             <label className={labelClass}>AQL (% máx. aceitável de defeitos)</label>
-            <select value={aql} onChange={e => setAql(Number(e.target.value))} className={inputClass}>
+            <Select value={aql} onChange={e => setAql(Number(e.target.value))} className="w-full">
               {COMMON_AQL_OPTIONS.map(v => <option key={v} value={v}>{v}%</option>)}
-            </select>
+            </Select>
           </div>
         </PanelSection>
       </Panel>
@@ -98,13 +97,13 @@ export function StatisticalAuditPanel({ companyId, userId, userEmail }: Statisti
       <Panel>
         <PanelSection padding="md">
           <p className="text-section mb-3">Plano de amostragem (ISO 2859-1 / ANSI Z1.4)</p>
-          <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
-            <div><p className="text-xs text-fg-subtle">Tamanho da população</p><p className="text-sm font-semibold text-fg">{plan.populationSize}</p></div>
-            <div><p className="text-xs text-fg-subtle">Letra-código</p><p className="text-sm font-semibold text-fg">{plan.codeLetter}</p></div>
-            <div><p className="text-xs text-fg-subtle">Amostra recomendada</p><p className="text-sm font-semibold text-fg">{plan.sampleSize}</p></div>
-            <div><p className="text-xs text-fg-subtle">Ac (aceitar até)</p><p className="text-sm font-semibold text-fg">{plan.acceptanceNumber}</p></div>
-            <div><p className="text-xs text-fg-subtle">Re (rejeitar a partir de)</p><p className="text-sm font-semibold text-fg">{plan.rejectionNumber}</p></div>
-          </div>
+          <StatRow className="sm:grid-cols-5">
+            <StatCell><Stat label="Tamanho da população" value={plan.populationSize} /></StatCell>
+            <StatCell><Stat label="Letra-código" value={plan.codeLetter} /></StatCell>
+            <StatCell><Stat label="Amostra recomendada" value={plan.sampleSize} /></StatCell>
+            <StatCell><Stat label="Ac (aceitar até)" value={plan.acceptanceNumber} /></StatCell>
+            <StatCell><Stat label="Re (rejeitar a partir de)" value={plan.rejectionNumber} /></StatCell>
+          </StatRow>
           <p className="text-xs text-fg-subtle mt-3">Ac/Re calculados por aproximação estatística (Poisson) sobre o AQL — ver comentário em statisticalAuditAlgorithm.ts para a tabela oficial completa a integrar futuramente.</p>
           <div className="mt-4">
             <Button variant="secondary" onClick={handleDrawSample} disabled={plan.sampleSize === 0}>Sortear amostra sistemática</Button>
@@ -116,13 +115,13 @@ export function StatisticalAuditPanel({ companyId, userId, userEmail }: Statisti
         <Panel>
           <PanelSection padding="md">
             <p className="text-section mb-3">Resultado da auditoria</p>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4 items-center">
-              <div><p className="text-xs text-fg-subtle">Itens amostrados</p><p className="text-sm font-semibold text-fg">{sample.length}</p></div>
-              <div><p className="text-xs text-fg-subtle">Defeitos encontrados</p><p className="text-sm font-semibold text-fg">{result.defectsFound}</p></div>
-              <div>
+            <StatRow className="sm:grid-cols-3 items-center">
+              <StatCell><Stat label="Itens amostrados" value={sample.length} /></StatCell>
+              <StatCell><Stat label="Defeitos encontrados" value={result.defectsFound} /></StatCell>
+              <StatCell>
                 <Badge variant={result.accepted ? 'success' : 'danger'}>{result.accepted ? 'Lote aceito' : 'Lote rejeitado'}</Badge>
-              </div>
-            </div>
+              </StatCell>
+            </StatRow>
             <div className="mt-4">
               <Button size="sm" variant="secondary" onClick={handleLogResult} disabled={logged}>{logged ? 'Registrado no log de auditoria' : 'Registrar resultado'}</Button>
             </div>

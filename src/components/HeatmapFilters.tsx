@@ -33,7 +33,10 @@ const criticalityOptions: { value: CriticalityLevel | 'all'; label: string; colo
   { value: 'all', label: 'Todas', color: 'bg-fg-subtle' },
   { value: 'success', label: 'Saudável', color: 'bg-emerald-500' },
   { value: 'warning', label: 'Atenção', color: 'bg-amber-500' },
-  { value: 'danger', label: 'Risco', color: 'bg-orange-500' },
+  // "danger" e "warning" precisam continuar distinguíveis lado a lado nesta
+  // barra de filtros (os 5 dots aparecem juntos) — accent em vez de laranja
+  // (fora da paleta aprovada, §5/§23), mantendo os 5 valores diferenciáveis.
+  { value: 'danger', label: 'Risco', color: 'bg-accent' },
   { value: 'critical', label: 'Crítico', color: 'bg-red-500' },
 ];
 

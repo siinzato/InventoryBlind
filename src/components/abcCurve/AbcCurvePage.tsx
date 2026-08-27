@@ -2,7 +2,7 @@
 // (mesma família de telas dentro de Produtos): Page/PageHeader/Panel/PanelSection/Table/
 // Stat/SegmentedControl/Badge/Button/Select. Nenhum visual novo, nenhuma escrita no Inventário.
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState, type ReactNode } from 'react';
 import { ChevronDown, ChevronRight, Plus } from 'lucide-react';
 import {
   Page, PageHeader, Panel, PanelSection, Badge, Button, Select,
@@ -21,6 +21,16 @@ interface AbcCurvePageProps {
 }
 
 type Tab = 'overview' | 'products' | 'matrix' | 'sources';
+type ProductsView = 'summary' | 'commercial' | 'profitability' | 'classification';
+
+type Snapshot = SkuSnapshotRow & { id: string };
+
+interface ProductColumn {
+  key: string;
+  header: string;
+  numeric?: boolean;
+  render: (s: Snapshot) => ReactNode;
+}
 
 const COST_STATE_LABEL: Record<string, { label: string; variant: 'success' | 'warning' | 'danger' | 'neutral' }> = {
   NORMAL: { label: 'OK', variant: 'success' },
@@ -49,6 +59,47 @@ const classBadgeVariant = (cls: string | null): 'success' | 'warning' | 'danger'
 
 const fmtMoney = (value: number | null) => value === null ? '—' : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 const fmtPct = (value: number | null) => value === null ? '—' : `${(value * 100).toFixed(1)}%`;
+const fmtMultiplier = (value: number | null) => value === null ? '—' : `${value.toFixed(2)}x`;
+const fmtQty = (value: number | null) => value === null ? '—' : value.toLocaleString('pt-BR');
+const fmtCoverage = (value: number | null) => value === null ? '—' : `${value.toFixed(0)}d`;
+const costState = (s: Snapshot) => COST_STATE_LABEL[s.cost_state] ?? COST_STATE_LABEL.NORMAL;
+
+const PRODUCT_VIEW_OPTIONS: { value: ProductsView; label: string }[] = [
+  { value: 'summary', label: 'Resumo' },
+  { value: 'commercial', label: 'Comercial' },
+  { value: 'profitability', label: 'Rentabilidade' },
+  { value: 'classification', label: 'Classificação' },
+];
+
+const PRODUCT_COLUMNS: Record<ProductsView, ProductColumn[]> = {
+  summary: [
+    { key: 'qty', header: 'Qtd', numeric: true, render: s => fmtQty(s.quantity) },
+    { key: 'revenue', header: 'Faturamento', numeric: true, render: s => fmtMoney(s.revenue) },
+    { key: 'profit', header: 'Lucro bruto', numeric: true, render: s => fmtMoney(s.gross_profit) },
+    { key: 'margin', header: 'Margem', numeric: true, render: s => fmtPct(s.gross_margin) },
+    { key: 'abc', header: 'Classificação ABC', render: s => <Badge variant={classBadgeVariant(s.revenue_class)}>{s.revenue_class ?? '—'}</Badge> },
+  ],
+  commercial: [
+    { key: 'qty', header: 'Qtd', numeric: true, render: s => fmtQty(s.quantity) },
+    { key: 'revenue', header: 'Faturamento', numeric: true, render: s => fmtMoney(s.revenue) },
+    { key: 'avgPrice', header: 'Preço médio', numeric: true, render: s => fmtMoney(s.avg_price) },
+    { key: 'listPrice', header: 'Preço tabela', numeric: true, render: s => fmtMoney(s.list_price) },
+    { key: 'realization', header: 'Realização', numeric: true, render: s => fmtPct(s.price_realization) },
+  ],
+  profitability: [
+    { key: 'cost', header: 'Custo unitário', numeric: true, render: s => fmtMoney(s.cost) },
+    { key: 'cogs', header: 'CMV', numeric: true, render: s => fmtMoney(s.cogs) },
+    { key: 'profit', header: 'Lucro bruto', numeric: true, render: s => fmtMoney(s.gross_profit) },
+    { key: 'margin', header: 'Margem', numeric: true, render: s => fmtPct(s.gross_margin) },
+    { key: 'markup', header: 'Markup', numeric: true, render: s => fmtMultiplier(s.realized_markup) },
+  ],
+  classification: [
+    { key: 'turnover', header: 'ABC Giro', render: s => <Badge variant={classBadgeVariant(s.turnover_class)}>{s.turnover_class ?? '—'}</Badge> },
+    { key: 'revenueClass', header: 'ABC Faturamento', render: s => <Badge variant={classBadgeVariant(s.revenue_class)}>{s.revenue_class ?? '—'}</Badge> },
+    { key: 'profitClass', header: 'ABC Lucro', render: s => <Badge variant={classBadgeVariant(s.profit_class)}>{s.profit_class ?? '—'}</Badge> },
+    { key: 'status', header: 'Status', render: s => { const state = costState(s); return <Badge variant={state.variant}>{state.label}</Badge>; } },
+  ],
+};
 
 const PAGE_SIZE = 50;
 
@@ -66,6 +117,8 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
   const [page, setPage] = useState(0);
   const [expandedGroup, setExpandedGroup] = useState<string | null>(null);
   const [showWizard, setShowWizard] = useState(false);
+  const [productsView, setProductsView] = useState<ProductsView>('summary');
+  const [expandedSnapshotId, setExpandedSnapshotId] = useState<string | null>(null);
 
   const loadAnalyses = async () => {
     setLoading(true);
@@ -83,6 +136,7 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
   useEffect(() => {
     if (!selectedId) { setSnapshots([]); setRecommendations([]); setBatches([]); return; }
     setPage(0);
+    setExpandedSnapshotId(null);
     Promise.all([
       listSkuSnapshots(companyId, selectedId),
       listRecommendations(companyId, selectedId),
@@ -108,6 +162,17 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
 
   const totalPages = Math.max(1, Math.ceil(snapshots.length / PAGE_SIZE));
   const pagedSnapshots = snapshots.slice(page * PAGE_SIZE, page * PAGE_SIZE + PAGE_SIZE);
+  const productColumns = PRODUCT_COLUMNS[productsView];
+
+  const changeProductsView = (view: ProductsView) => {
+    setProductsView(view);
+    setExpandedSnapshotId(null);
+  };
+
+  const changePage = (next: number) => {
+    setPage(next);
+    setExpandedSnapshotId(null);
+  };
 
   if (loading) {
     return <Page><PanelSection padding="lg" className="text-center text-sm text-fg-subtle">Carregando...</PanelSection></Page>;
@@ -172,45 +237,97 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
 
           {tab === 'products' && (
             <Panel>
+              <PanelSection padding="md" className="flex justify-end">
+                <SegmentedControl
+                  label="Visão"
+                  value={productsView}
+                  onChange={changeProductsView}
+                  options={PRODUCT_VIEW_OPTIONS}
+                />
+              </PanelSection>
               <div className="overflow-x-auto">
                 <Table className="min-w-max">
                   <Thead>
                     <Tr>
-                      <Th className="whitespace-nowrap">SKU</Th><Th className="whitespace-nowrap">Produto</Th>
-                      <Th className="whitespace-nowrap">Qtd</Th><Th className="whitespace-nowrap">Faturamento</Th>
-                      <Th className="whitespace-nowrap">Preço médio</Th><Th className="whitespace-nowrap">Preço tabela</Th>
-                      <Th className="whitespace-nowrap">Custo</Th><Th className="whitespace-nowrap">CMV</Th>
-                      <Th className="whitespace-nowrap">Lucro</Th><Th className="whitespace-nowrap">Margem</Th>
-                      <Th className="whitespace-nowrap">Giro</Th><Th className="whitespace-nowrap">Fat.</Th>
-                      <Th className="whitespace-nowrap">Lucro (classe)</Th><Th className="whitespace-nowrap">Estoque</Th>
-                      <Th className="whitespace-nowrap">Cobertura</Th><Th className="whitespace-nowrap">Recomendação</Th>
-                      <Th className="whitespace-nowrap">Qualidade</Th>
+                      <Th className="whitespace-nowrap">Produto</Th>
+                      {productColumns.map(col => (
+                        <Th key={col.key} className="whitespace-nowrap">{col.header}</Th>
+                      ))}
+                      <Th className="w-10"><span className="sr-only">Detalhes</span></Th>
                     </Tr>
                   </Thead>
                   <tbody>
                     {pagedSnapshots.map(s => {
                       const rec = recommendationBySku.get(s.sku);
-                      const state = COST_STATE_LABEL[s.cost_state] ?? COST_STATE_LABEL.NORMAL;
+                      const state = costState(s);
+                      const isExpanded = expandedSnapshotId === s.id;
+                      const detailId = `abc-curve-product-detail-${s.id}`;
                       return (
-                        <Tr key={s.id}>
-                          <Td className="whitespace-nowrap">{s.sku}</Td>
-                          <Td className="max-w-xs truncate">{s.product_name ?? '—'}</Td>
-                          <Td numeric className="whitespace-nowrap">{s.quantity.toLocaleString('pt-BR')}</Td>
-                          <Td numeric className="whitespace-nowrap">{fmtMoney(s.revenue)}</Td>
-                          <Td numeric className="whitespace-nowrap">{fmtMoney(s.avg_price)}</Td>
-                          <Td numeric className="whitespace-nowrap">{fmtMoney(s.list_price)}</Td>
-                          <Td numeric className="whitespace-nowrap">{fmtMoney(s.cost)}</Td>
-                          <Td numeric className="whitespace-nowrap">{fmtMoney(s.cogs)}</Td>
-                          <Td numeric className="whitespace-nowrap">{fmtMoney(s.gross_profit)}</Td>
-                          <Td numeric className="whitespace-nowrap">{fmtPct(s.gross_margin)}</Td>
-                          <Td className="whitespace-nowrap"><Badge variant={classBadgeVariant(s.turnover_class)}>{s.turnover_class ?? '—'}</Badge></Td>
-                          <Td className="whitespace-nowrap"><Badge variant={classBadgeVariant(s.revenue_class)}>{s.revenue_class ?? '—'}</Badge></Td>
-                          <Td className="whitespace-nowrap"><Badge variant={classBadgeVariant(s.profit_class)}>{s.profit_class ?? '—'}</Badge></Td>
-                          <Td numeric className="whitespace-nowrap">{s.stock_available ?? '—'}</Td>
-                          <Td numeric className="whitespace-nowrap">{s.coverage_days !== null ? `${s.coverage_days.toFixed(0)}d` : '—'}</Td>
-                          <Td className="whitespace-nowrap">{rec ? RECOMMENDATION_LABEL[rec.code] : '—'}</Td>
-                          <Td className="whitespace-nowrap"><Badge variant={state.variant}>{state.label}</Badge></Td>
-                        </Tr>
+                        <Fragment key={s.id}>
+                          <Tr>
+                            <Td className="max-w-xs">
+                              <span className="block min-w-0">
+                                <span className="block truncate font-medium text-fg" title={s.product_name ?? undefined}>{s.product_name ?? '—'}</span>
+                                <span className="block truncate text-xs text-fg-subtle">{s.sku}</span>
+                              </span>
+                            </Td>
+                            {productColumns.map(col => (
+                              <Td key={col.key} numeric={col.numeric} className="whitespace-nowrap">{col.render(s)}</Td>
+                            ))}
+                            <Td className="whitespace-nowrap text-right">
+                              <button
+                                type="button"
+                                aria-expanded={isExpanded}
+                                aria-controls={detailId}
+                                onClick={() => setExpandedSnapshotId(isExpanded ? null : s.id)}
+                                className="inline-flex items-center justify-center rounded-control p-1 text-fg-subtle transition-colors hover:bg-surface-3 hover:text-fg"
+                              >
+                                {isExpanded ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                                <span className="sr-only">{isExpanded ? 'Recolher detalhes' : 'Expandir detalhes'}</span>
+                              </button>
+                            </Td>
+                          </Tr>
+                          {isExpanded && (
+                            <Tr id={detailId} className="bg-surface-3/40">
+                              <Td colSpan={productColumns.length + 2} className="space-y-3">
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                  <div className="space-y-1.5">
+                                    <p className="text-xs font-medium text-fg-subtle">Comercial</p>
+                                    <dl className="space-y-1 text-sm">
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Qtd</dt><dd className="font-mono tabular-nums text-fg">{fmtQty(s.quantity)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Faturamento</dt><dd className="font-mono tabular-nums text-fg">{fmtMoney(s.revenue)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Preço médio</dt><dd className="font-mono tabular-nums text-fg">{fmtMoney(s.avg_price)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Preço tabela</dt><dd className="font-mono tabular-nums text-fg">{fmtMoney(s.list_price)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Realização</dt><dd className="font-mono tabular-nums text-fg">{fmtPct(s.price_realization)}</dd></div>
+                                    </dl>
+                                  </div>
+                                  <div className="space-y-1.5 sm:border-l sm:border-edge/60 sm:pl-4">
+                                    <p className="text-xs font-medium text-fg-subtle">Rentabilidade</p>
+                                    <dl className="space-y-1 text-sm">
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Custo unitário</dt><dd className="font-mono tabular-nums text-fg">{fmtMoney(s.cost)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">CMV</dt><dd className="font-mono tabular-nums text-fg">{fmtMoney(s.cogs)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Lucro bruto</dt><dd className="font-mono tabular-nums text-fg">{fmtMoney(s.gross_profit)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Margem</dt><dd className="font-mono tabular-nums text-fg">{fmtPct(s.gross_margin)}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Markup</dt><dd className="font-mono tabular-nums text-fg">{fmtMultiplier(s.realized_markup)}</dd></div>
+                                    </dl>
+                                  </div>
+                                  <div className="space-y-1.5 sm:border-l sm:border-edge/60 sm:pl-4">
+                                    <p className="text-xs font-medium text-fg-subtle">Classificação</p>
+                                    <dl className="space-y-1 text-sm">
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">ABC Giro</dt><dd><Badge variant={classBadgeVariant(s.turnover_class)}>{s.turnover_class ?? '—'}</Badge></dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">ABC Faturamento</dt><dd><Badge variant={classBadgeVariant(s.revenue_class)}>{s.revenue_class ?? '—'}</Badge></dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">ABC Lucro</dt><dd><Badge variant={classBadgeVariant(s.profit_class)}>{s.profit_class ?? '—'}</Badge></dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Status</dt><dd><Badge variant={state.variant}>{state.label}</Badge></dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Recomendação</dt><dd className="text-right text-fg">{rec ? RECOMMENDATION_LABEL[rec.code] : '—'}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Estoque</dt><dd className="font-mono tabular-nums text-fg">{s.stock_available ?? '—'}</dd></div>
+                                      <div className="flex items-center justify-between gap-3"><dt className="text-fg-muted">Cobertura</dt><dd className="font-mono tabular-nums text-fg">{fmtCoverage(s.coverage_days)}</dd></div>
+                                    </dl>
+                                  </div>
+                                </div>
+                              </Td>
+                            </Tr>
+                          )}
+                        </Fragment>
                       );
                     })}
                   </tbody>
@@ -219,8 +336,8 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
               <PanelSection padding="sm" className="flex items-center justify-between text-sm text-fg-muted">
                 <span>{snapshots.length} SKUs — página {page + 1} de {totalPages}</span>
                 <div className="flex gap-2">
-                  <Button variant="ghost" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Anterior</Button>
-                  <Button variant="ghost" size="sm" disabled={page >= totalPages - 1} onClick={() => setPage(p => p + 1)}>Próxima</Button>
+                  <Button variant="ghost" size="sm" disabled={page === 0} onClick={() => changePage(page - 1)}>Anterior</Button>
+                  <Button variant="ghost" size="sm" disabled={page >= totalPages - 1} onClick={() => changePage(page + 1)}>Próxima</Button>
                 </div>
               </PanelSection>
             </Panel>

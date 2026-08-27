@@ -1,17 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ShieldCheck, Shield, ShieldAlert, ShieldX,
+  ShieldCheck, Shield, ShieldAlert,
   CheckCircle2, AlertTriangle, XCircle, Info,
   Lock, Unlock, Users, Activity, Database,
   Eye, RefreshCw, ChevronDown, ChevronUp,
   FileText, Globe, Clock, Server, Key,
-  Upload, Link, Settings, KeyRound, ArrowLeft,
+  Upload, Link, Settings, KeyRound, ArrowLeft, Check,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { hasPermission, getRoleLabel, getRoleBadgeColor } from '../lib/permissionService';
 import type { AuditLog, SecurityLog } from '../lib/auditLogService';
-import { Panel, PanelSection, Card, Table, Thead, Tr, Th, Td, Badge, Button } from './ui';
+import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button, Stat, StatRow, StatCell, ListRow } from './ui';
+import AccessDeniedPage from './AccessDeniedPage';
+import { AdminSessionsPanel } from './security/AdminSessionsPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -226,66 +228,70 @@ function OverviewCards({ companyId }: { companyId: string }) {
     if (companyId) load();
   }, [companyId]);
 
-  const cards = [
+  const skeleton = <span className="inline-block w-8 h-5 bg-surface-3 rounded animate-pulse" />;
+  const cards: { icon: React.ReactNode; label: string; value: React.ReactNode; sub: string; critical: boolean }[] = [
     {
       icon: <Shield size={14} />,
       label: 'RLS Status',
-      value: data?.rlsActive ? 'Ativo' : 'FALHA',
+      value: data ? (data.rlsActive ? 'Ativo' : 'FALHA') : skeleton,
       sub: 'Isolamento multiempresa',
-      status: data?.rlsActive ? 'ok' : 'critical',
+      critical: !!data && !data.rlsActive,
     },
     {
       icon: <FileText size={14} />,
       label: 'Logs de Auditoria',
-      value: data?.auditCount?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.auditCount.toLocaleString('pt-BR') : skeleton,
       sub: 'Eventos registrados',
-      status: 'ok',
+      critical: false,
     },
     {
       icon: <ShieldAlert size={14} />,
       label: 'Alertas Críticos',
-      value: data?.criticalAlerts?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.criticalAlerts.toLocaleString('pt-BR') : skeleton,
       sub: 'Severidade alta/crítica',
-      status: (data?.criticalAlerts ?? 0) > 0 ? 'critical' : 'ok',
+      critical: (data?.criticalAlerts ?? 0) > 0,
     },
     {
       icon: <Users size={14} />,
       label: 'Usuários da Empresa',
-      value: data?.profileCount?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.profileCount.toLocaleString('pt-BR') : skeleton,
       sub: 'Perfis vinculados',
-      status: 'ok',
+      critical: false,
     },
     {
       icon: <Database size={14} />,
       label: 'Logs de Segurança',
-      value: data?.secCount?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.secCount.toLocaleString('pt-BR') : skeleton,
       sub: 'Eventos de segurança',
-      status: 'ok',
+      critical: false,
     },
     {
       icon: <Lock size={14} />,
       label: 'Backup',
       value: 'Supabase',
       sub: 'Gerenciado automaticamente',
-      status: 'ok',
+      critical: false,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-3">
-      {cards.map((card) => (
-        <Card key={card.label} padding="sm">
-          <div className="flex items-center gap-1.5 text-fg-subtle mb-2">
-            {card.icon}
-            <span className="text-xs font-medium">{card.label}</span>
-          </div>
-          <div className={`text-xl font-semibold tabular-nums ${card.status === 'critical' ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>
-            {data ? card.value : <span className="inline-block w-8 h-5 bg-surface-3 rounded animate-pulse" />}
-          </div>
-          <div className="text-fg-subtle text-xs mt-0.5">{card.sub}</div>
-        </Card>
-      ))}
-    </div>
+    <Panel>
+      <PanelSection>
+        <StatRow className="md:grid-cols-3 lg:grid-cols-6">
+          {cards.map(card => (
+            <StatCell key={card.label}>
+              <Stat
+                icon={card.icon}
+                label={card.label}
+                value={card.value}
+                context={card.sub}
+                valueTone={card.critical ? 'critical' : 'default'}
+              />
+            </StatCell>
+          ))}
+        </StatRow>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -505,10 +511,10 @@ function ActiveSessions() {
             <p className="text-fg-subtle text-xs">Dispositivos com acesso ativo</p>
           </div>
         </div>
-        <div className="space-y-3">
-          <div className="flex items-center justify-between p-3 bg-surface-3 rounded-xl">
-            <div className="flex items-center gap-3">
-              <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+        <div>
+          <ListRow value={<Badge variant="neutral">Atual</Badge>}>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
               <div>
                 <p className="text-fg text-sm font-semibold">{profile?.email ?? user?.email}</p>
                 <p className="text-fg-subtle text-xs">
@@ -518,9 +524,8 @@ function ActiveSessions() {
                 </p>
               </div>
             </div>
-            <Badge variant="neutral">Atual</Badge>
-          </div>
-          <p className="text-fg-subtle text-xs text-center py-1">Gerenciamento avançado de sessões em breve</p>
+          </ListRow>
+          <p className="text-fg-subtle text-xs text-center py-2">Veja e gerencie todas as sessões na aba "Sessões"</p>
         </div>
       </PanelSection>
     </Panel>
@@ -573,7 +578,7 @@ function SecuritySettingsPanel({ companyId }: { companyId: string }) {
         {!settings
           ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-surface-3 rounded-xl animate-pulse" />)}</div>
           : (
-            <div className="space-y-4">
+            <div>
               <Row label="Confirmação de e-mail obrigatória" sub="Usuários devem confirmar o e-mail">
                 <Toggle value={settings.require_email_confirmation} disabled={!canEdit}
                   onChange={v => setSettings(s => s ? { ...s, require_email_confirmation: v } : s)} />
@@ -598,7 +603,7 @@ function SecuritySettingsPanel({ companyId }: { companyId: string }) {
               </Row>
               {canEdit && (
                 <Button onClick={save} disabled={saving} className="w-full mt-2">
-                  {saving ? 'Salvando…' : saved ? '✓ Salvo' : 'Salvar Configurações'}
+                  {saving ? 'Salvando…' : saved ? <><Check size={14} /> Salvo</> : 'Salvar Configurações'}
                 </Button>
               )}
             </div>
@@ -610,13 +615,10 @@ function SecuritySettingsPanel({ companyId }: { companyId: string }) {
 
 function Row({ label, sub, children }: { label: string; sub: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between p-3 bg-surface-3 rounded-xl">
-      <div>
-        <p className="text-fg text-sm">{label}</p>
-        <p className="text-fg-subtle text-xs">{sub}</p>
-      </div>
-      {children}
-    </div>
+    <ListRow value={children}>
+      <p className="text-fg text-sm">{label}</p>
+      <p className="text-fg-subtle text-xs">{sub}</p>
+    </ListRow>
   );
 }
 
@@ -650,15 +652,19 @@ function BackupStatus() {
             <p className="text-fg-subtle text-xs">Gerenciado pelo Supabase</p>
           </div>
         </div>
-        <div className="space-y-2">
+        <div>
           {items.map(item => (
-            <div key={item.label} className="flex items-center justify-between p-2.5 bg-surface-3 rounded-xl">
+            <ListRow
+              key={item.label}
+              value={
+                <span className="flex items-center gap-2">
+                  <span className="text-fg text-sm font-semibold">{item.value}</span>
+                  <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+                </span>
+              }
+            >
               <span className="text-fg-subtle text-sm">{item.label}</span>
-              <div className="flex items-center gap-2">
-                <span className="text-fg text-sm font-semibold">{item.value}</span>
-                <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
-              </div>
-            </div>
+            </ListRow>
           ))}
         </div>
       </PanelSection>
@@ -676,8 +682,8 @@ function ERPIntegrations({ companyId }: { companyId: string }) {
       .then(({ data }) => setIntegrations(data ?? []));
   }, [companyId]);
 
-  const statusColor = (s: string) =>
-    s === 'active' ? 'text-emerald-600 dark:text-emerald-400' : s === 'error' ? 'text-red-600 dark:text-red-400' : 'text-fg-subtle';
+  const statusVariant = (s: string): 'success' | 'danger' | 'neutral' =>
+    s === 'active' ? 'success' : s === 'error' ? 'danger' : 'neutral';
 
   return (
     <Panel>
@@ -698,18 +704,22 @@ function ERPIntegrations({ companyId }: { companyId: string }) {
             </div>
           )
           : (
-            <div className="space-y-2">
+            <div>
               {integrations.map(i => (
-                <div key={i.provider} className="flex items-center justify-between p-3 bg-surface-3 rounded-xl">
-                  <div className="flex items-center gap-2">
+                <ListRow
+                  key={i.provider}
+                  value={
+                    <span className="flex items-center gap-3">
+                      {i.last_sync_at && <span className="text-fg-subtle text-xs">{formatDate(i.last_sync_at)}</span>}
+                      <Badge variant={statusVariant(i.status)}>{i.status}</Badge>
+                    </span>
+                  }
+                >
+                  <span className="flex items-center gap-2">
                     <Key size={14} className="text-fg-subtle" />
                     <span className="text-fg text-sm font-semibold">{i.provider}</span>
-                  </div>
-                  <div className="flex items-center gap-3">
-                    {i.last_sync_at && <span className="text-fg-subtle text-xs">{formatDate(i.last_sync_at)}</span>}
-                    <span className={`text-xs font-semibold capitalize ${statusColor(i.status)}`}>{i.status}</span>
-                  </div>
-                </div>
+                  </span>
+                </ListRow>
               ))}
             </div>
           )}
@@ -804,16 +814,7 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
   const [tab, setTab] = useState<SecurityTab>('overview');
 
   if (!hasPermission(profile?.role, 'security.view')) {
-    return (
-      <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="text-center">
-          <ShieldX size={48} className="text-red-600 dark:text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-fg mb-2">Acesso negado</h2>
-          <p className="text-fg-subtle text-sm mb-6">Você não tem permissão para ver esta seção.</p>
-          <Button variant="secondary" onClick={onBack}>Voltar ao Dashboard</Button>
-        </div>
-      </div>
-    );
+    return <AccessDeniedPage onBack={onBack} />;
   }
 
   const tabs: { id: SecurityTab; label: string; icon: React.ReactNode }[] = [
@@ -874,7 +875,7 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
         )}
         {tab === 'audit'         && <AuditLogsTable companyId={companyId} />}
         {tab === 'security-logs' && <SecurityLogsTable companyId={companyId} />}
-        {tab === 'sessions'      && <ActiveSessions />}
+        {tab === 'sessions'      && <AdminSessionsPanel />}
         {tab === 'erp'           && <ERPIntegrations companyId={companyId} />}
         {tab === 'settings'      && <SecuritySettingsPanel companyId={companyId} />}
       </div>

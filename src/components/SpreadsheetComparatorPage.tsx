@@ -9,8 +9,8 @@
  */
 
 import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, GitCompareArrows, RefreshCw, X, CheckCircle2, AlertCircle, StopCircle, Download, FileSpreadsheet, FileText } from 'lucide-react';
-import { Button } from './ui';
+import { ArrowLeft, RefreshCw, X, StopCircle, Download, FileSpreadsheet, FileText } from 'lucide-react';
+import { Page, PageHeader, Button, ToastStack, useToasts } from './ui';
 import { ComparatorStepper } from './spreadsheet-comparator/ComparatorStepper';
 import { PresetStep } from './spreadsheet-comparator/PresetStep';
 import { FileUploadPanel } from './spreadsheet-comparator/FileUploadPanel';
@@ -32,9 +32,6 @@ import { buildResultCSV, downloadTextFile, downloadResultWorkbook, buildAndDownl
 import { loadComparatorPrefs, saveComparatorPrefs } from '../lib/spreadsheet-comparator/prefs';
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
-type ToastType = 'success' | 'error' | 'info';
-interface Toast { id: number; message: string; type: ToastType }
-let _tid = 0;
 
 const DEFAULT_SETTINGS: ComparisonSettingsType = {
   duplicateStrategy: 'aggregate', defaultCaseSensitive: false, defaultToleranceAbsolute: 0, defaultTolerancePercent: 0,
@@ -49,7 +46,7 @@ interface SpreadsheetComparatorPageProps {
 
 export const SpreadsheetComparatorPage: React.FC<SpreadsheetComparatorPageProps> = ({ onBack }) => {
   const [step, setStep] = useState<Step>(1);
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const { toasts, toast } = useToasts();
 
   const [preset, setPreset] = useState<ComparatorPresetId>('custom');
   const [labelA, setLabelA] = useState('Planilha A');
@@ -92,12 +89,6 @@ export const SpreadsheetComparatorPage: React.FC<SpreadsheetComparatorPageProps>
       visibleColumns: [],
     });
   }, [preset, settings]);
-
-  const toast = (message: string, type: ToastType = 'info') => {
-    const id = ++_tid;
-    setToasts(p => [...p, { id, message, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4500);
-  };
 
   const parsedA = useMemo(() => buildParsedSheet(baseA.grid, baseA.headerRowIndex, baseA.truncated), [baseA.grid, baseA.headerRowIndex, baseA.truncated]);
   const parsedB = useMemo(() => buildParsedSheet(baseB.grid, baseB.headerRowIndex, baseB.truncated), [baseB.grid, baseB.headerRowIndex, baseB.truncated]);
@@ -210,41 +201,23 @@ export const SpreadsheetComparatorPage: React.FC<SpreadsheetComparatorPageProps>
   const canGoToStep3 = !!baseA.meta && !!baseB.meta && !baseA.error && !baseB.error;
 
   return (
-    <div className="min-h-screen bg-surface p-6 sm:p-8">
-      <div className="max-w-5xl mx-auto">
-        {/* TOASTS */}
-        <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
-          {toasts.map(t => (
-            <div key={t.id} className={`flex items-center gap-2 px-4 py-3 rounded-container shadow-panel text-sm font-semibold max-w-xs pointer-events-auto ${
-              t.type === 'success' ? 'bg-emerald-600 text-white' : t.type === 'error' ? 'bg-red-600 text-white' : 'bg-surface-2 text-fg border border-edge'}`}>
-              {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : null}
-              {t.message}
-            </div>
-          ))}
-        </div>
+    <Page>
+      <ToastStack toasts={toasts} />
 
-        {/* HEADER */}
-        <div className="mb-8">
-          <button onClick={onBack} className="inline-flex items-center gap-2 text-sm text-fg-muted hover:text-fg transition-colors mb-6">
-            <ArrowLeft size={18} />Voltar
-          </button>
-          <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-accent rounded-xl">
-                <GitCompareArrows size={28} className="text-white" />
-              </div>
-              <div>
-                <h1 className="text-title">Comparador de Planilhas</h1>
-                <p className="text-sm text-fg-muted mt-1">Compare duas bases por chave, campo a campo — tudo no seu navegador</p>
-              </div>
-            </div>
+      <PageHeader
+        title="Comparador de Planilhas"
+        description="Compare duas bases por chave, campo a campo — tudo no seu navegador"
+        actions={
+          <>
+            <Button variant="ghost" onClick={onBack}><ArrowLeft size={16} />Voltar</Button>
             {step > 1 && (
               <Button variant="secondary" size="sm" onClick={resetAll}><X size={14} />Nova comparação</Button>
             )}
-          </div>
-        </div>
+          </>
+        }
+      />
 
-        <ComparatorStepper currentStep={step} />
+      <ComparatorStepper currentStep={step} />
 
         {step === 1 && (
           <PresetStep
@@ -336,10 +309,9 @@ export const SpreadsheetComparatorPage: React.FC<SpreadsheetComparatorPageProps>
             <ComparisonTable records={result.records} fields={fields} filter={tableFilter} onFilterChange={setTableFilter} onOpenDetails={setDetailsRecord} />
           </div>
         )}
-      </div>
 
       <ComparisonDetails record={detailsRecord} labelA={labelA} labelB={labelB} onClose={() => setDetailsRecord(null)} />
-    </div>
+    </Page>
   );
 };
 

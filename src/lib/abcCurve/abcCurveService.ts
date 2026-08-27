@@ -88,7 +88,7 @@ export async function findBatchesByFileHash(companyId: string, fileHash: string)
 }
 
 export interface SkuSnapshotRow {
-  sku: string; product_name: string | null; quantity: number; revenue: number; freight: number;
+  sku: string; product_id: string | null; product_name: string | null; quantity: number; revenue: number; freight: number;
   avg_price: number | null; list_price: number | null; promo_price: number | null; cost: number | null;
   cogs: number | null; gross_profit: number | null; gross_margin: number | null; realized_markup: number | null;
   price_realization: number | null; turnover_class: string | null; revenue_class: string | null;

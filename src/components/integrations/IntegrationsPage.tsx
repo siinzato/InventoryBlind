@@ -4,6 +4,7 @@ import {
   Badge,
   Button,
   Input,
+  Notice,
   Page,
   PageHeader,
   Panel,
@@ -32,7 +33,11 @@ import {
   type QueuedAdjustment,
   type StockWriteOutcome,
 } from '../../lib/integrations/integrationOperations';
+import { CONNECTION_STATUS_LABEL, CONNECTION_STATUS_VARIANT } from '../../lib/integrations/types';
 import type { IntegrationConnection, IntegrationProvider } from '../../lib/integrations/types';
+import { useAuth } from '../../lib/auth';
+import { logAuditEvent } from '../../lib/auditLogService';
+import { FiscalEntitySelector } from '../fiscalEntities/FiscalEntitySelector';
 
 type Tab = 'connection' | 'queue' | 'alerts';
 
@@ -53,6 +58,7 @@ export function IntegrationsPage({ onBack }: { onBack?: () => void } = {}) {
   const [tab, setTab] = useState<Tab>('connection');
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [creatingConnection, setCreatingConnection] = useState(false);
 
   const selected = useMemo(
     () => connections.find(c => c.id === selectedId) ?? null,
@@ -113,6 +119,29 @@ export function IntegrationsPage({ onBack }: { onBack?: () => void } = {}) {
         <EmptyState providers={providers} onCreated={load} />
       ) : (
         <>
+          {creatingConnection ? (
+            <Panel>
+              <PanelSection>
+                <h2 className="text-section">Nova conexão</h2>
+              </PanelSection>
+              <CreateConnectionForm
+                providers={providers}
+                onCreated={() => {
+                  setCreatingConnection(false);
+                  void load();
+                }}
+                onCancel={() => setCreatingConnection(false)}
+              />
+            </Panel>
+          ) : (
+            <div className="flex justify-end">
+              <Button variant="ghost" onClick={() => setCreatingConnection(true)}>
+                <Plug size={14} />
+                Nova conexão
+              </Button>
+            </div>
+          )}
+
           <ConnectionPicker
             connections={connections}
             selectedId={selectedId}
@@ -146,41 +175,8 @@ export function IntegrationsPage({ onBack }: { onBack?: () => void } = {}) {
 
 // ── Shared bits ─────────────────────────────────────────────────────────────
 
-/** Inline message. Semantic colour only — `danger` means something is wrong, not
- *  "this text is important". */
-function Notice({ tone, children }: { tone: 'danger' | 'warning' | 'success' | 'neutral'; children: React.ReactNode }) {
-  const TONE = {
-    danger: 'border-red-500/30 bg-red-500/5 text-red-600 dark:text-red-400',
-    warning: 'border-amber-500/30 bg-amber-500/5 text-amber-700 dark:text-amber-400',
-    success: 'border-emerald-500/30 bg-emerald-500/5 text-emerald-700 dark:text-emerald-400',
-    neutral: 'border-edge bg-surface-3 text-fg-muted',
-  } as const;
-
-  return (
-    <div className={`rounded-container border px-4 py-3 text-sm leading-relaxed ${TONE[tone]}`}>
-      {children}
-    </div>
-  );
-}
-
-const STATUS_VARIANT: Record<string, 'neutral' | 'success' | 'warning' | 'danger'> = {
-  active: 'success',
-  // Default state for a connection nobody has finished setting up. Neutral, not
-  // coloured: most connections start here and a screen of amber pills would train
-  // the operator to ignore the colour.
-  pending: 'neutral',
-  inactive: 'neutral',
-  error: 'danger',
-  revoked: 'danger',
-};
-
-const STATUS_LABEL: Record<string, string> = {
-  active: 'Ativa',
-  pending: 'Aguardando credencial',
-  inactive: 'Inativa',
-  error: 'Com erro',
-  revoked: 'Revogada',
-};
+const STATUS_VARIANT = CONNECTION_STATUS_VARIANT;
+const STATUS_LABEL = CONNECTION_STATUS_LABEL;
 
 function formatDateTime(iso: string | null): string {
   if (iso == null) return '—';
@@ -190,16 +186,34 @@ function formatDateTime(iso: string | null): string {
     : parsed.toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' });
 }
 
-// ── First run ───────────────────────────────────────────────────────────────
+// ── Criação de conexão ──────────────────────────────────────────────────────
 
-function EmptyState({ providers, onCreated }: { providers: IntegrationProvider[]; onCreated: () => void }) {
-  // Only providers with a connector on the server are offered. Listing the rest
-  // would let someone create a connection that can never sync.
-  const available = providers.filter(p => p.key === 'tiny');
+// Providers com conector real no servidor sincronizam de verdade. Providers de
+// marketplace sem conector ainda (ex.: Mercado Livre, status 'planned' no
+// catálogo) também podem ser criados — servem como identidade da conta de
+// canal (nome + empresa fiscal + external_account_id) para o resolvedor de
+// canal de origem das devoluções, mesmo sem sincronização automática ainda.
+function eligibleProviders(providers: IntegrationProvider[]): IntegrationProvider[] {
+  return providers.filter(p => p.key === 'tiny' || p.kind === 'marketplace');
+}
+
+function CreateConnectionForm({
+  providers,
+  onCreated,
+  onCancel,
+}: {
+  providers: IntegrationProvider[];
+  onCreated: () => void;
+  onCancel?: () => void;
+}) {
+  const available = eligibleProviders(providers);
   const [providerKey, setProviderKey] = useState(available[0]?.key ?? 'tiny');
   const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [failure, setFailure] = useState<string | null>(null);
+
+  const selectedProvider = available.find(p => p.key === providerKey);
+  const isPendingConnector = selectedProvider?.status === 'planned';
 
   async function create() {
     setBusy(true);
@@ -207,8 +221,9 @@ function EmptyState({ providers, onCreated }: { providers: IntegrationProvider[]
     try {
       await createConnection({
         providerKey,
-        displayName: displayName.trim() || available.find(p => p.key === providerKey)?.name || providerKey,
+        displayName: displayName.trim() || selectedProvider?.name || providerKey,
       });
+      setDisplayName('');
       onCreated();
     } catch (thrown) {
       setFailure(thrown instanceof Error ? thrown.message : 'Não foi possível criar a conexão.');
@@ -217,6 +232,54 @@ function EmptyState({ providers, onCreated }: { providers: IntegrationProvider[]
     }
   }
 
+  return (
+    <PanelSection className="space-y-4">
+      {failure && <Notice tone="danger">{failure}</Notice>}
+
+      <div className="grid gap-4 sm:grid-cols-2">
+        <Field label="Provedor">
+          <Select value={providerKey} onChange={e => setProviderKey(e.target.value)}>
+            {available.map(provider => (
+              <option key={provider.key} value={provider.key}>
+                {provider.name}
+              </option>
+            ))}
+          </Select>
+        </Field>
+        <Field label="Nome" hint="Como esta conexão aparece nas listas.">
+          <Input
+            value={displayName}
+            onChange={e => setDisplayName(e.target.value)}
+            placeholder={selectedProvider?.kind === 'marketplace' ? 'Mercado Livre — GoCase' : 'Tiny ERP — matriz'}
+          />
+        </Field>
+      </div>
+
+      {isPendingConnector && (
+        <Notice tone="neutral">
+          Integração pendente: {selectedProvider?.name} ainda não tem sincronização automática
+          neste ambiente. A conexão serve como identidade da conta (empresa fiscal e
+          identificador externo) — útil, por exemplo, para o InventoryBlind reconhecer o canal de
+          origem de uma devolução.
+        </Notice>
+      )}
+
+      <div className="flex items-center gap-3">
+        <Button onClick={create} disabled={busy}>
+          {busy && <Loader2 size={14} className="animate-spin" />}
+          Criar conexão
+        </Button>
+        {onCancel && (
+          <Button variant="ghost" onClick={onCancel} disabled={busy}>
+            Cancelar
+          </Button>
+        )}
+      </div>
+    </PanelSection>
+  );
+}
+
+function EmptyState({ providers, onCreated }: { providers: IntegrationProvider[]; onCreated: () => void }) {
   return (
     <Panel>
       <PanelSection>
@@ -231,34 +294,7 @@ function EmptyState({ providers, onCreated }: { providers: IntegrationProvider[]
           </div>
         </div>
       </PanelSection>
-
-      <PanelSection className="space-y-4">
-        {failure && <Notice tone="danger">{failure}</Notice>}
-
-        <div className="grid gap-4 sm:grid-cols-2">
-          <Field label="Provedor">
-            <Select value={providerKey} onChange={e => setProviderKey(e.target.value)}>
-              {available.map(provider => (
-                <option key={provider.key} value={provider.key}>
-                  {provider.name}
-                </option>
-              ))}
-            </Select>
-          </Field>
-          <Field label="Nome" hint="Como esta conexão aparece nas listas.">
-            <Input
-              value={displayName}
-              onChange={e => setDisplayName(e.target.value)}
-              placeholder="Tiny ERP — matriz"
-            />
-          </Field>
-        </div>
-
-        <Button onClick={create} disabled={busy}>
-          {busy && <Loader2 size={14} className="animate-spin" />}
-          Criar conexão
-        </Button>
-      </PanelSection>
+      <CreateConnectionForm providers={providers} onCreated={onCreated} />
     </Panel>
   );
 }
@@ -331,6 +367,7 @@ function ConnectionPanel({
   connection: IntegrationConnection;
   onChanged: () => void;
 }) {
+  const { profile } = useAuth();
   const [secret, setSecret] = useState('');
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'success' | 'danger' | 'warning' | 'neutral'; text: string } | null>(null);
@@ -516,6 +553,37 @@ function ConnectionPanel({
               />
             </Field>
           </div>
+
+          <Field
+            label="Empresa fiscal"
+            hint="A empresa (CNPJ) deste workspace que esta conexão representa. Usada para localizar corretamente o produto e o depósito no provedor."
+          >
+            <div className="space-y-1.5">
+              {connection.fiscalEntityId == null && <Badge variant="warning">Configuração pendente</Badge>}
+              <FiscalEntitySelector
+                companyId={connection.companyId}
+                value={connection.fiscalEntityId}
+                disabled={busy != null}
+                onChange={fiscalEntityId =>
+                  run('fiscalEntity', async () => {
+                    await updateConnection(connection.id, { fiscalEntityId });
+                    if (profile) {
+                      await logAuditEvent({
+                        companyId: connection.companyId,
+                        userId: profile.id,
+                        userEmail: profile.email ?? '',
+                        action: fiscalEntityId ? 'fiscal_entity.integration_linked' : 'fiscal_entity.integration_unlinked',
+                        resourceType: 'integration_connections',
+                        resourceId: connection.id,
+                        metadata: { fiscalEntityId },
+                      });
+                    }
+                    return { tone: 'success', text: fiscalEntityId ? 'Empresa fiscal vinculada.' : 'Vínculo removido.' };
+                  })
+                }
+              />
+            </div>
+          </Field>
 
           {readOnly && (
             <Notice tone="neutral">

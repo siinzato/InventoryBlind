@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { HelpCircle, ChevronDown, ChevronUp } from 'lucide-react';
-import { Panel, PanelSection, Button, Badge } from '../ui';
+import { Panel, PanelSection, Button, Badge, Input, Textarea } from '../ui';
 import {
   getOpenFiveWhysSessions, getFiveWhysAnswers, answerFiveWhys, completeFiveWhysSession,
 } from '../../lib/rcaService';
@@ -46,7 +46,7 @@ function SessionCard({ session, companyId, userId, userEmail, canManage, onChang
   };
 
   return (
-    <div className="border border-edge rounded-xl overflow-hidden">
+    <div className="border border-edge rounded-container overflow-hidden">
       <button onClick={() => setExpanded(!expanded)} className="w-full flex items-center justify-between gap-3 p-3.5 hover:bg-surface-3/50 transition-colors text-left">
         <div className="min-w-0">
           <p className="text-sm font-medium text-fg">
@@ -68,11 +68,11 @@ function SessionCard({ session, companyId, userId, userEmail, canManage, onChang
 
           {canManage && nextLevel <= 5 && (
             <div className="flex gap-2">
-              <input
+              <Input
                 value={draft}
                 onChange={e => setDraft(e.target.value)}
                 placeholder={`${nextLevel}º Por quê?`}
-                className="flex-1 p-2 border border-edge rounded-lg bg-surface text-sm text-fg"
+                className="flex-1"
               />
               <Button size="sm" onClick={handleAnswer} disabled={saving || !draft.trim()}>Responder</Button>
             </div>
@@ -81,7 +81,7 @@ function SessionCard({ session, companyId, userId, userEmail, canManage, onChang
           {canManage && nextLevel > 4 && (
             <div className="pt-2 border-t border-edge space-y-2">
               <label className="block text-xs font-semibold text-fg-subtle uppercase">Causa raiz identificada</label>
-              <textarea value={summary} onChange={e => setSummary(e.target.value)} rows={2} className="w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg resize-none" />
+              <Textarea value={summary} onChange={e => setSummary(e.target.value)} rows={2} />
               <Button size="sm" onClick={handleComplete} disabled={saving || !summary.trim()}>Concluir análise</Button>
             </div>
           )}

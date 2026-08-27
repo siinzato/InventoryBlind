@@ -6,8 +6,8 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ArrowLeft, Users, Plus, Trash2, Edit2, RefreshCw,
-  X, Check, AlertCircle, Shield, Eye, ClipboardCheck,
-  User, Mail, Search,
+  X, Check, AlertCircle, Shield, ShieldCheck, Eye, ClipboardCheck,
+  User, Mail, Search, Copy, Ticket,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
@@ -19,22 +19,22 @@ import { Modal, Panel, PanelSection, Badge, Button, Table, Thead, Tr, Th, Td } f
 type Role = 'owner' | 'admin' | 'manager' | 'counter' | 'viewer';
 type RoleBadgeVariant = 'neutral' | 'accent' | 'success' | 'warning' | 'danger';
 
+// badgeVariant segue a mesma regra de permissionService.getRoleBadgeColor:
+// papel é metadado neutro, não uma condição que precisa de atenção — só os
+// dois papéis privilegiados (owner/admin) ganham o tom de destaque (accent),
+// nunca uma cor por variedade (§5/§18). "warning" (âmbar) já foi usado aqui
+// para "Proprietário", o que sinalizava atenção sem motivo real — corrigido.
 const ROLE_CONFIG: Record<Role, { label: string; badgeVariant: RoleBadgeVariant; icon: React.ReactNode; desc: string }> = {
-  owner:   { label: 'Proprietário',  badgeVariant: 'warning', icon: <Shield size={12} />,          desc: 'Acesso total, gerencia empresa e usuários.' },
-  admin:   { label: 'Administrador', badgeVariant: 'accent',  icon: <ShieldCheckIcon size={12} />, desc: 'Acesso total, exceto configurações críticas da empresa.' },
-  manager: { label: 'Gerente',       badgeVariant: 'neutral', icon: <User size={12} />,             desc: 'Visualiza e opera todos os módulos.' },
-  counter: { label: 'Conferente',    badgeVariant: 'neutral', icon: <ClipboardCheck size={12} />,   desc: 'Realiza contagens e operações de picking.' },
-  viewer:  { label: 'Visualizador',  badgeVariant: 'neutral', icon: <Eye size={12} />,               desc: 'Somente leitura — não pode criar ou editar dados.' },
+  owner:   { label: 'Proprietário',  badgeVariant: 'accent',  icon: <Shield size={12} />,      desc: 'Acesso total, gerencia empresa e usuários.' },
+  admin:   { label: 'Administrador', badgeVariant: 'accent',  icon: <ShieldCheck size={12} />, desc: 'Acesso total, exceto configurações críticas da empresa.' },
+  manager: { label: 'Gerente',       badgeVariant: 'neutral', icon: <User size={12} />,         desc: 'Visualiza e opera todos os módulos.' },
+  counter: { label: 'Conferente',    badgeVariant: 'neutral', icon: <ClipboardCheck size={12} />, desc: 'Realiza contagens e operações de picking.' },
+  viewer:  { label: 'Visualizador',  badgeVariant: 'neutral', icon: <Eye size={12} />,          desc: 'Somente leitura — não pode criar ou editar dados.' },
 };
-
-// Inline icon helper (lucide doesn't export ShieldCheck as a name we can use as value)
-function ShieldCheckIcon({ size }: { size: number }) {
-  return <Check size={size} />;
-}
 
 // ── Invite Modal ──────────────────────────────────────────────────────────────
 
-const InviteModal: React.FC<{ companyId: string; onClose: () => void; onInvited: () => void }> = ({ companyId, onClose, onInvited }) => {
+const InviteModal: React.FC<{ onClose: () => void; onInvited: () => void }> = ({ onClose, onInvited }) => {
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role>('counter');
@@ -49,24 +49,29 @@ const InviteModal: React.FC<{ companyId: string; onClose: () => void; onInvited:
     setError(''); setLoading(true);
 
     try {
-      // Sign up the new user with company_id in metadata
+      // Cria o convite pendente ANTES de criar a conta — assim ele existe mesmo que o signUp
+      // falhe ou demore, e é a própria RPC accept_pending_invitations() (chamada automaticamente
+      // no próximo login, ver auth.tsx) que vincula a empresa. company_id/role não vão mais no
+      // metadata do signUp: desde a migration 015 (fix_privilege_escalation) esses metadados são
+      // ignorados por design pelo handle_new_user() — confiar neles era exatamente a causa do
+      // funcionário convidado cair no onboarding de criar empresa nova.
+      const { error: inviteErr } = await supabase.rpc('create_company_invitation', {
+        p_email: email.trim(),
+        p_role: role,
+        p_name: name.trim(),
+      });
+      if (inviteErr) throw inviteErr;
+
       const { data, error: signupErr } = await supabase.auth.signUp({
         email: email.trim(),
         password: tempPw,
         options: {
-          data: {
-            name: name.trim(),
-            company_id: companyId,
-            role,
-          },
+          data: { name: name.trim() },
         },
       });
 
       if (signupErr) throw signupErr;
       if (!data.user) throw new Error('Usuário não criado.');
-
-      // Mark profile as must_change_password
-      await supabase.from('profiles').update({ must_change_password: true }).eq('id', data.user.id);
 
       setSuccess(`Usuário ${name.trim()} convidado com sucesso! Senha temporária: ${tempPw}`);
       setTimeout(() => { onInvited(); onClose(); }, 3000);
@@ -131,6 +136,83 @@ const InviteModal: React.FC<{ companyId: string; onClose: () => void; onInvited:
   );
 };
 
+// ── Invite Code Modal ────────────────────────────────────────────────────────
+
+/** Código de convite da empresa (migration 082) — alternativa ao convite por e-mail: qualquer
+ *  pessoa com o código se cadastra sozinha em InventoryBlind e já entra vinculada a esta empresa.
+ *  Muda todo dia (get_or_create_daily_invite_code reaproveita o de hoje se já existir), então um
+ *  vazamento só vale por algumas horas. */
+const InviteCodeModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
+  const [code, setCode] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const { data, error: rpcErr } = await supabase.rpc('get_or_create_daily_invite_code');
+      if (cancelled) return;
+      if (rpcErr) {
+        setError(rpcErr.message || 'Erro ao gerar código de convite.');
+      } else {
+        setCode(data?.code ?? null);
+      }
+      setLoading(false);
+    })();
+    return () => { cancelled = true; };
+  }, []);
+
+  const copy = async () => {
+    if (!code) return;
+    try {
+      await navigator.clipboard.writeText(code);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // Clipboard indisponível (ex.: contexto não seguro) — o código já está visível na tela para
+      // copiar manualmente, então não há necessidade de mostrar erro aqui.
+    }
+  };
+
+  return (
+    <Modal open onClose={onClose} title="Código de Convite da Empresa" maxWidth="max-w-md">
+      <div className="space-y-4">
+        <p className="text-sm text-fg-muted">
+          Peça para a pessoa criar uma conta em InventoryBlind e escolher "Tenho um código de convite"
+          na tela de cadastro, informando o código abaixo. Ela entra automaticamente nesta empresa,
+          com perfil de Visualizador — você pode alterar o perfil dela depois aqui na lista.
+        </p>
+
+        {error && (
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
+            <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />{error}
+          </div>
+        )}
+
+        {loading ? (
+          <div className="flex items-center justify-center gap-2 py-6 text-fg-subtle">
+            <RefreshCw size={16} className="animate-spin" /> Gerando código...
+          </div>
+        ) : code ? (
+          <>
+            <div className="bg-surface-3 border border-edge rounded-xl p-5 text-center">
+              <p className="font-mono text-2xl font-bold tracking-[0.3em] text-fg">{code}</p>
+            </div>
+            <Button variant="secondary" onClick={copy} className="w-full">
+              {copied ? <Check size={14} /> : <Copy size={14} />}
+              {copied ? 'Copiado!' : 'Copiar código'}
+            </Button>
+            <p className="text-xs text-fg-subtle text-center">
+              Válido só hoje — um novo código é gerado automaticamente amanhã.
+            </p>
+          </>
+        ) : null}
+      </div>
+    </Modal>
+  );
+};
+
 // ── Role badge ────────────────────────────────────────────────────────────────
 
 const RoleBadge: React.FC<{ role: Role }> = ({ role }) => {
@@ -154,6 +236,7 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
   const [loading, setLoading] = useState(true);
   const [search, setSearch] = useState('');
   const [showInvite, setShowInvite] = useState(false);
+  const [showInviteCode, setShowInviteCode] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editRole, setEditRole] = useState<Role>('counter');
   const [saving, setSaving] = useState(false);
@@ -219,7 +302,11 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
       )}
 
       {showInvite && company && (
-        <InviteModal companyId={company.id} onClose={() => setShowInvite(false)} onInvited={load} />
+        <InviteModal onClose={() => setShowInvite(false)} onInvited={load} />
+      )}
+
+      {showInviteCode && company && (
+        <InviteCodeModal onClose={() => setShowInviteCode(false)} />
       )}
 
       {/* Header */}
@@ -238,9 +325,14 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
             </div>
           </div>
           {canManage && (
-            <Button onClick={() => setShowInvite(true)}>
-              <Plus size={15} /> Convidar
-            </Button>
+            <div className="flex items-center gap-2">
+              <Button variant="secondary" onClick={() => setShowInviteCode(true)}>
+                <Ticket size={15} /> Código de Convite
+              </Button>
+              <Button onClick={() => setShowInvite(true)}>
+                <Plus size={15} /> Convidar
+              </Button>
+            </div>
           )}
         </div>
       </div>
@@ -318,11 +410,11 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
                       </Td>
                       <Td>
                         {u.must_change_password ? (
-                          <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">Deve alterar senha</span>
+                          <Badge variant="warning">Deve alterar senha</Badge>
                         ) : u.id === profile?.id ? (
-                          <span className="text-xs text-emerald-600 dark:text-emerald-400 font-semibold">Você</span>
+                          <Badge variant="accent">Você</Badge>
                         ) : (
-                          <span className="text-xs text-fg-subtle">Ativo</span>
+                          <Badge variant="neutral">Ativo</Badge>
                         )}
                       </Td>
                       {canManage && (

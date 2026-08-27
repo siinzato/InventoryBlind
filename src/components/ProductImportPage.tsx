@@ -7,7 +7,7 @@ import { ColumnMappingWizard } from './ColumnMappingWizard';
 import { ProductImportPreview } from './ProductImportPreview';
 import { ProductImportProgress } from './ProductImportProgress';
 import { ProductImportSummary } from './ProductImportSummary';
-import { Panel, PanelSection, Button } from './ui';
+import { Page, PageHeader, Panel, PanelSection, Button } from './ui';
 import type { ProductValidated, ImportSummary, ImportProgress, ImportError, ImportStatus, ColumnMapping, ProductFromDB } from '../lib/productImportTypes';
 import {
   parseCSV,
@@ -490,11 +490,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   // Admin check overlay
   const AdminCheckOverlay = () => (
     <div className="rounded-container border border-amber-500/20 bg-amber-500/10 p-8 text-center">
-      <div className="flex justify-center mb-4">
-        <div className="p-4 bg-amber-500/10 rounded-full">
-          <Lock size={40} className="text-amber-600 dark:text-amber-400" />
-        </div>
-      </div>
+      <Lock size={32} className="mx-auto mb-3 text-amber-600 dark:text-amber-400" />
       <h3 className="text-title mb-2">Acesso Restrito</h3>
       <p className="text-sm text-fg-muted mb-6">
         Somente administradores podem importar produtos.
@@ -509,11 +505,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   const ImportErrorResult = () => (
     <div>
       <div className="text-center mb-8">
-        <div className="flex justify-center mb-4">
-          <div className="p-4 bg-red-500/10 rounded-full">
-            <XCircle size={64} className="text-red-600 dark:text-red-400" />
-          </div>
-        </div>
+        <XCircle size={32} className="mx-auto mb-3 text-red-600 dark:text-red-400" />
         <h2 className="text-title mb-2">
           Importação concluída com falhas
         </h2>
@@ -564,30 +556,19 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   );
 
   return (
-    <div className="min-h-screen bg-surface p-6 sm:p-8">
-      <div className="max-w-5xl mx-auto">
-        {/* Header */}
-        <div className="mb-8">
-          <button
-            onClick={onBack}
-            className="inline-flex items-center gap-2 text-sm text-fg-muted hover:text-fg transition-colors mb-6"
-          >
-            <ArrowLeft size={18} />
+    <Page>
+      <PageHeader
+        title="Importar Produtos"
+        description="Importe sua planilha de produtos para o sistema"
+        actions={
+          <Button variant="ghost" onClick={onBack}>
+            <ArrowLeft size={16} />
             Voltar
-          </button>
+          </Button>
+        }
+      />
 
-          <div className="flex items-center gap-4">
-            <div className="p-3 bg-accent rounded-xl">
-              <FileSpreadsheet size={28} className="text-white" />
-            </div>
-            <div>
-              <h1 className="text-title">Importar Produtos</h1>
-              <p className="text-sm text-fg-muted mt-1">Importe sua planilha de produtos para o sistema</p>
-            </div>
-          </div>
-        </div>
-
-        {/* Stepper */}
+      {/* Stepper */}
         <div className="flex items-center justify-center mb-8">
           {['upload', 'mapping', 'preview', 'importing', 'complete'].map((step, idx) => {
             const stepLabels: Record<string, string> = {
@@ -682,7 +663,6 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
             )}
           </>
         )}
-      </div>
-    </div>
+    </Page>
   );
 };

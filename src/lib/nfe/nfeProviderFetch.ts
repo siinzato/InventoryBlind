@@ -57,15 +57,23 @@ function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-/**
- * Busca a NF-e no provedor externo por chave de acesso e importa pelo mesmo
- * caminho da importação manual. Faz polling de WAITING/SEARCHING a cada ~2s,
- * até 10 tentativas, antes de desistir com um erro claro.
- */
-export async function fetchAndImportNfeByKey(
+interface ProviderXmlResult {
+  xml: string;
+  /** Não-nulo quando esta chave já existe em nfe_invoices (domínio da Conferência
+   *  por NF-e / compras). O XML já baixado naquela importação é reaproveitado —
+   *  nunca uma nova chamada ao provedor — mas a nota de compra em si não é
+   *  tocada por quem não pertence a esse domínio. */
+  existingPurchaseInvoice: NfeInvoice | null;
+}
+
+/** Faz o polling de WAITING/SEARCHING a cada ~2s (até 10 tentativas) e devolve
+ *  o XML puro — sem decidir o que fazer com ele. `fetchAndImportNfeByKey` e
+ *  `fetchNfeXmlByKey` compartilham este núcleo; cada um decide separadamente
+ *  se persiste como nota de compra ou não. */
+async function pollProviderForXml(
   invoiceKey: string,
   onAttempt?: (attempt: number, maxAttempts: number) => void,
-): Promise<ImportResult> {
+): Promise<ProviderXmlResult> {
   const key = invoiceKey.trim();
   if (!isValidNfeAccessKey(key)) {
     throw new Error('Chave de acesso inválida. Informe os 44 dígitos da NF-e.');
@@ -76,10 +84,13 @@ export async function fetchAndImportNfeByKey(
     const result = await callFetchFunction(key);
 
     if (result.outcome === 'already_imported') {
-      throw new NfeFetchByKeyError('Esta NF-e já foi importada.', result.invoice);
+      if (!result.invoice?.raw_xml) {
+        throw new Error('Não foi possível consultar a NF-e. Tente novamente.');
+      }
+      return { xml: result.invoice.raw_xml, existingPurchaseInvoice: result.invoice };
     }
     if (result.outcome === 'ok' && result.xml) {
-      return importNfeXml(result.xml);
+      return { xml: result.xml, existingPurchaseInvoice: null };
     }
     if (attempt < MAX_ATTEMPTS - 1) {
       await sleep(POLL_INTERVAL_MS);
@@ -87,4 +98,34 @@ export async function fetchAndImportNfeByKey(
   }
 
   throw new Error('O provedor demorou demais para responder. Tente novamente em instantes.');
+}
+
+/**
+ * Busca a NF-e no provedor externo por chave de acesso e importa pelo mesmo
+ * caminho da importação manual. Faz polling de WAITING/SEARCHING a cada ~2s,
+ * até 10 tentativas, antes de desistir com um erro claro.
+ */
+export async function fetchAndImportNfeByKey(
+  invoiceKey: string,
+  onAttempt?: (attempt: number, maxAttempts: number) => void,
+): Promise<ImportResult> {
+  const { xml, existingPurchaseInvoice } = await pollProviderForXml(invoiceKey, onAttempt);
+  if (existingPurchaseInvoice) {
+    throw new NfeFetchByKeyError('Esta NF-e já foi importada.', existingPurchaseInvoice);
+  }
+  return importNfeXml(xml);
+}
+
+/**
+ * Busca só o XML da NF-e pela chave de acesso, no mesmo provedor/Edge Function
+ * usado pela Conferência por NF-e — sem persistir em nfe_invoices. Para fluxos
+ * que processam o XML por conta própria e não pertencem ao domínio de compras
+ * (ex.: Nova Devolução), evitando misturar as duas listagens.
+ */
+export async function fetchNfeXmlByKey(
+  invoiceKey: string,
+  onAttempt?: (attempt: number, maxAttempts: number) => void,
+): Promise<string> {
+  const { xml } = await pollProviderForXml(invoiceKey, onAttempt);
+  return xml;
 }

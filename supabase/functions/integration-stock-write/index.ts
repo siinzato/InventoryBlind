@@ -104,7 +104,7 @@ interface ConnectionRow {
 const ADJUSTMENT_COLUMNS =
   'id, external_product_id, sku, external_warehouse_id, target_warehouse_id, previous_quantity, ' +
   'counted_quantity, delta_quantity, write_kind, movement_reason, reason, idempotency_key, ' +
-  'approved_at, attempts';
+  'approved_at, attempts, origin';
 
 interface AdjustmentRow extends ApprovedAdjustment {
   attempts: number;
@@ -314,7 +314,7 @@ Deno.serve(async (req: Request) => {
       results.push(outcome);
 
       if (!dryRun) {
-        await recordOutcome(userClient, adjustment, outcome);
+        await recordOutcome(userClient, adminClient, connection, adjustment, outcome);
       }
     }
 
@@ -615,6 +615,8 @@ function describeIntent(write: StockWrite): string {
  *  finding out. */
 async function recordOutcome(
   client: SupabaseClient,
+  adminClient: SupabaseClient,
+  connection: ConnectionRow,
   adjustment: AdjustmentRow,
   outcome: AdjustmentOutcome
 ): Promise<void> {
@@ -636,6 +638,16 @@ async function recordOutcome(
         error_message: null,
       })
       .eq('id', adjustment.id);
+
+    // Only the Logística Reversa origin raises/resolves alerts today (see below) —
+    // resolving here is what closes one it may have raised on an earlier attempt.
+    // A no-op RPC call when nothing is open; failure here must never fail the send
+    // that already succeeded, so it is swallowed.
+    if (adjustment.origin === 'reverse_logistics') {
+      try {
+        await adminClient.rpc('integration_resolve_alert', { p_connection_id: connection.id, p_kind: 'sync_failing' });
+      } catch { /* alerting is best-effort */ }
+    }
     return;
   }
 
@@ -651,6 +663,23 @@ async function recordOutcome(
       error_message: outcome.message ?? null,
     })
     .eq('id', adjustment.id);
+
+  // Guarded by origin so physical_count/manual/reconciliation/conflict_resolution
+  // keep their exact current behaviour — no alert was raised for them before this
+  // change, and none is raised for them now. Only the new reverse_logistics origin
+  // gets this notification, per the reverse-logistics sync spec.
+  if (permanent && adjustment.origin === 'reverse_logistics') {
+    try {
+      await adminClient.rpc('integration_raise_alert', {
+        p_company_id: connection.company_id,
+        p_connection_id: connection.id,
+        p_kind: 'sync_failing',
+        p_severity: 'warning',
+        p_message: `Falha ao sincronizar entrada de estoque da Logística Reversa com o Tiny (SKU ${adjustment.sku ?? '—'}).`,
+        p_context: { adjustmentId: adjustment.id, sku: adjustment.sku, errorKind: outcome.errorKind ?? outcome.code ?? null },
+      });
+    } catch { /* alerting is best-effort */ }
+  }
 }
 
 /** Parse the override list.

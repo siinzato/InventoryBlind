@@ -62,7 +62,8 @@ import {
   ListTodo,
   FileStack,
   Grid3x3,
-  ShoppingCart
+  ShoppingCart,
+  PackageX
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -135,6 +136,7 @@ const WarehouseDigitalTwinPage = React.lazy(() => import('./components/slotting/
 const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardPage').then(m => ({ default: m.RcaDashboardPage })));
 const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
 const PurchaseOrdersPage = React.lazy(() => import('./components/purchaseOrders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+const ReverseLogisticsPage = React.lazy(() => import('./components/reverseLogistics/ReverseLogisticsPage').then(m => ({ default: m.ReverseLogisticsPage })));
 const ProductBrandsPage = React.lazy(() => import('./components/productBrands/ProductBrandsPage').then(m => ({ default: m.ProductBrandsPage })));
 const AbcCurvePage = React.lazy(() => import('./components/abcCurve/AbcCurvePage').then(m => ({ default: m.AbcCurvePage })));
 const KnowledgeCenterPage = React.lazy(() => import('./components/account/KnowledgeCenterPage').then(m => ({ default: m.KnowledgeCenterPage })));
@@ -145,6 +147,7 @@ const AuditsAnalyticsPage = React.lazy(() => import('./components/analytics/Audi
 const ApiKeysPage = React.lazy(() => import('./components/settings/ApiKeysPage').then(m => ({ default: m.ApiKeysPage })));
 const WebhooksPage = React.lazy(() => import('./components/settings/WebhooksPage').then(m => ({ default: m.WebhooksPage })));
 const LogsPage = React.lazy(() => import('./components/settings/LogsPage').then(m => ({ default: m.LogsPage })));
+const FiscalEntitiesPage = React.lazy(() => import('./components/settings/FiscalEntitiesPage').then(m => ({ default: m.FiscalEntitiesPage })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -556,6 +559,7 @@ function AppContent() {
         { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
         { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
         { id: 'purchase-orders', label: 'Ordens de Compra',    icon: <ShoppingCart />, onClick: () => { setActiveTab('purchase-orders'); setMobileOpen(false); }, active: activeTab === 'purchase-orders' },
+        { id: 'reverse-logistics', label: 'Logística Reversa', icon: <PackageX />,    onClick: () => { setActiveTab('reverse-logistics'); setMobileOpen(false); }, active: activeTab === 'reverse-logistics' },
         { id: 'cbc',            label: 'Confidence Score',     icon: <Gauge />,       onClick: () => { setActiveTab('cbc'); setMobileOpen(false); },            active: activeTab === 'cbc' },
         { id: 'risk',           label: 'Inventário por Risco', icon: <AlertTriangle />, onClick: () => { setActiveTab('risk'); setMobileOpen(false); },         active: activeTab === 'risk' },
         { id: 'abcxyz',         label: 'Classificação ABC/XYZ', icon: <LayoutGrid />, onClick: () => { setActiveTab('abcxyz'); setMobileOpen(false); },   active: activeTab === 'abcxyz' },
@@ -668,6 +672,7 @@ function AppContent() {
         { id: 'config-api',      label: 'API',      icon: <Code2 />,    onClick: () => { setActiveTab('config-api'); setMobileOpen(false); },      active: activeTab === 'config-api' },
         { id: 'config-webhooks', label: 'Webhooks', icon: <Webhook />,  onClick: () => { setActiveTab('config-webhooks'); setMobileOpen(false); }, active: activeTab === 'config-webhooks' },
         { id: 'config-logs',     label: 'Logs',      icon: <FileText />, onClick: () => { setActiveTab('config-logs'); setMobileOpen(false); },     active: activeTab === 'config-logs' },
+        { id: 'config-empresas-fiscais', label: 'Empresas e Dados Fiscais', icon: <Building2 />, onClick: () => { setActiveTab('config-empresas-fiscais'); setMobileOpen(false); }, active: activeTab === 'config-empresas-fiscais' },
       ],
     },
   ];
@@ -1631,6 +1636,13 @@ function AppContent() {
           </React.Suspense>
         )}
 
+        {/* ABA LOGÍSTICA REVERSA */}
+        {activeTab === 'reverse-logistics' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ReverseLogisticsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
         {/* ANALYTICS: BLINDSCORE */}
         {activeTab === 'analytics-blindscore' && profile && (
           <React.Suspense fallback={<PageLoader />}>
@@ -1673,6 +1685,11 @@ function AppContent() {
         {activeTab === 'config-logs' && profile && canManageUsers(profile.role) && (
           <React.Suspense fallback={<PageLoader />}>
             <LogsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-empresas-fiscais' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <FiscalEntitiesPage companyId={companyId} />
           </React.Suspense>
         )}
 
@@ -2031,7 +2048,11 @@ function AppContent() {
 
       {/* PWA Install Instructions Modal (iOS) */}
       {showInstallModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowInstallModal(false)}>
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          style={{ zIndex: 'var(--z-modal)' }}
+          onClick={() => setShowInstallModal(false)}
+        >
           <div className="bg-surface-2 border border-edge rounded-sheet p-6 max-w-sm mx-4 shadow-overlay" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
@@ -2060,11 +2081,25 @@ function AppContent() {
 // ── Link Company screen ───────────────────────────────────────────────────────
 
 function LinkCompanyScreen() {
-  const { linkToAZ, createCompany, signOut, user } = useAuth();
+  const { linkToAZ, createCompany, joinByInviteCode, inviteCodeError, clearInviteCodeError, signOut, user } = useAuth();
   const [companyName, setCompanyName] = useState('');
   const [creating, setCreating] = useState(false);
   const [linkingAZ, setLinkingAZ] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
   const [error, setError] = useState('');
+
+  // Um código de convite informado no cadastro (SignupView, modo "Tenho um código de convite")
+  // já foi tentado automaticamente em runAuthSequence antes desta tela aparecer. Se falhou, o
+  // motivo chega aqui em vez de a pessoa cair silenciosamente em "criar empresa" sem explicação —
+  // consumido uma vez e limpo, para não reaparecer se ela tentar de novo manualmente abaixo.
+  useEffect(() => {
+    if (inviteCodeError) {
+      setError(inviteCodeError);
+      clearInviteCodeError();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   // This screen is a recovery path — the golden signup flow creates the
   // company via create_company_onboarding() right after signUp() and never
@@ -2086,6 +2121,20 @@ function LinkCompanyScreen() {
       console.error('[LinkCompanyScreen] createCompany error:', msg);
       setError('Não foi possível concluir a configuração da empresa. Tente novamente.');
       setCreating(false);
+    }
+  };
+
+  const handleJoinByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteCode.trim()) { setError('Informe o código de convite.'); return; }
+    setJoiningByCode(true);
+    setError('');
+    try {
+      await joinByInviteCode(inviteCode.trim());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Código de convite inválido.';
+      setError(msg);
+      setJoiningByCode(false);
     }
   };
 
@@ -2137,6 +2186,32 @@ function LinkCompanyScreen() {
             className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-xl font-bold text-sm transition"
           >
             {creating ? <Loader2 size={16} className="animate-spin" /> : 'Criar minha empresa'}
+          </button>
+        </form>
+
+        <div className="flex items-center gap-3 my-4" aria-hidden="true">
+          <div className="h-px flex-1 bg-edge" />
+          <span className="text-[11px] uppercase tracking-wider text-fg-subtle/70">ou</span>
+          <div className="h-px flex-1 bg-edge" />
+        </div>
+
+        <form onSubmit={handleJoinByCode} className="text-left mb-3">
+          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1.5">
+            Código de Convite da Empresa
+          </label>
+          <input
+            type="text"
+            value={inviteCode}
+            onChange={e => setInviteCode(e.target.value.toUpperCase())}
+            placeholder="Ex.: AB3DFGHJ"
+            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-xl text-fg text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
+          />
+          <button
+            type="submit"
+            disabled={joiningByCode}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge disabled:opacity-60 text-fg rounded-xl font-bold text-sm transition"
+          >
+            {joiningByCode ? <Loader2 size={16} className="animate-spin" /> : 'Entrar com código de convite'}
           </button>
         </form>
         {isDevOwner && (

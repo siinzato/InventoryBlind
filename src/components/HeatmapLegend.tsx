@@ -19,8 +19,10 @@ export const HeatmapLegend: React.FC = () => {
       description: 'Acuracidade entre 70% e 89%',
     },
     {
-      color: 'bg-orange-500',
-      border: 'border-orange-300',
+      // accent em vez de laranja (fora da paleta aprovada, §5/§23) — precisa
+      // continuar distinguível de "Atenção" (âmbar) nesta legenda de 5 itens.
+      color: 'bg-accent',
+      border: 'border-accent/40',
       label: 'Risco',
       description: 'Acuracidade entre 50% e 69%',
     },

@@ -15,8 +15,7 @@ import { runBatch, type BatchItemResult } from '../../lib/pdfCenter/batchRunner'
 import { buildOutputFilename } from '../../lib/pdfCenter/filenames';
 import { buildZip } from '../../lib/pdfCenter/zipExport';
 import { downloadBytes } from '../../lib/pdfCenter/downloadFile';
-import { ToastStack } from './ToastStack';
-import { useToasts } from './useToasts';
+import { ToastStack, useToasts } from '../ui';
 
 type BatchOp = 'rotate' | 'thermal' | 'extract' | 'toImage' | 'optimize';
 type OutputMode = 'zip' | 'individual' | 'merged';

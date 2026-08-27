@@ -8,16 +8,13 @@
  * src/lib/palletCalc/.
  */
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowLeft, AlertCircle, Boxes, CheckCircle2, GitCompareArrows, Layers } from 'lucide-react';
+import { ArrowLeft, Boxes, GitCompareArrows, Layers } from 'lucide-react';
 import { PalletCalcWorkspace } from './PalletCalcWorkspace';
 import { PalletBatchPage } from './PalletBatchPage';
 import { loadPalletCalcPrefs, savePalletCalcPrefs, type PalletCalcPrefs } from '../../lib/palletCalc/palletCalcPrefs';
+import { ToastStack, useToasts } from '../ui';
 
 type Mode = 'home' | 'unit' | 'compare' | 'batch';
-type ToastType = 'success' | 'error' | 'info';
-interface Toast { id: number; message: string; type: ToastType }
-
-let _tid = 0;
 
 interface PalletCalcPageProps {
   onBack: () => void;
@@ -25,18 +22,12 @@ interface PalletCalcPageProps {
 
 export function PalletCalcPage({ onBack }: PalletCalcPageProps) {
   const [mode, setMode] = useState<Mode>('home');
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const { toasts, toast } = useToasts();
   const [prefs, setPrefs] = useState<PalletCalcPrefs>({});
 
   useEffect(() => {
     const saved = loadPalletCalcPrefs();
     if (saved) setPrefs(saved);
-  }, []);
-
-  const toast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = ++_tid;
-    setToasts(p => [...p, { id, message, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4500);
   }, []);
 
   const handlePrefsChange = useCallback((patch: Partial<PalletCalcPrefs>) => {
@@ -53,15 +44,7 @@ export function PalletCalcPage({ onBack }: PalletCalcPageProps) {
 
   return (
     <div className="min-h-screen bg-surface-3">
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
-        {toasts.map(t => (
-          <div key={t.id} className={`flex items-center gap-2 px-4 py-3 rounded-container shadow-panel text-sm font-semibold max-w-xs pointer-events-auto ${
-            t.type === 'success' ? 'bg-emerald-600 text-white' : t.type === 'error' ? 'bg-red-600 text-white' : 'bg-surface-2 text-fg border border-edge'}`}>
-            {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : null}
-            {t.message}
-          </div>
-        ))}
-      </div>
+      <ToastStack toasts={toasts} />
 
       <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">

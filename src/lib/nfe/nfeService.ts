@@ -38,7 +38,7 @@ const PAGE_SIZE = 1000;
 // ── Products catalog (global/shared) ─────────────────────────────────────────
 
 /** Fetches only catalog products related to the codes/EANs referenced in a note. */
-async function fetchCandidateProducts(skus: string[], eans: string[]): Promise<CatalogProduct[]> {
+export async function fetchCandidateProducts(skus: string[], eans: string[]): Promise<CatalogProduct[]> {
   const found = new Map<string, CatalogProduct>();
 
   const chunk = <T,>(arr: T[], size: number): T[][] => {
@@ -105,7 +105,7 @@ export async function searchCatalog(term: string, limit = 20): Promise<CatalogPr
 
 // ── Learned associations (company-scoped) ────────────────────────────────────
 
-async function fetchLearned(skus: string[], eans: string[]): Promise<LearnedLookup> {
+export async function fetchLearned(skus: string[], eans: string[]): Promise<LearnedLookup> {
   const bySku = new Map<string, string>();
   const byEan = new Map<string, string>();
   const values = [...skus, ...eans];

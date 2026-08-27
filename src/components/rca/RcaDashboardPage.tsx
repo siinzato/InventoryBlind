@@ -183,9 +183,9 @@ export function RcaDashboardPage({ companyId, userId, userEmail, role }: RcaDash
                   {records.slice(0, 100).map(r => (
                     <Tr key={r.id}>
                       <Td>{new Date(r.occurred_at).toLocaleDateString('pt-BR')}</Td>
-                      <Td className="font-mono text-xs">{r.sku ?? '—'}</Td>
-                      <Td className="font-mono text-xs">{r.location ?? '—'}</Td>
-                      <Td className={r.divergence_qty < 0 ? 'text-red-500' : 'text-amber-500'}>{r.divergence_qty}</Td>
+                      <Td numeric>{r.sku ?? '—'}</Td>
+                      <Td numeric>{r.location ?? '—'}</Td>
+                      <Td numeric className={r.divergence_qty < 0 ? 'text-red-500' : 'text-amber-500'}>{r.divergence_qty}</Td>
                       <Td><CauseBadge cause={r.cause_category} customLabel={r.custom_cause_label} /></Td>
                       <Td>{r.operator_name ?? '—'}</Td>
                     </Tr>

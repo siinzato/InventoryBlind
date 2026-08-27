@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { AlertTriangle, Check } from 'lucide-react';
-import { Modal, Button } from '../ui';
+import { Modal, Button, Notice, Select, Input, Textarea } from '../ui';
 import { CAUSE_CATEGORIES } from '../../lib/rcaAlgorithm';
 import { createRcaRecord, uploadEvidence } from '../../lib/rcaService';
 import type { RcaCauseCategory, RcaSourceModule } from '../../lib/supabase';
@@ -99,16 +99,18 @@ export function RcaClassificationModal({ open, sourceModule, items, companyId, u
   return (
     <Modal open={open} onClose={() => {}} title="Classificar Causa da Divergência" maxWidth="max-w-2xl">
       <div className="space-y-5">
-        <div className="flex items-start gap-2 p-3 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-xs">
-          <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
-          <p>É necessário classificar a causa de cada divergência abaixo antes de continuar. Isso vira conhecimento operacional no dashboard de Root Cause Analysis.</p>
-        </div>
+        <Notice tone="warning">
+          <div className="flex items-start gap-2">
+            <AlertTriangle size={14} className="flex-shrink-0 mt-0.5" />
+            <p>É necessário classificar a causa de cada divergência abaixo antes de continuar. Isso vira conhecimento operacional no dashboard de Root Cause Analysis.</p>
+          </div>
+        </Notice>
 
         <div className="space-y-4 max-h-[50vh] overflow-y-auto pr-1">
           {items.map(item => {
             const d = draftFor(item.sourceItemId);
             return (
-              <div key={item.sourceItemId} className="p-3.5 border border-edge rounded-xl space-y-2.5">
+              <div key={item.sourceItemId} className="p-3.5 border border-edge rounded-container space-y-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-fg truncate">{item.productName ?? item.sku ?? 'Item sem identificação'}</p>
@@ -119,32 +121,30 @@ export function RcaClassificationModal({ open, sourceModule, items, companyId, u
                   </span>
                 </div>
 
-                <select
+                <Select
                   value={d.causeCategory}
                   onChange={e => updateDraft(item.sourceItemId, { causeCategory: e.target.value as RcaCauseCategory })}
-                  className="w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg"
+                  className="w-full"
                 >
                   <option value="">Selecione a causa...</option>
                   {CAUSE_CATEGORIES.map(c => (
                     <option key={c.value} value={c.value}>{c.label}</option>
                   ))}
-                </select>
+                </Select>
 
                 {d.causeCategory === 'outro' && (
-                  <input
+                  <Input
                     value={d.customCauseLabel}
                     onChange={e => updateDraft(item.sourceItemId, { customCauseLabel: e.target.value })}
                     placeholder="Descreva a causa..."
-                    className="w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg"
                   />
                 )}
 
-                <textarea
+                <Textarea
                   value={d.notes}
                   onChange={e => updateDraft(item.sourceItemId, { notes: e.target.value })}
                   placeholder="Observações (opcional)"
                   rows={2}
-                  className="w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg resize-none"
                 />
 
                 <RcaEvidenceUpload files={d.evidenceFiles} onChange={files => updateDraft(item.sourceItemId, { evidenceFiles: files })} />

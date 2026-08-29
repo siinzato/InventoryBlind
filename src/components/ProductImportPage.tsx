@@ -7,7 +7,8 @@ import { ColumnMappingWizard } from './ColumnMappingWizard';
 import { ProductImportPreview } from './ProductImportPreview';
 import { ProductImportProgress } from './ProductImportProgress';
 import { ProductImportSummary } from './ProductImportSummary';
-import { Page, PageHeader, Panel, PanelSection, Button } from './ui';
+import { Page, PageHeader, Panel, PanelSection, Button, PhaseRail } from './ui';
+import type { PhaseRailStep } from './ui';
 import type { ProductValidated, ImportSummary, ImportProgress, ImportError, ImportStatus, ColumnMapping, ProductFromDB } from '../lib/productImportTypes';
 import {
   parseCSV,
@@ -21,6 +22,14 @@ interface ProductImportPageProps {
   isAdmin: boolean;
   onRequestAdmin: () => void;
 }
+
+const IMPORT_PHASES: PhaseRailStep[] = [
+  { key: 'upload', label: 'Enviar' },
+  { key: 'mapping', label: 'Mapear' },
+  { key: 'preview', label: 'Revisar' },
+  { key: 'importing', label: 'Importar' },
+  { key: 'complete', label: 'Concluido' },
+];
 
 export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   onBack,
@@ -568,51 +577,13 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
         }
       />
 
-      {/* Stepper */}
-        <div className="flex items-center justify-center mb-8">
-          {['upload', 'mapping', 'preview', 'importing', 'complete'].map((step, idx) => {
-            const stepLabels: Record<string, string> = {
-              upload: 'Enviar',
-              mapping: 'Mapear',
-              preview: 'Revisar',
-              importing: 'Importar',
-              complete: 'Concluido',
-            };
-
-            const statusOrder = ['upload', 'mapping', 'preview', 'importing', 'complete'];
-            const effectiveStatus = status === 'error' ? 'complete' : status;
-            const currentIdx = statusOrder.indexOf(effectiveStatus);
-
-            const isComplete = currentIdx > idx;
-            const isCurrent = effectiveStatus === step;
-
-            return (
-              <React.Fragment key={step}>
-                {idx > 0 && (
-                  <div className={`w-16 h-1 mx-2 rounded ${
-                    isComplete || isCurrent ? 'bg-accent' : 'bg-surface-3'
-                  }`} />
-                )}
-                <div className="flex flex-col items-center">
-                  <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                    isComplete
-                      ? 'bg-accent text-white'
-                      : isCurrent
-                        ? 'bg-accent-strong text-white'
-                        : 'bg-surface-3 text-fg-subtle'
-                  }`}>
-                    {isComplete ? '✓' : idx + 1}
-                  </div>
-                  <p className={`text-xs mt-1 font-medium ${
-                    isComplete || isCurrent ? 'text-fg' : 'text-fg-subtle'
-                  }`}>
-                    {stepLabels[step]}
-                  </p>
-                </div>
-              </React.Fragment>
-            );
-          })}
-        </div>
+      {/* Fases da importação */}
+        <PhaseRail
+          label="Progresso da importação"
+          steps={IMPORT_PHASES}
+          currentKey={status === 'error' ? 'complete' : status}
+          className="mb-8"
+        />
 
         {/* Content */}
         {!isAdmin ? (

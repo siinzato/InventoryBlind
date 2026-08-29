@@ -52,6 +52,33 @@ export function findMyAssignment(assignees: TaskAssignee[], userId: string): Tas
   return assignees.find(a => a.user_id === userId);
 }
 
+// ── Arquivamento (Kanban → coluna Concluído; ver migration 095) ─────────────
+
+const ARCHIVE_AFTER_MS = 7 * 24 * 60 * 60 * 1000;
+
+/** Só concluídas. `archived_at` NULL cai no corte automático de 7 dias
+ *  (calculado aqui, sem escrita no banco); 'infinity' foi restaurada
+ *  explicitamente e nunca mais é varrida; qualquer outro valor é
+ *  arquivamento explícito (imediato, já no passado). */
+export function isAssigneeArchived(a: Pick<TaskAssignee, 'status' | 'archived_at' | 'completed_at'>, nowMs: number = Date.now()): boolean {
+  if (a.status !== 'done') return false;
+  if (a.archived_at) {
+    if (a.archived_at === 'infinity') return false;
+    return new Date(a.archived_at).getTime() <= nowMs;
+  }
+  if (!a.completed_at) return false;
+  return nowMs - new Date(a.completed_at).getTime() >= ARCHIVE_AFTER_MS;
+}
+
+/** Dias restantes até o corte automático — só faz sentido para uma concluída
+ *  ainda não arquivada; null quando não se aplica (sem completed_at, já
+ *  arquivada ou restaurada). */
+export function daysUntilAutoArchive(a: Pick<TaskAssignee, 'status' | 'archived_at' | 'completed_at'>, nowMs: number = Date.now()): number | null {
+  if (a.status !== 'done' || a.archived_at || !a.completed_at) return null;
+  const remainingMs = ARCHIVE_AFTER_MS - (nowMs - new Date(a.completed_at).getTime());
+  return Math.max(0, Math.ceil(remainingMs / (24 * 60 * 60 * 1000)));
+}
+
 /** Regras de visibilidade — espelham task_is_visible_to_me() do banco. A barreira real é a RLS. */
 export function canViewTask(task: Task, assignees: TaskAssignee[], role: Role | string | undefined, userId: string): boolean {
   if (isManagementRole(role)) return true;

@@ -53,6 +53,10 @@ export interface TaskAssignee {
   blocked_by: string | null;
   expected_resolver_user_id: string | null;
   paused_at: string | null;
+  // NULL = nunca arquivada; 'infinity' = restaurada explicitamente (nunca mais
+  // some pelo corte automático de 7 dias); qualquer outro valor = arquivada
+  // naquele instante. Ver migration 095 e isAssigneeArchived em taskDomain.ts.
+  archived_at: string | null;
   // Preenchido no client a partir de profiles — não existe na linha do banco.
   user_name?: string | null;
   user_email?: string | null;

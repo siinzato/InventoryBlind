@@ -18,7 +18,7 @@ const TASK_COLUMNS = [
 ].join(', ');
 const ASSIGNEE_COLUMNS = [
   'id', 'task_id', 'user_id', 'status', 'assigned_at', 'assigned_by', 'started_at', 'completed_at',
-  'block_reason', 'block_note', 'blocked_at', 'blocked_by', 'expected_resolver_user_id', 'paused_at',
+  'block_reason', 'block_note', 'blocked_at', 'blocked_by', 'expected_resolver_user_id', 'paused_at', 'archived_at',
 ].join(', ');
 const CHECKLIST_COLUMNS = 'id, task_id, label, is_done, position, completed_by, completed_at, created_at';
 const COMMENT_COLUMNS = 'id, task_id, user_id, body, created_at';
@@ -317,6 +317,27 @@ export async function cancelTask(taskId: string, reason: string): Promise<void> 
 export async function deletePersonalTask(taskId: string): Promise<void> {
   const { error } = await supabase.from('tasks').delete().eq('id', taskId);
   if (error) throw new TaskServiceError(error.message);
+}
+
+// ── Arquivamento (Kanban → coluna Concluído; ver migration 095) ─────────────
+
+export async function archiveMyAssignment(taskId: string): Promise<void> {
+  const { error } = await supabase.rpc('task_archive_my_assignment', { p_task_id: taskId });
+  if (error) throw new TaskServiceError(error.message);
+}
+
+export async function restoreMyAssignment(taskId: string): Promise<void> {
+  const { error } = await supabase.rpc('task_restore_my_assignment', { p_task_id: taskId });
+  if (error) throw new TaskServiceError(error.message);
+}
+
+/** Arquiva em lote todas as concluídas ainda ativas no board (nunca arquivadas
+ *  ou restauradas) — a ação "Arquivar concluídas" da coluna. Retorna quantas
+ *  linhas foram afetadas para feedback na UI. */
+export async function archiveMyDoneEligible(): Promise<number> {
+  const { data, error } = await supabase.rpc('task_archive_my_done_eligible');
+  if (error) throw new TaskServiceError(error.message);
+  return (data as number) ?? 0;
 }
 
 export async function toggleChecklistItem(itemId: string, isDone: boolean): Promise<void> {

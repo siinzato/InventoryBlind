@@ -2,20 +2,16 @@ import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
   Package,
   AlertTriangle,
-  Clock,
   Activity,
   Award,
   X,
   User,
   ShieldCheck,
-  MinusCircle,
   Lock,
   LogOut,
   Target,
-  Zap,
-  Users,
   Calendar,
-  BarChart2,
+  Clock,
   Plus,
   Loader2,
   History,
@@ -70,8 +66,8 @@ import { getTeamProductivity } from './lib/productivityService';
 import { getBlindAISituations } from './lib/blindAIInsightsEngine';
 import { tryFastPath, askBlindAIAgent, getContextualSuggestions, type ChatMessage } from './lib/blindAIAgent';
 import { computeGlobalStats } from './lib/blindAIAgentAlgorithm';
+import { KpisIndicadoresPage } from './components/KpisIndicadoresPage';
 import { SafeDropdown } from './components/SafeDropdown';
-import { DashboardRankingPreview } from './components/DashboardRankingPreview';
 import { CountManagementCenter } from './components/counting/CountManagementCenter';
 import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
@@ -86,7 +82,7 @@ import { WhatsNewButton } from './components/WhatsNewPanel';
 import { TaskNotificationBell } from './components/tasks/TaskNotificationBell';
 import { useTaskNotifications } from './lib/tasks/hooks';
 import {
-  ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge,
+  ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
 } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
@@ -94,6 +90,11 @@ import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnos
 import { evaluateDiagnosticEligibility } from './lib/dashboardDiagnosticRule';
 import { readBlockedFeatureInterest } from './lib/blockedFeatureInterest';
 import { MyShortcutsCard } from './components/dashboard/MyShortcutsCard';
+import { DashboardPriorities } from './components/dashboard/DashboardPriorities';
+import { DashboardInventoryProgress } from './components/dashboard/DashboardInventoryProgress';
+import { DashboardIntegrationsHealth } from './components/dashboard/DashboardIntegrationsHealth';
+import { listConnections } from './lib/integrations/integrationService';
+import type { IntegrationConnection } from './lib/integrations/types';
 
 // Code-split large page components for smaller initial bundle
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -175,16 +176,24 @@ function greetingPrefix(hour: number): string {
   return 'Boa noite';
 }
 
-/** Saudação discreta no espaço vazio do AppHeader — só na aba Dashboard (ver
- *  `left={activeTab === 'dashboard' ? ... }` no AppHeader mais abaixo). */
-function DashboardGreeting({ name }: { name: string | null }) {
+/** Texto de saudação do cabeçalho do Dashboard ("Boa tarde, Victor"). */
+function greetingText(name: string | null): string {
   const firstName = name?.trim().split(/\s+/)[0] ?? null;
   const prefix = greetingPrefix(new Date().getHours());
-  return (
-    <p className="text-sm text-fg-muted truncate">
-      {firstName ? `${prefix}, ${firstName}` : prefix}
-    </p>
-  );
+  return firstName ? `${prefix}, ${firstName}` : prefix;
+}
+
+/** "Atualizado hoje às 14:32" / "Atualizado em 27/08 às 14:32" — a partir do
+ *  carimbo real da última leitura bem-sucedida (nunca um valor fixo). */
+function formatLastLoaded(atMs: number | null): string | null {
+  if (atMs == null) return null;
+  const at = new Date(atMs);
+  const now = new Date();
+  const time = at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const sameDay = at.toDateString() === now.toDateString();
+  if (sameDay) return `Atualizado hoje às ${time}`;
+  const date = at.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return `Atualizado em ${date} às ${time}`;
 }
 
 function AppContent() {
@@ -275,42 +284,65 @@ function AppContent() {
   const [snapshotBrands, setSnapshotBrands] = useState<InventoryBrandHistory[]>([]);
 
   // Load data from Supabase
-  useEffect(() => {
+  // lastLoadedAt: só para o metadado "Atualizado às ..." do cabeçalho do
+  // Dashboard — carimbo do momento real da última leitura bem-sucedida, nunca
+  // um valor fixo. Extraído para useCallback (mesma query de sempre, sem
+  // mudança de lógica) só para que o botão de atualizar do Dashboard possa
+  // chamar a mesma função do efeito inicial.
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
+  const loadData = useCallback(async () => {
     if (!companyId) {
       setLoading(false);
       return;
     }
-    async function loadData() {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        const [brandsRes, vendasRes, kpisRes, operatorStatsRes] = await Promise.all([
-          supabase.from('inventory_brands').select('id, brand, total_sku, done_sku, divergences, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
-          supabase.from('top_vendas').select('id, produto, sku, vendas, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
-          supabase.from('custom_kpis').select('id, titulo, valor, unidade, variacao, tipo_variacao, cor_icone, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
-          getTeamProductivity(companyId)
-        ]);
+      const [brandsRes, vendasRes, kpisRes, operatorStatsRes] = await Promise.all([
+        supabase.from('inventory_brands').select('id, brand, total_sku, done_sku, divergences, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
+        supabase.from('top_vendas').select('id, produto, sku, vendas, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
+        supabase.from('custom_kpis').select('id, titulo, valor, unidade, variacao, tipo_variacao, cor_icone, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
+        getTeamProductivity(companyId)
+      ]);
 
-        if (brandsRes.error) throw brandsRes.error;
-        if (vendasRes.error) throw vendasRes.error;
-        if (kpisRes.error) throw kpisRes.error;
+      if (brandsRes.error) throw brandsRes.error;
+      if (vendasRes.error) throw vendasRes.error;
+      if (kpisRes.error) throw kpisRes.error;
 
-        setBrandsData(brandsRes.data || []);
-        setTopVendas(vendasRes.data || []);
-        setCustomKPIs(kpisRes.data || []);
-        setOperatorStats(operatorStatsRes);
+      setBrandsData(brandsRes.data || []);
+      setTopVendas(vendasRes.data || []);
+      setCustomKPIs(kpisRes.data || []);
+      setOperatorStats(operatorStatsRes);
 
-        setError(null);
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Falha ao carregar dados. Tente recarregar a página.');
-      } finally {
-        setLoading(false);
-      }
+      setError(null);
+      setLastLoadedAt(Date.now());
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Falha ao carregar dados. Tente recarregar a página.');
+    } finally {
+      setLoading(false);
     }
-
-    loadData();
   }, [companyId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Conexões de integração — carregado uma vez para o Dashboard (item
+  // "Conectar o estoque do ERP" em Prioridades agora + card condensado de
+  // Saúde e integrações). Mesma consulta que IntegrationsPage já usa
+  // (listConnections, escopada por RLS); null = ainda carregando ou usuário
+  // sem permissão de sincronizar integrações, e nesse caso nenhum dos dois
+  // cartões afirma nada sobre conexão.
+  const [erpConnections, setErpConnections] = useState<IntegrationConnection[] | null>(null);
+  useEffect(() => {
+    if (!companyId || !canSyncIntegrations(profile?.role)) { setErpConnections(null); return; }
+    let cancelled = false;
+    listConnections()
+      .then(list => { if (!cancelled) setErpConnections(list); })
+      .catch(() => { if (!cancelled) setErpConnections([]); });
+    return () => { cancelled = true; };
+  }, [companyId, profile?.role]);
 
   // Load snapshots (history)
   const loadSnapshots = useCallback(async () => {
@@ -366,17 +398,6 @@ function AppContent() {
         break;
     }
   }, []);
-
-  const healthStatus = useMemo(() => {
-    const acc = globais.acuracidade;
-    if (acc >= 80) {
-      return { label: 'ÓTIMA', color: 'text-emerald-600', border: 'border-l-emerald-500', iconColor: 'text-emerald-500', icon: ShieldCheck };
-    } else if (acc >= 50) {
-      return { label: 'MEDIANA', color: 'text-amber-500', border: 'border-l-amber-500', iconColor: 'text-amber-500', icon: MinusCircle };
-    } else {
-      return { label: 'CRÍTICA', color: 'text-red-600', border: 'border-l-red-500', iconColor: 'text-red-500', icon: AlertTriangle };
-    }
-  }, [globais.acuracidade]);
 
   // BlindAI states
   const [showAIChat, setShowAIChat] = useState(false);
@@ -596,7 +617,7 @@ function AppContent() {
       items: [
         { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet />, onClick: () => { setActiveTab('import'); setMobileOpen(false); },          active: activeTab === 'import' },
         { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
-        { id: 'products',        label: 'Produtos Importados',      icon: <Package />,         onClick: () => { setActiveTab('products'); setMobileOpen(false); },        active: activeTab === 'products' },
+        { id: 'products',        label: 'Catálogo de Produtos',     icon: <Package />,         onClick: () => { setActiveTab('products'); setMobileOpen(false); },        active: activeTab === 'products' },
         { id: 'product-brands',  label: 'Linhas e Marcas',          icon: <Tag />,             onClick: () => { setActiveTab('product-brands'); setMobileOpen(false); },  active: activeTab === 'product-brands' },
         { id: 'abc-curve',       label: 'Curva ABC',                icon: <BarChart3 />,       onClick: () => { setActiveTab('abc-curve'); setMobileOpen(false); },       active: activeTab === 'abc-curve' },
       ],
@@ -871,7 +892,6 @@ function AppContent() {
       <div className="flex-1 min-w-0 min-h-0 flex flex-col">
         <AppHeader
           onOpenMobileNav={() => setMobileOpen(true)}
-          left={activeTab === 'dashboard' ? <DashboardGreeting name={profile?.name ?? null} /> : undefined}
           right={
             <>
               <WhatsNewButton />
@@ -921,6 +941,7 @@ function AppContent() {
           <ImportedProductsPage
             onBack={() => setActiveTab('dashboard')}
             isAdmin={isLoggedIn}
+            onGoToImport={() => setActiveTab('import')}
           />
           </React.Suspense>
         )}
@@ -1026,15 +1047,65 @@ function AppContent() {
 
         {/* ABA DASHBOARD */}
         {activeTab === 'dashboard' && (
-          <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
+          <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
 
-            {/* Meus Atalhos — espaço fixo do topo do dashboard, sempre, para todo
+            {/* CABEÇALHO — título + saudação + seletor de inventário + atualizar + nova contagem */}
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-edge/70 pb-6">
+              <div className="min-w-0">
+                <h1 className="text-display">Visão operacional</h1>
+                <p className="mt-2 text-sm text-fg-muted truncate">
+                  {greetingText(profile?.name ?? null)}
+                  {company?.name ? ` · Inventário ${company.name}` : ''}
+                </p>
+                {formatLastLoaded(lastLoadedAt) && (
+                  <p className="mt-1 flex items-center gap-1 text-caption">
+                    <Clock size={11} />
+                    {formatLastLoaded(lastLoadedAt)}
+                  </p>
+                )}
+              </div>
+
+              <div className="flex flex-shrink-0 items-center gap-2">
+                <SafeDropdown
+                  trigger={
+                    <button className="flex items-center gap-2 rounded-control border border-edge px-3 py-2 text-sm text-fg hover:bg-surface-3/60 transition-colors">
+                      Inventário atual
+                      <ChevronDown size={13} className="text-fg-subtle" />
+                    </button>
+                  }
+                  items={[
+                    { id: 'current', label: 'Inventário atual', active: true, onClick: () => {} },
+                    ...(snapshots.length > 0
+                      ? snapshots.map(s => ({
+                          id: s.id,
+                          label: s.name,
+                          divider: s === snapshots[0],
+                          onClick: () => { handleViewSnapshot(s); setShowHistoryModal(true); },
+                        }))
+                      : [{ id: 'none', label: 'Nenhum histórico salvo ainda', disabled: true, divider: true, onClick: () => {} }]),
+                  ]}
+                />
+                <button
+                  onClick={() => loadData()}
+                  disabled={loading}
+                  title="Atualizar"
+                  className="p-2.5 rounded-control border border-edge text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                </button>
+                <Button onClick={() => setActiveTab('input')}>
+                  <Plus size={14} /> Nova contagem
+                </Button>
+              </div>
+            </div>
+
+            {/* Acesso rápido — espaço fixo do topo do dashboard, sempre, para todo
                 usuário e plano. Nunca é substituído pelo diagnóstico. */}
             {profile?.id && (
               <MyShortcutsCard companyId={companyId} userId={profile.id} navGroups={navGroups} />
             )}
 
-            {/* Aviso de diagnóstico — separado de Meus Atalhos, só quando elegível
+            {/* Aviso de diagnóstico — separado de Acesso rápido, só quando elegível
                 (workspace novo, poucos SKUs ou interesse em função bloqueada — ver
                 evaluateDiagnosticEligibility). "Agora não" vale só para esta sessão. */}
             {showDiagnosticInvite && (
@@ -1046,267 +1117,280 @@ function AppContent() {
               </React.Suspense>
             )}
 
-            {/* VISÃO GERAL: indicadores + BlindAI em um único painel */}
+            {/* RESUMO EXECUTIVO */}
             <Panel>
               <PanelSection padding="lg">
                 <StatRow>
-                  {([
-                    {
-                      label: 'Progresso Geral',
-                      value: `${globais.progresso.toFixed(1)}%`,
-                      context: `${globais.totalDone} de ${globais.totalSku} SKUs`,
-                    },
-                    {
-                      label: 'Acuracidade (IRA)',
-                      value: `${globais.acuracidade.toFixed(1)}%`,
-                      context: 'Via divergências',
-                      // The only figure here whose level is a condition, so the
-                      // only one allowed to carry colour.
-                      valueTone:
-                        globais.acuracidade >= 80 ? 'positive' : globais.acuracidade >= 50 ? 'warning' : 'critical',
-                    },
-                    {
-                      // Was 'Tempo de Inventário: 44 dias / Projeção: 27 dias',
-                      // both hardcoded. Nothing in the data model records a start
-                      // date or elapsed time, so neither figure could be derived
-                      // from anything — they were the same two numbers for every
-                      // company on every day. Replaced by a count that does come
-                      // from the loaded brands.
-                      label: 'Marcas concluídas',
-                      value: `${globais.tabela.filter(b => b.status === 'CONCLUÍDO').length} de ${globais.tabela.length}`,
-                      context: 'Contagem 100% finalizada',
-                    },
-                    { label: 'Divergências', value: globais.totalDiv, context: 'Unidades p/ recontagem' },
-                  ] satisfies StatProps[]).map(kpi => (
+                  {(() => {
+                    const inProgressRows = globais.tabela.filter(b => b.status === 'ANDAMENTO');
+                    const topInProgress = [...inProgressRows].sort((a, b) => b.progress - a.progress)[0] ?? null;
+                    const ACCURACY_TARGET = 95;
+                    return ([
+                      {
+                        label: 'Progresso Geral',
+                        value: `${globais.progresso.toFixed(1)}%`,
+                        context: `${globais.totalDone} de ${globais.totalSku} SKUs`,
+                      },
+                      {
+                        label: 'Acuracidade (IRA)',
+                        value: `${globais.acuracidade.toFixed(1)}%`,
+                        context: `Meta ${ACCURACY_TARGET}% · ${globais.acuracidade >= ACCURACY_TARGET ? 'dentro da meta' : 'abaixo da meta'}`,
+                        // The only figure here whose level is a condition, so the
+                        // only one allowed to carry colour.
+                        valueTone:
+                          globais.acuracidade >= 80 ? 'positive' : globais.acuracidade >= 50 ? 'warning' : 'critical',
+                      },
+                      { label: 'Divergências', value: globais.totalDiv, context: 'Aguardando recontagem' },
+                      {
+                        label: 'Linhas em andamento',
+                        value: `${inProgressRows.length} de ${globais.tabela.length}`,
+                        context: topInProgress
+                          ? `${topInProgress.brand} · ${topInProgress.progress.toFixed(1)}%`
+                          : 'Nenhuma linha em andamento',
+                      },
+                    ] satisfies StatProps[]);
+                  })().map(kpi => (
                     <StatCell key={kpi.label}>
                       <Stat {...kpi} />
                     </StatCell>
                   ))}
                 </StatRow>
               </PanelSection>
-
-              <PanelSection padding="lg">
-                <div className="flex items-start justify-between gap-4">
-                  <div>
-                    <h3 className="text-title flex items-center gap-2">
-                      <Bot size={18} className="text-accent" />
-                      BlindAI
-                    </h3>
-                    <p className="text-caption mt-0.5">Situações identificadas na operação</p>
-                  </div>
-                  <div className="flex gap-1.5 flex-shrink-0">
-                    <button
-                      onClick={loadSituations}
-                      disabled={situationsLoading}
-                      className="p-2 rounded-control text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
-                      title="Atualizar análise"
-                    >
-                      <RefreshCw size={16} className={situationsLoading ? 'animate-spin' : ''} />
-                    </button>
-                    <button
-                      onClick={() => setShowAIChat(!showAIChat)}
-                      className="flex items-center gap-1.5 px-3 py-1.5 rounded-control text-accent hover:bg-accent/10 transition-colors font-medium text-sm"
-                    >
-                      <MessageCircle size={15} />
-                      Conversar
-                      {showAIChat ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
-                    </button>
-                  </div>
-                </div>
-
-                {/* Situações detectadas */}
-                <div className="mt-4">
-                  {situationsLoading && situations.length === 0 ? (
-                    <p className="text-sm text-fg-subtle">Analisando a operação...</p>
-                  ) : situations.length === 0 ? (
-                    <p className="text-sm text-fg-subtle">Nenhuma situação crítica identificada no momento.</p>
-                  ) : (
-                    <div className="divide-y divide-edge">
-                      {situations.map(s => {
-                        const SituationIcon = resolveInsightIcon(s.icon, s.severity);
-                        return (
-                          <button
-                            key={s.id}
-                            onClick={() => setActiveTab(s.module)}
-                            className="w-full flex items-start gap-3 py-3 first:pt-0 last:pb-0 text-left -mx-1 px-1 rounded-control hover:bg-surface-3/60 transition-colors"
-                          >
-                            <SituationIcon size={15} className={`flex-shrink-0 mt-0.5 ${INSIGHT_ICON_TONE[s.severity]}`} />
-                            <div className="min-w-0 flex-1 space-y-1">
-                              <div className="flex items-center gap-2 flex-wrap">
-                                <p className="text-sm font-semibold text-fg">{s.title}</p>
-                                <Badge variant={SITUATION_SEVERITY_BADGE[s.severity]}>{s.actionLabel}</Badge>
-                              </div>
-                              <p className="text-sm text-fg-muted">{s.evidence}</p>
-                              <ul className="text-xs text-fg-subtle space-y-0.5">
-                                {s.reasons.map((reason, idx) => <li key={idx}>• {reason}</li>)}
-                              </ul>
-                              <p className="flex items-start gap-1 text-xs text-fg-subtle">
-                                <ArrowRight size={12} className="mt-0.5 flex-shrink-0" />
-                                {s.recommendation}
-                              </p>
-                            </div>
-                          </button>
-                        );
-                      })}
-                    </div>
-                  )}
-                </div>
-
-                {/* Chat: apoio secundário, não o produto principal */}
-                {showAIChat && (
-                  <div className="mt-4 bg-surface rounded-container border border-edge overflow-hidden">
-                    {/* Chat Messages */}
-                    <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: '300px' }}>
-                      {aiMessages.length === 0 && (
-                        <div className="text-center py-4">
-                          <Bot size={28} className="mx-auto text-fg-subtle mb-2" />
-                          <p className="text-fg-subtle text-sm">
-                            Pergunte sobre prioridades, risco, divergências ou estratégia de contagem.
-                          </p>
-                          <div className="flex flex-wrap gap-2 justify-center mt-3">
-                            {aiSuggestions.map((q) => (
-                              <button
-                                key={q}
-                                onClick={() => {
-                                  setAiInput(q);
-                                }}
-                                className="px-3 py-1.5 bg-surface-2 hover:bg-edge rounded-full text-xs text-fg-muted transition"
-                              >
-                                {q}
-                              </button>
-                            ))}
-                          </div>
-                        </div>
-                      )}
-                      {aiMessages.map((msg, idx) => (
-                        <div
-                          key={idx}
-                          className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                        >
-                          <div
-                            className={`max-w-[80%] rounded-control px-4 py-2 text-sm whitespace-pre-wrap ${
-                              msg.role === 'user'
-                                ? 'bg-accent text-white'
-                                : 'bg-surface-2 text-fg'
-                            }`}
-                          >
-                            {msg.content}
-                          </div>
-                        </div>
-                      ))}
-                      {aiLoading && (
-                        <div className="flex justify-start">
-                          <div className="bg-surface-2 rounded-control px-4 py-2 flex items-center gap-2">
-                            <Loader2 size={16} className="animate-spin text-fg-subtle" />
-                            <span className="text-fg-subtle text-sm">Analisando...</span>
-                          </div>
-                        </div>
-                      )}
-                    </div>
-
-                    {/* Chat Input */}
-                    <form onSubmit={handleSendAIMessage} className="border-t border-edge p-3 flex gap-2">
-                      <input
-                        type="text"
-                        value={aiInput}
-                        onChange={(e) => setAiInput(e.target.value)}
-                        placeholder="Pergunte sobre o inventário..."
-                        className="flex-1 bg-surface-2 text-fg placeholder-fg-subtle rounded-control px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
-                        disabled={aiLoading}
-                      />
-                      <button
-                        type="submit"
-                        disabled={aiLoading || !aiInput.trim()}
-                        className="bg-accent hover:bg-accent-strong text-white px-4 py-2 rounded-control transition disabled:opacity-50 disabled:cursor-not-allowed"
-                      >
-                        <Send size={18} />
-                      </button>
-                    </form>
-                  </div>
-                )}
-              </PanelSection>
             </Panel>
 
-            {/* ESTOQUE NO ERP — camada de inteligência sobre os dados sincronizados.
-                Added as a section of the existing Dashboard rather than replacing it:
-                the panels above describe the physical count operation, this one
-                describes what the ERP holds. Two different questions.
+            {/* GRID PRINCIPAL — esquerda: prioridades + controle por linha; direita: progresso + BlindAI + integrações */}
+            <div className="grid grid-cols-1 lg:grid-cols-[62%_1fr] gap-6 items-start">
 
-                Every figure inside carries its own availability state, so with no
-                integration connected this renders the onboarding panel instead of a
-                wall of zeros. */}
-            {canSyncIntegrations(profile?.role) && (
+              {/* COLUNA ESQUERDA */}
+              <div className="space-y-6 min-w-0">
+                <DashboardPriorities
+                  globais={globais}
+                  erpDisconnected={erpConnections == null ? null : erpConnections.length === 0}
+                  onRecount={() => setActiveTab('input')}
+                  onContinueCounting={() => setActiveTab('input')}
+                  onConnectErp={() => setActiveTab('integracoes')}
+                  onViewAll={() => setActiveTab('tasks')}
+                />
+
+                <Panel className="flex flex-col">
+                  <PanelSection padding="sm" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <h3 className="text-title">Controle por linha</h3>
+                    <span className="text-caption">Total: {globais.totalSku.toLocaleString('pt-BR')} SKUs</span>
+                  </PanelSection>
+
+                  <div className="overflow-x-auto flex-1">
+                    <table className="w-full text-sm text-left whitespace-nowrap">
+                      <thead>
+                        <tr className="border-b border-edge">
+                          <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide">Linha / Marca</th>
+                          <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Progresso</th>
+                          <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Concluídos</th>
+                          <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Acuracidade</th>
+                          <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Situação</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {globais.tabela.slice(0, 5).map((row) => (
+                          <tr key={row.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                            <td className="px-6 py-3.5 font-medium text-fg">{row.brand}</td>
+                            <td className="px-3 py-3.5 text-center text-fg-muted text-numeric text-xs">{row.progress.toFixed(1)}%</td>
+                            <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">{row.doneSku}</td>
+                            <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">
+                              {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : '—'}
+                            </td>
+                            <td className="px-6 py-3.5 text-center">
+                              <span className="text-xs font-medium text-fg-subtle">
+                                {row.status === 'CONCLUÍDO' ? 'Concluído' : 'Em andamento'}
+                              </span>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+
+                  <PanelSection padding="sm">
+                    <button
+                      onClick={() => setActiveTab('rankings')}
+                      className="w-full flex items-center justify-center gap-1.5 text-sm font-medium text-accent hover:text-accent-strong transition-colors py-1"
+                    >
+                      Ver desempenho completo <ArrowRight size={14} />
+                    </button>
+                  </PanelSection>
+                </Panel>
+              </div>
+
+              {/* COLUNA DIREITA */}
+              <div className="space-y-6 min-w-0">
+                <DashboardInventoryProgress
+                  companyId={companyId}
+                  globais={globais}
+                  onOpenKpis={() => setActiveTab('kpis')}
+                />
+
+                <Panel>
+                  <PanelSection padding="lg">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-title flex items-center gap-2">
+                          <Bot size={18} className="text-accent" />
+                          BlindAI
+                        </h3>
+                        <p className="text-caption mt-0.5">Situações identificadas na operação</p>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={loadSituations}
+                          disabled={situationsLoading}
+                          className="p-2 rounded-control text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
+                          title="Atualizar análise"
+                        >
+                          <RefreshCw size={16} className={situationsLoading ? 'animate-spin' : ''} />
+                        </button>
+                        <button
+                          onClick={() => setShowAIChat(!showAIChat)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control text-accent hover:bg-accent/10 transition-colors font-medium text-sm"
+                        >
+                          <MessageCircle size={15} />
+                          Conversar
+                          {showAIChat ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Situações detectadas */}
+                    <div className="mt-4">
+                      {situationsLoading && situations.length === 0 ? (
+                        <p className="text-sm text-fg-subtle">Analisando a operação...</p>
+                      ) : situations.length === 0 ? (
+                        <p className="text-sm text-fg-subtle">Nenhuma situação crítica identificada no momento.</p>
+                      ) : (
+                        <div className="divide-y divide-edge">
+                          {situations.map(s => {
+                            const SituationIcon = resolveInsightIcon(s.icon, s.severity);
+                            return (
+                              <button
+                                key={s.id}
+                                onClick={() => setActiveTab(s.module)}
+                                className="w-full flex items-start gap-3 py-3 first:pt-0 last:pb-0 text-left -mx-1 px-1 rounded-control hover:bg-surface-3/60 transition-colors"
+                              >
+                                <SituationIcon size={15} className={`flex-shrink-0 mt-0.5 ${INSIGHT_ICON_TONE[s.severity]}`} />
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-semibold text-fg">{s.title}</p>
+                                    <Badge variant={SITUATION_SEVERITY_BADGE[s.severity]}>{s.actionLabel}</Badge>
+                                  </div>
+                                  <p className="text-sm text-fg-muted">{s.evidence}</p>
+                                  <ul className="text-xs text-fg-subtle space-y-0.5">
+                                    {s.reasons.map((reason, idx) => <li key={idx}>• {reason}</li>)}
+                                  </ul>
+                                  <p className="flex items-start gap-1 text-xs text-fg-subtle">
+                                    <ArrowRight size={12} className="mt-0.5 flex-shrink-0" />
+                                    {s.recommendation}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Chat: apoio secundário, não o produto principal */}
+                    {showAIChat && (
+                      <div className="mt-4 bg-surface rounded-container border border-edge overflow-hidden">
+                        {/* Chat Messages */}
+                        <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: '300px' }}>
+                          {aiMessages.length === 0 && (
+                            <div className="text-center py-4">
+                              <Bot size={28} className="mx-auto text-fg-subtle mb-2" />
+                              <p className="text-fg-subtle text-sm">
+                                Pergunte sobre prioridades, risco, divergências ou estratégia de contagem.
+                              </p>
+                              <div className="flex flex-wrap gap-2 justify-center mt-3">
+                                {aiSuggestions.map((q) => (
+                                  <button
+                                    key={q}
+                                    onClick={() => {
+                                      setAiInput(q);
+                                    }}
+                                    className="px-3 py-1.5 bg-surface-2 hover:bg-edge rounded-full text-xs text-fg-muted transition"
+                                  >
+                                    {q}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {aiMessages.map((msg, idx) => (
+                            <div
+                              key={idx}
+                              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-[80%] rounded-control px-4 py-2 text-sm whitespace-pre-wrap ${
+                                  msg.role === 'user'
+                                    ? 'bg-accent text-white'
+                                    : 'bg-surface-2 text-fg'
+                                }`}
+                              >
+                                {msg.content}
+                              </div>
+                            </div>
+                          ))}
+                          {aiLoading && (
+                            <div className="flex justify-start">
+                              <div className="bg-surface-2 rounded-control px-4 py-2 flex items-center gap-2">
+                                <Loader2 size={16} className="animate-spin text-fg-subtle" />
+                                <span className="text-fg-subtle text-sm">Analisando...</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Chat Input */}
+                        <form onSubmit={handleSendAIMessage} className="border-t border-edge p-3 flex gap-2">
+                          <input
+                            type="text"
+                            value={aiInput}
+                            onChange={(e) => setAiInput(e.target.value)}
+                            placeholder="Pergunte sobre o inventário..."
+                            className="flex-1 bg-surface-2 text-fg placeholder-fg-subtle rounded-control px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                            disabled={aiLoading}
+                          />
+                          <button
+                            type="submit"
+                            disabled={aiLoading || !aiInput.trim()}
+                            className="bg-accent hover:bg-accent-strong text-white px-4 py-2 rounded-control transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Send size={18} />
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </PanelSection>
+                </Panel>
+
+                {canSyncIntegrations(profile?.role) && (
+                  <DashboardIntegrationsHealth
+                    connections={erpConnections}
+                    onConnect={() => setActiveTab('integracoes')}
+                    onViewIntegrations={() => setActiveTab('integracoes')}
+                  />
+                )}
+              </div>
+            </div>
+
+            {/* ESTOQUE NO ERP — detalhamento completo, só quando há ao menos uma
+                conexão. O card condensado de Saúde e integrações (coluna direita
+                acima) já cobre o estado desconectado; este continua existindo
+                para não perder o detalhamento que ele oferece quando conectado. */}
+            {canSyncIntegrations(profile?.role) && erpConnections != null && erpConnections.length > 0 && (
               <React.Suspense fallback={null}>
                 <ErpIntelligenceSection onDrill={handleIntelligenceDrill} />
               </React.Suspense>
             )}
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-
-              {/* COLUNA ESQUERDA: Saúde + Rankings, painel único */}
-              <Panel className="lg:col-span-1">
-                <PanelSection>
-                  <p className="text-section">Índice de Saúde do Estoque</p>
-                  <div className="flex items-center gap-2 mt-2">
-                    <healthStatus.icon size={20} className={healthStatus.iconColor} />
-                    <span className={`text-title ${healthStatus.color}`}>
-                      {healthStatus.label}
-                    </span>
-                  </div>
-                </PanelSection>
-
-                <DashboardRankingPreview
-                  melhores={globais.melhores}
-                  piores={globais.piores}
-                  inProgress={globais.tabela.filter(b => b.status === 'ANDAMENTO')}
-                  onViewAll={() => setActiveTab('rankings')}
-                />
-              </Panel>
-
-              {/* COLUNA DIREITA: Tabela de Controle — protagonista */}
-              <Panel className="lg:col-span-2 flex flex-col">
-                <PanelSection padding="sm" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
-                  <h3 className="text-title">Controle e Desempenho por Linha</h3>
-                  <span className="text-caption">Total: {globais.totalSku.toLocaleString('pt-BR')} SKUs</span>
-                </PanelSection>
-
-                <div className="overflow-x-auto flex-1">
-                  <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead>
-                      <tr className="border-b border-edge">
-                        <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide">Linha / Marca</th>
-                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Total</th>
-                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Concluídos</th>
-                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Progresso</th>
-                        <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Acuracidade</th>
-                        <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {globais.tabela.map((row) => (
-                        <tr key={row.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
-                          <td className="px-6 py-3.5 font-medium text-fg">{row.brand}</td>
-                          <td className="px-3 py-3.5 text-center text-fg-muted text-numeric">{row.totalSku}</td>
-                          <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">{row.doneSku}</td>
-                          <td className="px-3 py-3.5 text-center text-fg-muted text-numeric text-xs">{row.progress.toFixed(1)}%</td>
-                          <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">
-                            {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : '—'}
-                          </td>
-                          <td className="px-6 py-3.5 text-center">
-                            <span className={`text-xs font-medium ${
-                              row.status === 'CONCLUÍDO' ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'
-                            }`}>
-                              {row.status === 'CONCLUÍDO' ? 'Concluído' : 'Em andamento'}
-                            </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </Panel>
-
-            </div>
           </div>
         )}
 
@@ -1348,215 +1432,8 @@ function AppContent() {
         )}
 
         {/* ABA KPIs E INDICADORES */}
-        {activeTab === 'kpis' && (
-          <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
-            {/* KPI Cards - Dinâmicos, uma única faixa */}
-            {customKPIs.length > 0 && (
-              <Panel>
-                <PanelSection padding="lg">
-                  {/* The per-KPI icon used to sit in a coloured badge driven by a
-                      `cor_icone` column — colour chosen for variety, not meaning.
-                      The glyph stays as a quiet leading mark; the variation keeps
-                      its existing up/down semantics through the trend slot. */}
-                  <StatRow className="md:grid-cols-2">
-                    {customKPIs.map(kpi => (
-                      <StatCell key={kpi.id}>
-                        <Stat
-                          label={kpi.titulo}
-                          icon={
-                            kpi.cor_icone === 'red' ? <AlertTriangle /> :
-                            kpi.cor_icone === 'amber' ? <Clock /> :
-                            kpi.cor_icone === 'emerald' ? <Users /> :
-                            <Zap />
-                          }
-                          value={
-                            <>
-                              {kpi.valor}
-                              {kpi.unidade && (
-                                <span className="ml-1 text-base font-normal text-fg-muted">{kpi.unidade}</span>
-                              )}
-                            </>
-                          }
-                          trend={
-                            kpi.variacao
-                              ? {
-                                  value: kpi.variacao,
-                                  direction:
-                                    kpi.tipo_variacao === 'up' ? 'up' : kpi.tipo_variacao === 'down' ? 'down' : 'flat',
-                                  intent:
-                                    kpi.tipo_variacao === 'up' ? 'positive' : kpi.tipo_variacao === 'down' ? 'negative' : 'neutral',
-                                }
-                              : undefined
-                          }
-                        />
-                      </StatCell>
-                    ))}
-                  </StatRow>
-                </PanelSection>
-              </Panel>
-            )}
-
-            {/* Desempenho por Operador + Indicadores de Processo */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6 items-start">
-              <Panel>
-                <PanelSection padding="sm">
-                  <h3 className="text-title flex items-center gap-2">
-                    <Users size={16} className="text-fg-subtle" />
-                    Desempenho por Operador
-                  </h3>
-                </PanelSection>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-edge">
-                        <th className="p-3 text-left font-medium text-fg-subtle text-xs uppercase tracking-wide">Operador</th>
-                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">SKUs Contados</th>
-                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">Acuracidade</th>
-                        <th className="p-3 text-center font-medium text-fg-subtle text-xs uppercase tracking-wide">Divergências</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {operatorStats.length === 0 ? (
-                        <tr>
-                          <td colSpan={4} className="p-6 text-center text-fg-subtle text-sm">Nenhuma contagem registrada ainda.</td>
-                        </tr>
-                      ) : (
-                        [...operatorStats]
-                          .filter(op => op.contagens > 0)
-                          .sort((a, b) => (b.acuracidade_media ?? 0) - (a.acuracidade_media ?? 0))
-                          .slice(0, 6)
-                          .map((op) => (
-                            <tr key={op.user_id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
-                              <td className="p-3 font-medium text-fg">{op.name || '—'}</td>
-                              <td className="p-3 text-center font-semibold text-fg">{op.skus_contados}</td>
-                              <td className="p-3 text-center">
-                                <span className={`font-semibold ${op.acuracidade_media !== null ? (op.acuracidade_media >= 80 ? 'text-emerald-600 dark:text-emerald-400' : op.acuracidade_media >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400') : 'text-fg-subtle'}`}>
-                                  {op.acuracidade_media !== null ? `${op.acuracidade_media.toFixed(1)}%` : '—'}
-                                </span>
-                              </td>
-                              <td className="p-3 text-center text-fg-muted">{op.divergencias_reais}</td>
-                            </tr>
-                          ))
-                      )}
-                    </tbody>
-                  </table>
-                </div>
-              </Panel>
-
-              {/* Indicadores de Processo */}
-              <Panel>
-                <PanelSection padding="sm">
-                  <h3 className="text-title flex items-center gap-2">
-                    <BarChart2 size={16} className="text-fg-subtle" />
-                    Indicadores de Processo
-                  </h3>
-                </PanelSection>
-                <PanelSection className="space-y-5">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-fg-muted">Taxa de Conclusão Diária</span>
-                      <span className="text-sm font-semibold text-fg">85.4%</span>
-                    </div>
-                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full" style={{ width: '85.4%' }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-fg-muted">Meta de Acuracidade</span>
-                      <span className="text-sm font-semibold text-fg">{globais.acuracidade.toFixed(1)}% / 95%</span>
-                    </div>
-                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${globais.acuracidade >= 95 ? 'bg-emerald-500' : globais.acuracidade >= 80 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, (globais.acuracidade / 95) * 100)}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-fg-muted">Cobertura de Estoque</span>
-                      <span className="text-sm font-semibold text-fg">{globais.progresso.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full" style={{ width: `${globais.progresso}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm text-fg-muted">Divergências Recontadas</span>
-                      <span className="text-sm font-semibold text-fg">72.3%</span>
-                    </div>
-                    <div className="h-1.5 bg-edge rounded-full overflow-hidden">
-                      <div className="h-full bg-accent rounded-full" style={{ width: '72.3%' }}></div>
-                    </div>
-                  </div>
-                </PanelSection>
-              </Panel>
-            </div>
-
-            {/* Resumo Executivo */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
-              <Panel className="lg:col-span-2">
-                <PanelSection padding="sm">
-                  <h3 className="text-title flex items-center gap-2">
-                    <Target size={16} className="text-fg-subtle" />
-                    Resumo Executivo
-                  </h3>
-                </PanelSection>
-                <PanelSection>
-                  <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-edge">
-                    <div className="text-center px-2">
-                      <p className="text-display">{globais.totalSku.toLocaleString('pt-BR')}</p>
-                      <p className="text-caption mt-1">Total SKUs</p>
-                    </div>
-                    <div className="text-center px-2">
-                      <p className="text-display text-emerald-600 dark:text-emerald-400">{globais.totalDone.toLocaleString('pt-BR')}</p>
-                      <p className="text-caption mt-1">Contabilizados</p>
-                    </div>
-                    <div className="text-center px-2">
-                      <p className="text-display text-fg">{(globais.totalSku - globais.totalDone).toLocaleString('pt-BR')}</p>
-                      <p className="text-caption mt-1">Pendentes</p>
-                    </div>
-                    <div className="text-center px-2">
-                      <p className="text-display text-red-600 dark:text-red-400">{globais.totalDiv}</p>
-                      <p className="text-caption mt-1">Divergências</p>
-                    </div>
-                  </div>
-
-                  <div className="mt-6 p-4 bg-accent/10 rounded-lg">
-                    <h4 className="font-semibold text-accent text-sm mb-1.5">Projeção de Conclusão</h4>
-                    <p className="text-sm text-fg-muted">
-                      Com base na produtividade média de <strong className="text-fg">48 SKUs/dia</strong>, o inventário será concluído em aproximadamente <strong className="text-fg">{Math.ceil((globais.totalSku - globais.totalDone) / 48)} dias úteis</strong>.
-                    </p>
-                  </div>
-                </PanelSection>
-              </Panel>
-
-              <Panel>
-                <PanelSection padding="sm">
-                  <h3 className="text-title flex items-center gap-2">
-                    <Activity size={16} className="text-fg-subtle" />
-                    Status Atual
-                  </h3>
-                </PanelSection>
-                <PanelSection className="space-y-1">
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className="text-sm text-fg-muted">Linhas Concluídas</span>
-                    <span className="text-sm font-semibold text-emerald-600 dark:text-emerald-400">{globais.tabela.filter(b => b.status === 'CONCLUÍDO').length}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className="text-sm text-fg-muted">Em Andamento</span>
-                    <span className="text-sm font-semibold text-fg-subtle">{globais.tabela.filter(b => b.status === 'ANDAMENTO').length}</span>
-                  </div>
-                  <div className="flex items-center justify-between py-1.5">
-                    <span className="text-sm text-fg-muted">Próx. Meta</span>
-                    <span className="text-sm font-semibold text-fg">95% Acuracidade</span>
-                  </div>
-                </PanelSection>
-              </Panel>
-            </div>
-          </div>
+        {activeTab === 'kpis' && companyId && (
+          <KpisIndicadoresPage companyId={companyId} globais={globais} operatorStats={operatorStats} />
         )}
 
         {/* ABA NOVA CONTAGEM */}
@@ -1590,7 +1467,7 @@ function AppContent() {
         {/* ABA CBC — CONFIDENCE BASED COUNTING */}
         {activeTab === 'cbc' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <CBCDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+            <CBCDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} onNavigateToCount={() => setActiveTab('input')} />
           </React.Suspense>
         )}
 
@@ -1712,17 +1589,15 @@ function AppContent() {
       </main>
 
       {/* ABA RANKINGS COMPLETOS - rendered as full page, outside overflow container */}
-      {activeTab === 'rankings' && (
+      {activeTab === 'rankings' && companyId && (
         <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <RankingsPage
             onBack={() => setActiveTab('dashboard')}
+            companyId={companyId}
             brandsData={globais.tabela}
             topVendas={topVendas}
             operatorStats={operatorStats}
-            melhores={globais.melhores}
-            piores={globais.piores}
-            inProgress={globais.tabela.filter(b => b.status === 'ANDAMENTO')}
           />
           </React.Suspense>
         </div>

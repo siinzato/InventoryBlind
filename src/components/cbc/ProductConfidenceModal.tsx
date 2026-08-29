@@ -72,10 +72,14 @@ export function ProductConfidenceModal({ open, onClose, productId, productName, 
                   <Gauge size={18} className="text-accent" />
                   <span className="text-sm font-medium text-fg-muted">Confidence Score</span>
                 </div>
-                <div className="flex items-center gap-2">
-                  <span className="text-2xl font-bold text-fg">{confidence.confidence_score}</span>
-                  <ConfidenceBadge riskLevel={confidence.risk_level} />
-                </div>
+                {confidence.has_sufficient_data && confidence.risk_level ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-2xl font-bold text-fg">{confidence.confidence_score}</span>
+                    <ConfidenceBadge riskLevel={confidence.risk_level} />
+                  </div>
+                ) : (
+                  <span className="text-sm text-fg-subtle">Sem dados suficientes</span>
+                )}
               </div>
 
               <div className="flex items-center gap-2 text-sm text-fg-muted">

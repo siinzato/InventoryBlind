@@ -351,11 +351,17 @@ export interface LibraryResource {
   id: string;
   title: string;
   description: string | null;
-  category: 'pdf' | 'checklist' | 'pop' | 'template';
+  category: 'pdf' | 'checklist' | 'pop' | 'template' | 'ebook';
   external_url: string | null;
   is_placeholder: boolean;
   order_index: number;
   created_at: string;
+  publisher: string | null;
+  page_count: number | null;
+  format: string | null;
+  cover_url: string | null;
+  themes: string[] | null;
+  subject: string | null;
 }
 
 export interface AcademyTrackProgressRow {
@@ -395,8 +401,9 @@ export interface ProductConfidenceScore {
   id: string;
   company_id: string;
   product_id: string;
-  confidence_score: number;
-  risk_level: RiskLevel;
+  /** null quando has_sufficient_data é false — nunca um score fabricado. */
+  confidence_score: number | null;
+  risk_level: RiskLevel | null;
   next_count_date: string;
   factors: Record<string, ConfidenceFactorBreakdown>;
   top_reasons: string[];
@@ -404,6 +411,14 @@ export interface ProductConfidenceScore {
   last_algorithm_run: string;
   created_at: string;
   updated_at: string;
+  has_sufficient_data: boolean;
+  missing_factors: string[];
+  /** Prioridade de contagem — conceito separado de confiança, própria fórmula. */
+  priority_score: number | null;
+  why_to_count: string | null;
+  is_manually_scheduled: boolean;
+  scheduled_by: string | null;
+  scheduled_at: string | null;
 }
 
 export interface ProductConfidenceHistory {
@@ -417,14 +432,17 @@ export interface ProductConfidenceHistory {
 
 export interface CBCCompanySummary {
   company_id: string;
-  avg_confidence: number;
+  avg_confidence: number | null;
   total_scored: number;
+  distinct_locations: number;
   excelente_count: number;
   bom_count: number;
   medio_count: number;
   critico_count: number;
+  insufficient_count: number;
   overdue_count: number;
   due_this_week_count: number;
+  scheduled_this_week_count: number;
 }
 
 // Inventário por Risco (Risk Score) Types — semantically opposite to CBC:

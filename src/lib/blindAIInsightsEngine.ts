@@ -76,7 +76,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
       title: 'Contagens em atraso',
       evidence: `${cbcSummary.overdue_count} produto${cbcSummary.overdue_count === 1 ? '' : 's'} passaram da data recomendada de próxima contagem`,
       reasons: [
-        `Confiança média da empresa: ${Math.round(cbcSummary.avg_confidence)}`,
+        ...(cbcSummary.avg_confidence != null ? [`Confiança média da empresa: ${Math.round(cbcSummary.avg_confidence)}`] : []),
         `${cbcSummary.critico_count} produto${cbcSummary.critico_count === 1 ? '' : 's'} em confiança crítica`,
       ],
       recommendation: 'Agendar recontagem destes produtos para restaurar a confiança do saldo.',

@@ -5,6 +5,7 @@ export type AuditAction =
   | 'logout'
   | 'products.import'
   | 'products.delete'
+  | 'products.updated'
   | 'sales_import.completed'
   | 'sales_import.failed'
   | 'top10_config.updated'
@@ -145,6 +146,12 @@ export type AuditAction =
   // é registrada como metadado adicional (erpSyncAdjustmentId) do já existente
   // 'reverse_logistics.destination_decided'.
   | 'reverse_logistics.nfe_xml_return_created'
+  // Retiradas Full — planejamento e acompanhamento de retirada de estoque do Full de
+  // marketplace (migration 096). Sem conector real do Mercado Livre, o vínculo com a
+  // retirada real é sempre um passo manual ('full_withdrawal_linked_ml').
+  | 'reverse_logistics.full_withdrawal_created'
+  | 'reverse_logistics.full_withdrawal_status_changed'
+  | 'reverse_logistics.full_withdrawal_linked_ml'
   // Empresas fiscais (CNPJ) do workspace (migration 087). A maior parte destas ações é
   // gravada pelo próprio banco, dentro das RPCs fiscal_entities_* — 'settings.change'
   // não serviria porque essas mudanças precisam do próprio CNPJ/empresa no metadata,

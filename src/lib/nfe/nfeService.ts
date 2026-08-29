@@ -276,6 +276,58 @@ export async function getInvoiceItems(invoiceId: string): Promise<NfeInvoiceItem
   return (data ?? []) as NfeInvoiceItem[];
 }
 
+export interface InvoiceProgress {
+  totalLines: number;
+  countedLines: number;
+  divergentLines: number;
+  /** Maior `updated_at` entre os itens — última leitura real, sem consulta extra. */
+  lastActivityAt: string | null;
+}
+
+/** Progresso real de uma conferência, a partir dos próprios itens (nunca
+ *  inventa total: `totalLines` é a contagem de linhas existentes). Usada só
+ *  para a nota selecionada e para os cards "Em contagem"/"Em revisão" da
+ *  visualização por etapas — nunca para a lista inteira. */
+export async function getInvoiceProgress(invoiceId: string): Promise<InvoiceProgress> {
+  const { data, error } = await supabase
+    .from('nfe_invoice_items')
+    .select('result_status, updated_at')
+    .eq('invoice_id', invoiceId);
+  if (error) throw error;
+  const rows = data ?? [];
+  let countedLines = 0;
+  let divergentLines = 0;
+  let lastActivityAt: string | null = null;
+  for (const r of rows) {
+    if (r.result_status && r.result_status !== 'unlinked' && r.result_status !== 'pending') countedLines += 1;
+    if (r.result_status === 'missing' || r.result_status === 'surplus') divergentLines += 1;
+    if (r.updated_at && (!lastActivityAt || r.updated_at > lastActivityAt)) lastActivityAt = r.updated_at;
+  }
+  return { totalLines: rows.length, countedLines, divergentLines, lastActivityAt };
+}
+
+export interface InvoiceCountEvent {
+  id: string;
+  sku: string | null;
+  ean: string | null;
+  delta: number;
+  resulting_quantity: number;
+  source: CountSource;
+  created_at: string;
+}
+
+/** Histórico completo (imutável) de contagem de uma nota — usado só quando o
+ *  operador pede "Ver histórico completo", nunca carregado de antemão. */
+export async function getInvoiceCountEvents(invoiceId: string): Promise<InvoiceCountEvent[]> {
+  const { data, error } = await supabase
+    .from('nfe_count_events')
+    .select('id, sku, ean, delta, resulting_quantity, source, created_at')
+    .eq('invoice_id', invoiceId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as InvoiceCountEvent[];
+}
+
 // ── Mutations (preparation stage — before real start) ────────────────────────
 
 export async function linkItemToProduct(

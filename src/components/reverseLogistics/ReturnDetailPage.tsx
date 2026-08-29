@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react';
-import { ArrowLeft, History, Camera, RefreshCw, XCircle } from 'lucide-react';
+import { AnimatePresence, motion } from 'motion/react';
+import { ArrowLeft, Camera, RefreshCw, XCircle, Check, X, Package } from 'lucide-react';
 import { Page, PageHeader, Panel, PanelSection, Badge, Button, Input, Select, Textarea } from '../ui';
+import { RecordAdminMenu } from '../admin/RecordAdminMenu';
 import { AdminReasonModal, AdminRecordSummary } from '../admin/AdminReasonModal';
 import { useAuth } from '../../lib/auth';
 import {
@@ -38,11 +40,6 @@ interface ReturnDetailPageProps {
   onBack: () => void;
 }
 
-const STATUS_BADGE: Record<ReturnStatus, 'neutral' | 'accent' | 'success' | 'warning' | 'danger'> = {
-  received: 'neutral', in_conference: 'accent', in_inspection: 'accent',
-  awaiting_destination: 'warning', finalized: 'success', cancelled: 'danger',
-};
-
 const NEXT_STATUS_LABEL: Partial<Record<ReturnStatus, string>> = {
   in_conference: 'Avançar para Conferência',
   in_inspection: 'Avançar para Inspeção',
@@ -60,6 +57,121 @@ const CHECKLIST_FIELDS: { key: keyof InspectionChecklistInput; label: string }[]
   { key: 'serialMatches', label: 'Número de série correspondente' },
 ];
 
+/** Texto + ponto — nunca badge colorido para um status comum. Vermelho é
+ *  reservado para cancelamento (o único estado real de bloqueio/falha aqui). */
+function ReturnStatusText({ status }: { status: ReturnStatus }) {
+  if (status === 'cancelled') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm font-medium text-red-600 dark:text-red-400">
+        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-600 dark:bg-red-400" />
+        {RETURN_STATUS_LABEL[status]}
+      </span>
+    );
+  }
+  const active = status === 'in_conference' || status === 'in_inspection' || status === 'awaiting_destination';
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-sm ${active ? 'font-medium text-accent' : 'text-fg-muted'}`}>
+      <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${active ? 'bg-accent' : 'bg-fg-subtle'}`} />
+      {RETURN_STATUS_LABEL[status]}
+    </span>
+  );
+}
+
+/** Evita mostrar `00:00:00` quando o horário não carrega informação real —
+ *  mostra só a data nesse caso; caso contrário, data e hora completas. */
+function formatReceivedAt(iso: string): string {
+  const date = new Date(iso);
+  const isMidnight = date.getHours() === 0 && date.getMinutes() === 0 && date.getSeconds() === 0;
+  return isMidnight ? date.toLocaleDateString('pt-BR') : date.toLocaleString('pt-BR');
+}
+
+// ── Timeline operacional — 4 estágios visuais mapeados a partir do status real,
+//    sem criar nenhum estado novo (received e in_conference compartilham "Recebida"). ──
+const TIMELINE_STAGES = ['Recebida', 'Em inspeção', 'Destinação', 'Concluída'] as const;
+
+function timelineStageIndex(status: ReturnStatus): number {
+  switch (status) {
+    case 'received':
+    case 'in_conference': return 0;
+    case 'in_inspection': return 1;
+    case 'awaiting_destination': return 2;
+    case 'finalized': return 3;
+    default: return 0;
+  }
+}
+
+function ReturnTimeline({ status }: { status: ReturnStatus }) {
+  const current = timelineStageIndex(status);
+  return (
+    <div className="flex items-center">
+      {TIMELINE_STAGES.map((label, i) => (
+        <div key={label} className={`flex items-center ${i < TIMELINE_STAGES.length - 1 ? 'flex-1' : ''}`}>
+          <div className="flex flex-col items-center gap-1.5 flex-shrink-0">
+            <div className={`flex h-4 w-4 items-center justify-center rounded-full ${
+              i < current ? 'bg-fg-subtle' : i === current ? 'bg-accent' : 'border border-edge bg-surface'
+            }`}>
+              {i < current && <Check size={10} className="text-surface" strokeWidth={3} />}
+            </div>
+            <span className={`text-xs whitespace-nowrap ${i === current ? 'font-medium text-fg' : 'text-fg-subtle'}`}>{label}</span>
+          </div>
+          {i < TIMELINE_STAGES.length - 1 && (
+            <div className={`h-px flex-1 mx-2 ${i < current ? 'bg-fg-subtle' : 'bg-edge'}`} />
+          )}
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function itemSituationLabel(item: ReturnItem): string {
+  if (item.destinationStatus === 'moved') return 'Concluído';
+  if (item.destinationStatus === 'in_treatment') return 'Em tratamento';
+  if (item.destination) return 'Aguardando decisão';
+  if (item.classification) return 'Aguardando destinação';
+  return 'Aguardando inspeção';
+}
+
+function nextActionMessage(record: ReturnRecord, items: ReturnItem[], canFinalize: boolean): string {
+  if (record.status === 'cancelled') return 'Devolução cancelada.';
+  if (record.status === 'finalized') return 'Devolução concluída.';
+  const openQuarantine = items.filter(i => i.destination === 'quarantine' && i.destinationStatus !== 'moved').length;
+  if (record.status === 'awaiting_destination') {
+    const pending = items.filter(i => i.destinationStatus === 'pending' && !i.destination).length;
+    if (pending > 0) return `Defina a destinação de ${pending} ${pending === 1 ? 'item' : 'itens'}.`;
+    if (openQuarantine > 0) return 'Resolva o(s) bloqueio(s) de quarentena.';
+    if (canFinalize) return 'Todos os itens estão prontos para conclusão.';
+  }
+  if (record.status === 'received' || record.status === 'in_conference') return 'Confira os itens recebidos.';
+  if (record.status === 'in_inspection') return 'Inspecione os itens recebidos.';
+  return 'Acompanhe o andamento da devolução.';
+}
+
+const AUDIT_ACTION_LABEL: Record<string, string> = {
+  'reverse_logistics.received': 'Devolução recebida',
+  'reverse_logistics.item_registered': 'Item registrado',
+  'reverse_logistics.status_changed': 'Status alterado',
+  'reverse_logistics.item_inspected': 'Item inspecionado',
+  'reverse_logistics.destination_decided': 'Destinação decidida',
+  'reverse_logistics.cancelled': 'Devolução cancelada',
+  'reverse_logistics.approval_requested': 'Aprovação solicitada',
+  'reverse_logistics.approval_approved': 'Aprovação concedida',
+  'reverse_logistics.approval_rejected': 'Aprovação rejeitada',
+  'reverse_logistics.service_order_created': 'Ordem de serviço aberta',
+  'reverse_logistics.service_order_status_changed': 'Ordem de serviço atualizada',
+  'reverse_logistics.quarantine_hold_created': 'Bloqueio de quarentena registrado',
+  'reverse_logistics.quarantine_released': 'Quarentena liberada',
+  'reverse_logistics.batch_action_applied': 'Ação em lote aplicada',
+};
+
+function auditActionLabel(action: string): string {
+  return AUDIT_ACTION_LABEL[action] ?? action;
+}
+
+function eventNote(metadata: Record<string, unknown>): string {
+  const raw = metadata?.['reason'] ?? metadata?.['note'] ?? metadata?.['notes'];
+  return typeof raw === 'string' && raw.trim() ? raw : 'Não informada';
+}
+
 export function ReturnDetailPage({ companyId, returnId, onBack }: ReturnDetailPageProps) {
   const { profile } = useAuth();
   const [record, setRecord] = useState<ReturnRecord | null>(null);
@@ -76,6 +188,8 @@ export function ReturnDetailPage({ companyId, returnId, onBack }: ReturnDetailPa
   const [conditionGrades, setConditionGrades] = useState<ConditionGrade[]>([]);
   const [approvalSettings, setApprovalSettings] = useState<ApprovalSettings | null>(null);
   const [productPrices, setProductPrices] = useState<Map<string, number>>(new Map());
+  const [inspectingItemId, setInspectingItemId] = useState<string | null>(null);
+  const [showFullHistory, setShowFullHistory] = useState(false);
 
   const canWrite = hasPermission(profile?.role, 'inventory.write');
   const canApprove = canApproveReturnDestination(profile?.role);
@@ -168,14 +282,30 @@ export function ReturnDetailPage({ companyId, returnId, onBack }: ReturnDetailPa
   const canCancel = !['finalized', 'cancelled'].includes(record.status) && canApprove;
   const canFinalize = forwardStatus === 'finalized' && canFinalizeReturn(items);
 
+  const infoItems: { label: string; value: string }[] = [
+    { label: 'Origem', value: record.origin ?? '—' },
+    { label: 'Referência', value: record.referenceValue ?? '—' },
+    { label: 'Motivo declarado', value: record.reason ?? '—' },
+    { label: 'Recebida em', value: formatReceivedAt(record.receivedAt) },
+    { label: 'Responsável', value: userLabel(record.receivedBy) },
+    { label: 'Total de itens', value: String(items.length) },
+  ];
+
+  const inspectedCount = items.filter(i => i.inspectedAt).length;
+  const destinationDefinedCount = items.filter(i => i.destination).length;
+  const pendingCount = items.length - destinationDefinedCount;
+  const quarantineOpenCount = items.filter(i => i.destination === 'quarantine' && i.destinationStatus !== 'moved').length;
+
+  const inspectingItem = items.find(i => i.id === inspectingItemId) ?? null;
+
   return (
     <Page>
+      <p className="mb-2 text-xs text-fg-subtle">Logística Reversa <span className="mx-1">/</span> Devoluções</p>
       <PageHeader
         title={`Devolução ${record.code}`}
-        description={record.customerName ? `Cliente: ${record.customerName}` : undefined}
         actions={
-          <div className="flex flex-wrap gap-2">
-            <Button variant="ghost" onClick={onBack}><ArrowLeft size={16} /> Voltar</Button>
+          <div className="flex flex-wrap items-center gap-2">
+            <Button variant="ghost" size="sm" onClick={onBack}><ArrowLeft size={16} /> Voltar</Button>
             {canWrite && forwardStatus && forwardStatus !== 'finalized' && (
               <Button onClick={() => handleAdvance(forwardStatus)} disabled={busy}>{NEXT_STATUS_LABEL[forwardStatus]}</Button>
             )}
@@ -185,7 +315,10 @@ export function ReturnDetailPage({ companyId, returnId, onBack }: ReturnDetailPa
               </Button>
             )}
             {canCancel && (
-              <Button variant="danger" onClick={() => setShowCancel(true)}><XCircle size={16} /> Cancelar</Button>
+              <RecordAdminMenu
+                label="Mais ações desta devolução"
+                actions={[{ key: 'cancel', label: 'Cancelar devolução', tone: 'danger', icon: <XCircle size={15} />, onSelect: () => setShowCancel(true) }]}
+              />
             )}
           </div>
         }
@@ -196,47 +329,141 @@ export function ReturnDetailPage({ companyId, returnId, onBack }: ReturnDetailPa
       )}
 
       <Panel>
-        <PanelSection padding="md" className="flex flex-wrap items-center gap-3">
-          <Badge variant={STATUS_BADGE[record.status]}>{RETURN_STATUS_LABEL[record.status]}</Badge>
-          {record.unresolved && <Badge variant="warning">Não identificado</Badge>}
-          <span className="text-xs text-fg-subtle">Recebida em {new Date(record.receivedAt).toLocaleString('pt-BR')} por {userLabel(record.receivedBy)}</span>
+        <PanelSection padding="sm" className="flex flex-wrap items-center gap-3">
+          <ReturnStatusText status={record.status} />
+          {record.unresolved && <span className="text-xs text-fg-subtle">· Não identificado</span>}
         </PanelSection>
-        <PanelSection padding="md" className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-sm">
-          <div><p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Origem</p><p className="text-fg">{record.origin ?? '—'}</p></div>
-          <div><p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Referência</p><p className="text-fg">{record.referenceValue ?? '—'}</p></div>
-          <div><p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Motivo declarado</p><p className="text-fg">{record.reason ?? '—'}</p></div>
-          <div><p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Observações</p><p className="text-fg">{record.notes ?? '—'}</p></div>
+        <PanelSection padding="md">
+          <div className="flex flex-wrap">
+            {infoItems.map((it, idx) => (
+              <div key={it.label} className={`px-4 py-1 first:pl-0 ${idx > 0 ? 'border-l border-edge' : ''}`}>
+                <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">{it.label}</p>
+                <p className="mt-0.5 text-sm text-fg">{it.value}</p>
+              </div>
+            ))}
+          </div>
+          <div className="mt-3 border-t border-edge pt-3">
+            <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Observações</p>
+            <p className="mt-0.5 text-sm text-fg">{record.notes ?? 'Não informada'}</p>
+          </div>
           {record.status === 'cancelled' && (
-            <div className="sm:col-span-2"><p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Justificativa do cancelamento</p><p className="text-fg">{record.cancellationReason ?? '—'}</p></div>
+            <div className="mt-3 border-t border-edge pt-3">
+              <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Justificativa do cancelamento</p>
+              <p className="mt-0.5 text-sm text-fg">{record.cancellationReason ?? 'Não informada'}</p>
+            </div>
           )}
         </PanelSection>
       </Panel>
 
-      <Panel>
-        <PanelSection padding="md"><p className="text-title">Itens ({items.length})</p></PanelSection>
-        {items.length === 0 && <PanelSection padding="lg" className="text-center text-sm text-fg-subtle">Nenhum item registrado.</PanelSection>}
-        {items.map(item => (
-          <ReturnItemRow
-            key={item.id}
-            item={item}
-            returnStatus={record.status}
-            canWrite={canWrite}
-            canApprove={canApprove}
-            canDecideApproval={canDecideApproval}
-            canManageService={canManageService}
-            canRelease={canRelease}
-            canSyncErp={canSyncErp}
-            approvalSettings={approvalSettings}
-            conditionGrades={conditionGrades}
-            productPrices={productPrices}
-            userLabel={userLabel}
-            userId={profile?.id ?? ''}
-            userEmail={profile?.email ?? ''}
-            companyId={companyId}
-            onChanged={load}
-          />
-        ))}
-      </Panel>
+      {record.status !== 'cancelled' && (
+        <Panel>
+          <PanelSection padding="md">
+            <ReturnTimeline status={record.status} />
+          </PanelSection>
+        </Panel>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-[1fr_300px] gap-4 items-start">
+        <Panel>
+          <PanelSection padding="md"><p className="text-title">Itens ({items.length})</p></PanelSection>
+          {items.length === 0 && <PanelSection padding="lg" className="text-center text-sm text-fg-subtle">Nenhum item registrado.</PanelSection>}
+          {items.length > 0 && (
+            <div className="overflow-x-auto border-t border-edge">
+              <table className="w-full text-sm border-collapse">
+                <thead className="border-b border-edge">
+                  <tr>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-fg-subtle">Produto</th>
+                    <th className="text-right px-4 py-2.5 text-xs font-medium text-fg-subtle">Esperado</th>
+                    <th className="text-right px-4 py-2.5 text-xs font-medium text-fg-subtle">Recebido</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-fg-subtle">Local atual</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-fg-subtle">Condição</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-fg-subtle">Destinação</th>
+                    <th className="text-left px-4 py-2.5 text-xs font-medium text-fg-subtle">Situação</th>
+                    <th></th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {items.map(item => {
+                    const divergence = computeQuantityDivergence(item);
+                    const hasDivergence = divergence !== null && divergence !== 0;
+                    return (
+                      <tr key={item.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-control bg-surface-3 text-fg-subtle">
+                              <Package size={16} />
+                            </div>
+                            <div className="min-w-0">
+                              <p className="text-fg line-clamp-2">{item.description}</p>
+                              <p className="text-xs text-fg-subtle font-mono">{item.sku ?? '—'}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums text-fg">{item.expectedQuantity ?? '—'}</td>
+                        <td className="px-4 py-3 text-right font-mono tabular-nums text-fg">
+                          {item.receivedQuantity}
+                          {hasDivergence && <span className="ml-1 text-xs text-red-600 dark:text-red-400">({divergence! > 0 ? '+' : ''}{divergence})</span>}
+                        </td>
+                        <td className="px-4 py-3 text-fg-muted">{item.currentLocation}</td>
+                        <td className="px-4 py-3 text-fg-muted">{item.classification ? RETURN_CLASSIFICATION_LABEL[item.classification] : '—'}</td>
+                        <td className="px-4 py-3 text-fg-muted">{item.destination ? RETURN_DESTINATION_LABEL[item.destination] : 'Destinação pendente'}</td>
+                        <td className="px-4 py-3 text-fg-muted">{itemSituationLabel(item)}</td>
+                        <td className="px-4 py-3">
+                          <Button variant="ghost" size="sm" onClick={() => setInspectingItemId(item.id)}>Inspecionar</Button>
+                        </td>
+                      </tr>
+                    );
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Panel>
+
+        <div className="space-y-4">
+          <Panel>
+            <PanelSection padding="md" className="space-y-3">
+              <p className="text-sm font-semibold text-fg">Resumo da devolução</p>
+              <SummaryRow label="Itens recebidos" value={items.length} />
+              <SummaryRow label="Itens inspecionados" value={inspectedCount} />
+              <SummaryRow label="Destinação definida" value={destinationDefinedCount} />
+              <SummaryRow label="Pendências" value={pendingCount} tone={pendingCount > 0 ? 'critical' : 'default'} />
+              <SummaryRow label="Bloqueios de quarentena" value={quarantineOpenCount} tone={quarantineOpenCount > 0 ? 'critical' : 'default'} />
+              <div className="border-t border-edge pt-3">
+                <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Próxima ação</p>
+                <p className="text-sm text-fg">{nextActionMessage(record, items, canFinalize)}</p>
+              </div>
+            </PanelSection>
+          </Panel>
+
+          <Panel>
+            <PanelSection padding="md" className="flex items-center justify-between">
+              <p className="text-sm font-semibold text-fg">Atividade recente</p>
+            </PanelSection>
+            {history.length === 0 && <PanelSection padding="md" className="text-sm text-fg-subtle">Nenhum evento registrado ainda.</PanelSection>}
+            {history.length > 0 && (
+              <div className="divide-y divide-edge">
+                {(showFullHistory ? history : history.slice(0, 4)).map(event => (
+                  <div key={event.id} className="px-6 py-2.5">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm text-fg">{auditActionLabel(event.action)}</p>
+                      <p className="text-xs text-fg-subtle flex-shrink-0">{new Date(event.createdAt).toLocaleDateString('pt-BR')}</p>
+                    </div>
+                    <p className="text-xs text-fg-subtle">{event.userEmail ?? '—'}</p>
+                  </div>
+                ))}
+              </div>
+            )}
+            {history.length > 4 && (
+              <PanelSection padding="sm">
+                <button onClick={() => setShowFullHistory(v => !v)} className="text-xs text-accent hover:underline">
+                  {showFullHistory ? 'Ver menos' : 'Ver histórico completo'}
+                </button>
+              </PanelSection>
+            )}
+          </Panel>
+        </div>
+      </div>
 
       <Panel>
         <PanelSection padding="md" className="flex items-center justify-between gap-2">
@@ -271,16 +498,28 @@ export function ReturnDetailPage({ companyId, returnId, onBack }: ReturnDetailPa
         ))}
       </Panel>
 
-      <Panel>
-        <PanelSection padding="md" className="flex items-center gap-2"><History size={16} className="text-fg-subtle" /><p className="text-title">Histórico</p></PanelSection>
-        {history.length === 0 && <PanelSection padding="lg" className="text-center text-sm text-fg-subtle">Nenhum evento registrado ainda.</PanelSection>}
-        {history.map(event => (
-          <PanelSection key={event.id} padding="sm" className="flex items-center justify-between text-sm">
-            <span className="text-fg">{event.action}</span>
-            <span className="text-xs text-fg-subtle">{event.userEmail ?? '—'} · {new Date(event.createdAt).toLocaleString('pt-BR')}</span>
-          </PanelSection>
-        ))}
-      </Panel>
+      <ItemInspectorDrawer
+        open={!!inspectingItem}
+        item={inspectingItem}
+        returnStatus={record.status}
+        attachments={attachments}
+        history={history}
+        canWrite={canWrite}
+        canApprove={canApprove}
+        canDecideApproval={canDecideApproval}
+        canManageService={canManageService}
+        canRelease={canRelease}
+        canSyncErp={canSyncErp}
+        approvalSettings={approvalSettings}
+        conditionGrades={conditionGrades}
+        productPrices={productPrices}
+        userLabel={userLabel}
+        userId={profile?.id ?? ''}
+        userEmail={profile?.email ?? ''}
+        companyId={companyId}
+        onClose={() => setInspectingItemId(null)}
+        onChanged={load}
+      />
 
       <AdminReasonModal
         open={showCancel}
@@ -298,6 +537,154 @@ export function ReturnDetailPage({ companyId, returnId, onBack }: ReturnDetailPa
         }}
       />
     </Page>
+  );
+}
+
+function SummaryRow({ label, value, tone = 'default' }: { label: string; value: number; tone?: 'default' | 'critical' }) {
+  return (
+    <div className="flex items-center justify-between text-sm">
+      <span className="text-fg-subtle">{label}</span>
+      <span className={`font-medium tabular-nums ${tone === 'critical' && value > 0 ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>{value}</span>
+    </div>
+  );
+}
+
+// ── Inspetor do item: painel lateral com abas Inspeção / Evidências / Histórico —
+//    mesmo padrão de slide-over já usado em WarehousePositionDrawer/ProductQuickInspector. ──
+
+type InspectorTab = 'inspecao' | 'evidencias' | 'historico';
+
+interface ItemInspectorDrawerProps {
+  open: boolean;
+  item: ReturnItem | null;
+  returnStatus: ReturnStatus;
+  attachments: ReturnAttachment[];
+  history: ReturnAuditEvent[];
+  canWrite: boolean;
+  canApprove: boolean;
+  canDecideApproval: boolean;
+  canManageService: boolean;
+  canRelease: boolean;
+  canSyncErp: boolean;
+  approvalSettings: ApprovalSettings | null;
+  conditionGrades: ConditionGrade[];
+  productPrices: Map<string, number>;
+  userLabel: (id: string | null) => string;
+  userId: string;
+  userEmail: string;
+  companyId: string;
+  onClose: () => void;
+  onChanged: () => void;
+}
+
+function ItemInspectorDrawer({ open, item, returnStatus, attachments, history, onClose, onChanged, ...rowProps }: ItemInspectorDrawerProps) {
+  const [tab, setTab] = useState<InspectorTab>('inspecao');
+
+  useEffect(() => { if (open) setTab('inspecao'); }, [open, item?.id]);
+
+  const TABS: { key: InspectorTab; label: string }[] = [
+    { key: 'inspecao', label: 'Inspeção' },
+    { key: 'evidencias', label: 'Evidências' },
+    { key: 'historico', label: 'Histórico' },
+  ];
+
+  return (
+    <AnimatePresence>
+      {open && item && (
+        <div className="fixed inset-0" style={{ zIndex: 'var(--z-modal)' }}>
+          <motion.div
+            className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+            style={{ zIndex: 'var(--z-modal-backdrop)' }}
+            initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}
+            onClick={onClose}
+          />
+          <motion.div
+            initial={{ x: '100%' }} animate={{ x: 0 }} exit={{ x: '100%' }}
+            transition={{ duration: 0.25, ease: 'easeOut' }}
+            style={{ zIndex: 'var(--z-modal)' }}
+            className="absolute right-0 top-0 flex h-full w-full max-w-lg flex-col bg-surface border-l border-edge shadow-overlay"
+          >
+            <div className="flex items-start justify-between gap-3 px-6 py-4 border-b border-edge flex-shrink-0">
+              <div className="flex items-start gap-3 min-w-0">
+                <div className="flex h-11 w-11 flex-shrink-0 items-center justify-center rounded-control bg-surface-3 text-fg-subtle">
+                  <Package size={20} />
+                </div>
+                <div className="min-w-0">
+                  <h2 className="text-sm font-semibold text-fg line-clamp-2">{item.description}</h2>
+                  <p className="text-xs text-fg-subtle font-mono">{item.sku ?? '—'}</p>
+                  <p className="text-xs text-fg-subtle">{item.receivedQuantity} unidade{item.receivedQuantity === 1 ? '' : 's'} recebida{item.receivedQuantity === 1 ? '' : 's'} · {item.currentLocation}</p>
+                </div>
+              </div>
+              <button onClick={onClose} className="flex-shrink-0 text-fg-subtle hover:text-fg transition-colors"><X size={18} /></button>
+            </div>
+
+            <div className="flex border-b border-edge flex-shrink-0 px-2">
+              {TABS.map(t => (
+                <button
+                  key={t.key}
+                  onClick={() => setTab(t.key)}
+                  className={`px-3 py-2.5 text-xs font-medium border-b-2 transition-colors ${tab === t.key ? 'border-accent text-fg' : 'border-transparent text-fg-subtle hover:text-fg'}`}
+                >
+                  {t.label}
+                </button>
+              ))}
+            </div>
+
+            <div className="flex-1 overflow-y-auto">
+              {tab === 'inspecao' && (
+                <ReturnItemRow key={item.id} item={item} returnStatus={returnStatus} onChanged={onChanged} {...rowProps} />
+              )}
+
+              {tab === 'evidencias' && (
+                <div className="p-6 space-y-3">
+                  <p className="text-xs text-fg-subtle">Anexos são compartilhados por toda a devolução — envie ou abra pela seção "Anexos" da devolução.</p>
+                  {attachments.length === 0 && <p className="text-sm text-fg-subtle">Nenhum anexo enviado ainda.</p>}
+                  {attachments.length > 0 && (
+                    <div className="divide-y divide-edge">
+                      {attachments.map(att => (
+                        <div key={att.id} className="flex items-center justify-between py-2 text-sm">
+                          <span className="text-fg">{att.fileName}</span>
+                          <button
+                            type="button" className="text-xs text-accent underline"
+                            onClick={async () => { const url = await getReturnAttachmentSignedUrl(att.filePath); if (url) window.open(url, '_blank', 'noopener'); }}
+                          >
+                            Abrir
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {tab === 'historico' && (
+                <div className="p-6">
+                  <p className="text-xs text-fg-subtle mb-3">Histórico completo da devolução — ainda não há um rastro separado por item.</p>
+                  {history.length === 0 && <p className="text-sm text-fg-subtle">Nenhum evento registrado ainda.</p>}
+                  {history.length > 0 && (
+                    <div className="divide-y divide-edge">
+                      {history.map(event => (
+                        <div key={event.id} className="py-2.5">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="text-sm font-medium text-fg">{auditActionLabel(event.action)}</p>
+                            <p className="text-xs text-fg-subtle flex-shrink-0">{new Date(event.createdAt).toLocaleString('pt-BR')}</p>
+                          </div>
+                          <p className="text-xs text-fg-subtle mt-0.5">{event.userEmail ?? '—'} · {eventNote(event.metadata)}</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3 px-6 py-4 border-t border-edge flex-shrink-0">
+              <Button variant="secondary" onClick={onClose}>Cancelar</Button>
+            </div>
+          </motion.div>
+        </div>
+      )}
+    </AnimatePresence>
   );
 }
 
@@ -451,50 +838,43 @@ function ReturnItemRow({
     && !(destination === 'restock' && !!openHold);
 
   return (
-    <PanelSection padding="md" className="space-y-3 border-t border-edge first:border-t-0">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <div>
-          <p className="text-sm font-medium text-fg">{item.description}</p>
-          <p className="text-xs text-fg-subtle">SKU: {item.sku ?? '—'} · Local atual: {item.currentLocation}</p>
-        </div>
-        <div className="flex items-center gap-2">
-          {item.classification && <Badge variant="neutral">{RETURN_CLASSIFICATION_LABEL[item.classification]}</Badge>}
-          {item.destination && <Badge variant={item.destinationStatus === 'moved' ? 'success' : 'warning'}>{RETURN_DESTINATION_LABEL[item.destination]}</Badge>}
-        </div>
-      </div>
-
-      {/* Conferência */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
-        <div>
-          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Qtd. esperada</label>
-          <p className="text-sm text-fg font-mono">{item.expectedQuantity ?? '—'}</p>
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Qtd. recebida</label>
-          {canEditConference ? (
-            <Input value={receivedQuantity} onChange={e => setReceivedQuantity(e.target.value)} className="font-mono" />
-          ) : <p className="text-sm text-fg font-mono">{item.receivedQuantity}</p>}
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Lote</label>
-          {canEditConference ? <Input value={lotNumber} onChange={e => setLotNumber(e.target.value)} /> : <p className="text-sm text-fg">{item.lotNumber ?? '—'}</p>}
-        </div>
-        <div>
-          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Série</label>
-          {canEditConference ? <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} /> : <p className="text-sm text-fg">{item.serialNumber ?? '—'}</p>}
-        </div>
-      </div>
+    <div className="p-6 space-y-4">
       {divergence !== null && divergence !== 0 && (
-        <p className="text-xs text-amber-600 dark:text-amber-400">Divergência: {divergence > 0 ? '+' : ''}{divergence} em relação ao esperado.</p>
-      )}
-      {canEditConference && (
-        <Button size="sm" variant="secondary" onClick={saveConference} disabled={saving}>Salvar conferência</Button>
+        <p className="text-xs text-red-600 dark:text-red-400">Divergência: {divergence > 0 ? '+' : ''}{divergence} em relação ao esperado.</p>
       )}
 
-      {/* Inspeção */}
+      {/* Recebimento */}
+      <section className="space-y-3">
+        <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Recebimento</p>
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs text-fg-subtle mb-1">Qtd. esperada</label>
+            <p className="text-sm text-fg font-mono">{item.expectedQuantity ?? '—'}</p>
+          </div>
+          <div>
+            <label className="block text-xs text-fg-subtle mb-1">Qtd. recebida</label>
+            {canEditConference ? (
+              <Input value={receivedQuantity} onChange={e => setReceivedQuantity(e.target.value)} className="font-mono" />
+            ) : <p className="text-sm text-fg font-mono">{item.receivedQuantity}</p>}
+          </div>
+          <div>
+            <label className="block text-xs text-fg-subtle mb-1">Lote</label>
+            {canEditConference ? <Input value={lotNumber} onChange={e => setLotNumber(e.target.value)} /> : <p className="text-sm text-fg">{item.lotNumber ?? '—'}</p>}
+          </div>
+          <div>
+            <label className="block text-xs text-fg-subtle mb-1">Série</label>
+            {canEditConference ? <Input value={serialNumber} onChange={e => setSerialNumber(e.target.value)} /> : <p className="text-sm text-fg">{item.serialNumber ?? '—'}</p>}
+          </div>
+        </div>
+        {canEditConference && (
+          <Button size="sm" variant="secondary" onClick={saveConference} disabled={saving}>Salvar conferência</Button>
+        )}
+      </section>
+
+      {/* Avaliação */}
       {(canEditInspection || item.classification) && (
-        <div className="border-t border-edge pt-3 space-y-2">
-          <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Inspeção</p>
+        <section className="border-t border-edge pt-4 space-y-2">
+          <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Avaliação</p>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-1.5">
             {CHECKLIST_FIELDS.map(field => (
               <label key={field.key} className="flex items-center gap-2 text-sm text-fg">
@@ -507,29 +887,29 @@ function ReturnItemRow({
               </label>
             ))}
           </div>
-          <Select value={classification} onChange={e => setClassification(e.target.value as ReturnClassification)} disabled={!canEditInspection} className="w-64">
+          <Select value={classification} onChange={e => setClassification(e.target.value as ReturnClassification)} disabled={!canEditInspection} className="w-full sm:w-64">
             <option value="">Classificação...</option>
             {(Object.keys(RETURN_CLASSIFICATION_LABEL) as ReturnClassification[]).map(c => <option key={c} value={c}>{RETURN_CLASSIFICATION_LABEL[c]}</option>)}
           </Select>
           {canEditInspection && (
             alreadyInspected ? (
-              <InlineReasonAction label="Registrar correção da inspeção" onConfirm={saveInspection} disabled={saving} />
+              <InlineReasonAction label="Registrar correção da avaliação" onConfirm={saveInspection} disabled={saving} />
             ) : (
-              <Button size="sm" variant="secondary" onClick={() => saveInspection(null)} disabled={saving}>Salvar inspeção</Button>
+              <Button size="sm" variant="secondary" onClick={() => saveInspection(null)} disabled={saving}>Salvar avaliação</Button>
             )
           )}
-          {item.inspectedAt && <p className="text-xs text-fg-subtle">Inspecionado por {userLabel(item.inspectedBy)} em {new Date(item.inspectedAt).toLocaleString('pt-BR')}</p>}
-        </div>
+          {item.inspectedAt && <p className="text-xs text-fg-subtle">Avaliado por {userLabel(item.inspectedBy)} em {new Date(item.inspectedAt).toLocaleString('pt-BR')}</p>}
+        </section>
       )}
 
       {/* Destinação */}
       {(returnStatus === 'awaiting_destination' || item.destination) && (
-        <div className="border-t border-edge pt-3 space-y-2">
+        <section className="border-t border-edge pt-4 space-y-2">
           <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Destinação</p>
           {item.suggestedDestination && item.destinationStatus === 'pending' && (
             <p className="text-xs text-fg-subtle">
               Sugestão da regra: <span className="font-medium text-fg">{RETURN_DESTINATION_LABEL[item.suggestedDestination]}</span>
-              {destination && destination !== item.suggestedDestination && <span className="text-amber-600 dark:text-amber-400"> — decisão diverge da sugestão.</span>}
+              {destination && destination !== item.suggestedDestination && <span className="text-red-600 dark:text-red-400"> — decisão diverge da sugestão.</span>}
             </p>
           )}
           {item.destinationStatus !== 'pending' ? (
@@ -538,14 +918,21 @@ function ReturnItemRow({
                 {item.destination && RETURN_DESTINATION_LABEL[item.destination]}
                 {item.destinationStatus === 'in_treatment' && <span className="text-fg-subtle"> — em tratamento, aguardando conclusão da ordem de serviço.</span>}
                 {item.destinationStatus === 'moved' && <> — decidido por {userLabel(item.destinationDecidedBy)} em {item.destinationDecidedAt ? new Date(item.destinationDecidedAt).toLocaleString('pt-BR') : '—'}</>}
-                {item.destinationReason && <span className="block text-fg-subtle">Justificativa: {item.destinationReason}</span>}
               </p>
+              {item.destinationReason && (
+                <div className="rounded border border-edge p-2 text-xs space-y-0.5">
+                  <p className="text-fg-subtle">Decisão: <span className="text-fg">{item.destination ? RETURN_DESTINATION_LABEL[item.destination] : '—'}</span></p>
+                  <p className="text-fg-subtle">Responsável: <span className="text-fg">{userLabel(item.destinationDecidedBy)}</span></p>
+                  <p className="text-fg-subtle">Data: <span className="text-fg">{item.destinationDecidedAt ? new Date(item.destinationDecidedAt).toLocaleString('pt-BR') : '—'}</span></p>
+                  <p className="text-fg-subtle">Justificativa: <span className="text-fg">{item.destinationReason}</span></p>
+                </div>
+              )}
               {item.erpSyncAdjustmentId && (
                 <div className="flex flex-wrap items-center gap-2 text-xs">
                   <span className="text-fg-subtle">Sincronização com o Tiny:</span>
                   <Badge variant={
-                    erpSyncStatus?.syncStatus === 'sent' || erpSyncStatus?.syncStatus === 'confirmed' ? 'success'
-                    : erpSyncStatus?.syncStatus === 'failed' ? 'danger' : 'warning'
+                    erpSyncStatus?.syncStatus === 'sent' || erpSyncStatus?.syncStatus === 'confirmed' ? 'accent'
+                    : erpSyncStatus?.syncStatus === 'failed' ? 'danger' : 'neutral'
                   }>
                     {erpSyncStatus?.syncStatus === 'sent' ? 'Enviado'
                       : erpSyncStatus?.syncStatus === 'confirmed' ? 'Confirmado'
@@ -562,7 +949,7 @@ function ReturnItemRow({
           ) : returnStatus === 'awaiting_destination' ? (
             <div className="space-y-2">
               <div className="flex flex-wrap items-center gap-2">
-                <Select value={destination} onChange={e => setDestination(e.target.value as ReturnDestination)} className="w-64">
+                <Select value={destination} onChange={e => setDestination(e.target.value as ReturnDestination)} className="w-full sm:w-64">
                   <option value="">Selecione a destinação...</option>
                   {(Object.keys(RETURN_DESTINATION_LABEL) as ReturnDestination[]).map(d => <option key={d} value={d}>{RETURN_DESTINATION_LABEL[d]}</option>)}
                 </Select>
@@ -570,7 +957,7 @@ function ReturnItemRow({
                   <span className="text-xs text-red-600 dark:text-red-400">Item em quarentena aberta — libere antes de retornar ao estoque.</span>
                 )}
                 {destination && missingApprovalTypes.length > 0 && (
-                  <span className="text-xs text-amber-600 dark:text-amber-400">
+                  <span className="text-xs text-fg-subtle">
                     Exige aprovação: {missingApprovalTypes.map(t => APPROVAL_TYPE_LABEL[t]).join(', ')}.
                     {canWrite && (
                       <button
@@ -598,13 +985,13 @@ function ReturnItemRow({
                       <p>ERP conectado: {erpContext.connectionDisplayName}</p>
                       <p>SKU interno: {item.sku ?? '—'}</p>
                       <p>Produto no Tiny: {erpContext.productLinked ? (erpContext.externalProductName ?? erpContext.externalSku ?? '—') : (
-                        <span className="text-amber-600 dark:text-amber-400">sem vínculo</span>
+                        <span className="text-fg-subtle">sem vínculo</span>
                       )}</p>
                       <p>Depósito no Tiny: {erpContext.warehouseLinked ? (erpContext.externalWarehouseName ?? '—') : (
-                        <span className="text-amber-600 dark:text-amber-400">sem vínculo</span>
+                        <span className="text-fg-subtle">sem vínculo</span>
                       )}</p>
                       {(!erpContext.productLinked || !erpContext.warehouseLinked) && (
-                        <p className="text-amber-600 dark:text-amber-400">
+                        <p className="text-fg-subtle">
                           Sem vínculo completo, a destinação interna será concluída normalmente, mas a sincronização ficará "Requer atenção".
                         </p>
                       )}
@@ -620,16 +1007,16 @@ function ReturnItemRow({
               )}
             </div>
           ) : null}
-        </div>
+        </section>
       )}
 
       {/* Aprovações */}
       {approvalRequests.length > 0 && (
-        <div className="border-t border-edge pt-3 space-y-1.5">
+        <section className="border-t border-edge pt-4 space-y-1.5">
           <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Aprovações</p>
           {approvalRequests.map(req => (
             <div key={req.id} className="flex flex-wrap items-center gap-2 text-sm">
-              <Badge variant={req.status === 'pending' ? 'warning' : req.status === 'approved' ? 'success' : 'danger'}>{APPROVAL_TYPE_LABEL[req.approvalType]}</Badge>
+              <Badge variant={req.status === 'pending' ? 'neutral' : req.status === 'approved' ? 'accent' : 'danger'}>{APPROVAL_TYPE_LABEL[req.approvalType]}</Badge>
               <span className="text-xs text-fg-subtle">
                 {req.status === 'pending' ? 'Pendente' : req.status === 'approved' ? `Aprovado por ${userLabel(req.decidedBy)}` : `Rejeitado por ${userLabel(req.decidedBy)}`}
                 {req.decisionReason && ` — ${req.decisionReason}`}
@@ -642,11 +1029,12 @@ function ReturnItemRow({
               )}
             </div>
           ))}
-        </div>
+        </section>
       )}
+
       {/* Assistência técnica / recondicionamento */}
       {(item.destinationStatus === 'in_treatment' || openServiceOrder) && (
-        <div className="border-t border-edge pt-3 space-y-2">
+        <section className="border-t border-edge pt-4 space-y-2">
           <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Assistência / recondicionamento</p>
           {openServiceOrder ? (
             <ServiceOrderPanel order={openServiceOrder} canManage={canManageService} onChanged={async () => { await loadPhase2(); onChanged(); }} />
@@ -665,38 +1053,55 @@ function ReturnItemRow({
           {serviceOrders.filter(o => o.id !== openServiceOrder?.id).map(o => (
             <p key={o.id} className="text-xs text-fg-subtle">Ordem anterior: {SERVICE_ORDER_STATUS_LABEL[o.status]}{o.resultNotes ? ` — ${o.resultNotes}` : ''}</p>
           ))}
-        </div>
+        </section>
       )}
 
       {/* Quarentena */}
       {(openHold || item.destination === 'quarantine' || item.currentLocation.toLowerCase().includes('quarentena')) && (
-        <div className="border-t border-edge pt-3 space-y-2">
+        <section className="border-t border-edge pt-4 space-y-2">
           <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Quarentena</p>
           {openHold ? (
             <div className="text-sm text-fg space-y-1">
-              <p>Bloqueado desde {new Date(openHold.createdAt).toLocaleDateString('pt-BR')} — {openHold.blockReason}{openHold.responsible ? ` · Responsável: ${openHold.responsible}` : ''}{openHold.reviewDeadline ? ` · Prazo: ${new Date(openHold.reviewDeadline).toLocaleDateString('pt-BR')}` : ''}</p>
+              <p className="text-red-600 dark:text-red-400">
+                Bloqueado desde {new Date(openHold.createdAt).toLocaleDateString('pt-BR')} — {openHold.blockReason}
+              </p>
+              <p className="text-xs text-fg-subtle">{openHold.responsible ? `Responsável: ${openHold.responsible}` : ''}{openHold.reviewDeadline ? ` · Prazo: ${new Date(openHold.reviewDeadline).toLocaleDateString('pt-BR')}` : ''}</p>
               {canRelease && <InlineReasonAction label="Liberar quarentena" onConfirm={async reason => { await releaseQuarantineHold(openHold.id, reason); await loadPhase2(); onChanged(); }} />}
             </div>
-          ) : canWrite ? (
-            showQuarantineForm ? (
-              <QuarantineHoldForm
-                companyId={companyId} returnItemId={item.id} userId={userId} userEmail={userEmail}
-                onCreated={async () => { setShowQuarantineForm(false); await loadPhase2(); }}
-                onCancel={() => setShowQuarantineForm(false)}
-              />
-            ) : (
-              <Button size="sm" variant="secondary" onClick={() => setShowQuarantineForm(true)}>Registrar bloqueio de quarentena</Button>
-            )
-          ) : null}
-        </div>
+          ) : (
+            <>
+              <p className="text-sm text-fg-subtle">Sem bloqueio ativo.</p>
+              {canWrite && (
+                showQuarantineForm ? (
+                  <QuarantineHoldForm
+                    companyId={companyId} returnItemId={item.id} userId={userId} userEmail={userEmail}
+                    onCreated={async () => { setShowQuarantineForm(false); await loadPhase2(); }}
+                    onCancel={() => setShowQuarantineForm(false)}
+                  />
+                ) : (
+                  <Button size="sm" variant="secondary" onClick={() => setShowQuarantineForm(true)}>Registrar bloqueio</Button>
+                )
+              )}
+            </>
+          )}
+        </section>
       )}
 
-      {conditionGrades.length > 0 && item.conditionGradeId && (
-        <p className="text-xs text-fg-subtle">Grade de condição: {conditionGrades.find(g => g.id === item.conditionGradeId)?.label ?? '—'}</p>
-      )}
+      {/* Responsabilidade */}
+      <section className="border-t border-edge pt-4 space-y-1">
+        <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide">Responsabilidade</p>
+        {item.inspectedAt ? (
+          <p className="text-sm text-fg">Avaliação realizada por {userLabel(item.inspectedBy)} em {new Date(item.inspectedAt).toLocaleString('pt-BR')}</p>
+        ) : (
+          <p className="text-sm text-fg-subtle">Ainda não avaliado.</p>
+        )}
+        {conditionGrades.length > 0 && item.conditionGradeId && (
+          <p className="text-xs text-fg-subtle">Grade de condição: {conditionGrades.find(g => g.id === item.conditionGradeId)?.label ?? '—'}</p>
+        )}
+      </section>
 
       {error && <p className="text-sm text-red-600 dark:text-red-400">{error}</p>}
-    </PanelSection>
+    </div>
   );
 }
 

@@ -65,7 +65,7 @@ export function WarehouseAnalyticsPanel({ companyId }: WarehouseAnalyticsPanelPr
       <Panel>
         <PanelSection padding="md">
           <StatRow>
-            <StatCell><Stat label="Confidence Médio" value={`${cbcSummary ? Math.round(cbcSummary.avg_confidence) : 0}%`} /></StatCell>
+            <StatCell><Stat label="Confidence Médio" value={`${cbcSummary?.avg_confidence != null ? Math.round(cbcSummary.avg_confidence) : 0}%`} /></StatCell>
             <StatCell><Stat label="SKUs Avaliados" value={cbcSummary?.total_scored ?? 0} /></StatCell>
             <StatCell><Stat label="Atrasados" value={cbcSummary?.overdue_count ?? 0} /></StatCell>
             <StatCell><Stat label="Devidos essa semana" value={cbcSummary?.due_this_week_count ?? 0} /></StatCell>

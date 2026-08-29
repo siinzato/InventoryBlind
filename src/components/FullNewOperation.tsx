@@ -7,7 +7,8 @@ import {
 } from 'lucide-react';
 import type { FullItemStatus } from '../lib/fullManagerTypes';
 import { ITEM_STATUS_LABEL, ITEM_STATUS_COLOR, MARKETPLACES } from '../lib/fullManagerTypes';
-import { Panel, PanelSection, Button } from './ui';
+import { Panel, PanelSection, Button, PhaseRail } from './ui';
+import type { PhaseRailStep } from './ui';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -365,6 +366,12 @@ interface FullNewOperationProps {
   onCancel: () => void;
 }
 
+const FULL_OPERATION_PHASES: PhaseRailStep[] = [
+  { key: '1', label: 'Identificação' },
+  { key: '2', label: 'Upload' },
+  { key: '3', label: 'Pré-visualização' },
+];
+
 const FullNewOperation: React.FC<FullNewOperationProps> = ({ onComplete, onCancel }) => {
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [form, setForm] = useState<Step1Form>({ full_number: '', marketplace: 'Mercado Livre', responsible: '', notes: '' });
@@ -417,29 +424,9 @@ const FullNewOperation: React.FC<FullNewOperationProps> = ({ onComplete, onCance
     }
   };
 
-  const STEPS = ['Identificação', 'Upload', 'Pré-visualização'];
-
   return (
     <div className="space-y-6">
-      {/* Step indicator */}
-      <div className="flex items-center gap-0">
-        {STEPS.map((label, i) => {
-          const n = i + 1;
-          const active = step === n;
-          const done = step > n;
-          return (
-            <React.Fragment key={label}>
-              <div className="flex items-center gap-2">
-                <div className={`w-7 h-7 rounded-full flex items-center justify-center text-xs font-bold transition ${done ? 'bg-emerald-500 text-white' : active ? 'bg-accent text-white' : 'bg-edge text-fg-subtle'}`}>
-                  {done ? <Check size={14} /> : n}
-                </div>
-                <span className={`text-sm font-semibold hidden sm:block ${active ? 'text-fg' : 'text-fg-subtle'}`}>{label}</span>
-              </div>
-              {i < STEPS.length - 1 && <div className="flex-1 h-px bg-edge mx-3" />}
-            </React.Fragment>
-          );
-        })}
-      </div>
+      <PhaseRail label="Progresso da operação" steps={FULL_OPERATION_PHASES} currentKey={String(step)} />
 
       {error && (
         <div className="flex items-center gap-2 p-3 bg-red-500/10 rounded-lg text-sm text-red-700 dark:text-red-400">

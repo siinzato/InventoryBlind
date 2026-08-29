@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Plus, RefreshCw, FileText, LayoutGrid, BarChart3, Settings2 } from 'lucide-react';
-import { Page, PageHeader, Panel, PanelSection, Badge, Button, Input, Select, Table, Thead, Tr, Th, Td, SegmentedControl, StatRow, StatCell, Stat } from '../ui';
+import { Plus, RefreshCw, FileText, LayoutGrid, BarChart3, Settings2, PackageMinus } from 'lucide-react';
+import { Page, PageHeader, Panel, PanelSection, Button, Input, Select, Table, Thead, Tr, Th, Td, SegmentedControl, StatRow, StatCell, Stat } from '../ui';
 import { useAuth } from '../../lib/auth';
 import { hasPermission, canConfigureReturnRules } from '../../lib/permissionService';
 import {
@@ -14,20 +14,40 @@ import {
   RETURN_STATUS_LABEL, RETURN_DESTINATION_LABEL,
   type ReturnRecord, type ReturnStatus, type ReturnDestination, type ReturnItem,
 } from '../../lib/reverseLogistics/reverseLogisticsTypes';
+import type { FullWithdrawalStatus } from '../../lib/reverseLogistics/fullWithdrawalTypes';
 import { NewReturnModal } from './NewReturnModal';
 import { ReturnDetailPage } from './ReturnDetailPage';
 import { ReturnConfigPanel } from './ReturnConfigPanel';
+import { FullWithdrawalsView } from './FullWithdrawalsView';
+import { PlanFullWithdrawalWizard } from './PlanFullWithdrawalWizard';
+import { FullWithdrawalDetail } from './FullWithdrawalDetail';
 
-type View = 'list' | 'kpis' | 'config';
+type View = 'list' | 'full' | 'kpis' | 'config';
+type FullSubView = 'list' | 'wizard' | 'detail';
 
 interface ReverseLogisticsPageProps {
   companyId: string;
 }
 
-const STATUS_BADGE: Record<ReturnStatus, 'neutral' | 'accent' | 'success' | 'warning' | 'danger'> = {
-  received: 'neutral', in_conference: 'accent', in_inspection: 'accent',
-  awaiting_destination: 'warning', finalized: 'success', cancelled: 'danger',
-};
+/** Texto + ponto — nunca badge colorido para um status comum. Vermelho é
+ *  reservado para cancelamento (o único estado real de bloqueio/falha aqui). */
+function ReturnStatusText({ status }: { status: ReturnStatus }) {
+  if (status === 'cancelled') {
+    return (
+      <span className="inline-flex items-center gap-1.5 text-sm text-red-600 dark:text-red-400">
+        <span className="h-1.5 w-1.5 flex-shrink-0 rounded-full bg-red-600 dark:bg-red-400" />
+        {RETURN_STATUS_LABEL[status]}
+      </span>
+    );
+  }
+  const active = status === 'in_conference' || status === 'in_inspection' || status === 'awaiting_destination';
+  return (
+    <span className={`inline-flex items-center gap-1.5 text-sm ${active ? 'font-medium text-accent' : 'text-fg-muted'}`}>
+      <span className={`h-1.5 w-1.5 flex-shrink-0 rounded-full ${active ? 'bg-accent' : 'bg-fg-subtle'}`} />
+      {RETURN_STATUS_LABEL[status]}
+    </span>
+  );
+}
 
 export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
   const { profile } = useAuth();
@@ -45,6 +65,9 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
   const [showNew, setShowNew] = useState(false);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [view, setView] = useState<View>('list');
+  const [fullSubView, setFullSubView] = useState<FullSubView>('list');
+  const [selectedFullPlanId, setSelectedFullPlanId] = useState<string | null>(null);
+  const [editDraftPlanId, setEditDraftPlanId] = useState<string | null>(null);
   const [allItems, setAllItems] = useState<Awaited<ReturnType<typeof listItemsForReturns>>>([]);
   const [kpiPeriodStart, setKpiPeriodStart] = useState('');
   const [kpiPeriodEnd, setKpiPeriodEnd] = useState('');
@@ -130,6 +153,29 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
     );
   }
 
+  if (view === 'full' && fullSubView === 'wizard') {
+    return (
+      <PlanFullWithdrawalWizard
+        companyId={companyId}
+        existingPlanId={editDraftPlanId}
+        onCancel={() => setFullSubView('list')}
+        onDone={(planId, opts) => {
+          setSelectedFullPlanId(planId);
+          setFullSubView(opts?.openDetail ? 'detail' : 'list');
+        }}
+      />
+    );
+  }
+
+  if (view === 'full' && fullSubView === 'detail' && selectedFullPlanId) {
+    return (
+      <FullWithdrawalDetail
+        planId={selectedFullPlanId}
+        onBack={() => setFullSubView('list')}
+      />
+    );
+  }
+
   const toggleSelected = (id: string) => {
     setSelectedReturnIds(prev => {
       const next = new Set(prev);
@@ -170,6 +216,7 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
               onChange={setView}
               options={[
                 { value: 'list', label: 'Devoluções', icon: LayoutGrid },
+                { value: 'full', label: 'Retiradas Full', icon: PackageMinus },
                 { value: 'kpis', label: 'Indicadores', icon: BarChart3 },
                 ...(canConfigure ? [{ value: 'config' as View, label: 'Configurações', icon: Settings2 }] : []),
               ]}
@@ -177,11 +224,27 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
             {view === 'list' && canWrite && (
               <Button onClick={() => setShowNew(true)}><Plus size={16} /> Nova Devolução</Button>
             )}
+            {view === 'full' && fullSubView === 'list' && canWrite && (
+              <Button onClick={() => { setEditDraftPlanId(null); setFullSubView('wizard'); }}>
+                <Plus size={16} /> Planejar retirada Full
+              </Button>
+            )}
           </div>
         }
       />
 
       {view === 'config' && canConfigure && <ReturnConfigPanel companyId={companyId} userId={profile?.id ?? ''} userEmail={profile?.email ?? ''} />}
+
+      {view === 'full' && fullSubView === 'list' && (
+        <FullWithdrawalsView
+          companyId={companyId}
+          onOpenPlan={(planId: string, status: FullWithdrawalStatus) => {
+            setSelectedFullPlanId(planId);
+            if (status === 'draft') { setEditDraftPlanId(planId); setFullSubView('wizard'); }
+            else setFullSubView('detail');
+          }}
+        />
+      )}
 
       {view === 'kpis' && (
         <>
@@ -232,9 +295,10 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
       {view === 'list' && (
         <>
           <Panel>
-            <PanelSection padding="md" className="grid grid-cols-1 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-              <Input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} />
-              <Input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} />
+            <PanelSection padding="md" className="flex flex-wrap items-center gap-3">
+              <Input placeholder="Código, cliente ou SKU..." value={skuFilter} onChange={e => setSkuFilter(e.target.value)} className="flex-1 min-w-[220px]" />
+              <Input type="date" value={periodStart} onChange={e => setPeriodStart(e.target.value)} aria-label="Data inicial" />
+              <Input type="date" value={periodEnd} onChange={e => setPeriodEnd(e.target.value)} aria-label="Data final" />
               <Select value={statusFilter} onChange={e => setStatusFilter(e.target.value as ReturnStatus | 'all')}>
                 <option value="all">Todos os status</option>
                 {(Object.keys(RETURN_STATUS_LABEL) as ReturnStatus[]).map(s => <option key={s} value={s}>{RETURN_STATUS_LABEL[s]}</option>)}
@@ -247,7 +311,14 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
                 <option value="all">Todas as destinações</option>
                 {(Object.keys(RETURN_DESTINATION_LABEL) as ReturnDestination[]).map(d => <option key={d} value={d}>{RETURN_DESTINATION_LABEL[d]}</option>)}
               </Select>
-              <Input placeholder="Código, cliente ou SKU..." value={skuFilter} onChange={e => setSkuFilter(e.target.value)} />
+              {(statusFilter !== 'all' || destinationFilter !== 'all' || reasonFilter || skuFilter || periodStart || periodEnd) && (
+                <button
+                  onClick={() => { setStatusFilter('all'); setDestinationFilter('all'); setReasonFilter(''); setSkuFilter(''); setPeriodStart(''); setPeriodEnd(''); }}
+                  className="text-xs text-accent hover:underline"
+                >
+                  Limpar filtros
+                </button>
+              )}
             </PanelSection>
 
             {canWrite && selectedReturnIds.size > 0 && (
@@ -280,11 +351,11 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
                 <Table>
                   <Thead>
                     <Tr>
-                      {canWrite && <Th></Th>}
+                      {canWrite && <Th className="w-8"></Th>}
                       <Th>Código</Th>
-                      <Th>Cliente</Th>
+                      <Th>Cliente / Origem</Th>
                       <Th>Pedido/Documento</Th>
-                      <Th>Itens</Th>
+                      <Th className="text-right">Itens</Th>
                       <Th>Recebida em</Th>
                       <Th>Status</Th>
                       <Th>Destinação predominante</Th>
@@ -302,13 +373,16 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
                               <input type="checkbox" checked={selectedReturnIds.has(r.id)} onChange={() => toggleSelected(r.id)} className="h-4 w-4 rounded border-edge" />
                             </Td>
                           )}
-                          <Td className="font-medium">{r.code}</Td>
-                          <Td>{r.customerName ?? '—'}</Td>
+                          <Td className="font-medium whitespace-nowrap">{r.code}</Td>
+                          <Td>
+                            <p className="text-fg">{r.customerName ?? r.origin ?? '—'}</p>
+                            {r.customerName && r.origin && <p className="text-xs text-fg-subtle">{r.origin}</p>}
+                          </Td>
                           <Td>{r.referenceValue ?? '—'}</Td>
                           <Td numeric>{summary?.itemCount ?? 0}</Td>
                           <Td>{new Date(r.receivedAt).toLocaleDateString('pt-BR')}</Td>
-                          <Td><Badge variant={STATUS_BADGE[r.status]}>{RETURN_STATUS_LABEL[r.status]}</Badge></Td>
-                          <Td>{summary?.predominantDestination ? RETURN_DESTINATION_LABEL[summary.predominantDestination] : '—'}</Td>
+                          <Td><ReturnStatusText status={r.status} /></Td>
+                          <Td className="text-fg-muted">{summary?.predominantDestination ? RETURN_DESTINATION_LABEL[summary.predominantDestination] : '—'}</Td>
                           <Td>{r.receivedBy ? (userNames.get(r.receivedBy)?.name ?? userNames.get(r.receivedBy)?.email ?? '—') : '—'}</Td>
                           <Td>
                             <Button variant="ghost" size="sm" onClick={e => { e.stopPropagation(); setSelectedId(r.id); }}>

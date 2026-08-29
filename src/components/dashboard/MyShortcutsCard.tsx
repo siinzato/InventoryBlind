@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { Plus, Settings2 } from 'lucide-react';
+import { Settings2 } from 'lucide-react';
 import { Panel, PanelSection, Button, type SidebarNavGroup } from '../ui';
 import { listShortcuts, type UserShortcut } from '../../lib/shortcuts/shortcutService';
 import { buildRouteRegistry, findRouteOption, type ShortcutRouteOption } from '../../lib/shortcuts/routeRegistry';
@@ -11,8 +11,12 @@ interface MyShortcutsCardProps {
   navGroups: SidebarNavGroup[];
 }
 
-/** Card fixo do topo do dashboard — sempre "Meus Atalhos", para todo usuário e
- *  plano. O diagnóstico nunca ocupa este espaço; ele é um aviso à parte. */
+/** Faixa fixa do topo do dashboard — sempre "Acesso rápido", para todo usuário e
+ *  plano. O diagnóstico nunca ocupa este espaço; ele é um aviso à parte.
+ *
+ *  Compacta e horizontal (não é mais um Panel cheio de wrap) — mesmos dados e
+ *  mesma lógica de sempre (listShortcuts/ShortcutManagerModal), só reapresentados
+ *  como uma única linha discreta em vez de um card grande. */
 export function MyShortcutsCard({ companyId, userId, navGroups }: MyShortcutsCardProps) {
   const [shortcuts, setShortcuts] = useState<UserShortcut[]>([]);
   const [loading, setLoading] = useState(true);
@@ -47,34 +51,30 @@ export function MyShortcutsCard({ companyId, userId, navGroups }: MyShortcutsCar
 
   return (
     <Panel>
-      <PanelSection padding="md" className="flex items-center justify-between">
-        <p className="text-title">Meus Atalhos</p>
-        <Button variant="ghost" size="sm" onClick={() => setShowManager(true)}>
-          <Settings2 size={14} /> Gerenciar
-        </Button>
-      </PanelSection>
+      <PanelSection padding="sm" className="flex flex-wrap items-center gap-x-6 gap-y-2">
+        <p className="text-label flex-shrink-0">Acesso rápido</p>
 
-      <PanelSection padding="md">
-        {visible.length === 0 ? (
-          <div className="flex items-center justify-between gap-3">
+        <div className="flex flex-1 flex-wrap items-center gap-x-5 gap-y-2 min-w-0">
+          {visible.length === 0 ? (
             <p className="text-sm text-fg-subtle">Nenhum atalho configurado ainda.</p>
-            <Button size="sm" onClick={() => setShowManager(true)}><Plus size={14} /> Adicionar atalhos</Button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            {visible.map(({ shortcut, option }) => (
+          ) : (
+            visible.map(({ shortcut, option }) => (
               <button
                 key={shortcut.id}
                 type="button"
                 onClick={() => navGroups.flatMap(g => g.items).find(i => i.id === option.id)?.onClick()}
-                className="flex items-center gap-2 rounded-control border border-edge px-3 py-2 text-sm text-fg hover:bg-surface-3/60 transition-colors"
+                className="flex items-center gap-1.5 text-sm text-fg-muted hover:text-accent transition-colors"
               >
-                <span className="[&>svg]:w-4 [&>svg]:h-4 text-fg-muted">{option.icon}</span>
+                <span className="[&>svg]:w-4 [&>svg]:h-4">{option.icon}</span>
                 {option.label}
               </button>
-            ))}
-          </div>
-        )}
+            ))
+          )}
+        </div>
+
+        <Button variant="ghost" size="sm" className="flex-shrink-0" onClick={() => setShowManager(true)}>
+          <Settings2 size={14} /> Gerenciar
+        </Button>
       </PanelSection>
 
       {showManager && userId && (

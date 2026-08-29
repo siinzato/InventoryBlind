@@ -9,7 +9,7 @@ import {
 import {
   listMyDayTasks, listCompanyTasks, listTeamMembers, TeamTaskFilters,
   setMyTaskStatus, pauseMyTask, resumeMyTask, blockMyTask, unblockTask, TaskServiceError, getTaskDetail, TaskDetail,
-  getTaskModuleSettings, listTaskTemplates,
+  getTaskModuleSettings, listTaskTemplates, archiveMyAssignment, restoreMyAssignment, archiveMyDoneEligible,
 } from './taskService';
 import {
   listMyNotifications, markNotificationRead, markAllNotificationsRead, subscribeToTaskNotifications,
@@ -75,7 +75,24 @@ export function useMyDayTasks(userId: string | undefined) {
   const unblockMyTask = useCallback((taskId: string) =>
     run(() => unblockTask(taskId, undefined, true), 'Não foi possível desbloquear a tarefa.'), [run]);
 
-  return { tasks, loading, error, reload, setStatusOptimistic, pauseTask, resumeTask, blockTask, unblockMyTask };
+  const archiveTask = useCallback((taskId: string) =>
+    run(() => archiveMyAssignment(taskId), 'Não foi possível arquivar a tarefa.'), [run]);
+  const restoreTask = useCallback((taskId: string) =>
+    run(() => restoreMyAssignment(taskId), 'Não foi possível restaurar a tarefa.'), [run]);
+  const archiveDoneEligible = useCallback(async () => {
+    try {
+      const count = await archiveMyDoneEligible();
+      await reload();
+      return count;
+    } catch (err) {
+      throw new TaskServiceError(messageOf(err, 'Não foi possível arquivar as tarefas concluídas.'));
+    }
+  }, [reload]);
+
+  return {
+    tasks, loading, error, reload, setStatusOptimistic, pauseTask, resumeTask, blockTask, unblockMyTask,
+    archiveTask, restoreTask, archiveDoneEligible,
+  };
 }
 
 export function useTeamTasks(companyId: string | undefined, filters: TeamTaskFilters) {

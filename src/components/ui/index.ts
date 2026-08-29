@@ -15,6 +15,8 @@ export { Stat, StatRow, StatCell } from './Stat';
 export type { StatProps } from './Stat';
 export { SegmentedControl } from './SegmentedControl';
 export type { SegmentedOption } from './SegmentedControl';
+export { PhaseRail } from './PhaseRail';
+export type { PhaseRailStep } from './PhaseRail';
 export { ListRow } from './ListRow';
 export { resolveInsightIcon, INSIGHT_ICON_TONE } from './insightIcon';
 export type { InsightSeverity } from './insightIcon';

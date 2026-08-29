@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
-import { Panel, PanelSection, Button, Badge, SegmentedControl } from '../ui';
+import { Panel, PanelSection, Button, Badge, SegmentedControl, PhaseRail } from '../ui';
 import { supabase, BrandData } from '../../lib/supabase';
 import {
   CountRow, CountColumnMapping, COUNT_FIELDS,
@@ -59,7 +59,6 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
   const selectedBrand = brandsData.find(b => b.id === brandId);
-  const stepIdx = STEPS.findIndex(s => s.key === step);
 
   const handleFile = async (file: File) => {
     const { headers: h, rows: r } = await parseCountFile(file);
@@ -252,18 +251,7 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   return (
     <Panel>
       <PanelSection padding="md">
-        <div className="flex items-center justify-center gap-2">
-          {STEPS.map((s, idx) => (
-            <div key={s.key} className="flex items-center">
-              {idx > 0 && <div className={`w-10 h-1 mx-1 rounded ${stepIdx >= idx ? 'bg-accent' : 'bg-surface-3'}`} />}
-              <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-bold ${
-                stepIdx > idx ? 'bg-accent text-white' : stepIdx === idx ? 'bg-accent-strong text-white' : 'bg-surface-3 text-fg-subtle'
-              }`}>
-                {stepIdx > idx ? '✓' : idx + 1}
-              </div>
-            </div>
-          ))}
-        </div>
+        <PhaseRail label="Progresso da importação" steps={STEPS} currentKey={step} />
       </PanelSection>
 
       {step === 'upload' && (

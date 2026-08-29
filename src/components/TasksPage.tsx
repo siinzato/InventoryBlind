@@ -87,18 +87,18 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onBack, initialTaskId, onC
   }
 
   return (
-    <div className="min-h-screen bg-surface p-6 sm:p-8">
+    <div className="min-h-screen bg-surface p-4 sm:p-6">
       <div className="max-w-6xl mx-auto">
-        <div className="mb-6">
-          <button onClick={onBack} className="inline-flex items-center gap-2 text-sm text-fg-muted hover:text-fg transition-colors mb-6">
+        <div className="mb-4">
+          <button onClick={onBack} className="inline-flex items-center gap-2 text-sm text-fg-muted hover:text-fg transition-colors mb-3">
             <ArrowLeft size={18} />Voltar
           </button>
           <div className="flex items-center justify-between gap-4 flex-wrap">
-            <div className="flex items-center gap-4">
-              <div className="p-3 bg-accent rounded-xl"><ListTodo size={28} className="text-white" /></div>
+            <div className="flex items-center gap-3">
+              <div className="p-2 bg-accent rounded-lg"><ListTodo size={22} className="text-white" /></div>
               <div>
                 <h1 className="text-title">Meu Trabalho</h1>
-                <p className="text-sm text-fg-muted mt-1">Organize suas tarefas e acompanhe as da equipe</p>
+                <p className="text-sm text-fg-muted">Organize suas tarefas e acompanhe as da equipe</p>
               </div>
             </div>
             <div className="flex items-center gap-2">
@@ -107,10 +107,12 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onBack, initialTaskId, onC
           </div>
         </div>
 
-        <div className="flex bg-surface-3 rounded-lg p-1 gap-1 mb-6 w-fit overflow-x-auto max-w-full">
+        <div className="flex gap-5 mb-5 border-b border-edge overflow-x-auto max-w-full">
           {NAV.filter(n => !n.hidden).map(n => (
             <button key={n.id} onClick={() => setView(n.id)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 rounded-md text-sm font-medium transition whitespace-nowrap ${view === n.id ? 'bg-accent text-white' : 'text-fg-muted hover:text-fg'}`}>
+              className={`flex items-center gap-1.5 pb-2.5 text-sm font-medium transition whitespace-nowrap border-b-2 -mb-px ${
+                view === n.id ? 'text-accent border-accent' : 'text-fg-muted border-transparent hover:text-fg'
+              }`}>
               {n.icon}{n.label}
             </button>
           ))}
@@ -134,6 +136,9 @@ export const TasksPage: React.FC<TasksPageProps> = ({ onBack, initialTaskId, onC
             tasks={myDay.tasks} loading={myDay.loading} error={myDay.error} currentUserId={userId}
             onOpenTask={setDetailTaskId}
             onChangeMyStatus={(taskId, status) => myDay.setStatusOptimistic(taskId, status).catch(() => {})}
+            onArchiveTask={taskId => myDay.archiveTask(taskId).catch(() => {})}
+            onRestoreTask={taskId => myDay.restoreTask(taskId).catch(() => {})}
+            onArchiveEligible={() => myDay.archiveDoneEligible()}
           />
         )}
 

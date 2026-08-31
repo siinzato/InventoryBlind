@@ -41,7 +41,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
         title: 'Risco crítico concentrado',
         evidence: `${riskSummary.critico_count} produto${riskSummary.critico_count === 1 ? '' : 's'} em risco crítico — ${criticalPct}% do total avaliado`,
         reasons: [
-          `Risco médio da empresa: ${Math.round(riskSummary.avg_risk)}`,
+          `Risco médio da empresa: ${riskSummary.avg_risk != null ? Math.round(riskSummary.avg_risk) : '—'}`,
           `${riskSummary.alto_count} produto${riskSummary.alto_count === 1 ? '' : 's'} também em risco alto`,
         ],
         recommendation: 'Priorizar recontagem dos itens em risco crítico antes dos demais.',

@@ -1,24 +1,19 @@
-import { Badge } from '../ui';
 import type { AbcXyzCombo } from '../../lib/supabase';
 
-// A = maior valor (verde/destaque), C = menor valor; X = previsível (verde), Z = imprevisível (vermelho)
-// — a cor do badge reflete a letra XYZ (o eixo mais "operacionalmente urgente" no dia a dia).
-const VARIANT: Record<'X' | 'Y' | 'Z', 'success' | 'warning' | 'danger'> = {
-  X: 'success',
-  Y: 'warning',
-  Z: 'danger',
-};
-
 interface ClassificationBadgeProps {
-  combo: AbcXyzCombo;
+  combo: AbcXyzCombo | null;
   className?: string;
 }
 
+/** ABC e XYZ são categorias analíticas, não estados positivos/negativos — nenhuma cor por
+ *  classe, só texto grafite num contorno neutro (mesmo padrão de RiskBadge/ConfidenceBadge). */
 export function ClassificationBadge({ combo, className = '' }: ClassificationBadgeProps) {
-  const xyzLetter = combo[1] as 'X' | 'Y' | 'Z';
+  if (!combo) {
+    return <span className={`text-sm text-fg-subtle ${className}`}>Sem classificação</span>;
+  }
   return (
-    <Badge variant={VARIANT[xyzLetter]} className={className}>
+    <span className={`inline-flex items-center justify-center px-2 py-0.5 rounded border border-edge text-sm font-medium text-fg tabular-nums ${className}`}>
       {combo}
-    </Badge>
+    </span>
   );
 }

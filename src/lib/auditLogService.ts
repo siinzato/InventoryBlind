@@ -20,6 +20,8 @@ export type AuditAction =
   | 'user.invite_accepted'
   | 'company.invite_code_generated'
   | 'company.invite_code_joined'
+  | 'company.workspace_created'
+  | 'company.profile_updated'
   | 'user.role_change'
   | 'user.remove'
   | 'erp.token_change'

@@ -50,7 +50,12 @@ ALTER TABLE product_confidence_scores ADD COLUMN IF NOT EXISTS scheduled_at time
 
 CREATE INDEX IF NOT EXISTS product_confidence_scores_priority_idx ON product_confidence_scores (priority_score DESC);
 
-CREATE OR REPLACE VIEW cbc_company_summary_v
+-- CREATE OR REPLACE VIEW não aceita inserir uma coluna no meio da lista
+-- existente (Postgres tenta casar por posição e rejeita o rename implícito) —
+-- por isso dropa e recria em vez de substituir.
+DROP VIEW IF EXISTS cbc_company_summary_v;
+
+CREATE VIEW cbc_company_summary_v
 WITH (security_invoker = true) AS
 SELECT
   s.company_id,

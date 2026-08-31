@@ -27,6 +27,7 @@ export interface Company {
   settings: Record<string, unknown>;
   icon: string | null;
   description: string | null;
+  logoPath: string | null;
   createdAt: string;
 }
 
@@ -74,6 +75,10 @@ interface AuthContextValue {
   retryAuth: () => void;
   linkToAZ: () => Promise<void>;
   createCompany: (companyName: string, userName?: string) => Promise<void>;
+  /** Cria um workspace ADICIONAL para um usuário que já tem um workspace ativo
+   *  (diferente de createCompany, que é só o onboarding de primeiro acesso e
+   *  rejeita quem já está vinculado) — e já troca para ele em seguida. */
+  createWorkspace: (companyName: string) => Promise<void>;
   switchCompany: (companyId: string) => Promise<void>;
   /** Erro de um código de convite pendente (definido no cadastro) que falhou ao ser resolvido
    *  automaticamente em runAuthSequence — mostrado em LinkCompanyScreen junto com o formulário
@@ -217,27 +222,27 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const doLoadCompany = useCallback(async (companyId: string): Promise<Company | null> => {
     const { data, error } = await supabase
       .from('companies')
-      .select('id, name, slug, plan, settings, icon, description, created_at')
+      .select('id, name, slug, plan, settings, icon, description, logo_path, created_at')
       .eq('id', companyId)
       .maybeSingle();
 
     if (import.meta.env.DEV && error) console.warn('[Auth] Company error:', error.message);
     if (import.meta.env.DEV) console.log('[Auth] Company result:', data);
-    return (data ? { ...data, createdAt: data.created_at } : null) as Company | null;
+    return (data ? { ...data, createdAt: data.created_at, logoPath: data.logo_path } : null) as Company | null;
   }, []);
 
   const doLoadMemberships = useCallback(async (userId: string): Promise<CompanyMembership[]> => {
     const { data, error } = await supabase
       .from('company_members')
-      .select('last_accessed_at, companies(id, name, slug, plan, settings, icon, description, created_at)')
+      .select('last_accessed_at, companies(id, name, slug, plan, settings, icon, description, logo_path, created_at)')
       .eq('user_id', userId);
 
     if (import.meta.env.DEV && error) console.warn('[Auth] Memberships error:', error.message);
 
-    const rows = (data ?? []) as unknown as { last_accessed_at: string | null; companies: (Omit<Company, 'createdAt'> & { created_at: string }) | null }[];
+    const rows = (data ?? []) as unknown as { last_accessed_at: string | null; companies: (Omit<Company, 'createdAt' | 'logoPath'> & { created_at: string; logo_path: string | null }) | null }[];
     return rows
-      .filter((r): r is { last_accessed_at: string | null; companies: Omit<Company, 'createdAt'> & { created_at: string } } => !!r.companies)
-      .map(r => ({ ...r.companies, createdAt: r.companies.created_at, lastAccessedAt: r.last_accessed_at }));
+      .filter((r): r is { last_accessed_at: string | null; companies: Omit<Company, 'createdAt' | 'logoPath'> & { created_at: string; logo_path: string | null } } => !!r.companies)
+      .map(r => ({ ...r.companies, createdAt: r.companies.created_at, logoPath: r.companies.logo_path, lastAccessedAt: r.last_accessed_at }));
   }, []);
 
   // ── Resolve which view to show ─────────────────────────────────────────────
@@ -556,6 +561,25 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await runAuthSequence(user);
   }, [user, runAuthSequence]);
 
+  // ── createWorkspace — "Adicionar empresa" a partir de um workspace já ativo ───────────────
+  const createWorkspace = useCallback(async (companyName: string) => {
+    if (!user) throw new Error('No authenticated user');
+
+    const { data, error } = await supabase.rpc('create_additional_company', {
+      p_company_name: companyName,
+    });
+    if (error) throw new Error(error.message);
+
+    const newCompanyId = data?.[0]?.out_company_id;
+    if (newCompanyId) {
+      const { error: switchErr } = await supabase.rpc('switch_active_company', { target_company_id: newCompanyId });
+      if (switchErr && import.meta.env.DEV) console.error('[Auth] createWorkspace switch error:', switchErr.message);
+    }
+
+    loadingRef.current = false;
+    await runAuthSequence(user);
+  }, [user, runAuthSequence]);
+
   // ── joinByInviteCode — manual fallback on LinkCompanyScreen (migration 082) ───────────────
   // Same RPC the signup-time pending code resolves automatically in runAuthSequence; this is the
   // path for someone who already has an account (or whose signup-time code failed) typing a code
@@ -611,6 +635,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     retryAuth,
     linkToAZ,
     createCompany,
+    createWorkspace,
     switchCompany,
     inviteCodeError,
     clearInviteCodeError,

@@ -1,8 +1,9 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { motion } from 'motion/react';
 import { Building2, LogOut, ArrowRight } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { setRememberedWorkspaceDevice } from '../lib/workspacePrefs';
+import { getWorkspaceLogoSignedUrl } from '../lib/workspace/workspaceService';
 import { Panel, Button } from './ui';
 import { LogoMark } from './landing/landingUi';
 
@@ -21,6 +22,22 @@ export default function WorkspaceSelectorScreen() {
   const { companies, switchCompany, switchingCompany, signOut, setView } = useAuth();
   const [remember, setRemember] = useState(false);
   const [enteringId, setEnteringId] = useState<string | null>(null);
+  const [logoUrls, setLogoUrls] = useState<Record<string, string>>({});
+
+  // Bucket é privado — resolve a URL assinada de cada workspace com foto cadastrada
+  // (mesmo padrão de App.tsx/WorkspacesSettingsPage.tsx). Sem foto, cai no ícone/emoji.
+  useEffect(() => {
+    let cancelled = false;
+    const withLogo = companies.filter(c => c.logoPath);
+    Promise.all(withLogo.map(async c => [c.id, await getWorkspaceLogoSignedUrl(c.logoPath as string)] as const))
+      .then(entries => {
+        if (cancelled) return;
+        const next: Record<string, string> = {};
+        for (const [id, url] of entries) if (url) next[id] = url;
+        setLogoUrls(next);
+      });
+    return () => { cancelled = true; };
+  }, [companies]);
 
   const handleEnter = async (companyId: string) => {
     setEnteringId(companyId);
@@ -50,8 +67,14 @@ export default function WorkspaceSelectorScreen() {
             >
               <Panel className="p-5 h-full flex flex-col">
                 <div className="flex items-start gap-3 mb-4">
-                  <div className="w-11 h-11 rounded-xl bg-surface-3 flex items-center justify-center text-xl flex-shrink-0">
-                    {c.icon ? c.icon : <Building2 size={20} className="text-fg-subtle" />}
+                  <div className="w-11 h-11 rounded-xl bg-surface-3 flex items-center justify-center text-xl flex-shrink-0 overflow-hidden">
+                    {logoUrls[c.id] ? (
+                      <img src={logoUrls[c.id]} alt="" className="w-full h-full object-cover" />
+                    ) : c.icon ? (
+                      c.icon
+                    ) : (
+                      <Building2 size={20} className="text-fg-subtle" />
+                    )}
                   </div>
                   <div className="min-w-0">
                     <p className="font-semibold text-fg truncate">{c.name}</p>

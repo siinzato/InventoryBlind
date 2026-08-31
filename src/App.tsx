@@ -59,7 +59,8 @@ import {
   FileStack,
   Grid3x3,
   ShoppingCart,
-  PackageX
+  PackageX,
+  Layers
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -72,6 +73,7 @@ import { CountManagementCenter } from './components/counting/CountManagementCent
 import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
+import { getWorkspaceLogoSignedUrl } from './lib/workspace/workspaceService';
 import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
 import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations } from './lib/permissionService';
 import type { DrillTarget } from './lib/intelligence/contracts';
@@ -84,6 +86,7 @@ import { useTaskNotifications } from './lib/tasks/hooks';
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
+  SidebarFolderIcon,
 } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
 import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnosticStorage';
@@ -149,6 +152,7 @@ const ApiKeysPage = React.lazy(() => import('./components/settings/ApiKeysPage')
 const WebhooksPage = React.lazy(() => import('./components/settings/WebhooksPage').then(m => ({ default: m.WebhooksPage })));
 const LogsPage = React.lazy(() => import('./components/settings/LogsPage').then(m => ({ default: m.LogsPage })));
 const FiscalEntitiesPage = React.lazy(() => import('./components/settings/FiscalEntitiesPage').then(m => ({ default: m.FiscalEntitiesPage })));
+const WorkspacesSettingsPage = React.lazy(() => import('./components/settings/WorkspacesSettingsPage').then(m => ({ default: m.WorkspacesSettingsPage })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -197,9 +201,26 @@ function formatLastLoaded(atMs: number | null): string | null {
 }
 
 function AppContent() {
-  const { user, profile, company, companyId, companies, switchCompany, switchingCompany, signOut } = useAuth();
+  const { user, profile, company, companyId, companies, switchCompany, switchingCompany, createWorkspace, refreshProfile, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
+  // Logo do workspace (Configurações Avançadas → Workspaces) — bucket privado, então a URL
+  // de exibição é assinada e resolvida aqui para os 2 lugares que mostram o ícone do
+  // workspace fora daquela página: o avatar do seletor no topo do Sidebar e o dropdown
+  // de troca de workspace logo abaixo. Sem foto cadastrada, cai na inicial do nome (como já era).
+  const [workspaceLogoUrls, setWorkspaceLogoUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const withLogo = [company, ...companies].filter((c): c is typeof companies[number] => !!c && !!c.logoPath);
+    Promise.all(withLogo.map(async c => [c.id, await getWorkspaceLogoSignedUrl(c.logoPath as string)] as const))
+      .then(entries => {
+        if (cancelled) return;
+        const next: Record<string, string> = {};
+        for (const [id, url] of entries) if (url) next[id] = url;
+        setWorkspaceLogoUrls(next);
+      });
+    return () => { cancelled = true; };
+  }, [company, companies]);
   // Transferência da ferramenta "Consulta e Download de XML/NFe" pra Conferência
   // por NF-e: guarda o id da nota recém-encontrada só até a página consumir.
   const [nfePendingInvoiceId, setNfePendingInvoiceId] = useState<string | null>(null);
@@ -564,6 +585,7 @@ function AppContent() {
       label: 'Dashboard',
       sectionLabel: 'Visão Geral',
       railSection: true,
+      icon: <LayoutDashboard />,
       items: [
         { id: 'dashboard', label: 'Dashboard',           icon: <LayoutDashboard />, onClick: () => { setActiveTab('dashboard'); setMobileOpen(false); }, active: activeTab === 'dashboard' },
         { id: 'heatmap',   label: 'Heatmap',              icon: <Map />,             onClick: () => { setActiveTab('heatmap'); setMobileOpen(false); },   active: activeTab === 'heatmap' },
@@ -572,10 +594,26 @@ function AppContent() {
       ],
     },
     {
+      // Reposicionado de volta para "Visão Geral" (era o 3º grupo, sem sectionLabel
+      // próprio, visualmente dentro de "Operação Inteligente") — pedido explícito do
+      // usuário nesta conversa, revertendo a posição que uma sessão anterior tinha
+      // escolhido. Nenhum id/onClick/rota/permissão de item muda, só a posição.
+      id: 'analytics-group',
+      label: 'Analytics',
+      icon: <Gauge />,
+      items: [
+        { id: 'analytics-blindscore', label: 'BlindScore',             icon: <Gauge />,     onClick: () => { setActiveTab('analytics-blindscore'); setMobileOpen(false); }, active: activeTab === 'analytics-blindscore' },
+        { id: 'analytics-health',     label: 'Inventory Health Score', icon: <Activity />,  onClick: () => { setActiveTab('analytics-health'); setMobileOpen(false); },     active: activeTab === 'analytics-health' },
+        { id: 'analytics-ia',         label: 'IA Insights',            icon: <BarChart3 />, onClick: () => { setActiveTab('analytics-ia'); setMobileOpen(false); },         active: activeTab === 'analytics-ia' },
+        { id: 'analytics-audit',      label: 'Auditorias',             icon: <ShieldAlert />, onClick: () => { setActiveTab('analytics-audit'); setMobileOpen(false); },     active: activeTab === 'analytics-audit' },
+      ],
+    },
+    {
       id: 'counting-group',
       label: 'Operações',
       sectionLabel: 'Operação Inteligente',
       railSection: true,
+      icon: <SidebarFolderIcon />,
       items: [
         { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
         { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
@@ -590,23 +628,12 @@ function AppContent() {
       ],
     },
     {
-      // Movido para o cluster "Operação Inteligente" — só posição/legenda, nada de
-      // rota/permissão muda (ver comentário no topo de navGroups).
-      id: 'analytics-group',
-      label: 'Analytics',
-      items: [
-        { id: 'analytics-blindscore', label: 'BlindScore',             icon: <Gauge />,     onClick: () => { setActiveTab('analytics-blindscore'); setMobileOpen(false); }, active: activeTab === 'analytics-blindscore' },
-        { id: 'analytics-health',     label: 'Inventory Health Score', icon: <Activity />,  onClick: () => { setActiveTab('analytics-health'); setMobileOpen(false); },     active: activeTab === 'analytics-health' },
-        { id: 'analytics-ia',         label: 'IA Insights',            icon: <BarChart3 />, onClick: () => { setActiveTab('analytics-ia'); setMobileOpen(false); },         active: activeTab === 'analytics-ia' },
-        { id: 'analytics-audit',      label: 'Auditorias',             icon: <ShieldAlert />, onClick: () => { setActiveTab('analytics-audit'); setMobileOpen(false); },     active: activeTab === 'analytics-audit' },
-      ],
-    },
-    {
       // Grupo próprio e destravado. Não reaproveitei o item 'config-automacoes' que
       // existia em Configurações Avançadas porque aquele grupo tem lock de grupo — que
       // torna todo item interno não-interativo.
       id: 'automacoes-group',
       label: 'Automações',
+      icon: <SidebarFolderIcon />,
       items: [
         { id: 'automacoes', label: 'Agentes e Automações', icon: <Workflow />, onClick: () => { setActiveTab('automacoes'); setMobileOpen(false); }, active: activeTab === 'automacoes' },
       ],
@@ -614,6 +641,7 @@ function AppContent() {
     {
       id: 'products-group',
       label: 'Produtos',
+      icon: <SidebarFolderIcon />,
       items: [
         { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet />, onClick: () => { setActiveTab('import'); setMobileOpen(false); },          active: activeTab === 'import' },
         { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
@@ -625,6 +653,7 @@ function AppContent() {
     {
       id: 'tools-group',
       label: 'Ferramentas',
+      icon: <SidebarFolderIcon />,
       items: [
         { id: 'tasks',           label: 'Meu Trabalho',         icon: <ListTodo />, onClick: () => { setActiveTab('tasks'); setMobileOpen(false); },         active: activeTab === 'tasks' },
         { id: 'nfe-xml-lookup',  label: 'Consulta e Download de XML/NFe', icon: <FileSearch />, onClick: () => { setActiveTab('nfe-xml-lookup'); setMobileOpen(false); }, active: activeTab === 'nfe-xml-lookup' },
@@ -642,6 +671,7 @@ function AppContent() {
       label: 'I.B Academy',
       sectionLabel: 'Aprendizado e Gestão',
       railSection: true,
+      icon: <GraduationCap />,
       items: [
         { id: 'academy', label: 'I.B Academy', icon: <GraduationCap />, onClick: () => { setActiveTab('academy'); setMobileOpen(false); }, active: activeTab === 'academy' },
       ],
@@ -649,6 +679,7 @@ function AppContent() {
     {
       id: 'account-group',
       label: 'Minha Conta',
+      icon: <User />,
       items: [
         { id: 'conta', label: 'Produtividade', icon: <User />, onClick: () => { setActiveTab('conta'); setMobileOpen(false); }, active: activeTab === 'conta' },
         { id: 'knowledge', label: 'Recursos e Conhecimento', icon: <BookOpen />, onClick: () => { setActiveTab('knowledge'); setMobileOpen(false); }, active: activeTab === 'knowledge' },
@@ -663,6 +694,7 @@ function AppContent() {
     {
       id: 'admin-group',
       label: 'Administração',
+      icon: <Lock />,
       items: [
         { id: 'admin', label: 'Acesso Administrativo', icon: <Lock />, onClick: () => { setActiveTab('admin'); setMobileOpen(false); }, active: activeTab === 'admin' },
         ...(canManageUsers(profile?.role) ? [{ id: 'users', label: 'Usuários', icon: <UserCog />, onClick: () => { setActiveTab('users'); setMobileOpen(false); }, active: activeTab === 'users' }] : []),
@@ -677,6 +709,7 @@ function AppContent() {
       // para 'integracoes') muda de lugar.
       id: 'integracoes-group',
       label: 'Integrações',
+      icon: <Plug />,
       items: [
         { id: 'integracoes-hub', label: 'Integrações', icon: <Plug />, onClick: () => { setActiveTab('integracoes-hub'); setMobileOpen(false); }, active: activeTab === 'integracoes-hub' || activeTab === 'integracoes' },
       ],
@@ -689,11 +722,13 @@ function AppContent() {
       id: 'config-avancada-group',
       label: 'Configurações Avançadas',
       locked: !canManageUsers(profile?.role),
+      icon: <Code2 />,
       items: [
         { id: 'config-api',      label: 'API',      icon: <Code2 />,    onClick: () => { setActiveTab('config-api'); setMobileOpen(false); },      active: activeTab === 'config-api' },
         { id: 'config-webhooks', label: 'Webhooks', icon: <Webhook />,  onClick: () => { setActiveTab('config-webhooks'); setMobileOpen(false); }, active: activeTab === 'config-webhooks' },
         { id: 'config-logs',     label: 'Logs',      icon: <FileText />, onClick: () => { setActiveTab('config-logs'); setMobileOpen(false); },     active: activeTab === 'config-logs' },
         { id: 'config-empresas-fiscais', label: 'Empresas e Dados Fiscais', icon: <Building2 />, onClick: () => { setActiveTab('config-empresas-fiscais'); setMobileOpen(false); }, active: activeTab === 'config-empresas-fiscais' },
+        { id: 'config-workspaces', label: 'Workspaces', icon: <Layers />, onClick: () => { setActiveTab('config-workspaces'); setMobileOpen(false); }, active: activeTab === 'config-workspaces' },
       ],
     },
   ];
@@ -716,9 +751,13 @@ function AppContent() {
               disabled={switchingCompany}
               className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-xl bg-surface-2/70 hover:bg-surface-3 border border-edge/70 transition-colors duration-200 disabled:opacity-60"
             >
-              <span className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
-                {company.name.slice(0, 1).toUpperCase()}
-              </span>
+              {workspaceLogoUrls[company.id] ? (
+                <img src={workspaceLogoUrls[company.id]} alt="" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
+              ) : (
+                <span className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
+                  {company.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
               <span className="min-w-0 text-left leading-tight">
                 <span className="block truncate text-xs font-semibold text-fg">
                   {switchingCompany ? 'Trocando...' : company.name}
@@ -734,7 +773,9 @@ function AppContent() {
             ...companies.map(c => ({
               id: c.id,
               label: c.name,
-              icon: (
+              icon: workspaceLogoUrls[c.id] ? (
+                <img src={workspaceLogoUrls[c.id]} alt="" className="w-5 h-5 rounded-md object-cover" />
+              ) : (
                 <span className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white text-[9px] font-semibold">
                   {c.name.slice(0, 1).toUpperCase()}
                 </span>
@@ -758,16 +799,10 @@ function AppContent() {
           ]}
         />
       )}
-      <button
-        onClick={() => { setActiveTab('input'); setMobileOpen(false); }}
-        className="w-full flex items-center justify-center gap-1.5 px-3 py-2 bg-accent hover:bg-accent-strong text-white text-sm font-semibold rounded-lg transition-colors"
-      >
-        <Plus size={14} /> Nova Contagem
-      </button>
     </div>
   );
 
-  // Compartilhado pelo trigger do header (userMenu) e pelo avatar da faixa navy do
+  // Compartilhado pelo trigger do header (userMenu) e pelo avatar do rodapé do
   // Sidebar — mesmo menu, dois pontos de entrada, sem duplicar a lógica de permissão.
   const userMenuItems = [
     { id: 'conta', label: 'Minha Conta', icon: <User size={14} />, onClick: () => setActiveTab('conta') },
@@ -813,10 +848,10 @@ function AppContent() {
       trigger={
         <button
           title={profile?.email ?? undefined}
-          className="relative w-9 h-9 flex-shrink-0 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-white uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-white/50"
+          className="relative w-9 h-9 flex-shrink-0 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-white uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
         >
           {(profile?.email ?? '?').slice(0, 1)}
-          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-rail" />
+          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-surface-2" />
         </button>
       }
       items={userMenuItems}
@@ -842,6 +877,15 @@ function AppContent() {
         onToggleCollapsed={toggleSidebarCollapsed}
         railHelp={{ icon: <HelpCircle size={17} />, label: 'Recursos e Conhecimento', onClick: () => setActiveTab('knowledge') }}
         railAvatar={railAvatar}
+        workspaceAvatar={company && (
+          workspaceLogoUrls[company.id] ? (
+            <img src={workspaceLogoUrls[company.id]} alt="" className="w-9 h-9 rounded-lg object-cover" />
+          ) : (
+            <span className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-white text-sm font-semibold uppercase">
+              {company.name.slice(0, 1)}
+            </span>
+          )
+        )}
       />
 
       {/* ── SIDEBAR (mobile drawer) ──────────────────────────────────────── */}
@@ -1474,14 +1518,14 @@ function AppContent() {
         {/* ABA INVENTÁRIO POR RISCO */}
         {activeTab === 'risk' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <RiskDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+            <RiskDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} onNavigateToCount={() => setActiveTab('input')} />
           </React.Suspense>
         )}
 
         {/* ABA CLASSIFICAÇÃO ABC/XYZ */}
         {activeTab === 'abcxyz' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <AbcXyzDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+            <AbcXyzDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} onOpenProduct={() => setActiveTab('products')} />
           </React.Suspense>
         )}
 
@@ -1567,6 +1611,20 @@ function AppContent() {
         {activeTab === 'config-empresas-fiscais' && profile && canManageUsers(profile.role) && (
           <React.Suspense fallback={<PageLoader />}>
             <FiscalEntitiesPage companyId={companyId} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-workspaces' && profile && company && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <WorkspacesSettingsPage
+              company={company}
+              companies={companies}
+              userId={profile.id}
+              userEmail={profile.email}
+              switchingCompany={switchingCompany}
+              onSwitchCompany={switchCompany}
+              onCreateWorkspace={createWorkspace}
+              onRefresh={refreshProfile}
+            />
           </React.Suspense>
         )}
 

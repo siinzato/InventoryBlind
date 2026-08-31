@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-31-workspaces-config-avancada',
+    date: '2026-08-31',
+    category: 'novidade',
+    title: 'Nova área de Workspaces em Configurações Avançadas',
+    description: 'Agora dá para editar nome, foto (logo), ícone e descrição do seu workspace, ver a lista de todos os workspaces em que você opera e trocar entre eles, além de criar um workspace novo direto por lá — tudo sem sair do painel de Configurações Avançadas.',
+  },
+  {
+    id: '2026-08-31-menu-lateral-unificado',
+    date: '2026-08-31',
+    category: 'melhoria',
+    title: 'Menu lateral renovado',
+    description: 'O menu lateral agora é um único painel, com cantos arredondados e bordas discretas — sem a faixa escura de ícones ao lado. No modo reduzido, cada seção continua com seu próprio ícone (não só um atalho por grupo), e a Análise voltou para o topo, junto do Dashboard.',
+  },
+  {
+    id: '2026-08-31-inventario-por-risco',
+    date: '2026-08-31',
+    category: 'correcao',
+    title: 'Inventário por Risco agora mostra "dados insuficientes" em vez de um risco parecido para tudo',
+    description: 'Corrigimos um problema em que quase todos os produtos apareciam com o mesmo risco baixo, mesmo sem nenhuma contagem registrada. Agora o risco é calculado a partir de dois números separados e explicáveis — Probabilidade de falha e Impacto operacional — e produtos nunca contados aparecem como "dados insuficientes", nunca com um risco inventado. A tela também ganhou evolução real do risco, causa dominante de cada item, agrupamento de itens próximos em rotas de inspeção e um painel de detalhe com as evidências por trás do cálculo.',
+  },
+  {
     id: '2026-08-28-cbc-contagem-por-confianca',
     date: '2026-08-28',
     category: 'correcao',

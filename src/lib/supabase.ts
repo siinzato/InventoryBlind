@@ -454,14 +454,24 @@ export interface ProductRiskScore {
   id: string;
   company_id: string;
   product_id: string;
-  risk_score: number;
-  risk_level: RiskBand;
+  /** null quando has_sufficient_data é false — nunca um score fabricado. */
+  risk_score: number | null;
+  risk_level: RiskBand | null;
+  /** Causa dominante (texto curto, ex. "Divergência recorrente"). */
   risk_reason: string;
-  factors: Record<string, ConfidenceFactorBreakdown>;
+  /** Probabilidade e impacto separados — Risk Score = Probabilidade × Impacto / 100. */
+  probability: number | null;
+  impact: number | null;
+  factors: {
+    probability: Record<string, ConfidenceFactorBreakdown & { max: number }>;
+    impact: Record<string, ConfidenceFactorBreakdown & { max: number }>;
+  };
   algorithm_version: string;
   last_risk_update: string;
   created_at: string;
   updated_at: string;
+  has_sufficient_data: boolean;
+  missing_factors: string[];
 }
 
 export interface ProductRiskHistory {
@@ -484,25 +494,37 @@ export interface ProductCriticalityOverride {
 
 export interface RiskCompanySummary {
   company_id: string;
-  avg_risk: number;
+  avg_risk: number | null;
   total_scored: number;
   critico_count: number;
   alto_count: number;
   medio_count: number;
   baixo_count: number;
+  insufficient_count: number;
 }
 
+
+export type AbcXyzUnclassifiedReason = 'sem_movimento' | 'sem_custo' | 'fonte_desconectada' | 'historico_insuficiente' | 'sku_nao_associado';
+export type AbcXyzPeriod = '90d' | '6m' | '12m';
 
 export interface ProductAbcXyzClassification {
   id: string;
   company_id: string;
   product_id: string;
-  abc_class: AbcClass;
-  xyz_class: XyzClass;
-  abc_xyz_class: AbcXyzCombo;
+  /** null quando unclassified_reason está preenchido — nunca uma classe fabricada. */
+  abc_class: AbcClass | null;
+  xyz_class: XyzClass | null;
+  abc_xyz_class: AbcXyzCombo | null;
   classification_date: string;
+  period: AbcXyzPeriod;
+  source: string;
   value_moved: number;
+  quantity_moved: number;
+  unit_cost_used: number | null;
   demand_coefficient_variation: number | null;
+  weeks_with_data: number;
+  weeks_without_sale: number;
+  unclassified_reason: AbcXyzUnclassifiedReason | null;
   reasons: string[];
   algorithm_version: string;
   created_at: string;
@@ -515,6 +537,7 @@ export interface ProductAbcXyzHistory {
   product_id: string;
   abc_xyz_class: AbcXyzCombo;
   value_moved: number;
+  period: AbcXyzPeriod;
   recorded_at: string;
 }
 

@@ -9,6 +9,7 @@
 
 import { supabase } from '../supabase';
 import { logAuditEvent } from '../auditLogService';
+import { computeAccuracy } from '../blindAIAgentAlgorithm';
 import { classifyObservation } from './observationClassifier';
 import { renderClosingSummary } from './closingSummaryTemplate';
 import type {
@@ -68,6 +69,18 @@ function observationFromRow(row: ObservationRow): ClosingReportObservation {
     id: row.id, reportId: row.report_id, countRecordId: row.count_record_id, observationText: row.observation_text,
     matchedCategoryIds: row.matched_category_ids ?? [], isUnclassified: row.is_unclassified, createdAt: row.created_at,
   };
+}
+
+/**
+ * Decisão pura: o `accuracy_final` persistido no relatório atual está desatualizado
+ * em relação à acuracidade canônica (computeAccuracy sobre os totais consolidados
+ * da linha)? Usada só para decidir se uma abertura/geração deve reprocessar
+ * automaticamente — nunca para escrever nada sozinha.
+ */
+export function isAccuracyStale(persisted: number | null, canonical: number | null, epsilon = 0.05): boolean {
+  if (canonical === null) return false;
+  if (persisted === null) return true;
+  return Math.abs(persisted - canonical) > epsilon;
 }
 
 /** Lê as categorias da empresa; semeia as 5 iniciais só se a empresa ainda não tem nenhuma. */
@@ -205,6 +218,57 @@ export async function getCurrentReportForBrand(companyId: string, brandId: strin
   return { report, observations };
 }
 
+/**
+ * Lista os relatórios `is_current=true` da empresa para o ciclo atual — usada
+ * pela página "Resultados por Linha". Nunca lê outro ciclo nem outra empresa.
+ */
+export async function listCurrentReportsForCycle(companyId: string): Promise<ClosingReport[]> {
+  const cycleStart = await getCurrentCycleStart(companyId);
+  let query = supabase
+    .from('inventory_closing_reports')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('is_current', true);
+  query = cycleStart ? query.eq('cycle_start', cycleStart) : query.is('cycle_start', null);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('[ClosingReport] Error listing current reports:', error);
+    return [];
+  }
+  return ((data as ReportRow[]) ?? []).map(reportFromRow);
+}
+
+export interface ClosingResultRow {
+  brandId: string;
+  brandName: string;
+  report: ClosingReport | null;
+}
+
+/**
+ * Combinação pura (sem I/O) das linhas concluídas do ciclo com os relatórios já
+ * gerados — usada pela página "Resultados por Linha". Uma linha só entra na lista
+ * quando seus pendentes já chegaram a zero (total_sku - done_sku <= 0); uma linha
+ * concluída sem relatório ainda entra, com `report: null`, para oferecer "Gerar
+ * resumo". Ordenação: fechamentos mais recentes primeiro, sem relatório por último.
+ */
+export function buildClosingResults(
+  brandsData: { id: string; brand: string; total_sku: number; done_sku: number }[],
+  reports: ClosingReport[]
+): ClosingResultRow[] {
+  const reportsByBrand = new Map(reports.map(r => [r.brandId, r]));
+  const rows: ClosingResultRow[] = brandsData
+    .filter(b => b.total_sku - b.done_sku <= 0)
+    .map(b => ({ brandId: b.id, brandName: b.brand, report: reportsByBrand.get(b.id) ?? null }));
+
+  return rows.sort((a, b) => {
+    if (a.report && b.report) return b.report.generatedAt.localeCompare(a.report.generatedAt);
+    if (a.report && !b.report) return -1;
+    if (!a.report && b.report) return 1;
+    return a.brandName.localeCompare(b.brandName);
+  });
+}
+
 interface GenerateOptions {
   force?: boolean;
   userId?: string | null;
@@ -240,12 +304,23 @@ export async function generateClosingReport(
   }
 
   const cycleStart = await getCurrentCycleStart(companyId);
+  const canonicalAccuracyFinal = computeAccuracy(brand.done_sku, brand.divergences);
+
+  // `forceRegenerate` cobre tanto o reprocessamento explícito (botão "Reprocessar
+  // resumo") quanto a autocorreção: se o accuracy_final já persistido diverge do
+  // canônico (ex.: relatório antigo que copiava o último registro de contagem em
+  // vez do total consolidado), a abertura do resumo já dispara uma nova versão —
+  // nunca uma edição silenciosa da versão anterior.
+  let forceRegenerate = force;
 
   if (!force) {
     const existing = await fetchCurrentReport(companyId, brandId, cycleStart);
     if (existing) {
-      const observations = await getObservationsForReport(existing.id);
-      return { status: 'already_current', report: reportFromRow(existing), observations };
+      if (!isAccuracyStale(existing.accuracy_final, canonicalAccuracyFinal)) {
+        const observations = await getObservationsForReport(existing.id);
+        return { status: 'already_current', report: reportFromRow(existing), observations };
+      }
+      forceRegenerate = true;
     }
   }
 
@@ -268,7 +343,6 @@ export async function generateClosingReport(
   let divergenciasEncontradas = 0;
   let divergenciasRecontadas = 0;
   let accuracyInitial: number | null = null;
-  let accuracyFinal: number | null = null;
   const categoryCountMap = new Map<string, number>();
   let unclassifiedCount = 0;
   const observationsToInsert: { countRecordId: string; text: string; matchedCategoryIds: string[]; isUnclassified: boolean }[] = [];
@@ -277,7 +351,6 @@ export async function generateClosingReport(
     divergenciasEncontradas += record.divergencias_encontradas ?? 0;
     divergenciasRecontadas += record.divergencias_recontadas ?? 0;
     if (record.accuracy_initial !== null) accuracyInitial = record.accuracy_initial;
-    if (record.accuracy_final !== null) accuracyFinal = record.accuracy_final;
 
     const text = (record.observacoes ?? '').trim();
     if (!text) continue;
@@ -301,7 +374,7 @@ export async function generateClosingReport(
     divergenciasEncontradas,
     divergenciasRecontadas,
     divergenciasReais: brand.divergences,
-    accuracyFinal,
+    accuracyFinal: canonicalAccuracyFinal,
     categoryCounts,
     unclassifiedCount,
   });
@@ -309,7 +382,7 @@ export async function generateClosingReport(
   // 3. Reprocessamento: a versão anterior vira histórico (is_current=false) antes do
   // novo insert — nunca é editada, só deixa de ser "a atual".
   let nextVersion = 1;
-  if (force) {
+  if (forceRegenerate) {
     const previous = await fetchCurrentReport(companyId, brandId, cycleStart);
     if (previous) {
       nextVersion = previous.version + 1;
@@ -337,7 +410,7 @@ export async function generateClosingReport(
       divergencias_recontadas: divergenciasRecontadas,
       divergencias_reais: brand.divergences,
       accuracy_initial: accuracyInitial,
-      accuracy_final: accuracyFinal,
+      accuracy_final: canonicalAccuracyFinal,
       category_counts: categoryCounts,
       unclassified_count: unclassifiedCount,
       summary_text: summaryText,
@@ -379,7 +452,7 @@ export async function generateClosingReport(
   if (userId && userEmail) {
     await logAuditEvent({
       companyId, userId, userEmail,
-      action: force ? 'closing_report.reprocessed' : 'closing_report.generated',
+      action: forceRegenerate ? 'closing_report.reprocessed' : 'closing_report.generated',
       resourceType: 'inventory_closing_reports', resourceId: reportRow.id,
       metadata: { brandId, version: nextVersion },
     });

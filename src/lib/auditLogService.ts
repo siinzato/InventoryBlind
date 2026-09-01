@@ -51,6 +51,8 @@ export type AuditAction =
   | 'slotting.layout_updated'
   | 'slotting.recommendation_decided'
   | 'slotting.sku_moved'
+  | 'slotting.layout_published'
+  | 'slotting.addresses_imported'
   | 'rca.divergence_classified'
   | 'rca.five_whys_opened'
   | 'rca.five_whys_answered'

@@ -28,7 +28,7 @@ export function WarehouseInsightsStrip({ insights, onFocus }: WarehouseInsightsS
     return (
       <Panel>
         <PanelSection padding="md" className="text-sm text-fg-subtle">
-          Sem insights automáticos ainda — volte após mais operações registradas.
+          Nenhuma situação operacional relevante identificada nesta atualização.
         </PanelSection>
       </Panel>
     );
@@ -36,6 +36,7 @@ export function WarehouseInsightsStrip({ insights, onFocus }: WarehouseInsightsS
 
   return (
     <Panel>
+      <PanelSection padding="sm"><p className="text-section">Atenção operacional</p></PanelSection>
       <PanelSection padding="sm" className="divide-y divide-edge/60">
         {insights.map(insight => {
           const clickable = !!onFocus && !!insight.focusLocationCode;

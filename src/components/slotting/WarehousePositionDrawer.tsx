@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
-import { X, MapPin } from 'lucide-react';
-import { Badge } from '../ui';
+import { X, MapPin, ClipboardPlus } from 'lucide-react';
+import { Badge, Button } from '../ui';
 import { findExpeditionCell, findShortestPath, estimatePickingTimeSeconds } from '../../lib/slottingEngine';
 import { getPositionActivity, type PositionActivity } from '../../lib/warehouseTwinService';
 import { RISK_BAND_LABEL } from '../../lib/riskAlgorithm';
@@ -29,6 +29,10 @@ interface WarehousePositionDrawerProps {
   status: LocationLiveStatus | null;
   cells: WarehouseCell[];
   cellSizeMeters: number;
+  /** Leva ao fluxo de contagem já existente (Nova Contagem) — reaproveitado, não duplicado.
+   *  Não preenche o endereço automaticamente: isso exigiria mudar CountManagementCenter/
+   *  ManualCountTab, fora do escopo direto desta tela. */
+  onCreateCount?: () => void;
 }
 
 function formatDate(iso: string | null): string {
@@ -44,7 +48,7 @@ function formatDate(iso: string | null): string {
  *  motion/react + tokens (bg-surface/border-edge) já usados em ui/Modal.tsx, porque o
  *  pedido é literalmente "abrir painel lateral" ao clicar num endereço, e não existia
  *  esse padrão de slide-over no app ainda. */
-export function WarehousePositionDrawer({ open, onClose, companyId, cell, status, cells, cellSizeMeters }: WarehousePositionDrawerProps) {
+export function WarehousePositionDrawer({ open, onClose, companyId, cell, status, cells, cellSizeMeters, onCreateCount }: WarehousePositionDrawerProps) {
   const [activity, setActivity] = useState<PositionActivity | null>(null);
 
   useEffect(() => {
@@ -172,6 +176,14 @@ export function WarehousePositionDrawer({ open, onClose, companyId, cell, status
                       <p className="text-xs text-fg-subtle">{abcXyzStrategy.description} {abcXyzStrategy.countingGuidance}</p>
                     </div>
                   )}
+                </div>
+              )}
+
+              {onCreateCount && (
+                <div className="pt-4 border-t border-edge">
+                  <Button size="sm" variant="secondary" onClick={onCreateCount} className="w-full">
+                    <ClipboardPlus size={14} /> Criar contagem
+                  </Button>
                 </div>
               )}
 

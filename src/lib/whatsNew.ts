@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-08-31-warehouse-digital-twin-fase1',
+    date: '2026-08-31',
+    category: 'novidade',
+    title: 'Warehouse Digital Twin renovado',
+    description: 'A tela do armazém ganhou uma central operacional com mapa, resumo de ocupação e situações que merecem atenção; um assistente guiado para configurar a planta em etapas (planta, escala, estrutura, endereços e revisão antes de publicar); e um replay que reproduz os eventos reais de separação e divergência na ordem em que aconteceram.',
+  },
+  {
+    id: '2026-08-31-resultados-por-linha',
+    date: '2026-08-31',
+    category: 'novidade',
+    title: 'Nova página Resultados por Linha',
+    description: 'No menu Dashboard agora tem uma página para consultar o fechamento de cada linha/marca do ciclo atual — SKUs contados, divergências e acuracidade final, com busca por nome e acesso rápido ao resumo completo de qualquer linha já concluída.',
+  },
+  {
+    id: '2026-08-31-acuracidade-final-resumo-fechamento',
+    date: '2026-08-31',
+    category: 'correcao',
+    title: 'Resumo de fechamento com a acuracidade final correta',
+    description: 'O resumo de fechamento de uma linha agora sempre mostra a mesma acuracidade final que aparece no Dashboard. Resumos antigos que haviam sido salvos com o valor errado são atualizados automaticamente na próxima vez que forem abertos, sem perder o histórico.',
+  },
+  {
     id: '2026-08-31-workspaces-config-avancada',
     date: '2026-08-31',
     category: 'novidade',

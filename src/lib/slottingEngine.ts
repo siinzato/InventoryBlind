@@ -23,6 +23,35 @@ function isWalkable(cell: WarehouseCell | undefined): boolean {
   );
 }
 
+export type LengthUnit = 'm' | 'cm';
+
+export interface ScaleCalibrationInput {
+  /** Coordenadas em pixel dos dois pontos clicados sobre a planta renderizada. */
+  pointA: GridPoint;
+  pointB: GridPoint;
+  /** Pitch atual de renderização (px por célula da grade, já considerando zoom). */
+  pixelsPerCell: number;
+  realDistance: number;
+  unit: LengthUnit;
+}
+
+/** Calibração visual de escala (Etapa "Escala" do configurador): converte a distância em
+ *  pixels entre dois pontos clicados + a distância real informada pelo usuário em
+ *  `cell_size_meters`. Retorna null em qualquer entrada degenerada (dois pontos iguais,
+ *  distância/pitch <= 0) — nunca NaN/Infinity, e a UI deve tratar null como "escala não
+ *  calibrada", nunca como zero metros por célula. */
+export function computeCellSizeFromTwoPoints(input: ScaleCalibrationInput): number | null {
+  const { pointA, pointB, pixelsPerCell, realDistance, unit } = input;
+  if (pixelsPerCell <= 0 || realDistance <= 0) return null;
+
+  const pixelDistance = Math.hypot(pointB.x - pointA.x, pointB.y - pointA.y);
+  if (pixelDistance <= 0) return null;
+
+  const cellsDistance = pixelDistance / pixelsPerCell;
+  const realDistanceMeters = unit === 'cm' ? realDistance / 100 : realDistance;
+  return realDistanceMeters / cellsDistance;
+}
+
 export function findExpeditionCell(cells: WarehouseCell[]): WarehouseCell | null {
   return cells.find(c => c.cell_type === 'expedicao') ?? null;
 }

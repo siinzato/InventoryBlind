@@ -1,10 +1,10 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { ZoomIn, ZoomOut, Maximize2, Radio } from 'lucide-react';
+import { ZoomIn, ZoomOut, Maximize2 } from 'lucide-react';
 import { SegmentedControl } from '../ui';
 import { FloorPlanBackground } from './FloorPlanBackground';
 import type {
-  WarehouseLayout, WarehouseCell, LocationLiveStatus, WarehouseLiveLayer, RiskBand, RiskLevel, AbcClass,
+  WarehouseLayout, WarehouseCell, WarehouseZone, LocationLiveStatus, WarehouseLiveLayer, RiskBand, RiskLevel, AbcClass,
 } from '../../lib/supabase';
 
 interface LiveWarehouseMapProps {
@@ -22,10 +22,9 @@ interface LiveWarehouseMapProps {
    *  Muda a cada clique (mesmo endereço duas vezes seguidas) deve reacionar — o chamador é
    *  responsável por variar a referência/trigger se precisar refocar no mesmo lugar. */
   focusLocationCode?: string | null;
-  /** Liga o pulso ambiente de "armazém vivo" — puramente visual, não representa eventos
-   *  reais em tempo real (o app não tem feed de posição ao vivo); pondera a escolha da
-   *  posição pelo tráfego já calculado para não parecer aleatório. Desligado por padrão. */
-  simulationActive?: boolean;
+  /** Rótulos de zona (ZONA A/B/C) desenhados sobre a grade — puramente visual, não afeta
+   *  cor/seleção de célula. */
+  zones?: WarehouseZone[];
 }
 
 // Pitch real da grade (w-5 h-5 = 20px + gap-0.5 = 2px).
@@ -35,7 +34,7 @@ const MAX_SCALE = 2.5;
 const FOCUS_SCALE = 2;
 
 const LAYERS: { id: WarehouseLiveLayer; label: string; hint: string }[] = [
-  { id: 'ocupacao', label: 'Ocupação', hint: 'Verde = posição ocupada, âmbar = endereço cadastrado sem produto atual.' },
+  { id: 'ocupacao', label: 'Ocupação', hint: 'Escala de cinza a navy: quanto mais escuro, mais ocupado. Contorno tracejado = endereço cadastrado sem produto atual.' },
   { id: 'divergencia', label: 'Divergência', hint: 'Intensidade por nº de divergências (RCA) já classificadas para o SKU da posição.' },
   { id: 'picking', label: 'Picking', hint: 'Intensidade por nº de picks no período (mesma base do heatmap de tráfego).' },
   { id: 'giro', label: 'Giro', hint: 'Intensidade por valor movimentado (ABC/XYZ) — proxy de giro do SKU.' },
@@ -64,35 +63,17 @@ function intensityColor(ratio: number): string {
   return 'bg-red-500/55';
 }
 
-/** Escolha ponderada por tráfego real (não uniforme) — corredores mais movimentados
- *  "pulsam" com mais frequência que endereços parados, para o pulso de simulação parecer
- *  derivado de atividade real em vez de aleatório. */
-function pickWeightedOccupiedCell(cells: WarehouseCell[], liveData: Map<string, LocationLiveStatus>): WarehouseCell | null {
-  const candidates = cells
-    .filter(c => c.cell_type === 'posicao' && c.location_code && liveData.get(c.location_code)?.occupied)
-    .map(c => ({ cell: c, weight: 1 + (liveData.get(c.location_code!)?.pickCount ?? 0) }));
-  if (candidates.length === 0) return null;
-  const total = candidates.reduce((sum, c) => sum + c.weight, 0);
-  let roll = Math.random() * total;
-  for (const c of candidates) {
-    roll -= c.weight;
-    if (roll <= 0) return c.cell;
-  }
-  return candidates[candidates.length - 1].cell;
-}
-
 /** Quarta grade independente do módulo (Editor/Heatmap/RouteViewer já reimplementam o
  *  mesmo padrão cada um do seu jeito) — deliberadamente não extrai uma base compartilhada
  *  para não precisar tocar nos três componentes existentes que já funcionam. Mostra uma
  *  única camada por vez (não sobrepõe cores) para manter a leitura visual limpa. */
 export function LiveWarehouseMap({
-  layout, cells, liveData, traffic, layer, onLayerChange, onSelectPosition, lockLayer, focusLocationCode, simulationActive,
+  layout, cells, liveData, traffic, layer, onLayerChange, onSelectPosition, lockLayer, focusLocationCode, zones = [],
 }: LiveWarehouseMapProps) {
   const cellByKey = useMemo(() => new Map(cells.map(c => [`${c.x},${c.y}`, c])), [cells]);
   const containerRef = useRef<HTMLDivElement>(null);
   const [scale, setScale] = useState(MIN_SCALE);
   const [highlightKey, setHighlightKey] = useState<string | null>(null);
-  const [simPulseKey, setSimPulseKey] = useState<string | null>(null);
 
   useEffect(() => {
     if (!focusLocationCode) return;
@@ -112,17 +93,6 @@ export function LiveWarehouseMap({
     return () => { cancelAnimationFrame(raf); clearTimeout(clearHighlight); };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusLocationCode]);
-
-  useEffect(() => {
-    if (!simulationActive) { setSimPulseKey(null); return; }
-    const interval = setInterval(() => {
-      const cell = pickWeightedOccupiedCell(cells, liveData);
-      if (!cell) return;
-      setSimPulseKey(`${cell.x},${cell.y}`);
-      setTimeout(() => setSimPulseKey(null), 1300);
-    }, 3500);
-    return () => clearInterval(interval);
-  }, [simulationActive, cells, liveData]);
 
   const maxValues = useMemo(() => {
     const statuses = Array.from(liveData.values());
@@ -151,8 +121,10 @@ export function LiveWarehouseMap({
 
     switch (layer) {
       case 'ocupacao':
+        // Monocromático (cinza → navy), sem verde/âmbar — só vermelho é reservado para
+        // alerta real em outras camadas. Vazio cadastrado fica com contorno tracejado.
         if (!cell.location_code) return 'bg-surface-3';
-        return status?.occupied ? 'bg-emerald-500/40' : 'bg-amber-500/30';
+        return status?.occupied ? 'bg-fg/60' : 'bg-surface-3 border-dashed';
       case 'vazios':
         return cell.location_code ? 'bg-surface-3' : 'bg-sky-500/35';
       case 'divergencia':
@@ -188,11 +160,6 @@ export function LiveWarehouseMap({
             value={layer}
             onChange={id => onLayerChange?.(id)}
           />
-          {simulationActive && (
-            <span className="flex items-center gap-1 text-[11px] font-medium text-fg-muted">
-              <Radio size={11} /> Simulação ativa
-            </span>
-          )}
         </div>
       )}
       {activeLayerMeta && <p className="text-xs text-fg-subtle">{activeLayerMeta.hint}</p>}
@@ -247,21 +214,22 @@ export function LiveWarehouseMap({
                     />
                   );
                 })()}
-                {simPulseKey && (() => {
-                  const [sx, sy] = simPulseKey.split(',').map(Number);
-                  return (
-                    <motion.div
-                      key={`sim-${simPulseKey}`}
-                      className="absolute rounded-full bg-emerald-400/70 pointer-events-none"
-                      style={{ left: sx * CELL_PX + 2, top: sy * CELL_PX + 2, width: 16, height: 16 }}
-                      initial={{ opacity: 0, scale: 0.4 }}
-                      animate={{ opacity: [0, 0.9, 0], scale: [0.4, 1.8, 2.4] }}
-                      exit={{ opacity: 0 }}
-                      transition={{ duration: 1.3, ease: 'easeOut' }}
-                    />
-                  );
-                })()}
               </AnimatePresence>
+
+              {zones.map(zone => (
+                <div
+                  key={zone.id}
+                  className="absolute border-2 border-dashed border-fg-subtle/50 pointer-events-none"
+                  style={{
+                    left: zone.min_x * CELL_PX, top: zone.min_y * CELL_PX,
+                    width: (zone.max_x - zone.min_x + 1) * CELL_PX, height: (zone.max_y - zone.min_y + 1) * CELL_PX,
+                  }}
+                >
+                  <span className="absolute -top-0.5 left-0 -translate-y-full bg-surface/90 text-[10px] font-semibold text-fg-muted px-1 rounded-t">
+                    {zone.name}
+                  </span>
+                </div>
+              ))}
             </motion.div>
           </div>
         </div>

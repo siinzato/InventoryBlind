@@ -60,7 +60,8 @@ import {
   Grid3x3,
   ShoppingCart,
   PackageX,
-  Layers
+  Layers,
+  FileBarChart2
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -153,6 +154,7 @@ const WebhooksPage = React.lazy(() => import('./components/settings/WebhooksPage
 const LogsPage = React.lazy(() => import('./components/settings/LogsPage').then(m => ({ default: m.LogsPage })));
 const FiscalEntitiesPage = React.lazy(() => import('./components/settings/FiscalEntitiesPage').then(m => ({ default: m.FiscalEntitiesPage })));
 const WorkspacesSettingsPage = React.lazy(() => import('./components/settings/WorkspacesSettingsPage').then(m => ({ default: m.WorkspacesSettingsPage })));
+const ClosingResultsPage = React.lazy(() => import('./components/counting/ClosingResultsPage').then(m => ({ default: m.ClosingResultsPage })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
@@ -591,6 +593,7 @@ function AppContent() {
         { id: 'heatmap',   label: 'Heatmap',              icon: <Map />,             onClick: () => { setActiveTab('heatmap'); setMobileOpen(false); },   active: activeTab === 'heatmap' },
         { id: 'kpis',      label: 'KPIs e Indicadores',   icon: <Target />,          onClick: () => { setActiveTab('kpis'); setMobileOpen(false); },      active: activeTab === 'kpis' },
         { id: 'rankings',  label: 'Rankings',             icon: <Award />,           onClick: () => { setActiveTab('rankings'); setMobileOpen(false); },  active: activeTab === 'rankings' },
+        { id: 'closing-results', label: 'Resultados por Linha', icon: <FileBarChart2 />, onClick: () => { setActiveTab('closing-results'); setMobileOpen(false); }, active: activeTab === 'closing-results' },
       ],
     },
     {
@@ -1480,6 +1483,13 @@ function AppContent() {
           <KpisIndicadoresPage companyId={companyId} globais={globais} operatorStats={operatorStats} />
         )}
 
+        {/* ABA RESULTADOS POR LINHA */}
+        {activeTab === 'closing-results' && companyId && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ClosingResultsPage companyId={companyId} brandsData={brandsData} userId={profile.id} userEmail={profile.email ?? null} />
+          </React.Suspense>
+        )}
+
         {/* ABA NOVA CONTAGEM */}
         {activeTab === 'input' && (
           <CountManagementCenter
@@ -1532,7 +1542,7 @@ function AppContent() {
         {/* ABA WAREHOUSE DIGITAL TWIN */}
         {activeTab === 'slotting' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <WarehouseDigitalTwinPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} />
+            <WarehouseDigitalTwinPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} onNavigateToCount={() => setActiveTab('input')} />
           </React.Suspense>
         )}
 

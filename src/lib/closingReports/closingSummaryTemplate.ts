@@ -39,7 +39,7 @@ export function renderClosingSummary(input: ClosingSummaryInput): string {
   lines.push('');
   lines.push(
     `Divergências reais confirmadas: ${input.divergenciasReais}. ` +
-      (input.accuracyFinal !== null ? `Acuracidade final: ${input.accuracyFinal.toFixed(0)}%.` : 'Acuracidade final: —.')
+      (input.accuracyFinal !== null ? `Acuracidade final: ${input.accuracyFinal.toFixed(1)}%.` : 'Acuracidade final: —.')
   );
 
   return lines.join('\n');

@@ -546,6 +546,8 @@ export type WarehouseCellType = 'rua' | 'modulo' | 'posicao' | 'expedicao' | 'va
 export type SlottingRecommendationType = 'mover_mais_perto' | 'aproximar_expedicao' | 'agrupar_frequentes' | 'redistribuir_fluxo';
 export type SlottingRecommendationStatus = 'pendente' | 'aprovada' | 'rejeitada' | 'adiada';
 
+export type WarehouseLayoutStatus = 'draft' | 'published' | 'archived';
+
 export interface WarehouseLayout {
   id: string;
   company_id: string;
@@ -559,6 +561,27 @@ export interface WarehouseLayout {
   background_offset_y: number;
   background_scale: number;
   background_opacity: number;
+  status: WarehouseLayoutStatus;
+  version: number;
+  published_at: string | null;
+  scale_confirmed: boolean;
+  created_at: string;
+  updated_at: string;
+}
+
+export type WarehouseZoneKind = 'zona' | 'area' | 'obstaculo';
+
+export interface WarehouseZone {
+  id: string;
+  layout_id: string;
+  company_id: string;
+  code: string;
+  name: string;
+  kind: WarehouseZoneKind;
+  min_x: number;
+  min_y: number;
+  max_x: number;
+  max_y: number;
   created_at: string;
   updated_at: string;
 }
@@ -571,6 +594,7 @@ export interface WarehouseCell {
   y: number;
   cell_type: WarehouseCellType;
   location_code: string | null;
+  capacity: number | null;
 }
 
 export interface WarehouseSlottingRecommendation {

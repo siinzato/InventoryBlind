@@ -98,6 +98,23 @@ export async function getPositionActivity(companyId: string, sku: string): Promi
 
 /** Orquestra todos os overlays do mapa vivo num único Map por endereço — cada campo só
  *  soma dados de um serviço já existente; nenhuma fórmula de score é recalculada aqui. */
+/** Horário do evento operacional mais recente — só olha a fonte de maior volume/frequência
+ *  real do app (picks de Full Manager); contagens/divergências são eventos bem mais raros
+ *  em comparação e não mudariam esse "mais recente" na prática esperada. Null quando a
+ *  empresa nunca teve nenhum pick registrado — nunca "agora" fabricado. */
+export async function getLatestPickEventAt(companyId: string): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('full_operation_items')
+    .select('picked_at')
+    .eq('company_id', companyId)
+    .eq('status', 'picked')
+    .order('picked_at', { ascending: false })
+    .limit(1)
+    .maybeSingle();
+  if (error) { console.error('[WarehouseTwin] Error loading latest pick event:', error); return null; }
+  return (data?.picked_at as string | undefined) ?? null;
+}
+
 export async function getLiveLayerData(
   companyId: string,
   layoutId: string,

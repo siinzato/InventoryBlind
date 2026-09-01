@@ -44,6 +44,17 @@ export function detectIntent(question: string): BlindAIIntent {
 // Extraído do useMemo que já existia em App.tsx para que o Dashboard e a tool
 // `get_dashboard_overview` da Edge Function calculem exatamente a mesma fórmula.
 
+/**
+ * Acuracidade final consolidada de uma linha/marca — fonte única usada pelo
+ * Dashboard (computeGlobalStats), pela listagem de resultados e pelo resumo de
+ * fechamento (closingReportService.ts). Nunca copiar de um registro de contagem
+ * individual: o resultado da linha é sempre derivado dos totais consolidados.
+ */
+export function computeAccuracy(doneSku: number, divergences: number): number | null {
+  if (doneSku <= 0) return null;
+  return Math.min(100, Math.max(0, ((doneSku - divergences) / doneSku) * 100));
+}
+
 export interface GlobalStatsRow {
   id: string;
   brand: string;
@@ -77,7 +88,7 @@ export function computeGlobalStats(brands: BrandData[]): GlobalStats {
     totalDivGeral += b.divergences;
 
     const progress = b.total_sku > 0 ? Math.min(100, (b.done_sku / b.total_sku) * 100) : 0;
-    const accuracy = b.done_sku > 0 ? Math.max(0, ((b.done_sku - b.divergences) / b.done_sku) * 100) : null;
+    const accuracy = computeAccuracy(b.done_sku, b.divergences);
 
     return {
       id: b.id,
@@ -92,7 +103,7 @@ export function computeGlobalStats(brands: BrandData[]): GlobalStats {
   });
 
   const progressoGeral = totalSkuGeral > 0 ? (totalDoneGeral / totalSkuGeral) * 100 : 0;
-  const acuracidadeGeral = totalDoneGeral > 0 ? Math.max(0, ((totalDoneGeral - totalDivGeral) / totalDoneGeral) * 100) : 0;
+  const acuracidadeGeral = computeAccuracy(totalDoneGeral, totalDivGeral) ?? 0;
 
   const concluidas = dataProcessada.filter(b => b.status === 'CONCLUÍDO' && b.accuracy !== null);
   const concluidasOrdenadas = [...concluidas].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0));

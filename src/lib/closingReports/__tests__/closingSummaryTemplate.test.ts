@@ -34,7 +34,7 @@ describe('renderClosingSummary', () => {
     expect(text).toContain('Problemas com divergências resolvidas na recontagem — 11 registros');
     expect(text).toContain('Observações não classificadas — 1');
     expect(text).toContain('Divergências reais confirmadas: 0.');
-    expect(text).toContain('Acuracidade final: 100%.');
+    expect(text).toContain('Acuracidade final: 100.0%.');
   });
 
   it('usa singular quando a contagem é 1', () => {

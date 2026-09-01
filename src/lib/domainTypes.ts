@@ -21,21 +21,33 @@ export interface BrandData {
 
 // Root Cause Analysis (RCA) Types
 export type RcaSourceModule = 'import_count' | 'full_operation' | 'nfe_receiving';
-export type RcaCauseCategory =
+
+/** Processo onde a divergência ocorreu — fixo (não configurável por workspace,
+ *  diferente de categoria de causa), separado da causa em si desde a reformulação. */
+export type RcaProcessArea =
   | 'recebimento'
   | 'armazenagem'
   | 'picking'
   | 'separacao'
   | 'expedicao'
   | 'inventario'
-  | 'furto_perda'
-  | 'avaria'
+  | 'logistica_reversa'
   | 'cadastro'
-  | 'conversao_unidade'
-  | 'erro_operacional'
-  | 'sistema_integracao'
-  | 'sem_causa_identificada'
+  | 'integracao_sincronizacao'
   | 'outro';
+
+/** Código de categoria de causa — configurável por workspace
+ *  (rca_cause_categories/rca_cause_subcauses), por isso deixou de ser union
+ *  literal. DEFAULT_CAUSE_CATEGORIES em rcaAlgorithm.ts documenta os códigos
+ *  padrão fornecidos a toda empresa. */
+export type RcaCauseCategory = string;
+
+export type RcaSeverity = 'baixa' | 'media' | 'alta' | 'critica';
+export type RcaClassificationStatus = 'classified' | 'pending';
+
+// Legado (migration 033) — superado por rca_case_why_steps/RcaCaseWhyStep para
+// novas investigações; tipos mantidos porque rca_five_whys_sessions/answers
+// continuam existindo no banco (vazias, nunca removidas).
 export type RcaFiveWhysTriggerType = 'sku' | 'cause_category';
 export type RcaFiveWhysStatus = 'open' | 'completed';
 
@@ -53,12 +65,127 @@ export interface RcaRecord {
   supplier_name: string | null;
   supplier_cnpj: string | null;
   divergence_qty: number;
-  cause_category: RcaCauseCategory;
+  process_area: RcaProcessArea | null;
+  cause_category: RcaCauseCategory | null;
+  subcause_code: string | null;
   custom_cause_label: string | null;
   notes: string | null;
+  severity: RcaSeverity;
+  classification_status: RcaClassificationStatus;
+  containment_needed: boolean;
+  known_recurrence: boolean;
+  financial_impact: number | null;
+  manual_escalation: boolean;
+  rca_case_id: string | null;
   classified_by: string | null;
   classified_by_email: string | null;
   occurred_at: string;
+  created_at: string;
+}
+
+export interface RcaCauseCategoryRow {
+  id: string;
+  company_id: string;
+  code: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+export interface RcaCauseSubcauseRow {
+  id: string;
+  company_id: string;
+  category_code: string;
+  code: string;
+  label: string;
+  is_default: boolean;
+  is_active: boolean;
+  created_at: string;
+}
+
+export type RcaCaseStatus =
+  | 'rascunho' | 'em_investigacao' | 'causa_proposta' | 'plano_em_execucao'
+  | 'aguardando_verificacao' | 'eficaz' | 'ineficaz_reaberto' | 'encerrado';
+
+export type RcaRootCauseStatus = 'proposta' | 'confirmada';
+
+export interface RcaCase {
+  id: string;
+  company_id: string;
+  case_number: number;
+  case_year: number;
+  status: RcaCaseStatus;
+  severity: RcaSeverity;
+  process_area: RcaProcessArea;
+  cause_category: RcaCauseCategory | null;
+  subcause_code: string | null;
+  problem_what: string;
+  problem_where: string | null;
+  problem_when: string | null;
+  problem_impact_qty: number | null;
+  problem_expected_pattern: string | null;
+  problem_observed_result: string | null;
+  financial_impact: number | null;
+  owner_id: string | null;
+  due_at: string | null;
+  root_cause_text: string | null;
+  root_cause_status: RcaRootCauseStatus | null;
+  root_cause_confirmed_by: string | null;
+  root_cause_confirmed_at: string | null;
+  root_cause_justification: string | null;
+  escalation_reasons: string[];
+  opened_at: string;
+  closed_at: string | null;
+  closed_by: string | null;
+  created_by: string;
+  updated_by: string | null;
+  updated_at: string;
+}
+
+export interface RcaCaseDivergenceLink {
+  id: string;
+  case_id: string;
+  rca_record_id: string;
+  company_id: string;
+  linked_by: string | null;
+  linked_at: string;
+}
+
+export type RcaWhyStepRole = 'sintoma' | 'causa_direta' | 'causa_contribuinte' | 'causa_raiz_proposta';
+
+export interface RcaCaseWhyStep {
+  id: string;
+  case_id: string;
+  company_id: string;
+  parent_step_id: string | null;
+  order_index: number;
+  question: string;
+  answer: string;
+  role: RcaWhyStepRole;
+  author_id: string | null;
+  author_email: string | null;
+  created_at: string;
+  updated_at: string;
+}
+
+export type RcaActionType = 'contencao' | 'corretiva' | 'preventiva' | 'verificacao';
+export type RcaVerificationResult = 'eficaz' | 'ineficaz';
+
+export interface RcaCaseAction {
+  id: string;
+  case_id: string;
+  company_id: string;
+  action_type: RcaActionType;
+  task_id: string | null;
+  effectiveness_criteria: string | null;
+  observation_window_days: number | null;
+  expected_result: string | null;
+  observed_result: string | null;
+  verification_result: RcaVerificationResult | null;
+  verified_by: string | null;
+  verified_at: string | null;
+  created_by: string | null;
   created_at: string;
 }
 

@@ -1,34 +1,48 @@
-import { CAUSE_CATEGORIES } from '../../lib/rcaAlgorithm';
+import { PROCESS_AREAS } from '../../lib/rcaAlgorithm';
 import { Input, SegmentedControl, type SegmentedOption } from '../ui';
 import type { RcaFilters } from '../../lib/rcaService';
 
 interface RcaFilterBarProps {
   filters: RcaFilters;
   onChange: (filters: RcaFilters) => void;
+  /** Categorias ativas da empresa (padrão + customizadas) — carregadas pela página, já
+   *  que a taxonomia agora é configurável por workspace (rca_cause_categories). */
+  causeOptions: { value: string; label: string }[];
 }
 
 const ALL = '__all__';
 
-/** Filtros por período/causa/SKU/operador/endereço/fornecedor/recorrência.
+/** Filtros por período/processo/causa/SKU/operador/endereço/fornecedor/recorrência.
  *
  *  Antes cada pill carregava a própria borda (N caixinhas em fila) e cada input
  *  repetia as classes de campo à mão. Agora usa os primitivos compartilhados —
- *  SegmentedControl para a causa e Input para os campos — o que também traz os
+ *  SegmentedControl para causa/processo e Input para os campos — o que também traz os
  *  alvos de toque para 44px, relevante porque este filtro é usado em tablet no
  *  chão de operação. */
-export function RcaFilterBar({ filters, onChange }: RcaFilterBarProps) {
+export function RcaFilterBar({ filters, onChange, causeOptions }: RcaFilterBarProps) {
   const set = (patch: Partial<RcaFilters>) => onChange({ ...filters, ...patch });
 
-  const causeOptions: SegmentedOption<string>[] = [
+  const causeSelectOptions: SegmentedOption<string>[] = [
     { value: ALL, label: 'Todas as causas' },
-    ...CAUSE_CATEGORIES.map(c => ({ value: c.value, label: c.label })),
+    ...causeOptions,
+  ];
+  const processSelectOptions: SegmentedOption<string>[] = [
+    { value: ALL, label: 'Todos os processos' },
+    ...PROCESS_AREAS.map(p => ({ value: p.value, label: p.label })),
   ];
 
   return (
     <div className="space-y-3">
       <SegmentedControl
+        label="Processo afetado"
+        options={processSelectOptions}
+        value={filters.processArea ?? ALL}
+        onChange={value => set({ processArea: value === ALL ? undefined : (value as RcaFilters['processArea']) })}
+      />
+
+      <SegmentedControl
         label="Categoria de causa"
-        options={causeOptions}
+        options={causeSelectOptions}
         value={filters.causeCategory ?? ALL}
         onChange={value => set({ causeCategory: value === ALL ? undefined : (value as RcaFilters['causeCategory']) })}
       />

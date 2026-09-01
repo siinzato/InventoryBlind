@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-01-menu-lateral-compacto-e-adaptavel',
+    date: '2026-09-01',
+    category: 'melhoria',
+    title: 'Menu lateral mais compacto e adaptável',
+    description: 'O menu lateral agora ocupa menos espaço, preserva a foto cadastrada do workspace tanto aberto quanto reduzido e reúne os destinos de cada seção em um painel compacto, sem alongar a navegação. O modo reduzido ganhou identificação ao passar o mouse e toda a interface do menu acompanha corretamente os temas claro e escuro.',
+  },
+  {
+    id: '2026-09-01-root-cause-analysis-reformulado',
+    date: '2026-09-01',
+    category: 'novidade',
+    title: 'Root Cause Analysis reformulado',
+    description: 'Toda divergência resolvida agora recebe uma classificação de causa (processo, categoria e subcausa separados) e alimenta o Pareto, a cobertura e a tendência com dados reais. Casos mais graves ou recorrentes abrem automaticamente uma investigação completa com cadeia de porquês, causa raiz, plano de ação (com responsável e prazo) e verificação de eficácia antes de poder ser encerrada. Divergências antigas sem classificação aparecem numa fila de regularização.',
+  },
+  {
     id: '2026-08-31-warehouse-digital-twin-fase1',
     date: '2026-08-31',
     category: 'novidade',

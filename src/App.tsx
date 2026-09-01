@@ -872,14 +872,50 @@ function AppContent() {
     >
 
       {/* ── SIDEBAR (desktop) ─────────────────────────────────────────────── */}
+      {/* O toggle de visibilidade por breakpoint fica no wrapper, não na
+          className do Sidebar — passar "hidden md:flex" direto no elemento
+          colidiria com o `display: grid` que .ib-sidebar já define (mesma
+          especificidade, a última classe declarada no bundle vencia). */}
+      <div className="hidden md:block">
       <Sidebar
         groups={navGroups}
-        header={sidebarHeader}
-        className="hidden md:flex"
         collapsed={sidebarCollapsed}
         onToggleCollapsed={toggleSidebarCollapsed}
         railHelp={{ icon: <HelpCircle size={17} />, label: 'Recursos e Conhecimento', onClick: () => setActiveTab('knowledge') }}
         railAvatar={railAvatar}
+        workspace={company ? {
+          name: company.name,
+          label: 'Workspace',
+          logoUrl: workspaceLogoUrls[company.id],
+          menuItems: [
+            ...companies.map(c => ({
+              id: c.id,
+              label: c.name,
+              icon: workspaceLogoUrls[c.id] ? (
+                <img src={workspaceLogoUrls[c.id]} alt="" className="w-5 h-5 rounded-md object-cover" />
+              ) : (
+                <span className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white text-[9px] font-semibold">
+                  {c.name.slice(0, 1).toUpperCase()}
+                </span>
+              ),
+              active: c.id === company.id,
+              onClick: () => switchCompany(c.id),
+            })),
+            {
+              id: 'add-company',
+              label: (
+                <span className="flex items-center gap-1.5">
+                  Adicionar empresa
+                  <span className="text-overline bg-surface-3 rounded px-1 py-0.5">Em breve</span>
+                </span>
+              ),
+              icon: <Plus size={14} />,
+              disabled: true,
+              divider: true,
+              onClick: () => {},
+            },
+          ],
+        } : undefined}
         workspaceAvatar={company && (
           workspaceLogoUrls[company.id] ? (
             <img src={workspaceLogoUrls[company.id]} alt="" className="w-9 h-9 rounded-lg object-cover" />
@@ -890,6 +926,7 @@ function AppContent() {
           )
         )}
       />
+      </div>
 
       {/* ── SIDEBAR (mobile drawer) ──────────────────────────────────────── */}
       {mobileOpen && (

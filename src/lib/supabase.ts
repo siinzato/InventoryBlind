@@ -1,6 +1,9 @@
 import { createClient } from '@supabase/supabase-js';
 import type {
-  BrandData, RcaSourceModule, RcaCauseCategory, RcaFiveWhysTriggerType, RcaFiveWhysStatus, RcaRecord,
+  BrandData, RcaSourceModule, RcaProcessArea, RcaCauseCategory, RcaSeverity, RcaClassificationStatus,
+  RcaFiveWhysTriggerType, RcaFiveWhysStatus, RcaRecord,
+  RcaCauseCategoryRow, RcaCauseSubcauseRow, RcaCaseStatus, RcaRootCauseStatus, RcaCase,
+  RcaCaseDivergenceLink, RcaWhyStepRole, RcaCaseWhyStep, RcaActionType, RcaVerificationResult, RcaCaseAction,
   AbcClass, XyzClass, AbcXyzCombo, BlindAIPriority, BlindAILineRanking,
 } from './domainTypes';
 
@@ -8,7 +11,10 @@ import type {
 // — importados aqui (para uso nas interfaces abaixo) e reexportados (para que nenhum
 // import existente em outros arquivos precise mudar).
 export type {
-  BrandData, RcaSourceModule, RcaCauseCategory, RcaFiveWhysTriggerType, RcaFiveWhysStatus, RcaRecord,
+  BrandData, RcaSourceModule, RcaProcessArea, RcaCauseCategory, RcaSeverity, RcaClassificationStatus,
+  RcaFiveWhysTriggerType, RcaFiveWhysStatus, RcaRecord,
+  RcaCauseCategoryRow, RcaCauseSubcauseRow, RcaCaseStatus, RcaRootCauseStatus, RcaCase,
+  RcaCaseDivergenceLink, RcaWhyStepRole, RcaCaseWhyStep, RcaActionType, RcaVerificationResult, RcaCaseAction,
   AbcClass, XyzClass, AbcXyzCombo, BlindAIPriority, BlindAILineRanking,
 };
 
@@ -625,11 +631,21 @@ export interface WarehouseOptimizationHistoryEntry {
   recorded_at: string;
 }
 
+export type RcaEvidenceType =
+  | 'divergencia' | 'contagem' | 'movimentacao' | 'picking' | 'sistema'
+  | 'produto' | 'endereco' | 'fornecedor' | 'observacao' | 'anexo';
+
 export interface RcaEvidence {
   id: string;
-  rca_record_id: string;
+  rca_record_id: string | null;
+  rca_case_id: string | null;
+  why_step_id: string | null;
   company_id: string;
-  file_path: string;
+  evidence_type: RcaEvidenceType;
+  source_table: string | null;
+  source_record_id: string | null;
+  note: string | null;
+  file_path: string | null;
   file_name: string | null;
   uploaded_by: string | null;
   created_at: string;
@@ -666,6 +682,7 @@ export interface RcaSettings {
   company_id: string;
   recurrence_threshold_count: number;
   recurrence_window_days: number;
+  financial_impact_threshold: number | null;
   updated_at: string;
 }
 

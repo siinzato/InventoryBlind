@@ -4,7 +4,7 @@ import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { createPortal } from 'react-dom';
 import { Check } from 'lucide-react';
 
-interface DropdownItem {
+export interface DropdownItem {
   id: string;
   label: React.ReactNode;
   icon?: React.ReactNode;

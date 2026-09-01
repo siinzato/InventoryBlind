@@ -8,7 +8,7 @@ export { Modal } from './Modal';
 export { Table, Thead, Tr, Th, Td } from './Table';
 export { ThemeToggle } from './ThemeToggle';
 export { Sidebar } from './Sidebar';
-export type { SidebarNavItem, SidebarNavGroup } from './Sidebar';
+export type { SidebarNavItem, SidebarNavGroup, SidebarWorkspaceInfo } from './Sidebar';
 export { SidebarFolderIcon } from './SidebarFolderIcon';
 export { AppHeader } from './AppHeader';
 export { Input, Select, Textarea } from './Input';

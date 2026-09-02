@@ -20,6 +20,55 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-02-biblioteca-31-ebooks',
+    date: '2026-09-02',
+    category: 'novidade',
+    title: '31 e-books gratuitos na Biblioteca do I.B Academy',
+    description: 'A Biblioteca ganhou 31 materiais gratuitos para ler ou baixar direto na plataforma, organizados em quatro áreas: Logística (13 títulos, de introdução a supply chain e Logística 4.0), E-commerce (5), Operações (2) e Excel (11, do básico ao avançado). Cada material mostra autoria, instituição, idioma, número de páginas e, quando disponível, o link para a publicação original — todos identificados como conteúdo externo com curadoria do I.B Academy. Use os filtros por área, nível e idioma, ou busque por autor, instituição ou tema.',
+  },
+  {
+    id: '2026-09-02-biblioteca-creditos-e-filtros',
+    date: '2026-09-02',
+    category: 'melhoria',
+    title: 'Biblioteca com créditos da obra, fonte original e filtros',
+    description: 'Os materiais da Biblioteca agora mostram os créditos completos quando disponíveis — autor ou autores, instituição, ano, idioma, categoria e licença — e um botão "Fonte original" que leva à publicação oficial do autor ou da instituição, separado do arquivo disponibilizado aqui. Materiais produzidos por terceiros aparecem identificados como conteúdo externo com curadoria do I.B Academy. A busca passou a considerar autor, instituição, tema e idioma, e os e-books ganharam filtros por área, nível e idioma. Ler e baixar ficaram mais confiáveis, com aviso claro caso algo falhe.',
+  },
+  {
+    id: '2026-09-02-blindscore-indice-executivo',
+    date: '2026-09-02',
+    category: 'melhoria',
+    title: 'BlindScore agora mostra em que você pode confiar (e o que fazer agora)',
+    description: 'O BlindScore passou a usar a confiança que o Confidence Score já calcula produto a produto, em vez de uma nota própria. Além da nota, a tela mostra quantos produtos realmente sustentam a leitura, se a evidência é suficiente para representar o catálogo (com aviso de leitura provisória quando não é), o que sustenta a confiança, o que está reduzindo e uma lista de prioridades com atalho direto para o módulo certo. A qualidade da validação agora aparece como "não avaliada" quando ainda não há reconferências, em vez de ser tratada como nota baixa, e a falta de dados nunca é convertida em penalidade.',
+  },
+  {
+    id: '2026-09-02-agentes-operacionais',
+    date: '2026-09-02',
+    category: 'novidade',
+    title: 'Agentes: automações apresentadas do jeito que a operação pensa',
+    description: 'Uma nova aba "Agentes" reúne o Agente de Divergências e o Agente de Recontagem — cada um monitora um evento real do estoque, avalia uma condição e executa uma ação, exatamente como as automações de sempre, mas mostrado em linguagem de negócio (quando isso acontecer, se essa condição bater, então faça isso), sem precisar entender o desenho técnico do fluxo. Dá para acompanhar status, execuções recentes, taxa de sucesso e a atividade mais recente de cada agente, ajustar a lógica dele com o mesmo painel de configuração de sempre, ativar ou desativar, e abrir o fluxo completo no editor visual quando quiser o detalhe todo.',
+  },
+  {
+    id: '2026-09-02-execucoes-observabilidade',
+    date: '2026-09-02',
+    category: 'novidade',
+    title: 'Execuções de automação com histórico completo e teste seguro',
+    description: 'A aba Execuções agora mostra o histórico completo com filtros por automação, resultado e período, e ao abrir uma execução você vê o caminho percorrido no fluxo (o mesmo desenho do editor, só para consulta), o passo onde parou, entrada e saída de cada bloco e o motivo do erro. Também dá para testar uma automação com um evento real recente sem aplicar nenhuma ação de verdade, e testar novamente uma execução com erro do mesmo jeito seguro. Uma área de métricas mostra tempo médio, taxa de sucesso e a distribuição de resultados do período.',
+  },
+  {
+    id: '2026-09-02-agentes-automacoes-visao-operacional',
+    date: '2026-09-02',
+    category: 'melhoria',
+    title: 'Agentes e Automações mais claros e informativos',
+    description: 'A tela de Automações ganhou uma faixa com automações ativas, execuções de hoje, taxa de sucesso e falhas recentes, além de busca por nome e filtro por gatilho. No editor visual, cada bloco agora mostra um resumo do que está configurado, o painel de propriedades pode ser aberto e fechado sem perder o canvas de vista, e uma barra de status mostra se o fluxo está válido e quantos gatilhos, condições, ações, erros e avisos ele tem. O botão de salvar também passou a mostrar há quanto tempo foi salvo.',
+  },
+  {
+    id: '2026-09-02-simulacao-inventario-planejamento',
+    date: '2026-09-02',
+    category: 'melhoria',
+    title: 'Simulação de Inventário agora é um planejador completo',
+    description: 'A aba de Simulação de Inventário, dentro de Auditoria de Estoque, ganhou previsão operacional completa, um indicador de capacidade da equipe (carga x folga), um diagnóstico automático do cenário configurado, comparação entre três cenários (econômico, recomendado e acelerado) e um gráfico de tempo por número de operadores — tudo calculado a partir dos dados reais da sua operação.',
+  },
+  {
     id: '2026-09-01-menu-lateral-compacto-e-adaptavel',
     date: '2026-09-01',
     category: 'melhoria',

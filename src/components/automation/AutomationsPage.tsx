@@ -1,7 +1,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  AlertTriangle,
   ArrowLeft,
   Bell,
+  Bot,
+  CheckCircle2,
   Copy,
   History,
   Loader2,
@@ -9,16 +12,21 @@ import {
   Play,
   Plus,
   RefreshCw,
+  Search,
   Sparkles,
   Trash2,
   Workflow as WorkflowIcon,
 } from 'lucide-react';
-import { Badge, Button, Notice, Page, PageHeader, Panel, PanelSection, SegmentedControl, Table, Td, Th, Thead, Tr } from '../ui';
+import {
+  Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection, Select,
+  SegmentedControl, Table, Td, Th, Thead, Tr,
+} from '../ui';
 import {
   createAutomation,
   deleteAutomation,
   duplicateAutomation,
   listAutomations,
+  listExecutions,
   listNotifications,
   markNotificationRead,
   processAutomationQueue,
@@ -27,8 +35,10 @@ import {
 import { AUTOMATION_TEMPLATES } from '../../lib/automation/templates';
 import { validateWorkflow } from '../../lib/automation/workflow';
 import { TRIGGERS, isKnownTrigger } from '../../lib/automation/registry';
-import { AUTOMATION_STATUS_LABEL, type Automation, type AutomationNotification } from '../../lib/automation/types';
+import { AUTOMATION_STATUS_LABEL, type Automation, type AutomationExecution, type AutomationNotification } from '../../lib/automation/types';
+import { AgentsPanel } from './AgentsPanel';
 import { AutomationEditor } from './AutomationEditor';
+import { AutomationKpiCard } from './AutomationKpiCard';
 import { ExecutionHistory } from './ExecutionHistory';
 
 interface Props {
@@ -36,7 +46,7 @@ interface Props {
   onBack?: () => void;
 }
 
-type View = 'list' | 'templates' | 'executions';
+type View = 'list' | 'agents' | 'templates' | 'executions';
 type Filter = 'all' | 'active' | 'inactive';
 
 const STATUS_VARIANT = {
@@ -54,8 +64,11 @@ const STATUS_VARIANT = {
 export function AutomationsPage({ canManage, onBack }: Props) {
   const [automations, setAutomations] = useState<Automation[]>([]);
   const [notifications, setNotifications] = useState<AutomationNotification[]>([]);
+  const [executions, setExecutions] = useState<AutomationExecution[]>([]);
   const [view, setView] = useState<View>('list');
   const [filter, setFilter] = useState<Filter>('all');
+  const [search, setSearch] = useState('');
+  const [triggerFilter, setTriggerFilter] = useState<string>('all');
   const [loading, setLoading] = useState(true);
   const [busy, setBusy] = useState<string | null>(null);
   const [message, setMessage] = useState<{ tone: 'ok' | 'error'; text: string } | null>(null);
@@ -64,13 +77,17 @@ export function AutomationsPage({ canManage, onBack }: Props) {
   const load = useCallback(async () => {
     setLoading(true);
     try {
-      const [list, notices] = await Promise.all([
+      const [list, notices, recentExecutions] = await Promise.all([
         listAutomations(),
         // Não bloqueia a tela: sem as notificações a lista continua útil.
         listNotifications({ onlyUnread: true }).catch(() => [] as AutomationNotification[]),
+        // Idem para a faixa de indicadores — sem execuções recentes a lista de
+        // automações continua útil, só a faixa fica sem números.
+        listExecutions({ limit: 200 }).catch(() => [] as AutomationExecution[]),
       ]);
       setAutomations(list);
       setNotifications(notices);
+      setExecutions(recentExecutions);
     } catch (thrown) {
       setMessage({
         tone: 'error',
@@ -84,6 +101,59 @@ export function AutomationsPage({ canManage, onBack }: Props) {
   useEffect(() => {
     void load();
   }, [load]);
+
+  // Faixa de indicadores (§1) — só números que já vêm de dados reais já buscados
+  // acima; nada é inventado, e o que não puder ser derivado fica "—".
+  const kpis = useMemo(() => {
+    const startOfToday = new Date().setHours(0, 0, 0, 0);
+    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+    const now = Date.now();
+    const last24h = now - 24 * 60 * 60 * 1000;
+    const last7d = now - 7 * 24 * 60 * 60 * 1000;
+
+    const executionsToday = executions.filter(e => new Date(e.startedAt).getTime() >= startOfToday).length;
+    const executionsYesterday = executions.filter(e => {
+      const t = new Date(e.startedAt).getTime();
+      return t >= startOfYesterday && t < startOfToday;
+    }).length;
+    // Só mostra a variação quando ontem teve execução para comparar — do
+    // contrário a % seria infinita ou enganosa (0 → N não é "cresceu X%").
+    const executionsTrendPct = executionsYesterday > 0
+      ? Math.round(((executionsToday - executionsYesterday) / executionsYesterday) * 100)
+      : null;
+
+    const real7d = executions.filter(e => !e.dryRun && new Date(e.startedAt).getTime() >= last7d);
+    const successRate = real7d.length === 0
+      ? null
+      : Math.round((real7d.filter(e => e.status === 'success').length / real7d.length) * 100);
+
+    const recentFailures = executions.filter(e => e.status === 'failed' && new Date(e.startedAt).getTime() >= last24h).length;
+
+    return {
+      activeCount: automations.filter(a => a.status === 'active').length,
+      totalCount: automations.length,
+      executionsToday,
+      executionsTrendPct,
+      successRate,
+      recentFailures,
+    };
+  }, [automations, executions]);
+
+  // Taxa de sucesso por automação (coluna da tabela) — mesma amostra de execuções
+  // já buscada para a faixa de indicadores, sem outra chamada ao banco.
+  const successRateByAutomation = useMemo(() => {
+    const map = new Map<string, number | null>();
+    for (const automation of automations) {
+      const real = executions.filter(e => e.automationId === automation.id && !e.dryRun);
+      map.set(automation.id, real.length === 0 ? null : Math.round((real.filter(e => e.status === 'success').length / real.length) * 100));
+    }
+    return map;
+  }, [automations, executions]);
+
+  const availableTriggers = useMemo(
+    () => Array.from(new Set(automations.map(a => a.triggerType))),
+    [automations]
+  );
 
   async function run(key: string, action: () => Promise<string>) {
     setBusy(key);
@@ -99,10 +169,16 @@ export function AutomationsPage({ canManage, onBack }: Props) {
   }
 
   const filtered = useMemo(() => {
-    if (filter === 'active') return automations.filter(a => a.status === 'active');
-    if (filter === 'inactive') return automations.filter(a => a.status !== 'active');
-    return automations;
-  }, [automations, filter]);
+    let list = automations;
+    if (filter === 'active') list = list.filter(a => a.status === 'active');
+    if (filter === 'inactive') list = list.filter(a => a.status !== 'active');
+    if (triggerFilter !== 'all') list = list.filter(a => a.triggerType === triggerFilter);
+    const query = search.trim().toLowerCase();
+    if (query !== '') list = list.filter(a => a.name.toLowerCase().includes(query) || (a.description ?? '').toLowerCase().includes(query));
+    return list;
+  }, [automations, filter, triggerFilter, search]);
+
+  const hasActiveFilters = filter !== 'all' || triggerFilter !== 'all' || search.trim() !== '';
 
   if (editing != null) {
     return (
@@ -150,6 +226,40 @@ export function AutomationsPage({ canManage, onBack }: Props) {
         <NotificationsPanel notifications={notifications} onChanged={load} />
       )}
 
+      {!loading && automations.length > 0 && (
+        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <AutomationKpiCard
+            icon={WorkflowIcon}
+            iconClass="bg-accent/10 text-accent"
+            title="Automações ativas"
+            value={kpis.activeCount}
+            context={`de ${kpis.totalCount} no total`}
+          />
+          <AutomationKpiCard
+            icon={RefreshCw}
+            iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
+            title="Execuções hoje"
+            value={kpis.executionsToday}
+            context={kpis.executionsTrendPct == null ? 'sem execução ontem para comparar' : `${kpis.executionsTrendPct >= 0 ? '↑' : '↓'} ${Math.abs(kpis.executionsTrendPct)}% vs ontem`}
+          />
+          <AutomationKpiCard
+            icon={CheckCircle2}
+            iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
+            title="Taxa de sucesso"
+            value={kpis.successRate == null ? '—' : `${kpis.successRate}%`}
+            context={kpis.successRate == null ? 'sem execuções reais em 7 dias' : 'últimos 7 dias'}
+          />
+          <AutomationKpiCard
+            icon={AlertTriangle}
+            iconClass="bg-red-500/10 text-red-600 dark:text-red-400"
+            title="Falhas recentes"
+            value={kpis.recentFailures}
+            context="últimas 24h"
+            tone={kpis.recentFailures > 0 ? 'critical' : 'default'}
+          />
+        </div>
+      )}
+
       <SegmentedControl
         label="Visão"
         width="full"
@@ -157,13 +267,16 @@ export function AutomationsPage({ canManage, onBack }: Props) {
         onChange={value => setView(value as View)}
         options={[
           { value: 'list', label: 'Automações', icon: WorkflowIcon },
+          { value: 'agents', label: 'Agentes', icon: Bot },
           { value: 'templates', label: 'Templates', icon: Sparkles },
           { value: 'executions', label: 'Execuções', icon: History },
         ]}
       />
 
-      {view === 'executions' ? (
-        <ExecutionHistory automations={automations} />
+      {view === 'agents' ? (
+        <AgentsPanel automations={automations} canManage={canManage} onChanged={load} onOpenWorkflow={setEditing} />
+      ) : view === 'executions' ? (
+        <ExecutionHistory automations={automations} canManage={canManage} />
       ) : view === 'templates' ? (
         <TemplatesPanel
           canManage={canManage}
@@ -184,6 +297,22 @@ export function AutomationsPage({ canManage, onBack }: Props) {
         <EmptyState canManage={canManage} onCreate={() => setEditing('new')} onTemplates={() => setView('templates')} />
       ) : (
         <Panel>
+          <PanelSection className="flex flex-wrap items-center gap-3">
+            <Input
+              icon={<Search size={14} />}
+              placeholder="Buscar automação pelo nome"
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="min-w-[220px] flex-1"
+            />
+            <Select value={triggerFilter} onChange={e => setTriggerFilter(e.target.value)} className="w-auto">
+              <option value="all">Gatilho: Todos</option>
+              {availableTriggers.map(key => (
+                <option key={key} value={key}>{isKnownTrigger(key) ? TRIGGERS[key].label : key}</option>
+              ))}
+            </Select>
+          </PanelSection>
+
           <PanelSection className="flex flex-wrap items-center justify-between gap-3">
             <SegmentedControl
               label="Filtro"
@@ -197,9 +326,10 @@ export function AutomationsPage({ canManage, onBack }: Props) {
             />
             {canManage && (
               <Button
-                variant="secondary"
+                variant="ghost"
                 size="sm"
                 disabled={busy != null}
+                title="Ação técnica: processa manualmente a fila de eventos pendentes, sem esperar o próximo ciclo automático."
                 onClick={() =>
                   run('queue', async () => {
                     const result = await processAutomationQueue();
@@ -223,14 +353,23 @@ export function AutomationsPage({ canManage, onBack }: Props) {
                   <Th>Situação</Th>
                   <Th>Execuções</Th>
                   <Th>Última execução</Th>
-                  <Th />
+                  <Th>Próxima execução</Th>
+                  <Th>Taxa de sucesso</Th>
+                  <Th>Ações</Th>
                 </Tr>
               </Thead>
               <tbody>
                 {filtered.length === 0 && (
                   <Tr>
-                    <Td colSpan={6} className="text-fg-muted">
-                      Nenhuma automação neste filtro.
+                    <Td colSpan={8} className="text-fg-muted">
+                      <div className="flex flex-wrap items-center gap-3">
+                        <span>{hasActiveFilters ? 'Nenhuma automação encontrada para esses filtros.' : 'Nenhuma automação neste filtro.'}</span>
+                        {hasActiveFilters && (
+                          <Button variant="ghost" size="sm" onClick={() => { setSearch(''); setFilter('all'); setTriggerFilter('all'); }}>
+                            Limpar filtros
+                          </Button>
+                        )}
+                      </div>
                     </Td>
                   </Tr>
                 )}
@@ -276,6 +415,13 @@ export function AutomationsPage({ canManage, onBack }: Props) {
                               dateStyle: 'short',
                               timeStyle: 'short',
                             })}
+                      </Td>
+                      {/* Nenhuma automação hoje tem horário de agendamento configurável pela
+                          tela (ver limitação no relatório) — a coluna fica estruturalmente
+                          presente, mas nunca com um valor inventado. */}
+                      <Td className="whitespace-nowrap text-fg-subtle">—</Td>
+                      <Td className="tabular-nums text-fg-muted">
+                        {successRateByAutomation.get(automation.id) == null ? '—' : `${successRateByAutomation.get(automation.id)}%`}
                       </Td>
                       <Td>
                         {canManage && (

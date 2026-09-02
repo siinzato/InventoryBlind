@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, RotateCcw, Archive as ArchiveIcon } from 'lucide-react';
 import { Modal, Input } from '../ui';
 import { TaskWithAssignees } from '../../lib/tasks/types';
-import { findMyAssignment, isAssigneeArchived, formatDueRelative } from '../../lib/tasks/taskDomain';
+import { findMyAssignment, isAssigneeArchived, formatTaskTimeline } from '../../lib/tasks/taskDomain';
 
 interface ArchivedTasksDrawerProps {
   open: boolean;
@@ -44,12 +44,12 @@ export const ArchivedTasksDrawer: React.FC<ArchivedTasksDrawerProps> = ({ open, 
           </div>
         ) : (
           <div className="space-y-2 max-h-[60vh] overflow-y-auto">
-            {filtered.map(({ task }) => (
+            {filtered.map(({ task, mine }) => (
               <div key={task.id} className="flex items-start justify-between gap-2 p-3 bg-surface-2 border border-edge rounded-lg">
                 <button onClick={() => onOpenTask(task.id)} className="text-left flex-1 min-w-0">
                   <p className="text-sm font-semibold text-fg truncate">{task.title}</p>
                   <p className="text-xs text-fg-subtle mt-0.5">
-                    {task.category ? `${task.category} • ` : ''}{formatDueRelative(task)}
+                    {task.category ? `${task.category} • ` : ''}{formatTaskTimeline(task, mine)}
                   </p>
                 </button>
                 <button

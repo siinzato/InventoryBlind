@@ -368,6 +368,24 @@ export interface LibraryResource {
   cover_url: string | null;
   themes: string[] | null;
   subject: string | null;
+  /** Autoria — array porque uma obra pode ter vários autores. Vazio/null quando a referência
+   *  editorial é a instituição (`publisher`); nunca inferido a partir do título. */
+  authors: string[] | null;
+  /** Origem oficial da publicação (site do autor/instituição). Distinto de `external_url`, que
+   *  segue apontando para o arquivo dos recursos antigos. */
+  source_url: string | null;
+  /** Caminho do PDF no bucket academy-library, ex.: 'ebooks/logistica/arquivo.pdf'. */
+  storage_path: string | null;
+  language: string | null;
+  subcategory: string | null;
+  level: string | null;
+  published_year: number | null;
+  /** 'ib' = produzido pelo InventoryBlind/I.B Academy; 'external' = obra de terceiro apenas
+   *  disponibilizada com créditos pela curadoria. */
+  content_origin: 'ib' | 'external';
+  license_name: string | null;
+  license_url: string | null;
+  rights_note: string | null;
 }
 
 export interface AcademyTrackProgressRow {

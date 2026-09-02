@@ -42,6 +42,7 @@ import type { WorkflowUpdater } from '../../lib/automation/useFlowHistory';
 import { useTheme } from '../../lib/useTheme';
 import { FlowEdge } from './flow/FlowEdge';
 import { FlowNode } from './flow/FlowNode';
+import { FlowStatusBar } from './flow/FlowStatusBar';
 import { FlowToolbar } from './flow/FlowToolbar';
 import { NodeConfigPanel } from './flow/NodeConfigPanel';
 import { NodeLibraryPanel } from './flow/NodeLibraryPanel';
@@ -154,6 +155,7 @@ function AutomationCanvasInner({
       ...node,
       data: {
         ...node.data,
+        triggerType,
         canManage,
         connectedBranches: connectedByNode.get(node.id) ?? new Set(),
         problems: problemsByNode.get(node.id) ?? [],
@@ -163,7 +165,7 @@ function AutomationCanvasInner({
         onRequestAdd: handleRequestAdd,
       },
     }));
-  }, [workflow, canManage, connectedByNode, problemsByNode, lastTestNodeStatuses, handleRemoveNode, handleRequestAdd]);
+  }, [workflow, triggerType, canManage, connectedByNode, problemsByNode, lastTestNodeStatuses, handleRemoveNode, handleRequestAdd]);
 
   const buildEnrichedEdges = useCallback((): Edge<FlowEdgeExtraData>[] => {
     return workflowToFlowEdges(workflow).map(edge => ({
@@ -374,6 +376,7 @@ function AutomationCanvasInner({
           <Background gap={24} size={1} />
           <Controls showInteractive={false} />
           {showMiniMap && <MiniMap pannable zoomable className="!bg-surface-2" />}
+          <FlowStatusBar workflow={workflow} problems={problems} valid={!problems.some(p => p.severity === 'error')} />
           <FlowToolbar
             canUndo={canUndo}
             canRedo={canRedo}

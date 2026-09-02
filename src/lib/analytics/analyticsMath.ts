@@ -76,15 +76,23 @@ export interface RecurrenceStat {
   windowDays: number;
 }
 
-/** Reincidência real: dentre os SKUs com pelo menos uma divergência classificada (RCA) na
- *  janela carregada, qual fração já bateu o limiar de recorrência configurado pela própria
- *  empresa (rca_settings) — o mesmo limiar que rcaService/checkRecurrence usam, não um novo. */
+/** Reincidência real: dentre os SKUs com pelo menos uma divergência classificada (RCA)
+ *  OCORRIDA dentro da janela configurada pela própria empresa (rca_settings), qual fração já
+ *  bateu o limiar de recorrência — o mesmo limiar e o mesmo recorte de janela que
+ *  rcaService.checkRecurrence usa (occurred_at >= hoje - recurrence_window_days), não um novo.
+ *
+ *  Bug real corrigido aqui: os `records` recebidos já vêm de uma janela de busca maior
+ *  (analyticsDataService fixa 180 dias como buffer), mas antes dessa correção o `windowDays`
+ *  configurado só era devolvido para exibição — nunca aplicado como recorte real sobre
+ *  `records`. Um registro fora da janela configurada contava como reincidência mesmo assim. */
 export function computeRecurrenceStat(
   records: RcaRecord[],
   thresholdCount: number,
-  windowDays: number
+  windowDays: number,
+  now: number = Date.now()
 ): RecurrenceStat | null {
-  const withSku = records.filter(r => r.sku);
+  const since = now - windowDays * 86400000;
+  const withSku = records.filter(r => r.sku && new Date(r.occurred_at).getTime() >= since);
   if (withSku.length === 0) return null;
 
   const countBySku = new Map<string, number>();
@@ -93,4 +101,70 @@ export function computeRecurrenceStat(
   const distinctSkus = countBySku.size;
   const recurringSkus = Array.from(countBySku.values()).filter(c => c >= thresholdCount).length;
   return { distinctSkus, recurringSkus, ratePct: (recurringSkus / distinctSkus) * 100, thresholdCount, windowDays };
+}
+
+export interface PillarAverages {
+  accuracyHistory: number;
+  recency: number;
+  stability: number;
+  integrity: number;
+  /** Produtos que realmente entraram na média (não o total lido). */
+  sampleSize: number;
+}
+
+const PILLAR_KEYS = ['accuracyHistory', 'recency', 'stability', 'integrity'] as const;
+
+/** Um fator de product_confidence_scores.factors. `max` é o que o CBC atual grava; `weight`
+ *  existe desde a primeira versão e, no CBC atual, é sempre igual a `max` — por isso serve de
+ *  fallback sem inventar um teto novo. */
+export type PillarFactorRow = Record<string, { score: number; max?: number; weight?: number } | undefined>;
+
+function usableMax(factor: { score: number; max?: number; weight?: number } | undefined): number | null {
+  if (!factor) return null;
+  const max = factor.max ?? factor.weight;
+  return typeof max === 'number' && max > 0 ? max : null;
+}
+
+/** Uma linha só entra nos pilares se tiver pelo menos um dos 4 fatores do CBC ATUAL. Linhas
+ *  gravadas pela versão anterior do algoritmo (8 fatores: divergenceHistory, daysSinceLastCount,
+ *  movementFrequency, ...) não são convertíveis nestes 4 — elas precisam ser recalculadas pelo
+ *  CBC, e tratá-las como base dos pilares seria mostrar um agregado que não corresponde à
+ *  composição atual da confiança. */
+export function isPillarEligible(row: PillarFactorRow): boolean {
+  return PILLAR_KEYS.some(key => usableMax(row[key]) !== null);
+}
+
+export function pillarEligibleCount(factorRows: PillarFactorRow[]): number {
+  return factorRows.filter(isPillarEligible).length;
+}
+
+/** Média normalizada (0-100) de cada um dos 4 pilares que cbcAlgorithm.ts já calcula por SKU
+ *  (accuracyHistory/recency/stability/integrity), agregada por workspace — nenhuma fórmula de
+ *  confiança nova, só a agregação dos fatores que o CBC já persiste em
+ *  product_confidence_scores.factors para os SKUs com has_sufficient_data = true. null quando
+ *  nenhuma linha lida tem os fatores da versão atual (nunca uma média fabricada). */
+export function computePillarAverages(factorRows: PillarFactorRow[]): PillarAverages | null {
+  const eligible = factorRows.filter(isPillarEligible);
+  if (eligible.length === 0) return null;
+
+  const sums: Record<(typeof PILLAR_KEYS)[number], number> = { accuracyHistory: 0, recency: 0, stability: 0, integrity: 0 };
+  const counts: Record<(typeof PILLAR_KEYS)[number], number> = { accuracyHistory: 0, recency: 0, stability: 0, integrity: 0 };
+
+  for (const row of eligible) {
+    for (const key of PILLAR_KEYS) {
+      const factor = row[key];
+      const max = usableMax(factor);
+      if (!factor || max === null) continue;
+      sums[key] += (factor.score / max) * 100;
+      counts[key] += 1;
+    }
+  }
+
+  return {
+    accuracyHistory: counts.accuracyHistory > 0 ? Math.round(sums.accuracyHistory / counts.accuracyHistory) : 0,
+    recency: counts.recency > 0 ? Math.round(sums.recency / counts.recency) : 0,
+    stability: counts.stability > 0 ? Math.round(sums.stability / counts.stability) : 0,
+    integrity: counts.integrity > 0 ? Math.round(sums.integrity / counts.integrity) : 0,
+    sampleSize: eligible.length,
+  };
 }

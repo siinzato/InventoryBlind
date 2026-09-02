@@ -223,4 +223,19 @@ describe('migration 072 — grants: só authenticated, nunca anon/service_role',
     expect(grantsAndRevokes.length).toBeGreaterThan(0);
     grantsAndRevokes.forEach(stmt => expect(stmt).not.toMatch(/service_role/));
   });
+
+  // 9 e 10 do pedido: botão "Concluir", drag-and-drop para "Concluído", detalhe da tarefa e
+  // Meu Dia chamam todos a MESMA RPC (taskService.setMyTaskStatus), então a persistência de
+  // completed_at é garantida num único lugar, com timestamp do servidor.
+  it('9/10. task_set_my_status persiste completed_at com now() do servidor ao concluir', () => {
+    const body = functionBody('task_set_my_status');
+    expect(body).toContain("completed_at = CASE WHEN p_status = 'done' THEN now()");
+    expect(body).toMatch(/UPDATE task_assignees SET/);
+    // Não usa horário vindo do cliente.
+    expect(body).not.toMatch(/completed_at\s*=\s*p_/);
+  });
+
+  it('11. reabrir limpa completed_at, para o ciclo antigo não valer como conclusão vigente', () => {
+    expect(functionBody('task_set_my_status')).toContain("completed_at = CASE WHEN p_status = 'done' THEN now() ELSE NULL END");
+  });
 });

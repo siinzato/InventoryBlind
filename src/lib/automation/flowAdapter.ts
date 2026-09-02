@@ -168,6 +168,29 @@ export function edgeStatusesFromExecutions(workflow: AutomationWorkflow, executi
   return statuses;
 }
 
+/** Estado visual de um node num trace de execução (histórico ou teste) — os 3
+ *  primeiros são exatamente `NodeExecutionStatus`; `attention` é só de tela,
+ *  nunca persistido: sinaliza um node que teve sucesso mas precisou de mais de
+ *  uma tentativa, distinto de um sucesso limpo. Um node ausente do registro
+ *  (nunca visitado nesta execução) simplesmente não aparece no mapa — fica com
+ *  a aparência padrão do node, discreta, como pede o requisito de trace. */
+export type TraceNodeStatus = NodeExecutionStatus | 'attention';
+
+/** Último status observado por node, a partir do histórico real de
+ *  `automation_node_executions` — mesma regra de "o mais recente da sequência
+ *  vence" que `AutomationEditor.tsx` já usa para colorir o teste ao vivo,
+ *  aqui generalizada para qualquer trace (histórico ou teste). */
+export function computeTraceNodeStatuses(nodeExecutions: NodeExecution[]): Record<string, TraceNodeStatus> {
+  const ordered = [...nodeExecutions].sort((a, b) => a.sequence - b.sequence);
+  const statuses: Record<string, TraceNodeStatus> = {};
+
+  for (const ne of ordered) {
+    statuses[ne.nodeId] = ne.status === 'success' && ne.attempts > 1 ? 'attention' : ne.status;
+  }
+
+  return statuses;
+}
+
 /** "Auto-organizar" (§17): recalcula a posição de TODOS os nodes a partir do
  *  grafo, inclusive os que o usuário já tinha arrastado — é uma ação explícita
  *  e reversível (entra no histórico de desfazer), diferente da posição

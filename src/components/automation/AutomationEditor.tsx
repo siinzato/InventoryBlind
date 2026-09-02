@@ -1,6 +1,6 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, ArrowLeft, Check, Loader2, Play } from 'lucide-react';
-import { Button, Input, Page, PageHeader, Panel, PanelSection } from '../ui';
+import { Badge, Button, Input, Page, PageHeader, Panel, PanelSection } from '../ui';
 import {
   createAutomation,
   listNodeExecutions,
@@ -12,13 +12,28 @@ import { edgeStatusesFromExecutions } from '../../lib/automation/flowAdapter';
 import { useFlowHistory } from '../../lib/automation/useFlowHistory';
 import { validateWorkflow } from '../../lib/automation/workflow';
 import { AutomationCanvas } from './AutomationCanvas';
-import type { Automation, AutomationWorkflow, NodeExecutionStatus } from '../../lib/automation/types';
+import { AUTOMATION_STATUS_LABEL, type Automation, type AutomationStatus, type AutomationWorkflow, type NodeExecutionStatus } from '../../lib/automation/types';
+
+const STATUS_VARIANT: Record<AutomationStatus, 'success' | 'neutral' | 'danger'> = {
+  active: 'success',
+  draft: 'neutral',
+  inactive: 'neutral',
+  error: 'danger',
+};
 
 interface Props {
   automation: Automation | null;
   canManage: boolean;
   onClose: () => void;
   onSaved: () => Promise<void>;
+}
+
+function formatSavedAgo(date: Date): string {
+  const minutes = Math.floor((Date.now() - date.getTime()) / 60_000);
+  if (minutes <= 0) return 'Salvo agora';
+  if (minutes < 60) return `Salvo há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  return `Salvo há ${hours} h`;
 }
 
 const BLANK_WORKFLOW: AutomationWorkflow = {
@@ -44,6 +59,15 @@ export function AutomationEditor({ automation, canManage, onClose, onSaved }: Pr
   const [focusNodeId, setFocusNodeId] = useState<string | null>(null);
   const [lastTestStatuses, setLastTestStatuses] = useState<Record<string, NodeExecutionStatus> | null>(null);
   const [lastTestEdgeStatuses, setLastTestEdgeStatuses] = useState<Record<string, NodeExecutionStatus> | null>(null);
+  const [lastSavedAt, setLastSavedAt] = useState<Date | null>(null);
+  // Só para o texto "Salvo há Xmin" se atualizar sozinho enquanto a tela fica aberta —
+  // não é infraestrutura de autosave, nada é salvo sozinho aqui.
+  const [, forceTick] = useState(0);
+  useEffect(() => {
+    if (lastSavedAt == null) return;
+    const id = setInterval(() => forceTick(t => t + 1), 30_000);
+    return () => clearInterval(id);
+  }, [lastSavedAt]);
 
   const triggerNode = workflow.nodes.find(n => n.type === 'trigger');
   const triggerType = (triggerNode as { triggerType?: string } | undefined)?.triggerType ?? 'manual';
@@ -57,6 +81,7 @@ export function AutomationEditor({ automation, canManage, onClose, onSaved }: Pr
       const input = { name, description, workflow };
       const saved = automation == null ? await createAutomation(input) : await updateAutomation(automation.id, input);
       setFeedback({ tone: 'ok', text: 'Automação salva como rascunho. Ative quando estiver pronta.' });
+      setLastSavedAt(new Date());
       return saved;
     } catch (thrown) {
       setFeedback({ tone: 'error', text: thrown instanceof Error ? thrown.message : 'Não foi possível salvar.' });
@@ -79,6 +104,78 @@ export function AutomationEditor({ automation, canManage, onClose, onSaved }: Pr
           </Button>
         }
       />
+
+      {canManage && (
+        <div className="sticky top-0 z-10 flex flex-wrap items-center gap-2 rounded-container border border-edge bg-surface-2/95 px-4 py-2.5 shadow-panel backdrop-blur">
+          {automation != null && (
+            <Badge variant={STATUS_VARIANT[automation.status]}>{AUTOMATION_STATUS_LABEL[automation.status]}</Badge>
+          )}
+          <span className="text-xs text-fg-subtle">
+            {saving ? 'Salvando…' : lastSavedAt ? formatSavedAgo(lastSavedAt) : 'Não salvo ainda'}
+          </span>
+          <span className="h-4 w-px bg-edge" />
+
+          <Button size="sm" disabled={saving || name.trim() === ''} onClick={() => void save()}>
+            {saving && <Loader2 size={14} className="animate-spin" />}
+            Salvar
+          </Button>
+
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={saving || !validation.valid || name.trim() === ''}
+            title={!validation.valid ? 'Corrija os erros acima para poder ativar' : undefined}
+            onClick={async () => {
+              const saved = await save();
+              if (saved == null) return;
+              try {
+                await setAutomationStatus(saved.id, 'active');
+                setFeedback({ tone: 'ok', text: 'Automação ativada.' });
+                await onSaved();
+              } catch (thrown) {
+                setFeedback({ tone: 'error', text: thrown instanceof Error ? thrown.message : 'Não foi possível ativar.' });
+              }
+            }}
+          >
+            <Check size={14} />
+            Salvar e ativar
+          </Button>
+
+          {automation != null && (
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={saving}
+              title="O teste avalia o fluxo e registra a execução, mas não aplica as ações que alteram dados."
+              onClick={async () => {
+                setSaving(true);
+                setFeedback(null);
+                setLastTestStatuses(null);
+                setLastTestEdgeStatuses(null);
+                try {
+                  const result = await runAutomationManually(automation.id, { dryRun: true });
+                  setFeedback({ tone: result.ok ? 'ok' : 'error', text: result.message });
+                  // Resultado real do teste (§19) — nunca inventado. Se não vier
+                  // executionId (ex.: falha antes de abrir uma execução), não há
+                  // nada para destacar, e nada é destacado.
+                  if (result.executionId) {
+                    const nodeExecutions = await listNodeExecutions(result.executionId).catch(() => []);
+                    const byNode: Record<string, NodeExecutionStatus> = {};
+                    for (const ne of nodeExecutions) byNode[ne.nodeId] = ne.status;
+                    setLastTestStatuses(byNode);
+                    setLastTestEdgeStatuses(edgeStatusesFromExecutions(workflow, nodeExecutions));
+                  }
+                } finally {
+                  setSaving(false);
+                }
+              }}
+            >
+              <Play size={14} />
+              Testar sem aplicar
+            </Button>
+          )}
+        </div>
+      )}
 
       {feedback && (
         <div
@@ -156,73 +253,6 @@ export function AutomationEditor({ automation, canManage, onClose, onSaved }: Pr
           />
         </PanelSection>
       </Panel>
-
-      {canManage && (
-        <Panel>
-          <PanelSection className="flex flex-wrap items-center gap-2">
-            <Button disabled={saving || name.trim() === ''} onClick={() => void save()}>
-              {saving && <Loader2 size={14} className="animate-spin" />}
-              Salvar
-            </Button>
-
-            <Button
-              variant="secondary"
-              disabled={saving || !validation.valid || name.trim() === ''}
-              title={!validation.valid ? 'Corrija os erros acima para poder ativar' : undefined}
-              onClick={async () => {
-                const saved = await save();
-                if (saved == null) return;
-                try {
-                  await setAutomationStatus(saved.id, 'active');
-                  setFeedback({ tone: 'ok', text: 'Automação ativada.' });
-                  await onSaved();
-                } catch (thrown) {
-                  setFeedback({ tone: 'error', text: thrown instanceof Error ? thrown.message : 'Não foi possível ativar.' });
-                }
-              }}
-            >
-              <Check size={14} />
-              Salvar e ativar
-            </Button>
-
-            {automation != null && (
-              <Button
-                variant="ghost"
-                disabled={saving}
-                onClick={async () => {
-                  setSaving(true);
-                  setFeedback(null);
-                  setLastTestStatuses(null);
-                  setLastTestEdgeStatuses(null);
-                  try {
-                    const result = await runAutomationManually(automation.id, { dryRun: true });
-                    setFeedback({ tone: result.ok ? 'ok' : 'error', text: result.message });
-                    // Resultado real do teste (§19) — nunca inventado. Se não vier
-                    // executionId (ex.: falha antes de abrir uma execução), não há
-                    // nada para destacar, e nada é destacado.
-                    if (result.executionId) {
-                      const nodeExecutions = await listNodeExecutions(result.executionId).catch(() => []);
-                      const byNode: Record<string, NodeExecutionStatus> = {};
-                      for (const ne of nodeExecutions) byNode[ne.nodeId] = ne.status;
-                      setLastTestStatuses(byNode);
-                      setLastTestEdgeStatuses(edgeStatusesFromExecutions(workflow, nodeExecutions));
-                    }
-                  } finally {
-                    setSaving(false);
-                  }
-                }}
-              >
-                <Play size={14} />
-                Testar sem aplicar
-              </Button>
-            )}
-
-            <p className="text-xs leading-relaxed text-fg-subtle">
-              O teste avalia o fluxo e registra a execução, mas não aplica as ações que alteram dados.
-            </p>
-          </PanelSection>
-        </Panel>
-      )}
     </Page>
   );
 }

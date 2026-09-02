@@ -12,53 +12,135 @@ import type { AbcXyzCombo } from '../domainTypes';
 export { available, unavailable, isAvailable, UNAVAILABLE_COPY };
 export type { MetricValue, UnavailableReason };
 
-export type AnalyticsFactorKey =
-  | 'accuracy'
-  | 'divergence_rate'
-  | 'reliability'
-  | 'abcxyz_risk'
-  | 'recurrence';
+// BlindScore V2 — a nota principal vem direto do CBC (cbc_company_summary_v.avg_confidence),
+// não de uma dedução própria. Os tipos abaixo descrevem a composição executiva em torno dela
+// (cobertura, validação, pilares, riscos), nunca um segundo cálculo de confiança por SKU.
 
-export const FACTOR_LABEL: Record<AnalyticsFactorKey, string> = {
-  accuracy: 'Acuracidade das contagens',
-  divergence_rate: 'Taxa de divergências reais',
-  reliability: 'Confiabilidade das contagens (reconferência)',
-  abcxyz_risk: 'SKUs de risco (ABC/XYZ)',
-  recurrence: 'Reincidência de divergências (RCA)',
+export type EvidenceLevel = 'alta' | 'moderada' | 'baixa';
+
+export const EVIDENCE_LABEL: Record<EvidenceLevel, string> = {
+  alta: 'Evidência alta',
+  moderada: 'Evidência moderada',
+  baixa: 'Evidência baixa',
 };
 
-export interface AnalyticsDeduction {
-  factor: AnalyticsFactorKey;
-  label: string;
-  /** Pontos deduzidos de 100. */
-  points: number;
-  /** Frase que explica o número real por trás da dedução — nunca um julgamento sem evidência. */
-  detail: string;
+export interface CoverageStat {
+  /** Produtos com has_sufficient_data = true (confiança realmente calculável). */
+  evaluated: number;
+  /** Total real de products do workspace — nunca assumido a partir de product_confidence_scores. */
+  totalCatalog: number;
+  /** Produtos que ainda não sustentam a leitura (totalCatalog - evaluated, nunca negativo). */
+  gap: number;
+  pct: number;
+  evidence: EvidenceLevel;
 }
 
-export type BlindScoreStatus = 'excelente' | 'bom' | 'atencao' | 'critico' | 'indisponivel';
+export type ValidationQuality = 'alta' | 'moderada' | 'baixa' | 'nao_avaliada';
+
+export const VALIDATION_QUALITY_LABEL: Record<ValidationQuality, string> = {
+  alta: 'Alta',
+  moderada: 'Moderada',
+  baixa: 'Baixa',
+  nao_avaliada: 'Não avaliada',
+};
+
+export interface ValidationStat {
+  quality: ValidationQuality;
+  totalChains: number;
+  /** Cadeias com recontagem — a base real de avaliação. Sem ela, a qualidade do processo não é
+   *  "baixa", é "não avaliada": ausência de reconferência não é julgamento negativo. */
+  sampleChains: number;
+  pctRecontagens: number;
+  pctIndependentes: number;
+  pctAprovadas: number;
+}
+
+export interface PillarScore {
+  key: 'accuracyHistory' | 'recency' | 'stability' | 'integrity';
+  label: string;
+  /** 0-100, já normalizado (score/max do próprio fator do CBC). */
+  value: number;
+  /** Leitura curta e determinística derivada do próprio valor. */
+  reading: string;
+}
+
+/** Por que os pilares não pôde ser agregados — estados reais e distinguíveis pelos dados, nunca
+ *  a mesma mensagem genérica para causas diferentes. */
+export type PillarsUnavailableReason =
+  /** Nenhum produto tem evidência suficiente ainda. */
+  | 'no_evaluated_products'
+  /** Há produtos avaliados, mas os fatores gravados são da versão anterior do Confidence Score
+   *  (8 fatores) e precisam ser recalculados para compor os 4 pilares atuais. */
+  | 'stale_algorithm';
+
+export type RiskSeverity = 'alta' | 'media' | 'baixa';
+
+export interface RiskFactorItem {
+  key: string;
+  label: string;
+  detail: string;
+  count: number;
+  /** Unidade contada — "produtos", "SKUs", "contagens". */
+  unit: string;
+  severity: RiskSeverity;
+  /** Tab de destino do drill-down (mesmo id usado por App.tsx/setActiveTab), quando existe navegação real. */
+  navigateTo?: string;
+  actionLabel?: string;
+}
+
+/** Recomendação determinística derivada de condição real — sem IA, sem texto generativo e sem
+ *  estimar impacto em pontos. */
+export interface Recommendation {
+  key: string;
+  title: string;
+  detail: string;
+  navigateTo?: string;
+  actionLabel?: string;
+}
+
+export interface AbcXyzExposure {
+  highRiskCount: number;
+  totalClassified: number;
+}
+
+export type BlindScoreStatus = 'excelente' | 'bom' | 'atencao' | 'critico' | 'provisorio' | 'indisponivel';
 
 export const BLIND_SCORE_STATUS_LABEL: Record<BlindScoreStatus, string> = {
   excelente: 'Excelente',
   bom: 'Bom',
   atencao: 'Requer atenção',
   critico: 'Crítico',
+  provisorio: 'Leitura provisória',
   indisponivel: 'Indisponível',
 };
 
 export interface BlindScoreResult {
-  status: BlindScoreStatus;
-  /** 0-100, ou null se nenhum fator pôde ser avaliado. */
+  /** 0-100, ou null se nenhum SKU tem confiança calculável ainda. */
   score: number | null;
-  deductions: AnalyticsDeduction[];
-  evaluatedFactors: AnalyticsFactorKey[];
-  skippedFactors: { factor: AnalyticsFactorKey; reason: UnavailableReason }[];
-  /** Fatores avaliados com a menor dedução — "principais fatores positivos". */
-  positives: AnalyticsDeduction[];
-  /** Fatores avaliados com a maior dedução (>0) — "principais fatores negativos". */
-  negatives: AnalyticsDeduction[];
-  /** Acurácia real por sessão de contagem, em ordem cronológica — a evolução real disponível. */
+  status: BlindScoreStatus;
+  /** Texto curto e honesto derivado do status real — nunca fixo. */
+  summary: string;
+  coverage: CoverageStat;
+  validation: ValidationStat;
+  /** Vazio quando nenhum produto avaliado ainda sustenta a agregação por pilar. */
+  pillars: PillarScore[];
+  /** Produtos que efetivamente sustentam os pilares — a base explícita da seção, que NÃO é o
+   *  catálogo inteiro nem necessariamente todos os produtos avaliados. */
+  pillarsBase: number;
+  /** null quando os pilares foram calculados. */
+  pillarsUnavailable: PillarsUnavailableReason | null;
+  /** true quando a nota vem de linhas do CBC que a versão atual do algoritmo ainda não
+   *  recalculou — o score continua sendo o avg_confidence real, mas a leitura está defasada. */
+  staleEvaluation: boolean;
+  /** Já ordenado por relevância (maior contagem primeiro), no máximo 6 itens. */
+  reducingFactors: RiskFactorItem[];
+  /** Ações determinísticas, na ordem em que fazem diferença. */
+  recommendations: Recommendation[];
+  /** null quando ABC/XYZ ainda não foi configurado/classificado — nunca 0 fabricado. */
+  abcXyzExposure: AbcXyzExposure | null;
+  /** Acurácia real por sessão de contagem, em ordem cronológica. */
   accuracyTrend: { period: string; value: number }[];
+  lastRecalculatedAt: string | null;
 }
 
 export type IndicatorStatus = 'saudavel' | 'atencao' | 'critico' | 'indisponivel';

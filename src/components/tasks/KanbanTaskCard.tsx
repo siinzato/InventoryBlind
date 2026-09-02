@@ -1,7 +1,7 @@
 import React from 'react';
 import { PlayCircle, CheckCircle2, Lock, Archive, MapPin, Clock } from 'lucide-react';
 import { TaskWithAssignees, AssigneeStatus } from '../../lib/tasks/types';
-import { findMyAssignment, formatDueRelative, isOverdue, TASK_PRIORITY_LABEL } from '../../lib/tasks/taskDomain';
+import { findMyAssignment, formatTaskTimeline, isOverdue, TASK_PRIORITY_LABEL } from '../../lib/tasks/taskDomain';
 
 interface KanbanTaskCardProps {
   task: TaskWithAssignees;
@@ -31,8 +31,8 @@ export const KanbanTaskCard: React.FC<KanbanTaskCardProps> = ({
 }) => {
   const now = Date.now();
   const mine = findMyAssignment(task.assignees, currentUserId);
-  const overdue = isOverdue(task, now);
-  const dueLabel = formatDueRelative(task, now);
+  const overdue = isOverdue(task, now, mine);
+  const dueLabel = formatTaskTimeline(task, mine, now);
 
   const stripeKey: keyof typeof STRIPE = mine?.status === 'done'
     ? 'done'

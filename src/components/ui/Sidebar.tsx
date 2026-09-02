@@ -447,15 +447,44 @@ function GroupMenuPopover({ group, sectionNumber, anchor, onClose }: {
       role="menu"
       aria-label={group.label}
     >
+      <SubmenuPanelContents
+        group={group}
+        sectionNumber={sectionNumber}
+        onSelect={item => {
+          item.onClick();
+          onClose();
+        }}
+      />
+    </div>,
+    document.body,
+  );
+}
+
+/** Conteúdo visual do popover separado do portal para manter testável o
+ *  contrato da prancheta técnica sem duplicar navegação ou estado. */
+export function SubmenuPanelContents({ group, sectionNumber, onSelect }: {
+  group: SidebarNavGroup;
+  sectionNumber: number;
+  onSelect: (item: SidebarNavItem) => void;
+}) {
+  const prefix = String(sectionNumber).padStart(2, '0');
+
+  return (
+    <div className="ib-submenu-artboard" data-submenu-artboard="technical">
+      <span className="ib-submenu-corner is-tl" aria-hidden="true" />
+      <span className="ib-submenu-corner is-tr" aria-hidden="true" />
+      <span className="ib-submenu-corner is-bl" aria-hidden="true" />
+      <span className="ib-submenu-corner is-br" aria-hidden="true" />
       <div className="ib-submenu-heading">
         <Icon name={groupIconName(group.id)} />
         <strong>{group.label}</strong>
-        <small>{String(sectionNumber).padStart(2, '0')}</small>
+        <small>{prefix}</small>
       </div>
       <div className="ib-submenu-list">
+        <span className="ib-submenu-track" aria-hidden="true" />
         {group.items.map((item, index) => {
           const locked = group.locked || item.locked;
-          const coordinate = `${String(sectionNumber).padStart(2, '0')}.${index + 1}`;
+          const coordinate = `${prefix}.${index + 1}`;
           return (
             <button
               key={item.id}
@@ -464,11 +493,7 @@ function GroupMenuPopover({ group, sectionNumber, anchor, onClose }: {
               className={item.active ? 'is-active' : ''}
               title={locked ? LOCKED_TOOLTIP : item.label}
               disabled={locked}
-              onClick={() => {
-                if (locked) return;
-                item.onClick();
-                onClose();
-              }}
+              onClick={() => { if (!locked) onSelect(item); }}
             >
               <span>{item.label}</span>
               <small>{coordinate}</small>
@@ -476,8 +501,7 @@ function GroupMenuPopover({ group, sectionNumber, anchor, onClose }: {
           );
         })}
       </div>
-    </div>,
-    document.body,
+    </div>
   );
 }
 

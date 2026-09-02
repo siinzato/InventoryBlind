@@ -6,7 +6,7 @@ import {
 import { Badge } from '../ui';
 import { TaskWithAssignees, AssigneeStatus, TaskPriority, TaskStatus, BlockReason, BLOCK_REASONS } from '../../lib/tasks/types';
 import {
-  findMyAssignment, formatAssigneeProgress, formatDueRelative, isOverdue,
+  findMyAssignment, formatAssigneeProgress, formatTaskTimeline, isOverdue,
   canTransitionAssigneeStatus, TASK_STATUS_LABEL, TASK_PRIORITY_LABEL, BLOCK_REASON_LABEL, formatDuration,
 } from '../../lib/tasks/taskDomain';
 
@@ -63,8 +63,8 @@ export const TaskCard: React.FC<TaskCardProps> = ({
   const now = Date.now();
   const mine = findMyAssignment(task.assignees, currentUserId);
   const progress = formatAssigneeProgress(task.assignees);
-  const dueLabel = formatDueRelative(task, now);
-  const overdue = isOverdue(task, now);
+  const dueLabel = formatTaskTimeline(task, mine, now);
+  const overdue = isOverdue(task, now, mine);
   const priorityMeta = PRIORITY_META[task.priority];
   const sinceStarted = mine?.status === 'in_progress' ? formatSinceStarted(mine.started_at, now) : null;
 

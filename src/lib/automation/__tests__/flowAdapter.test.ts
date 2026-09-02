@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   addNode,
   autoLayoutWorkflow,
+  computeTraceNodeStatuses,
   connectionToEdge,
   edgeId,
   edgeStatusesFromExecutions,
@@ -16,7 +17,7 @@ import {
 } from '../flowAdapter';
 import type { AutomationWorkflow, NodeExecution } from '../types';
 
-function execution(nodeId: string, sequence: number, status: NodeExecution['status']): NodeExecution {
+function execution(nodeId: string, sequence: number, status: NodeExecution['status'], attempts = 1): NodeExecution {
   return {
     id: `exec-${sequence}`,
     executionId: 'run-1',
@@ -28,7 +29,7 @@ function execution(nodeId: string, sequence: number, status: NodeExecution['stat
     conditionResult: null,
     output: null,
     errorMessage: null,
-    attempts: 1,
+    attempts,
     startedAt: '2026-01-01T00:00:00Z',
     finishedAt: '2026-01-01T00:00:01Z',
     durationMs: 10,
@@ -268,5 +269,34 @@ describe('flowAdapter — caminho percorrido num teste real', () => {
     ]);
 
     expect(statuses[edgeId({ from: 'trigger', to: 'cond-1', branch: 'next' })]).toBe('success');
+  });
+});
+
+describe('computeTraceNodeStatuses — estado visual do trace (§3)', () => {
+  it('mapeia sucesso, ignorado e erro diretamente do histórico real', () => {
+    const statuses = computeTraceNodeStatuses([
+      execution('trigger', 1, 'success'),
+      execution('cond-1', 2, 'skipped'),
+      execution('action-1', 3, 'failed'),
+    ]);
+    expect(statuses).toEqual({ trigger: 'success', 'cond-1': 'skipped', 'action-1': 'failed' });
+  });
+
+  it('sucesso com mais de uma tentativa vira "attention", não sucesso limpo', () => {
+    const statuses = computeTraceNodeStatuses([execution('action-1', 1, 'success', 2)]);
+    expect(statuses['action-1']).toBe('attention');
+  });
+
+  it('um node nunca visitado simplesmente não aparece no mapa (discreto, não fabricado)', () => {
+    const statuses = computeTraceNodeStatuses([execution('trigger', 1, 'success')]);
+    expect(statuses['action-1']).toBeUndefined();
+  });
+
+  it('numa repetição do mesmo node (loop), o status mais recente da sequência vence', () => {
+    const statuses = computeTraceNodeStatuses([
+      execution('loop-body', 2, 'failed'),
+      execution('loop-body', 1, 'success'),
+    ]);
+    expect(statuses['loop-body']).toBe('failed');
   });
 });

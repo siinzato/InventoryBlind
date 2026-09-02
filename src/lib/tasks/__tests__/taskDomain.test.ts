@@ -5,7 +5,7 @@ import {
   canChangeMyStatus, canCreateCorporateTask, bucketByDueDate, summarizeMyDay, computeWorkloadByUser,
   formatRelativeTime, canTransitionAssigneeStatus, canValidateTask, canReopenTask,
   isOverdue, isDueSoon, formatDueRelative, computeTimeBreakdown, formatDuration, recommendNextTask,
-  computeOperationalIndicators, groupTasksForMyDay,
+  computeOperationalIndicators, groupTasksForMyDay, completedLate, formatTaskTimeline,
 } from '../taskDomain';
 import { Task, TaskAssignee, TaskWithAssignees } from '../types';
 
@@ -285,6 +285,119 @@ describe('isOverdue / isDueSoon — "vence em breve" com limite configurável (d
   it('sem prazo nunca é atrasada nem vence em breve', () => {
     expect(isOverdue({ due_date: null, due_time: null, status: 'todo' }, NOW)).toBe(false);
     expect(isDueSoon({ due_date: null, due_time: null, status: 'todo' }, NOW)).toBe(false);
+  });
+});
+
+// Bug corrigido: as colunas do Kanban e os grupos do Meu Dia são governados pelo status da
+// ATRIBUIÇÃO, não pelo da tarefa. Um card já em "Concluído" (minha parte 'done') seguia sendo
+// avaliado pelo status da tarefa ('todo'/'in_progress') e exibia "Atrasada há Xh" crescendo.
+describe('atraso atual x conclusão fora do prazo (estado terminal da minha atribuição)', () => {
+  const NOW = new Date('2026-08-21T10:00:00').getTime();
+  const PAST = { due_date: '2026-08-21', due_time: '09:00:00', status: 'in_progress' as const };
+  const FUTURE = { due_date: '2026-08-21', due_time: '11:00:00', status: 'in_progress' as const };
+  const done = (completed_at: string | null) => ({ ...assignee('me', 'done'), completed_at });
+
+  it('1. tarefa ativa com prazo passado é atrasada', () => {
+    expect(isOverdue(PAST, NOW, assignee('me', 'in_progress'))).toBe(true);
+  });
+
+  it('2. tarefa ativa com prazo futuro não é atrasada', () => {
+    expect(isOverdue(FUTURE, NOW, assignee('me', 'todo'))).toBe(false);
+  });
+
+  it('3. minha parte concluída com prazo passado não está atualmente atrasada', () => {
+    expect(isOverdue(PAST, NOW, done('2026-08-21T09:30:00Z'))).toBe(false);
+  });
+
+  it('4. concluída depois do prazo: completedLate true, isOverdue false', () => {
+    const mine = done('2026-08-21T09:30:00');
+    expect(completedLate(PAST, mine)).toBe(true);
+    expect(isOverdue(PAST, NOW, mine)).toBe(false);
+  });
+
+  it('5. concluída antes do prazo não é atrasada nem tardia', () => {
+    const mine = done('2026-08-21T08:00:00');
+    expect(isOverdue(FUTURE, NOW, mine)).toBe(false);
+    expect(completedLate(FUTURE, mine)).toBe(false);
+  });
+
+  it('6. concluída sem completed_at não mostra "Atrasada" nem inventa data', () => {
+    const mine = done(null);
+    expect(isOverdue(PAST, NOW, mine)).toBe(false);
+    expect(completedLate(PAST, mine)).toBe(false);
+    expect(formatTaskTimeline(PAST, mine, NOW)).toBe('Concluída');
+  });
+
+  it('7/8. tarefa arquivada ou cancelada nunca é atrasada', () => {
+    const archived = { ...done('2026-08-21T09:30:00'), archived_at: '2026-08-21T09:40:00' };
+    expect(isOverdue(PAST, NOW, archived)).toBe(false);
+    expect(isOverdue({ ...PAST, status: 'cancelled' }, NOW, assignee('me', 'todo'))).toBe(false);
+  });
+
+  it('11. reabrir volta a aplicar a regra de prazo (completed_at do ciclo antigo não vale)', () => {
+    // task_set_my_status zera completed_at ao sair de 'done' (migration 072), então a
+    // atribuição reaberta chega aqui como 'todo' sem conclusão vigente.
+    const reopened = assignee('me', 'todo');
+    expect(reopened.completed_at).toBeNull();
+    expect(isOverdue(PAST, NOW, reopened)).toBe(true);
+  });
+
+  it('15. comparação por instante UTC, apresentação no fuso local', () => {
+    const utcNoon = '2026-08-21T12:00:00Z';
+    const mine = done(utcNoon);
+    // O prazo é 09:00 local; a conclusão em UTC é convertida para o mesmo instante antes de comparar.
+    expect(completedLate(PAST, mine)).toBe(new Date(utcNoon).getTime() > new Date('2026-08-21T09:00:00').getTime());
+    const label = formatTaskTimeline(PAST, mine, NOW);
+    expect(label.startsWith('Concluída em ')).toBe(true);
+    expect(label).toContain(new Date(utcNoon).toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' }));
+  });
+});
+
+describe('formatTaskTimeline — nenhuma view decide sozinha se mostra atraso', () => {
+  const NOW = new Date('2026-08-21T10:00:00').getTime();
+  const PAST = { due_date: '2026-08-21', due_time: '08:40:00', status: 'in_progress' as const };
+
+  it('em aberto continua mostrando o prazo relativo de sempre', () => {
+    expect(formatTaskTimeline(PAST, assignee('me', 'in_progress'), NOW)).toBe('Atrasada há 1h20');
+  });
+
+  it('concluída mostra a data real da conclusão e o relógio de atraso para', () => {
+    const mine = { ...assignee('me', 'done'), completed_at: '2026-08-21T09:00:00' };
+    const label = formatTaskTimeline(PAST, mine, NOW);
+    expect(label).toBe('Concluída em 21/08/2026 às 09:00');
+    // Duas horas depois o texto é idêntico — não incrementa após a conclusão.
+    expect(formatTaskTimeline(PAST, mine, NOW + 7_200_000)).toBe(label);
+  });
+
+  it('tarefa concluída/cancelada no nível da tarefa também não mostra atraso', () => {
+    expect(formatTaskTimeline({ ...PAST, status: 'done' }, null, NOW)).toBe('Concluída');
+    expect(formatTaskTimeline({ ...PAST, status: 'validated' }, null, NOW)).toBe('Concluída');
+    expect(formatTaskTimeline({ ...PAST, status: 'cancelled' }, null, NOW)).toBe('Cancelada');
+  });
+});
+
+describe('contadores e filtros excluem estados terminais', () => {
+  const NOW = new Date('2026-08-21T10:00:00').getTime();
+
+  it('12/13. contador de atrasadas ignora quem já concluiu a própria parte', () => {
+    const overdueTask = (assignees: TaskAssignee[]): TaskWithAssignees => ({
+      ...baseTask({ due_date: '2026-08-20', due_time: '09:00:00', status: 'in_progress' }), assignees,
+    });
+    const open = computeOperationalIndicators([overdueTask([assignee('me', 'todo')])], 'me', NOW);
+    expect(open.overdue).toBe(1);
+
+    const finished = computeOperationalIndicators(
+      [overdueTask([{ ...assignee('me', 'done'), completed_at: '2026-08-21T09:00:00' }])], 'me', NOW,
+    );
+    expect(finished.overdue).toBe(0);
+  });
+
+  it('grupos do Meu Dia não colocam concluída em "Atrasadas"', () => {
+    const t: TaskWithAssignees = {
+      ...baseTask({ due_date: '2026-08-20', status: 'in_progress' }),
+      assignees: [{ ...assignee('me', 'done'), completed_at: '2026-08-21T09:00:00' }],
+    };
+    expect(groupTasksForMyDay([t], 'me', '2026-08-21').overdue).toHaveLength(0);
   });
 });
 

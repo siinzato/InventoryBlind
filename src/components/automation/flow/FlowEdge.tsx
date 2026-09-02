@@ -34,6 +34,9 @@ export function FlowEdge({
     targetPosition,
   });
 
+  // Fora de um resultado de teste real, a saída "Não" de um branch já pinta a
+  // aresta discretamente (§7 — leitura de SIM/NÃO no canvas), sem tocar em
+  // nenhuma lógica de conexão: é só o branch que a aresta já carrega.
   const strokeClass =
     edgeData?.testStatus === 'success'
       ? 'stroke-emerald-500'
@@ -41,7 +44,18 @@ export function FlowEdge({
         ? 'stroke-red-500'
         : selected
           ? 'stroke-accent'
-          : 'stroke-[rgb(var(--edge))]';
+          : edgeData?.branch === 'false'
+            ? 'stroke-red-400/70'
+            : edgeData?.branch === 'true'
+              ? 'stroke-emerald-500/70'
+              : 'stroke-[rgb(var(--edge))]';
+
+  const labelToneClass =
+    edgeData?.branch === 'true'
+      ? 'border-emerald-500/30 bg-emerald-500/10 text-emerald-700 dark:text-emerald-400'
+      : edgeData?.branch === 'false'
+        ? 'border-red-500/30 bg-red-500/10 text-red-700 dark:text-red-400'
+        : 'border-edge bg-surface text-fg-muted';
 
   return (
     <>
@@ -49,7 +63,7 @@ export function FlowEdge({
       {edgeData?.label && (
         <EdgeLabelRenderer>
           <div
-            className="pointer-events-none absolute rounded-control border border-edge bg-surface px-1.5 py-0.5 text-[10px] text-fg-muted"
+            className={`pointer-events-none absolute rounded-control border px-1.5 py-0.5 text-[10px] font-medium uppercase tracking-wide ${labelToneClass}`}
             style={{ transform: `translate(-50%, -50%) translate(${labelX}px, ${labelY}px)` }}
           >
             {edgeData.label}

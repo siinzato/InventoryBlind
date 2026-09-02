@@ -12,6 +12,7 @@ import { logAuditEvent, type AuditAction } from '../auditLogService';
 import { validateWorkflow } from './workflow';
 import type {
   Automation,
+  AutomationEvent,
   AutomationExecution,
   AutomationNotification,
   AutomationStatus,
@@ -315,7 +316,7 @@ async function readFunctionError(error: unknown, fallback: string): Promise<stri
 
 const EXECUTION_COLUMNS =
   'id, company_id, automation_id, event_id, automation_version, trigger_type, trigger_source, ' +
-  'status, dry_run, context, error_message, started_at, finished_at, duration_ms, depth';
+  'status, dry_run, context, error_message, started_at, finished_at, duration_ms, depth, triggered_by';
 
 function toExecution(row: Record<string, unknown>): AutomationExecution {
   return {
@@ -334,6 +335,7 @@ function toExecution(row: Record<string, unknown>): AutomationExecution {
     finishedAt: (row.finished_at as string | null) ?? null,
     durationMs: (row.duration_ms as number | null) ?? null,
     depth: Number(row.depth ?? 0),
+    triggeredBy: (row.triggered_by as string | null) ?? null,
   };
 }
 
@@ -351,6 +353,98 @@ export async function listExecutions(
   const { data, error } = await query.returns<Record<string, unknown>[]>();
   if (error) throw error;
   return (data ?? []).map(toExecution);
+}
+
+export interface ExecutionPageFilters {
+  /** Já resolvido pelo chamador (ex.: nome digitado → ids que batem) — este
+   *  serviço só filtra por id, nunca por texto, para não duplicar a lógica de
+   *  busca por nome que já vive na lista de automações carregada na tela. */
+  automationIds?: string[];
+  automationId?: string;
+  status?: AutomationExecution['status'];
+  /** ISO — só execuções a partir desta data (período selecionado na tela). */
+  from?: string;
+  limit?: number;
+  offset?: number;
+}
+
+export interface ExecutionsPage {
+  executions: AutomationExecution[];
+  total: number;
+}
+
+/** Página filtrada do histórico, com contagem total real (para "1–N de M") —
+ *  MESMA tabela/colunas de `listExecutions`, só com `range()` em vez de
+ *  `limit()` e os filtros que a aba Execuções precisa. `listExecutions` continua
+ *  intocada porque a faixa de KPIs da tela de Automações já depende dela. */
+export async function listExecutionsPage(filters: ExecutionPageFilters = {}): Promise<ExecutionsPage> {
+  const limit = filters.limit ?? 10;
+  const offset = filters.offset ?? 0;
+
+  let query = supabase
+    .from('automation_executions')
+    .select(EXECUTION_COLUMNS, { count: 'exact' })
+    .order('started_at', { ascending: false })
+    .range(offset, offset + limit - 1);
+
+  if (filters.automationId) query = query.eq('automation_id', filters.automationId);
+  if (filters.automationIds) query = query.in('automation_id', filters.automationIds);
+  if (filters.status) query = query.eq('status', filters.status);
+  if (filters.from) query = query.gte('started_at', filters.from);
+
+  const { data, error, count } = await query.returns<Record<string, unknown>[]>();
+  if (error) throw error;
+  return { executions: (data ?? []).map(toExecution), total: count ?? 0 };
+}
+
+/** Eventos reais recentes de um tipo de gatilho — para o teste de automação
+ *  poder rodar com um `payload` de verdade em vez de contexto vazio (§7). O
+ *  próprio engine já usa `event.payload` como `context.trigger` (ver
+ *  engine.ts `runAutomation`), então o formato aqui é exatamente o que a
+ *  automação já lê em produção. */
+export async function listRecentEvents(eventType: string, limit = 8): Promise<AutomationEvent[]> {
+  const { data, error } = await supabase
+    .from('automation_events')
+    .select('id, company_id, event_type, payload, source_table, source_id, origin_execution_id, origin_automation_id, depth, created_at')
+    .eq('event_type', eventType)
+    .order('created_at', { ascending: false })
+    .limit(limit)
+    .returns<Record<string, unknown>[]>();
+
+  if (error) throw error;
+
+  return (data ?? []).map(row => ({
+    id: row.id as string,
+    companyId: row.company_id as string,
+    eventType: row.event_type as string,
+    payload: (row.payload as Record<string, unknown>) ?? {},
+    sourceTable: (row.source_table as string | null) ?? null,
+    sourceId: (row.source_id as string | null) ?? null,
+    originExecutionId: (row.origin_execution_id as string | null) ?? null,
+    originAutomationId: (row.origin_automation_id as string | null) ?? null,
+    depth: Number(row.depth ?? 0),
+    createdAt: row.created_at as string,
+  }));
+}
+
+/** Quantos passos cada execução da página atual já tem registrado —
+ *  UMA consulta (só a coluna `execution_id`, sem trazer payload/output) para
+ *  as até `limit` execuções visíveis, em vez de um detalhe pesado por linha
+ *  (§14: a listagem carrega resumo; o passo a passo completo só ao abrir). */
+export async function countStepsByExecution(executionIds: string[]): Promise<Record<string, number>> {
+  if (executionIds.length === 0) return {};
+
+  const { data, error } = await supabase
+    .from('automation_node_executions')
+    .select('execution_id')
+    .in('execution_id', executionIds)
+    .returns<{ execution_id: string }[]>();
+
+  if (error) throw error;
+
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) counts[row.execution_id] = (counts[row.execution_id] ?? 0) + 1;
+  return counts;
 }
 
 export async function listNodeExecutions(executionId: string): Promise<NodeExecution[]> {

@@ -15,6 +15,7 @@ import {
   AchievementDefinition,
 } from './supabase';
 import { logAuditEvent } from './auditLogService';
+import { downloadFileName, resolveEbookAccess } from './academy/libraryEbooks';
 
 export async function getTracks(): Promise<AcademyTrack[]> {
   const { data, error } = await supabase.from('academy_tracks').select('*').order('order_index');
@@ -178,6 +179,72 @@ export async function getLibraryResources(): Promise<LibraryResource[]> {
   const { data, error } = await supabase.from('library_resources').select('*').order('order_index');
   if (error) { console.error('Error loading library resources:', error); return []; }
   return (data ?? []) as LibraryResource[];
+}
+
+// ── Biblioteca: leitura e download dos PDFs ──────────────────────────────────────────────
+// O bucket academy-library é privado (migration 105), então o arquivo só é acessível por
+// signed URL. A URL é resolvida SOB DEMANDA, no clique: assinar os PDFs de todo o catálogo
+// durante o carregamento da lista seria uma requisição por material (N+1) e as URLs
+// expirariam antes de serem usadas. As regras de qual caminho usar (Storage x arquivo legado)
+// ficam em academy/libraryEbooks.ts.
+
+const LIBRARY_BUCKET = 'academy-library';
+/** Vida da signed URL: suficiente para abrir/baixar o arquivo, curta o bastante para o link
+ *  não circular indefinidamente. */
+const SIGNED_URL_TTL_SECONDS = 600;
+
+/** URL para ABRIR o PDF em nova guia. Lança erro com mensagem exibível quando o material não
+ *  tem arquivo ou o Storage falha — o chamador mostra o erro, nunca engole a Promise. */
+export async function getLibraryResourceReadUrl(resource: LibraryResource): Promise<string> {
+  const { file } = resolveEbookAccess(resource);
+  if (!file) throw new Error('Este material ainda não tem arquivo disponível.');
+  if (file.kind === 'legacy') return file.url;
+
+  const { data, error } = await supabase.storage
+    .from(LIBRARY_BUCKET)
+    .createSignedUrl(file.path, SIGNED_URL_TTL_SECONDS);
+  if (error || !data?.signedUrl) {
+    console.error('Error signing library resource URL:', error);
+    throw new Error('Não foi possível abrir o material agora. Tente novamente.');
+  }
+  return data.signedUrl;
+}
+
+/** Baixa o arquivo de verdade. Para o Storage privado, `download()` traz o blob (um <a download>
+ *  apontando para outra origem seria ignorado pelo navegador); para o arquivo legado, busca o
+ *  próprio arquivo servido pelo app. */
+export async function downloadLibraryResource(resource: LibraryResource): Promise<void> {
+  const { file } = resolveEbookAccess(resource);
+  if (!file) throw new Error('Este material ainda não tem arquivo disponível.');
+
+  let blob: Blob;
+  if (file.kind === 'storage') {
+    const { data, error } = await supabase.storage.from(LIBRARY_BUCKET).download(file.path);
+    if (error || !data) {
+      console.error('Error downloading library resource:', error);
+      throw new Error('Não foi possível baixar o material agora. Tente novamente.');
+    }
+    blob = data;
+  } else {
+    const response = await fetch(file.url).catch((thrown: unknown) => {
+      console.error('Error fetching legacy library file:', thrown);
+      throw new Error('Não foi possível baixar o material agora. Tente novamente.');
+    });
+    if (!response.ok) throw new Error('Não foi possível baixar o material agora. Tente novamente.');
+    blob = await response.blob();
+  }
+
+  const objectUrl = URL.createObjectURL(blob);
+  try {
+    const anchor = document.createElement('a');
+    anchor.href = objectUrl;
+    anchor.download = downloadFileName(resource);
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+  } finally {
+    URL.revokeObjectURL(objectUrl);
+  }
 }
 
 // ── Academy achievements — extends the existing achievement_definitions/user_achievements

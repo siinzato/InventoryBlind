@@ -1,6 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { createElement } from 'react';
+import { renderToStaticMarkup } from 'react-dom/server';
 import {
   SIDEBAR_LAYOUT,
+  SubmenuPanelContents,
   computeSectionNumbers,
   groupIconName,
   itemIconName,
@@ -100,5 +103,31 @@ describe('workspaceFallback', () => {
 
   it('nunca gera iniciais predefinidas para um nome vazio', () => {
     expect(workspaceFallback('   ')).toBe('?');
+  });
+});
+
+describe('SubmenuPanelContents', () => {
+  it('renderiza a prancheta técnica com quatro cantos, coordenadas e item ativo', () => {
+    const markup = renderToStaticMarkup(
+      createElement(SubmenuPanelContents, {
+        group: group({
+          id: 'dashboard-group',
+          label: 'Dashboard',
+          items: [
+            { id: 'dashboard', label: 'Dashboard', icon: null, onClick: () => {}, active: true },
+            { id: 'heatmap', label: 'Heatmap', icon: null, onClick: () => {}, active: false },
+          ],
+        }),
+        sectionNumber: 1,
+        onSelect: () => {},
+      }),
+    );
+
+    expect(markup.match(/ib-submenu-corner/g)).toHaveLength(4);
+    expect(markup).toContain('data-submenu-artboard="technical"');
+    expect(markup).toContain('class="ib-submenu-track"');
+    expect(markup).toContain('class="is-active"');
+    expect(markup).toContain('01.1');
+    expect(markup).toContain('01.2');
   });
 });

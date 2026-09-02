@@ -193,10 +193,49 @@ export function computeDueTimestamp(dueDate: string | null, dueTime: string | nu
 
 const OPEN_STATUSES: TaskStatus[] = ['todo', 'in_progress', 'paused', 'blocked'];
 
-export function isOverdue(task: { due_date: string | null; due_time: string | null; status: TaskStatus }, nowMs: number = Date.now()): boolean {
+/** Estados terminais no nível da TAREFA — nenhum deles pode estar "atrasado agora". */
+export const TERMINAL_TASK_STATUSES: TaskStatus[] = ['done', 'validated', 'cancelled'];
+
+export function isTaskTerminal(status: TaskStatus): boolean {
+  return TERMINAL_TASK_STATUSES.includes(status);
+}
+
+/** Estado terminal no nível da MINHA ATRIBUIÇÃO. Existe porque as colunas do Kanban e os
+ *  grupos do Meu Dia são governados por `task_assignees.status`, não pelo status da tarefa:
+ *  minha parte pode estar 'done' enquanto a tarefa segue 'todo'/'in_progress' (outros
+ *  responsáveis, validação pendente). Sem considerar isso, um card já na coluna "Concluído"
+ *  continuava sendo avaliado como atrasado. */
+export function isAssignmentTerminal(assignee: Pick<TaskAssignee, 'status'> | null | undefined): boolean {
+  return assignee?.status === 'done';
+}
+
+/**
+ * Atraso ATUAL. `mine` é opcional para não quebrar os chamadores que avaliam a tarefa como um
+ * todo; quando informado, minha conclusão também encerra o atraso (é o que a UI mostra).
+ * Comparação sempre por instante (getTime), nunca por string formatada.
+ */
+export function isOverdue(
+  task: { due_date: string | null; due_time: string | null; status: TaskStatus },
+  nowMs: number = Date.now(),
+  mine?: Pick<TaskAssignee, 'status'> | null,
+): boolean {
   if (!OPEN_STATUSES.includes(task.status)) return false;
+  if (isAssignmentTerminal(mine)) return false;
   const due = computeDueTimestamp(task.due_date, task.due_time);
   return !!due && due.getTime() < nowMs;
+}
+
+/**
+ * Atraso HISTÓRICO: terminou depois do prazo. Conceito separado de `isOverdue` — não conta em
+ * contador, filtro, ordenação nem notificação de atraso; serve para relatório.
+ */
+export function completedLate(
+  task: { due_date: string | null; due_time: string | null },
+  mine: Pick<TaskAssignee, 'status' | 'completed_at'> | null | undefined,
+): boolean {
+  if (!isAssignmentTerminal(mine) || !mine?.completed_at) return false;
+  const due = computeDueTimestamp(task.due_date, task.due_time);
+  return !!due && new Date(mine.completed_at).getTime() > due.getTime();
 }
 
 /** Configurável por empresa via task_module_settings (default 120min = "próximas
@@ -213,8 +252,39 @@ export function isDueSoon(
   return diffMs > 0 && diffMs <= thresholdMinutes * 60_000;
 }
 
+/** "Concluída em 02/09/2026 às 14:30" quando há `completed_at` confiável; só "Concluída"
+ *  quando não há. Nunca usa `agora` nem `updated_at` como se fossem a conclusão, e nunca
+ *  inventa data. Apresentação no fuso local do usuário (o Date já formata em local time);
+ *  o instante guardado continua sendo UTC. */
+export function formatCompletedAt(completedAt: string | null | undefined): string {
+  if (!completedAt) return 'Concluída';
+  const at = new Date(completedAt);
+  if (Number.isNaN(at.getTime())) return 'Concluída';
+  const date = at.toLocaleDateString('pt-BR');
+  const time = at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  return `Concluída em ${date} às ${time}`;
+}
+
+/**
+ * Rótulo de tempo do card — ÚNICO ponto que as views devem usar. Em estado terminal o relógio
+ * de atraso para de vez e o texto passa a ser a conclusão real; fora dele, o prazo relativo de
+ * sempre. `formatDueRelative` continua existindo como formatador puro de prazo (usado aqui e
+ * por quem só quer o prazo), mas nenhuma tela decide sozinha se mostra atraso.
+ */
+export function formatTaskTimeline(
+  task: { due_date: string | null; due_time: string | null; status: TaskStatus },
+  mine: Pick<TaskAssignee, 'status' | 'completed_at'> | null | undefined,
+  nowMs: number = Date.now(),
+): string {
+  if (isAssignmentTerminal(mine)) return formatCompletedAt(mine?.completed_at);
+  if (task.status === 'done' || task.status === 'validated') return 'Concluída';
+  if (task.status === 'cancelled') return 'Cancelada';
+  return formatDueRelative(task, nowMs);
+}
+
 /** "Vence em 38 min" / "Vence hoje às 16:30" / "Atrasada há 1h20" / "Amanhã às
- *  08:00" / "Sem prazo definido" — os exemplos literais do pedido. */
+ *  08:00" / "Sem prazo definido" — os exemplos literais do pedido. Só descreve o PRAZO:
+ *  quem decide se o atraso ainda se aplica é `formatTaskTimeline`. */
 export function formatDueRelative(task: { due_date: string | null; due_time: string | null }, nowMs: number = Date.now()): string {
   const due = computeDueTimestamp(task.due_date, task.due_time);
   if (!due) return 'Sem prazo definido';
@@ -450,7 +520,7 @@ export function computeOperationalIndicators(
     if (mine.status === 'done') return;
     if (mine.status === 'blocked') { blocked++; return; }
     if (mine.status === 'in_progress') inProgress++;
-    if (isOverdue(t, nowMs)) overdue++;
+    if (isOverdue(t, nowMs, mine)) overdue++;
     else if (isDueSoon(t, nowMs, dueSoonThresholdMinutes)) dueSoon++;
   });
 

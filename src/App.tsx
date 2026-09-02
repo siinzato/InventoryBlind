@@ -1614,7 +1614,7 @@ function AppContent() {
         {/* ANALYTICS: BLINDSCORE */}
         {activeTab === 'analytics-blindscore' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <BlindScorePage companyId={companyId} />
+            <BlindScorePage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
           </React.Suspense>
         )}
 

@@ -62,8 +62,8 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
       const mine = findMyAssignment(t.assignees, currentUserId);
       if (!mine) return false;
       switch (filter) {
-        case 'overdue': return mine.status !== 'done' && isOverdue(t, now);
-        case 'due_soon': return mine.status !== 'done' && !isOverdue(t, now) && isDueSoon(t, now, dueSoonThresholdMinutes);
+        case 'overdue': return isOverdue(t, now, mine);
+        case 'due_soon': return mine.status !== 'done' && !isOverdue(t, now, mine) && isDueSoon(t, now, dueSoonThresholdMinutes);
         case 'blocked': return mine.status === 'blocked';
         case 'in_progress': return mine.status === 'in_progress';
         case 'today': return !t.due_date || t.due_date <= today;

@@ -19,7 +19,7 @@ import {
   Zap,
   type LucideIcon,
 } from 'lucide-react';
-import { ACTIONS, isKnownTrigger, TRIGGERS, type ActionKey } from './registry';
+import { ACTIONS, findField, isKnownTrigger, OPERATORS, TRIGGERS, type ActionKey, type OperatorKey } from './registry';
 import type { AutomationNode, AutomationWorkflow, NodeType } from './types';
 
 export interface NodeVisualMeta {
@@ -114,6 +114,47 @@ export function describeNode(node: AutomationNode): string {
       return node.prompt.trim() === '' ? 'Sem instrução' : node.prompt.slice(0, 80);
     case 'action':
       return node.actionType in ACTIONS ? ACTIONS[node.actionType as ActionKey].label : node.actionType;
+  }
+}
+
+/** Linhas extras "Rótulo: valor" para o node mostrar sua configuração real sem abrir
+ *  o painel — só o que já está preenchido, nunca um placeholder inventado. Fica
+ *  abaixo do resumo de uma linha que `describeNode` já produz. */
+export function describeNodeDetails(node: AutomationNode, triggerType: string): string[] {
+  switch (node.type) {
+    case 'condition':
+    case 'branch': {
+      const lines = node.rules.slice(0, 2).map(rule => {
+        const field = findField(triggerType, rule.field);
+        const fieldLabel = field?.label ?? (rule.field || '(campo)');
+        const operator = OPERATORS[rule.operator as OperatorKey];
+        if (!operator) return fieldLabel;
+        const hasValue = operator.needsValue && rule.value != null && rule.value !== '';
+        const valuePart = hasValue ? ` ${Array.isArray(rule.value) ? rule.value.join(', ') : rule.value}` : '';
+        return `${fieldLabel} ${operator.label.toLowerCase()}${valuePart}`;
+      });
+      if (node.rules.length > 2) lines.push(`+${node.rules.length - 2} condição(ões)`);
+      return lines;
+    }
+    case 'action': {
+      const definition = node.actionType in ACTIONS ? ACTIONS[node.actionType as ActionKey] : null;
+      if (!definition) return [];
+      return definition.params
+        .map(param => {
+          const raw = node.config[param.key];
+          if (raw == null || raw === '') return null;
+          const display = param.kind === 'select'
+            ? (param.options?.find(o => o.value === raw)?.label ?? String(raw))
+            : String(raw);
+          return `${param.label}: ${display.length > 28 ? `${display.slice(0, 27)}…` : display}`;
+        })
+        .filter((line): line is string => line != null)
+        .slice(0, 3);
+    }
+    case 'loop':
+      return node.field ? [`Campo: ${node.field}`, `Máximo: ${node.maxIterations} iteração(ões)`] : [];
+    default:
+      return [];
   }
 }
 

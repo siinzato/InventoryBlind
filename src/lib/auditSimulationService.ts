@@ -5,7 +5,7 @@
 
 import { supabase } from './supabase';
 import { getTeamProductivity } from './productivityService';
-import { estimateHistoricalProductivity } from './auditSimulationEngine';
+import { estimateHistoricalProductivityDetailed, type HistoricalProductivityResult } from './auditSimulationEngine';
 
 export interface AuditableBrand {
   id: string;
@@ -24,8 +24,35 @@ export async function listAuditableBrands(companyId: string): Promise<AuditableB
 }
 
 /** Produtividade histórica média da empresa (SKUs/hora), ponderada pelo volume contado de
- *  cada operador. Retorna null quando ainda não há contagens com duração registrada. */
-export async function getHistoricalProductivity(companyId: string): Promise<number | null> {
+ *  cada operador, junto com o total de horas amostradas (usado só para o Confiança da
+ *  previsão). Retorna null quando ainda não há contagens com duração registrada. */
+export async function getHistoricalProductivity(companyId: string): Promise<HistoricalProductivityResult | null> {
   const stats = await getTeamProductivity(companyId);
-  return estimateHistoricalProductivity(stats.map(s => ({ skusContados: s.skus_contados, tempoMedioSegundos: s.tempo_medio_segundos })));
+  return estimateHistoricalProductivityDetailed(stats.map(s => ({ skusContados: s.skus_contados, tempoMedioSegundos: s.tempo_medio_segundos })));
+}
+
+export interface BrandAuditHistory {
+  /** Nº de contagens iniciais (count_number = 1) já registradas para esta linha — dado real de
+   *  inventory_count_records, nunca inventado. */
+  previousAudits: number;
+  /** % das contagens iniciais dessa linha que precisaram de recontagem (count_number > 1). */
+  recountRatePercent: number | null;
+}
+
+/** Histórico real de auditorias de uma linha específica — usado para as informações
+ *  auxiliares da Simulação (qtd. de inventários anteriores, estimativa de recontagem).
+ *  Retorna null quando a linha ainda não tem nenhuma contagem registrada. */
+export async function getBrandAuditHistory(companyId: string, brandId: string): Promise<BrandAuditHistory | null> {
+  const { data, error } = await supabase
+    .from('inventory_count_records')
+    .select('count_number')
+    .eq('company_id', companyId)
+    .eq('brand_id', brandId);
+  if (error || !data || data.length === 0) return null;
+
+  const previousAudits = data.filter(r => r.count_number === 1).length;
+  if (previousAudits === 0) return null;
+  const recounts = data.filter(r => r.count_number > 1).length;
+
+  return { previousAudits, recountRatePercent: (recounts / previousAudits) * 100 };
 }

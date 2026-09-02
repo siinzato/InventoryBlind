@@ -338,6 +338,9 @@ export interface AutomationExecution {
   finishedAt: string | null;
   durationMs: number | null;
   depth: number;
+  /** Quem acionou uma execução manual (migration 051, `triggered_by`). Nulo para
+   *  execuções de evento/agendamento/webhook — não há "pessoa" nesses casos. */
+  triggeredBy: string | null;
 }
 
 export type NodeExecutionStatus = 'success' | 'failed' | 'skipped';

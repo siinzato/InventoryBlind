@@ -13,6 +13,11 @@ import { listRecords as listRcaRecords } from './rcaService';
 import { computeParetoBuckets, groupByDimension, CAUSE_LABEL } from './rcaAlgorithm';
 import type { BlindAISituation } from './supabase';
 
+/** Inteiro em pt-BR (separador de milhar) — só formatação de um valor já calculado. */
+function int(value: number): string {
+  return value.toLocaleString('pt-BR');
+}
+
 function pct(part: number, total: number): number {
   return total > 0 ? Math.round((part / total) * 100) : 0;
 }
@@ -82,6 +87,19 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
       recommendation: 'Agendar recontagem destes produtos para restaurar a confiança do saldo.',
       module: 'cbc',
       actionLabel: 'Ver Confidence Score',
+      // Mesmos números da frase acima, separados do texto para a apresentação poder
+      // destacá-los. Contagem vencida e confiança crítica são medidas diferentes e
+      // continuam com rótulos próprios — uma nunca descreve a outra.
+      hero: {
+        value: int(cbcSummary.overdue_count),
+        caption: 'produtos com contagem recomendada vencida',
+      },
+      metrics: [
+        ...(cbcSummary.avg_confidence != null
+          ? [{ value: int(Math.round(cbcSummary.avg_confidence)), label: 'Confiança média da empresa' }]
+          : []),
+        { value: int(cbcSummary.critico_count), label: 'Produtos em confiança crítica' },
+      ],
     });
   }
 

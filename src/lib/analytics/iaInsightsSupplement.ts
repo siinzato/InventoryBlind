@@ -20,6 +20,14 @@ export interface AnalyticsInsight extends Omit<BlindAISituation, 'module'> {
 
 const SINCE_90D = () => new Date(Date.now() - 90 * 86400000).toISOString();
 
+/** Percentual em pt-BR com uma casa — só formatação de um valor já calculado. */
+const pctBr = (value: number) => `${value.toFixed(1).replace('.', ',')}%`;
+
+/** Variação em pontos percentuais, com sinal e unidade explícitos: p.p. é diferença
+ *  entre percentuais, nunca variação relativa. */
+const ppBr = (points: number) =>
+  `${points > 0 ? '+' : '−'}${Math.abs(points).toFixed(1).replace('.', ',')} p.p.`;
+
 /** ⚠️ Concentração de divergências em uma localização — "Aumento de divergências detectado"
  *  do pedido, na dimensão de localização. Limiar de 30% e amostra mínima de 5 seguem o mesmo
  *  padrão de significância de blindAIInsightsEngine (pctOfTotal >= 25 / topSkusPct >= 30). */
@@ -75,6 +83,17 @@ async function getAccuracyTrendInsight(companyId: string): Promise<AnalyticsInsi
       : 'Investigar o que mudou no processo de contagem nas sessões mais recentes.',
     module: 'analytics-audit',
     actionLabel: 'Ver Auditorias (Analytics)',
+    // Os mesmos avgFirst/avgSecond/deltaPoints da frase acima, separados do texto para a
+    // apresentação poder comparar as duas metades na escala fixa de 0 a 100%.
+    hero: {
+      value: pctBr(avgSecond),
+      caption: 'Acurácia média na segunda metade das sessões',
+      delta: { value: ppBr(deltaPoints), intent: improving ? ('positive' as const) : ('negative' as const) },
+    },
+    comparison: [
+      { label: 'Primeira metade', value: pctBr(avgFirst), pct: avgFirst },
+      { label: 'Segunda metade', value: pctBr(avgSecond), pct: avgSecond },
+    ],
   };
 }
 

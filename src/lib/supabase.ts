@@ -773,6 +773,39 @@ export interface BlindAISituation {
   /** Aba do Dashboard para onde o card navega ao ser clicado. */
   module: 'risk' | 'cbc' | 'abcxyz' | 'rca';
   actionLabel: string;
+  /** Recorte numérico OPCIONAL da mesma situação, para a apresentação poder destacar o
+   *  número em vez de repetir a frase. Aditivo e puramente de leitura: os valores são os
+   *  mesmos que já entram em `evidence`/`reasons`, só chegam formatados e separados do
+   *  texto — nenhum score novo, nenhum recálculo. Consumidor que não conhece esses campos
+   *  (o painel do Dashboard) segue mostrando as frases, exatamente como antes. */
+  hero?: InsightHero;
+  /** Indicadores secundários da situação, cada um com o seu próprio rótulo. */
+  metrics?: InsightMetric[];
+  /** Comparação de duas ou mais medidas na MESMA escala 0–100 (%), na ordem de leitura. */
+  comparison?: InsightComparisonItem[];
+}
+
+/** Número principal de uma situação, já formatado em pt-BR pelo motor que o calculou. */
+export interface InsightHero {
+  value: string;
+  caption: string;
+  /** Variação já formatada com a unidade correta (ex. "−8,2 p.p."). `intent` só diz se a
+   *  variação é boa ou ruim para a operação — a cor fica com a camada de apresentação. */
+  delta?: { value: string; intent: 'positive' | 'negative' };
+}
+
+export interface InsightMetric {
+  value: string;
+  label: string;
+}
+
+export interface InsightComparisonItem {
+  label: string;
+  /** Valor já formatado para exibição (ex. "58,5%"). */
+  value: string;
+  /** O mesmo valor em 0–100, para a barra. Todas as barras de uma comparação usam esta
+   *  escala fixa, nunca o maior valor da série. */
+  pct: number;
 }
 
 /** Estrutura pronta para reconstrução histórica do CD — hoje `isMock` é sempre `true`

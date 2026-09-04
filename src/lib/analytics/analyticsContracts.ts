@@ -143,12 +143,25 @@ export interface BlindScoreResult {
   lastRecalculatedAt: string | null;
 }
 
-export type IndicatorStatus = 'saudavel' | 'atencao' | 'critico' | 'indisponivel';
+/** Estado de um diagnóstico do Inventory Health. Os três estados sem julgamento são
+ *  deliberadamente distintos, porque descrevem causas diferentes e uma nunca deve ser
+ *  apresentada como a outra:
+ *
+ *  - `nao_avaliado`: o processo existe e roda, mas ainda não há amostra suficiente para
+ *    julgá-lo (ex. nenhuma reconferência). Falta de evidência não é resultado ruim — mesma
+ *    regra que o BlindScore V2 já aplica em ValidationQuality.
+ *  - `informacao`: o dado é contexto de priorização, não evidência de estoque incorreto
+ *    (ex. ABC/XYZ) — atribuir "saudável/crítico" a ele seria um julgamento artificial.
+ *  - `indisponivel`: a fonte ou a configuração necessária não existe no workspace. */
+export type IndicatorStatus =
+  | 'saudavel' | 'atencao' | 'critico' | 'nao_avaliado' | 'informacao' | 'indisponivel';
 
 export const INDICATOR_STATUS_LABEL: Record<IndicatorStatus, string> = {
   saudavel: 'Saudável',
   atencao: 'Atenção',
   critico: 'Crítico',
+  nao_avaliado: 'Não avaliada',
+  informacao: 'Informação',
   indisponivel: 'Indisponível',
 };
 
@@ -156,13 +169,114 @@ export const INDICATOR_STATUS_BADGE: Record<IndicatorStatus, 'success' | 'warnin
   saudavel: 'success',
   atencao: 'warning',
   critico: 'danger',
+  nao_avaliado: 'neutral',
+  informacao: 'neutral',
   indisponivel: 'neutral',
 };
+
+/** Bloco do diagnóstico a que o indicador pertence. Só os três primeiros descrevem saúde;
+ *  `exposure` prioriza e `pending` é cobertura de dados. */
+export type HealthDomain = 'physical' | 'validation' | 'recurrence' | 'movement' | 'exposure' | 'pending';
+
+export const HEALTH_DOMAIN_LABEL: Record<HealthDomain, string> = {
+  physical: 'Confiabilidade física',
+  validation: 'Processo de validação',
+  recurrence: 'Recorrência e localização',
+  movement: 'Movimento e disponibilidade',
+  exposure: 'Exposição operacional',
+  pending: 'Cobertura do diagnóstico',
+};
+
+export const HEALTH_DOMAIN_DESCRIPTION: Record<HealthDomain, string> = {
+  physical: 'Aderência entre o estoque registrado e o físico.',
+  validation: 'Qualidade e independência das contagens.',
+  recurrence: 'Padrões de divergências na operação.',
+  movement: 'Disponibilidade frente à demanda observada.',
+  exposure: 'Informações para priorização da operação.',
+  pending: 'Disponibilidade de dados para os indicadores.',
+};
+
+/** Evidência de movimentação — o que a base realmente sustenta ANTES de qualquer diagnóstico
+ *  de ruptura ou estoque parado. `missing` = não existe fonte de venda; `insufficient` = a
+ *  fonte existe mas nenhum produto tem movimentação mensurável na janela classificada.
+ *  A janela NÃO é inventada aqui: é o `period` que o próprio ABC/XYZ já classificou. */
+export interface MovementEvidence {
+  state: 'available' | 'insufficient' | 'missing';
+  /** Janela real do ABC/XYZ ('90d' | '6m' | '12m'), nunca um recorte novo. */
+  period: string | null;
+  /** Produtos cuja movimentação é mensurável (inclui ausência medida de venda). */
+  productsEvaluated: number;
+  totalCatalog: number;
+  coveragePct: number;
+  lastClassifiedAt: string | null;
+  /** Leitura curta e determinística da própria cobertura. */
+  note: string;
+}
+
+/** Linha de drill-down de movimento — montada a partir dos dados já carregados, sem nova query. */
+export interface MovementDrillRow {
+  productId: string;
+  sku: string;
+  name: string;
+  location: string | null;
+  stockQuantity: number;
+  quantityMoved: number;
+  /** Semanas sem venda medidas pelo ABC/XYZ. null quando o dado não existe — nunca uma data
+   *  de última movimentação inventada. */
+  weeksWithoutSale: number | null;
+  riskLevel: string | null;
+}
+
+/** Diagnóstico agregado de uma marca ou linha. Deliberadamente SEM nota composta: os sinais
+ *  ficam lado a lado e o "principal sinal" é uma escolha por ordem de gravidade, não uma soma
+ *  ponderada. `null` em um sinal significa "não avaliável", que é diferente de zero. */
+export interface SegmentDiagnosis {
+  key: string;
+  name: string;
+  /** Marca à qual a linha pertence — só para `kind: 'line'`. */
+  parentName: string | null;
+  products: number;
+  divergentProducts: number | null;
+  riskCritical: number | null;
+  riskHigh: number | null;
+  stockoutWithDemand: number | null;
+  noMovement: number | null;
+  /** Sinal mais grave com contagem > 0, na ordem fixa ruptura → risco crítico → divergência →
+   *  risco alto → sem movimento. null quando nenhum sinal disparou. */
+  mainSignal: { key: string; label: string; count: number } | null;
+}
+
+export interface SegmentDiagnosisResult {
+  brands: SegmentDiagnosis[];
+  lines: SegmentDiagnosis[];
+  /** Produtos com marca associada — a base real do ranking. */
+  associatedProducts: number;
+  totalCatalog: number;
+  coveragePct: number;
+}
+
+/** Contagem executiva derivada dos indicadores reais — nenhuma nota nova, nenhum número
+ *  fixo: só a distribuição dos estados que os dados sustentam. O score consolidado
+ *  continua sendo responsabilidade exclusiva do BlindScore. */
+export interface HealthSummary {
+  critico: number;
+  atencao: number;
+  saudavel: number;
+  naoAvaliado: number;
+  /** Indicadores que hoje têm dado suficiente para serem lidos. */
+  availableCount: number;
+  totalCount: number;
+  /** Indicador de maior severidade, escolhido deterministicamente — null quando nada exige
+   *  atenção. */
+  priority: HealthIndicator | null;
+}
 
 export type HealthIndicatorDrill =
   | { kind: 'abcxyz_risk'; combos: AbcXyzCombo[] }
   | { kind: 'recurrence' }
-  | { kind: 'location'; location: string };
+  | { kind: 'location'; location: string }
+  /** Drill de movimento — as linhas vêm dos dados já carregados, sem nova consulta. */
+  | { kind: 'movement'; view: 'stockout' | 'idle' };
 
 export interface HealthIndicator {
   key: string;
@@ -172,4 +286,9 @@ export interface HealthIndicator {
   unit: '%' | 'un';
   detail: string;
   drill?: HealthIndicatorDrill;
+  domain: HealthDomain;
+  /** Tab de destino (mesmo id usado por App.tsx/setActiveTab), só quando existe navegação
+   *  real para investigar o indicador — nunca um botão sem destino. */
+  navigateTo?: string;
+  actionLabel?: string;
 }

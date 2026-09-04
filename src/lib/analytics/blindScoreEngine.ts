@@ -61,7 +61,7 @@ function statusFromScore(score: number | null, coveragePct: number): BlindScoreS
 /** Só classifica quando existe amostra real de reconferência. Sem nenhuma cadeia recontada, o
  *  reliabilityIndex cai por AUSÊNCIA de amostra, não por processo ruim — chamar isso de "Baixa"
  *  transformaria falta de dado em nota negativa. */
-function validationQualityFrom(sampleChains: number, reliabilityIndex: number): ValidationQuality {
+export function validationQualityFrom(sampleChains: number, reliabilityIndex: number): ValidationQuality {
   if (sampleChains === 0) return 'nao_avaliada';
   if (reliabilityIndex >= 70) return 'alta';
   if (reliabilityIndex >= 40) return 'moderada';

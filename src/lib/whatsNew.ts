@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-03-inventory-health-movimento',
+    date: '2026-09-03',
+    category: 'novidade',
+    title: 'Inventory Health: ruptura com demanda, estoque parado e concentração por marca',
+    description: 'O Inventory Health passou a responder também sobre disponibilidade: o bloco "Movimento e disponibilidade" mostra quantos produtos estão em ruptura com demanda (sem saldo atual onde houve venda na janela já analisada) e quantos estão com estoque parado (saldo positivo sem venda no período), cada um com a lista de SKUs por trás do número. Quando há preço cadastrado, o estoque parado também aparece com um valor estimado, identificado como estimativa. O novo quadro "Concentração por marca e linha" mostra onde os problemas se acumulam — divergência, risco, ruptura e estoque parado por marca ou por linha, com o principal sinal de cada uma e a cobertura real das associações. Nada é assumido quando falta base: sem dados de venda o diagnóstico aparece como indisponível, e com base insuficiente aparece como não avaliado, nunca como saudável.',
+  },
+  {
+    id: '2026-09-03-inventory-health-diagnostico',
+    date: '2026-09-03',
+    category: 'melhoria',
+    title: 'Inventory Health agora diz o que olhar primeiro',
+    description: 'O Inventory Health deixou de ser uma lista de métricas e passou a funcionar como diagnóstico: um resumo executivo com quantas áreas estão críticas, em atenção e estáveis, a situação prioritária do momento e blocos separados por assunto (confiabilidade física, processo de validação, recorrência e localização, exposição operacional). Duas leituras foram corrigidas: a qualidade da validação agora aparece como "Não avaliada" quando ainda não houve nenhuma reconferência, em vez de ser tratada como resultado ruim, e a classificação ABC/XYZ passou a ser apresentada como informação de priorização, não como nota de saúde. O risco dos SKUs entrou usando o número que o Inventário por Risco já calcula. Os indicadores que ainda dependem de dados ficam reunidos em "Cobertura do diagnóstico", e cada bloco tem atalho para o módulo onde se investiga o problema.',
+  },
+  {
+    id: '2026-09-03-ia-insights-resumo-executivo',
+    date: '2026-09-03',
+    category: 'melhoria',
+    title: 'IA Insights agora é um resumo executivo em cartões',
+    description: 'A tela de IA Insights deixou de ser uma lista corrida e passou a mostrar um cartão por padrão identificado, em duas colunas no computador e uma no celular. Cada cartão segue sempre a mesma ordem de leitura: de qual módulo veio, o que está acontecendo com o número principal em destaque, os indicadores que sustentam a leitura, a evidência, a ação recomendada e o atalho para o módulo. Quando o padrão compara dois períodos, as duas medidas aparecem em barras na mesma escala de 0 a 100%, com a diferença em pontos percentuais. Os números, os critérios e os destinos continuam exatamente os mesmos: nenhum padrão aparece sem evidência suficiente nos dados.',
+  },
+  {
     id: '2026-09-02-biblioteca-31-ebooks',
     date: '2026-09-02',
     category: 'novidade',

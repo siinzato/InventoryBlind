@@ -48,6 +48,7 @@ function raw(overrides: Partial<AnalyticsRawData> = {}): AnalyticsRawData {
     abcXyzMatrix: {} as Record<AbcXyzCombo, { count: number; value: number }>,
     cbcSummary: null,
     cbcLastRecalculatedAt: null,
+    riskSummary: null,
     catalogTotal: 0,
     pillarFactorRows: [],
     overdueWithSufficientData: 0,

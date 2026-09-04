@@ -1621,7 +1621,7 @@ function AppContent() {
         {/* ANALYTICS: INVENTORY HEALTH */}
         {activeTab === 'analytics-health' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <InventoryHealthPage companyId={companyId} />
+            <InventoryHealthPage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
           </React.Suspense>
         )}
 

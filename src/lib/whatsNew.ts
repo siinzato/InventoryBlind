@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-04-auditorias-performance-reincidencia',
+    date: '2026-09-04',
+    category: 'melhoria',
+    title: 'Auditorias: evolução das contagens e o que volta a divergir',
+    description: 'As abas Performance e Reincidência agora respondem perguntas de verdade. Em Performance, um gráfico único mostra a evolução por sessão e alterna entre acurácia, cobertura e taxa de divergência — com o tamanho real da amostra sempre visível, para que uma contagem de 16 SKUs não pareça igual a uma de 195; clicar em um ponto abre a sessão. Abaixo, a distribuição das contagens por operador, sempre com a base (sessões e SKUs contados) ao lado de cada percentual — é evidência operacional, não avaliação de pessoas. Em Reincidência, aparecem os SKUs que divergiram em sessões diferentes dentro da janela configurada em Root Cause Analysis, com o histórico completo de cada um (sessão por sessão, saldo, diferença, localização e causa quando já classificada), as localizações que se repetem entre auditorias e as causas recorrentes vindas da classificação real do RCA. Duas divergências da mesma sessão não contam como repetição entre auditorias, e quando não há classificação no RCA a tela diz isso claramente, em vez de sugerir que a operação está saudável.',
+  },
+  {
+    id: '2026-09-04-auditorias-historico',
+    date: '2026-09-04',
+    category: 'melhoria',
+    title: 'Auditorias: resumo executivo, cobertura por sessão e detalhamento das divergências',
+    description: 'O histórico de Auditorias deixou de ser só uma tabela. No topo, um resumo mostra quantas sessões foram feitas, quantos SKUs foram contados, a acurácia observada (com a base usada) e quantas sessões foram aprovadas. Cada sessão agora exibe a cobertura da contagem — quanto do universo previsto foi realmente contado — e a taxa de divergência ao lado da quantidade. Filtros de período, operador, tipo e aprovação, mais uma busca rápida, ajudam a chegar na sessão certa. Clicando em qualquer sessão, abre-se o detalhamento: resumo da sessão, a lista real dos itens divergentes com saldo do sistema, saldo contado, diferença e localização (com busca e exportação em CSV), a situação da reconferência e da aprovação, e o atalho para investigar as causas no Root Cause Analysis quando há divergências registradas. A aprovação continua significando a validação/encerramento da sessão, e não uma nota de acurácia.',
+  },
+  {
     id: '2026-09-03-inventory-health-movimento',
     date: '2026-09-03',
     category: 'novidade',

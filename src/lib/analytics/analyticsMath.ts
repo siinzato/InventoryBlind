@@ -36,8 +36,12 @@ export interface DivergenceRateStat {
 
 /** Taxa real de divergências: soma de divergencias_reais / soma de skus_contados entre todas
  *  as sessões — não a média das taxas por sessão, que daria peso desproporcional a sessões
- *  pequenas. */
-export function computeDivergenceRateStat(records: InventoryCountRecord[]): DivergenceRateStat | null {
+ *  pequenas.
+ *
+ *  O parâmetro é o subconjunto de campos que a regra realmente usa (widening só de tipo,
+ *  sem mudança de comportamento) — assim agregações por operador/período em outras telas
+ *  reutilizam esta MESMA definição em vez de recriar a soma/soma em outro arquivo. */
+export function computeDivergenceRateStat(records: Pick<InventoryCountRecord, 'skus_contados' | 'divergencias_reais'>[]): DivergenceRateStat | null {
   const totalCounted = records.reduce((sum, r) => sum + (r.skus_contados ?? 0), 0);
   if (totalCounted === 0) return null;
   const totalDivergent = records.reduce((sum, r) => sum + (r.divergencias_reais ?? 0), 0);

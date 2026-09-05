@@ -1635,7 +1635,7 @@ function AppContent() {
         {/* ANALYTICS: AUDITORIAS */}
         {activeTab === 'analytics-audit' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <AuditsAnalyticsPage companyId={companyId} />
+            <AuditsAnalyticsPage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
           </React.Suspense>
         )}
 

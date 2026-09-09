@@ -8,6 +8,11 @@ import {
   type ManualCountTimingErrors,
 } from '../../lib/countManagementUtils';
 import type { LiveCountStats } from './CountSidePanel';
+import { listLineUniverse } from '../../lib/inventoryCycle/inventoryCycleService';
+import {
+  buildCycleLineRows, mergeCurrentCycleCounts,
+  type CycleLineRow, type CycleLineSummary,
+} from '../../lib/inventoryCycle/inventoryCycleModel';
 import { useAuth } from '../../lib/auth';
 import { generateClosingReport } from '../../lib/closingReports/closingReportService';
 import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
@@ -22,12 +27,48 @@ interface ManualCountTabProps {
   onStatsChange: (stats: LiveCountStats) => void;
 }
 
+const sameLabel = (a: string, b: string): boolean =>
+  a.trim().localeCompare(b.trim(), 'pt-BR', { sensitivity: 'base' }) === 0;
+
+/** A contagem manual continua sendo gravada por linha de contagem: é o que os registros
+ *  de contagem e o relatório de fechamento referenciam. O grupo escolhido no inventário
+ *  atual é resolvido para essa linha pelo nome; se ainda não existir uma — Ventosa,
+ *  Outlet, Linha PET —, ela é criada zerada, com o universo atual do grupo. Nenhuma linha
+ *  existente é renomeada, apagada ou tem contagem alterada aqui. */
+async function resolveCountingLine(
+  group: CycleLineRow, brandsData: BrandData[], companyId: string,
+): Promise<BrandData | null> {
+  const existing = brandsData.find(b => sameLabel(b.brand, group.label));
+  if (existing) return existing;
+
+  const maxOrder = Math.max(0, ...brandsData.map(b => b.order_index));
+  const { data, error } = await supabase
+    .from('inventory_brands')
+    .insert({
+      company_id: companyId,
+      brand: group.label,
+      total_sku: group.totalSku,
+      done_sku: 0,
+      divergences: 0,
+      order_index: maxOrder + 1,
+    })
+    .select()
+    .single();
+
+  if (error) {
+    console.error('Error resolving counting line:', error);
+    return null;
+  }
+  return data as BrandData;
+}
+
 const inputClass = 'w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 text-fg bg-surface text-sm';
 const labelClass = 'block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1';
 
 export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved, onStatsChange }: ManualCountTabProps) {
   const { profile } = useAuth();
-  const [brandId, setBrandId] = useState('');
+  const [groupKey, setGroupKey] = useState('');
+  const [universe, setUniverse] = useState<CycleLineSummary[]>([]);
   const [operator1, setOperator1] = useState('');
   const [operator2, setOperator2] = useState('');
   const [totalSku, setTotalSku] = useState('');
@@ -41,20 +82,36 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const [timingErrors, setTimingErrors] = useState<ManualCountTimingErrors>({});
   const [saving, setSaving] = useState(false);
   const [insight, setInsight] = useState<string | null>(null);
-  const [thirdCountContext, setThirdCountContext] = useState<{ brandId: string; rootId: string } | null>(null);
+  const [thirdCountContext, setThirdCountContext] = useState<{ groupKey: string; rootId: string } | null>(null);
   const [closingReport, setClosingReport] = useState<ClosingReport | null>(null);
   const [closingObservations, setClosingObservations] = useState<ClosingReportObservation[]>([]);
   const [closingBrandName, setClosingBrandName] = useState('');
   const [reprocessing, setReprocessing] = useState(false);
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
 
-  const selectedBrand = brandsData.find(b => b.id === brandId);
+  // Mesma fonte do Dashboard: o universo do inventário atual, agrupado pela linha que a
+  // classificação Marca > Linha já gravou no produto, com o trabalho já concluído do
+  // ciclo por cima. Não existe lista de grupos própria desta tela.
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    listLineUniverse(companyId)
+      .then(lines => { if (!cancelled) setUniverse(lines); })
+      .catch(err => console.error('Error loading inventory universe:', err));
+    return () => { cancelled = true; };
+  }, [companyId]);
+
+  const groups = useMemo(
+    () => buildCycleLineRows(mergeCurrentCycleCounts(universe, brandsData).lines),
+    [universe, brandsData]
+  );
+  const selectedGroup = groups.find(g => g.groupKey === groupKey);
 
   useEffect(() => {
-    if (selectedBrand) setTotalSku(String(selectedBrand.total_sku));
+    if (selectedGroup) setTotalSku(String(selectedGroup.totalSku));
     // Selecionar a linha só carrega os totais/pendências — nunca inicia um
     // cronômetro nem preenche início/término, que ficam por conta do operador.
-  }, [selectedBrand?.id]);
+  }, [selectedGroup?.groupKey]);
 
   const metrics = useMemo(() => calculateCountMetrics({
     skusContados: parseInt(skusContados) || 0,
@@ -68,21 +125,24 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
 
   useEffect(() => {
     onStatsChange({
-      linha: selectedBrand?.brand ?? '',
+      linha: selectedGroup?.label ?? '',
       totalSku: parseInt(totalSku) || 0,
-      contados: parseInt(skusContados) || 0,
+      // Painel e dropdown contam a mesma coisa: o que o inventário atual já tem
+      // contabilizado no grupo, mais o que está sendo digitado agora. Com o campo
+      // vazio, os pendentes do painel são exatamente os pendentes do dropdown.
+      contados: (selectedGroup?.doneSku ?? 0) + (parseInt(skusContados) || 0),
       divergencias: parseInt(divergenciasReais) || 0,
       acuracidade: metrics.accuracyFinal,
-      active: !!brandId,
+      active: !!groupKey,
       mode: 'range',
       startedAt: startedDate ? startedDate.toISOString() : null,
       finishedAt: finishedDate ? finishedDate.toISOString() : null,
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [brandId, totalSku, skusContados, divergenciasReais, metrics.accuracyFinal, startedDate, finishedDate]);
+  }, [groupKey, selectedGroup?.doneSku, totalSku, skusContados, divergenciasReais, metrics.accuracyFinal, startedDate, finishedDate]);
 
   const resetForm = (keepBrand: boolean) => {
-    if (!keepBrand) setBrandId('');
+    if (!keepBrand) setGroupKey('');
     setOperator1('');
     setOperator2('');
     setSkusContados('');
@@ -98,7 +158,7 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
-    if (!selectedBrand || !skusContados) return;
+    if (!selectedGroup || !skusContados) return;
 
     const errors = validateManualCountTiming(startedDate, finishedDate, new Date());
     setTimingErrors(errors);
@@ -109,13 +169,27 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
     const qtdContabilizada = parseInt(skusContados) || 0;
     const qtdDivergenciasReais = parseInt(divergenciasReais) || 0;
 
-    const newDoneSku = Math.min(selectedBrand.total_sku, selectedBrand.done_sku + qtdContabilizada);
-    const newDivergences = selectedBrand.divergences + qtdDivergenciasReais;
+    const countingLine = await resolveCountingLine(selectedGroup, brandsData, companyId);
+    if (!countingLine) {
+      setSaving(false);
+      return;
+    }
+
+    const newDoneSku = Math.min(selectedGroup.totalSku, countingLine.done_sku + qtdContabilizada);
+    const newDivergences = countingLine.divergences + qtdDivergenciasReais;
 
     const { error: brandError } = await supabase
       .from('inventory_brands')
-      .update({ done_sku: newDoneSku, divergences: newDivergences, updated_at: new Date().toISOString() })
-      .eq('id', selectedBrand.id);
+      // `total_sku` acompanha o universo atual do grupo — o mesmo número que o operador
+      // vê no formulário e que vai gravado no registro de contagem. Sem isso a linha de
+      // contagem ficaria com um escopo antigo menor que os contados.
+      .update({
+        total_sku: selectedGroup.totalSku,
+        done_sku: newDoneSku,
+        divergences: newDivergences,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', countingLine.id);
 
     if (brandError) {
       console.error('Error updating brand from manual count:', brandError);
@@ -123,19 +197,19 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
       return;
     }
 
-    const isThirdCount = thirdCountContext?.brandId === selectedBrand.id;
+    const isThirdCount = thirdCountContext?.groupKey === selectedGroup.groupKey;
 
     const { data: recordData, error: recordError } = await supabase
       .from('inventory_count_records')
       .insert({
         company_id: companyId,
-        brand_id: selectedBrand.id,
+        brand_id: countingLine.id,
         count_number: isThirdCount ? 3 : 1,
         source: 'manual',
         linked_count_id: isThirdCount ? thirdCountContext!.rootId : null,
         operator_1: operator1 || null,
         operator_2: operator2 || null,
-        total_sku: parseInt(totalSku) || selectedBrand.total_sku,
+        total_sku: parseInt(totalSku) || selectedGroup.totalSku,
         skus_contados: qtdContabilizada,
         divergencias_encontradas: parseInt(divergenciasEncontradas) || 0,
         divergencias_recontadas: parseInt(divergenciasRecontadas) || 0,
@@ -156,22 +230,25 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
       console.error('Error inserting count record:', recordError);
     }
 
-    onBrandsUpdated(brandsData.map(b => b.id === selectedBrand.id ? { ...b, done_sku: newDoneSku, divergences: newDivergences } : b));
-    setInsight(generateCountInsight(metrics, qtdDivergenciasReais, selectedBrand.brand));
+    const savedLine = { ...countingLine, total_sku: selectedGroup.totalSku, done_sku: newDoneSku, divergences: newDivergences };
+    onBrandsUpdated(brandsData.some(b => b.id === savedLine.id)
+      ? brandsData.map(b => (b.id === savedLine.id ? savedLine : b))
+      : [...brandsData, savedLine]);
+    setInsight(generateCountInsight(metrics, qtdDivergenciasReais, selectedGroup.label));
 
     if (!isThirdCount && shouldRecommendThirdCount(qtdDivergenciasReais) && recordData) {
-      setThirdCountContext({ brandId: selectedBrand.id, rootId: recordData.id });
+      setThirdCountContext({ groupKey: selectedGroup.groupKey, rootId: recordData.id });
     } else {
       setThirdCountContext(null);
     }
 
     // Fechamento automático: só dispara quando os pendentes já chegaram a zero, e
     // nunca reabre/recalcula a contagem que acabou de ser salva acima — só lê.
-    if (newDoneSku >= selectedBrand.total_sku) {
-      generateClosingReport(companyId, selectedBrand.id, { userId: profile?.id ?? null, userEmail: profile?.email ?? null })
+    if (selectedGroup.doneSku + qtdContabilizada >= selectedGroup.totalSku) {
+      generateClosingReport(companyId, countingLine.id, { userId: profile?.id ?? null, userEmail: profile?.email ?? null })
         .then(result => {
           if (result.status === 'generated' || result.status === 'already_current') {
-            setClosingBrandName(selectedBrand.brand);
+            setClosingBrandName(selectedGroup.label);
             setClosingReport(result.report);
             setClosingObservations(result.observations);
           } else if (result.status === 'error') {
@@ -223,10 +300,10 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className={labelClass}>Linha / Marca</label>
-            <select required value={brandId} onChange={e => setBrandId(e.target.value)} className={inputClass}>
+            <select required value={groupKey} onChange={e => setGroupKey(e.target.value)} className={inputClass}>
               <option value="">Selecione a linha ou marca...</option>
-              {brandsData.map(b => (
-                <option key={b.id} value={b.id}>{b.brand} (Pendentes: {b.total_sku - b.done_sku})</option>
+              {groups.map(g => (
+                <option key={g.groupKey} value={g.groupKey}>{g.label} (Pendentes: {g.pendingSku})</option>
               ))}
             </select>
           </div>

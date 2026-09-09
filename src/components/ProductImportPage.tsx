@@ -18,7 +18,7 @@ import {
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { classifyCompanyProducts } from '../lib/productBrands/productBrandService';
-import { syncActiveInventoryScope } from '../lib/productBrands/inventoryScopeSync';
+import { syncActiveCycleItems } from '../lib/inventoryCycle/inventoryCycleService';
 
 interface ProductImportPageProps {
   onBack: () => void;
@@ -388,7 +388,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
           message: 'Classificando marcas e linhas...',
         });
         await classifyCompanyProducts(companyId, profile?.id ?? '', profile?.email ?? '', { onlyUnclassified: true });
-        await syncActiveInventoryScope(companyId);
+        await syncActiveCycleItems(companyId, profile?.id ?? null);
       } catch (syncErr) {
         console.warn('[handleConfirmImport] Classificação/reconciliação não concluída:', syncErr);
         executionErrors.push({

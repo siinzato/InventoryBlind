@@ -59,8 +59,8 @@ export default {
         // every concern. Existing rounded-xl/lg usage is untouched — these
         // are additive, semantic names for the redesign to grow into.
         control: '0.625rem',   // buttons, inputs, small controls
-        container: '0.75rem',  // cards, panels — same value as rounded-xl today
-        sheet: '1.25rem',       // modals, drawers, bottom sheets
+        container: '0.4375rem', // cards, panels — 7px: canto reto e técnico, ainda suavizado
+        sheet: '0.5rem',        // modals, drawers, bottom sheets — 8px, um passo acima de container
       },
       boxShadow: {
         // Deliberately quiet — most surfaces should need none of these at

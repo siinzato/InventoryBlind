@@ -22,7 +22,13 @@ const GOCASE_LINES: ClassifierLine[] = [
   line('ventosa', 'Ventosa', ['ventosa', 'ventosas'], 12),
   // Bases acima de Térmicos: senão "garrafa" venceria "base" em "Base de Silicone Garrafa Fresh".
   line('bases', 'Bases', ['base de silicone', 'base de garrafa', 'base para garrafa', 'base garrafa', 'base', 'bases', 'suporte', 'stand', 'dock'], 15),
-  line('termicos', 'Térmicos', ['termico', 'termica', 'termicos', 'termicas', 'garrafa termica', 'garrafa', 'squeeze'], 20),
+  // Garrafa e copo têm linha própria acima de Térmicos: "térmico" descreve a característica
+  // do produto, não define o tipo dele. Térmicos só recebe o que não é nenhum dos dois.
+  // Tampa acima de garrafa: uma tampa PARA garrafa não é uma garrafa.
+  line('tampas', 'Tampa de Garrafa', ['tampa de garrafa', 'tampa para garrafa', 'tampas para garrafas', 'tampa gocase garrafas', 'tampa gocase garrafa'], 14),
+  line('garrafas', 'Garrafas Térmicas', ['garrafa termica', 'garrafas termicas', 'garrafa'], 16),
+  line('copos', 'Copos Térmicos', ['copo termico', 'copos termicos', 'copo', 'copos'], 17),
+  line('termicos', 'Térmicos', ['termico', 'termica', 'termicos', 'termicas', 'squeeze'], 20),
   line('mochilas', 'Mochilas e Tote Daily', ['mochila', 'mochilas', 'tote daily', 'bolsa tote daily'], 40),
   line('joy', 'Joy', ['joy'], 60),
   line('puffer', 'Puffer', ['puffer'], 70),
@@ -66,8 +72,8 @@ describe('prioridade dentro da marca — categoria vence modelo', () => {
   });
 
   it('térmico vence modelo', () => {
-    expect(classify('Garrafa Térmica Fresh Gocase 650ml Good Vibes').lineId).toBe('termicos');
-    expect(classify('Garrafa Térmica Joy Gocase 500ml').lineId).toBe('termicos');
+    expect(classify('Garrafa Térmica Fresh Gocase 650ml Good Vibes').lineId).toBe('garrafas');
+    expect(classify('Garrafa Térmica Joy Gocase 500ml').lineId).toBe('garrafas');
   });
 
   it('Tote Daily vai para Mochilas e Tote Daily', () => {
@@ -213,7 +219,49 @@ describe('Ventosa e Bases de garrafa', () => {
     expect(classify('Ventosa de Silicone Gocase Para Capinha OUTLET').lineId).toBe('outlet');
   });
 
-  it('garrafa térmica sem base continua em Térmicos', () => {
-    expect(classify('Garrafa Térmica Fresh Gocase 650ml Good Vibes').lineId).toBe('termicos');
+  it('garrafa térmica sem base vai para Garrafas Térmicas', () => {
+    expect(classify('Garrafa Térmica Fresh Gocase 650ml Good Vibes').lineId).toBe('garrafas');
+  });
+});
+
+// Correção da família térmica: garrafa, copo e lancheira são TIPOS de produto; "térmico" é só
+// uma característica. Antes, qualquer título com "térmica" caía em Térmicos.
+describe('família térmica — o tipo do produto vence a característica', () => {
+  it('lancheira térmica continua em Lancheiras, com qualquer litragem ou modelo', () => {
+    expect(classify('Lancheira Térmica Puffer Gocase').lineId).toBe('lancheiras');
+    expect(classify('Lancheira Térmica Gocase 6L').lineId).toBe('lancheiras');
+    expect(classify('Gocase Lancheira Térmica Marmiteira - Rosa').lineId).toBe('lancheiras');
+  });
+
+  it('garrafa térmica vai para Garrafas Térmicas, e a litragem não muda a linha', () => {
+    for (const title of ['Garrafa Térmica Gocase 650ml', 'Garrafa Térmica Gocase 1L', 'Garrafa Termica Gocase Rosa', 'Garrafa Térmica Gocase 1200ml']) {
+      expect(classify(title).lineId).toBe('garrafas');
+    }
+    // Título real do catálogo sem a palavra "térmica".
+    expect(classify('Garrafa Gocase Fresh Poeira das Estrelas - 950ml - Lilás').lineId).toBe('garrafas');
+  });
+
+  it('copo térmico vai para Copos Térmicos, e capacidade/cor não mudam a linha', () => {
+    for (const title of ['Copo Térmico Gocase 500ml', 'Copo Termico Gocase com Tampa', 'Copo Térmico Gocase Vibe 470ml - Preto', 'Copo Térmico Daily Gocase Aço Inoxidável - 600ml - Rosa']) {
+      expect(classify(title).lineId).toBe('copos');
+    }
+  });
+
+  it('térmico que não é garrafa nem copo permanece em Térmicos', () => {
+    expect(classify('Taça Térmica Drink Gocase Aço Inox - 420ml - Preto').lineId).toBe('termicos');
+    expect(classify('Gocase Bolsa Térmica Daily Escola Faculdade Trabalho - Preto').lineId).toBe('termicos');
+  });
+
+  it('OUTLET vence qualquer térmico', () => {
+    expect(classify('Lancheira Térmica Gocase OUTLET').lineId).toBe('outlet');
+    expect(classify('Garrafa Térmica Gocase 650ml OUTLET').lineId).toBe('outlet');
+    expect(classify('Copo Térmico Gocase OUTLET').lineId).toBe('outlet');
+  });
+
+  it('base e tampa de garrafa não são arrastadas para as linhas novas', () => {
+    expect(classify('Base de Silicone Fit G - Garrafa Fresh 950ml - Azul Claro').lineId).toBe('bases');
+    expect(classify('Base de Silicone Para Copo Life 1180ml - Preto').lineId).toBe('bases');
+    expect(classify('Tampa Gocase Garrafas 950ml, 650ml, 350ml e 1200ml - Azul').lineId).toBe('tampas');
+    expect(classify('Tampa de Garrafa Gocase 650ml - Rosa').lineId).toBe('tampas');
   });
 });

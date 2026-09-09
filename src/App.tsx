@@ -68,6 +68,8 @@ import { getTeamProductivity } from './lib/productivityService';
 import { getBlindAISituations } from './lib/blindAIInsightsEngine';
 import { tryFastPath, askBlindAIAgent, getContextualSuggestions, type ChatMessage } from './lib/blindAIAgent';
 import { computeGlobalStats } from './lib/blindAIAgentAlgorithm';
+import { cycleLinesAsBrandData, mergeCurrentCycleCounts, type CycleLineSummary } from './lib/inventoryCycle/inventoryCycleModel';
+import { listLineUniverse } from './lib/inventoryCycle/inventoryCycleService';
 import { KpisIndicadoresPage } from './components/KpisIndicadoresPage';
 import { SafeDropdown } from './components/SafeDropdown';
 import { CountManagementCenter } from './components/counting/CountManagementCenter';
@@ -313,6 +315,11 @@ function AppContent() {
   // mudança de lógica) só para que o botão de atualizar do Dashboard possa
   // chamar a mesma função do efeito inicial.
   const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
+  // Universo do inventário ativo, uma linha por agrupamento (migration 112). É a fonte
+  // única do Dashboard: os produtos do catálogo com a linha que a classificação já
+  // gravou. Não há segunda taxonomia de reserva — `brandsData` abaixo serve apenas as
+  // telas de contagem agregada e o fechamento, nunca os indicadores do Dashboard.
+  const [lineUniverse, setLineUniverse] = useState<CycleLineSummary[]>([]);
   const loadData = useCallback(async () => {
     if (!companyId) {
       setLoading(false);
@@ -336,6 +343,9 @@ function AppContent() {
       setTopVendas(vendasRes.data || []);
       setCustomKPIs(kpisRes.data || []);
       setOperatorStats(operatorStatsRes);
+
+      // O Dashboard lê a view de agrupamento, nunca os itens um a um.
+      setLineUniverse(await listLineUniverse(companyId));
 
       setError(null);
       setLastLoadedAt(Date.now());
@@ -396,7 +406,16 @@ function AppContent() {
     setSnapshotBrands(data || []);
   };
 
-  const globais = useMemo(() => computeGlobalStats(brandsData), [brandsData]);
+  // Um só inventário: o universo é o catálogo atual agrupado pela linha que a
+  // classificação Marca > Linha já gravou em cada produto, e sobre ele entra o trabalho
+  // já concluído neste ciclo — que foi registrado por linha de contagem, antes da
+  // reorganização. O Dashboard não reclassifica nada e não conhece nome de linha nenhum:
+  // a lista de linhas é o que o inventário tiver. As fórmulas de progresso, acuracidade,
+  // divergência, ritmo e situação seguem sendo as de sempre: `computeGlobalStats`.
+  const globais = useMemo(
+    () => computeGlobalStats(cycleLinesAsBrandData(mergeCurrentCycleCounts(lineUniverse, brandsData).lines)),
+    [lineUniverse, brandsData]
+  );
 
   /** Where an ERP-intelligence drill-down lands.
    *

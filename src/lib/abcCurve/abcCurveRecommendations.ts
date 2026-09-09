@@ -3,6 +3,7 @@
 // regras que se aplicam. Nunca executa ação — só sugere, com prioridade/regra/justificativa.
 
 import type { SkuSnapshot } from './abcCurveEngine';
+import type { AbcCommercialPolicy } from './abcCurvePolicy';
 
 export type RecommendationCode =
   | 'PREJUIZO' | 'CORRIGIR_CUSTO' | 'COMPRA_URGENTE' | 'PROTEGER_DISPONIBILIDADE'
@@ -16,18 +17,15 @@ export interface Recommendation {
   justification: string;
 }
 
-// Limiares locais do módulo (não configuráveis via UI nesta versão) — documentados aqui porque
-// o pedido não especificou um número exato para "baixa/alta cobertura" ou "margem forte/baixa".
-const LOW_COVERAGE_DAYS = 7;
-const HEALTHY_COVERAGE_DAYS = 30;
-const EXCESS_COVERAGE_DAYS = 90;
-const STRONG_MARGIN = 0.4;
-const LOW_MARGIN = 0.15;
-
 const hasStock = (s: SkuSnapshot): boolean => s.stockAvailable !== null;
 
 // Regras avaliadas em ordem de prioridade — a primeira que se aplicar decide a recomendação.
-export const evaluateRecommendation = (s: SkuSnapshot): Recommendation | null => {
+//
+// A política é PARÂMETRO OBRIGATÓRIO, não constante do módulo: os limiares de cobertura e de
+// margem que antes viviam fixos aqui (7/30/90 dias, 15%/40%) agora chegam da análise e ficam
+// gravados com ela. Sem valor padrão nesta assinatura de propósito — assim nenhum chamador
+// consegue produzir recomendação com critério que a análise não registrou.
+export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPolicy): Recommendation | null => {
   if (s.costState === 'PREJUIZO') {
     return {
       code: 'PREJUIZO',
@@ -37,17 +35,20 @@ export const evaluateRecommendation = (s: SkuSnapshot): Recommendation | null =>
     };
   }
 
-  if (s.costState === 'SEM_CUSTO') {
+  // Só é problema de cadastro de custo quando existe atividade comercial real no período:
+  // sem venda, o custo ausente não impede diagnóstico nenhum, e a informação útil sobre esse
+  // SKU é o estoque parado (última regra) — que antes ficava inalcançável por interceptação.
+  if (s.costState === 'SEM_CUSTO' && (s.quantity > 0 || s.revenue > 0)) {
     return {
       code: 'CORRIGIR_CUSTO',
       priority: 2,
-      ruleApplied: 'custo ausente',
+      ruleApplied: 'venda no período sem custo cadastrado',
       justification: `SKU ${s.sku} vendeu ${s.quantity} unidades sem custo cadastrado — não é possível calcular lucro/margem.`,
     };
   }
 
   if (s.profitClass === 'A' && hasStock(s)) {
-    if (s.stockAvailable! <= 0 || (s.coverageDays !== null && s.coverageDays < LOW_COVERAGE_DAYS)) {
+    if (s.stockAvailable! <= 0 || (s.coverageDays !== null && s.coverageDays < policy.lowCoverageDays)) {
       return {
         code: 'COMPRA_URGENTE',
         priority: 3,
@@ -55,7 +56,7 @@ export const evaluateRecommendation = (s: SkuSnapshot): Recommendation | null =>
         justification: `Classe A de lucro (R$ ${s.grossProfit?.toFixed(2)}) com cobertura de ${s.coverageDays?.toFixed(1) ?? '0'} dias (estoque ${s.stockAvailable}).`,
       };
     }
-    if (s.coverageDays !== null && s.coverageDays >= HEALTHY_COVERAGE_DAYS) {
+    if (s.coverageDays !== null && s.coverageDays >= policy.healthyCoverageDays) {
       return {
         code: 'PROTEGER_DISPONIBILIDADE',
         priority: 4,
@@ -74,7 +75,7 @@ export const evaluateRecommendation = (s: SkuSnapshot): Recommendation | null =>
     };
   }
 
-  if (s.revenueClass === 'A' && s.grossMargin !== null && s.grossMargin < LOW_MARGIN) {
+  if (s.revenueClass === 'A' && s.grossMargin !== null && s.grossMargin < policy.lowMarginPct / 100) {
     return {
       code: 'RENEGOCIAR_CUSTO_OU_PRECO',
       priority: 6,
@@ -83,7 +84,7 @@ export const evaluateRecommendation = (s: SkuSnapshot): Recommendation | null =>
     };
   }
 
-  if ((s.profitClass === 'A' || s.profitClass === 'B') && s.grossMargin !== null && s.grossMargin >= STRONG_MARGIN && s.turnoverClass === 'C') {
+  if ((s.profitClass === 'A' || s.profitClass === 'B') && s.grossMargin !== null && s.grossMargin >= policy.strongMarginPct / 100 && s.turnoverClass === 'C') {
     return {
       code: 'PROMOVER',
       priority: 7,
@@ -92,7 +93,7 @@ export const evaluateRecommendation = (s: SkuSnapshot): Recommendation | null =>
     };
   }
 
-  if (s.profitClass === 'C' && hasStock(s) && s.coverageDays !== null && s.coverageDays > EXCESS_COVERAGE_DAYS) {
+  if (s.profitClass === 'C' && hasStock(s) && s.coverageDays !== null && s.coverageDays > policy.excessCoverageDays) {
     return {
       code: 'REDUZIR_COMPRA_OU_LIQUIDAR',
       priority: 8,

@@ -5,7 +5,7 @@ import { supabase, InventoryCountRecord, BrandData } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { generateClosingReport } from '../../lib/closingReports/closingReportService';
 import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
-import { ClosingSummaryModal } from './closing/ClosingSummaryModal';
+import { CountClosingSummaryModal } from './closing/CountClosingSummaryModal';
 import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
 
 interface CountHistorySectionProps {
@@ -166,7 +166,7 @@ export function CountHistorySection({ companyId, brandsById, brandsData, refresh
         );
       })}
 
-      <ClosingSummaryModal
+      <CountClosingSummaryModal
         open={!!closingReport}
         onClose={() => setClosingReport(null)}
         brandName={closingBrandName}

@@ -11,6 +11,9 @@ import {
   listReviewQueue, confirmProductAssociation, classifyCompanyProducts,
   type ProductBrand, type ProductLine, type ProductBrandAssociation,
 } from '../../lib/productBrands/productBrandService';
+import { logoPathsToSign, resolveBrandLogoUrls } from '../../lib/brandLogos/brandLogoAlgorithm';
+import { signBrandLogoPaths } from '../../lib/brandLogos/brandLogoService';
+import { BrandMark } from '../brandLogos/BrandMark';
 import { BrandLineFormModal } from './BrandLineFormModal';
 import { ImportedProductsPage, type ProductBrandLineFilter } from '../ImportedProductsPage';
 
@@ -21,6 +24,8 @@ interface ProductBrandsPageProps {
 export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
   const { profile } = useAuth();
   const [brands, setBrands] = useState<ProductBrand[]>([]);
+  /** brandId -> URL assinada do logo, só das marcas deste workspace. */
+  const [logoUrls, setLogoUrls] = useState<Record<string, string>>({});
   const [lines, setLines] = useState<ProductLine[]>([]);
   const [members, setMembers] = useState<TeamMember[]>([]);
   const [counts, setCounts] = useState<{ brand: Map<string, number>; line: Map<string, number>; noLine: Map<string, number> }>({ brand: new Map(), line: new Map(), noLine: new Map() });
@@ -44,6 +49,12 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
       ]);
       setBrands(brandsData);
       setLines(linesData);
+
+      // Logos das marcas deste workspace: uma assinatura em lote para todos os caminhos.
+      const logoSources = brandsData.map(b => ({ brandId: b.id, brandName: b.name, keywords: b.keywords, logoPath: b.logoPath }));
+      const paths = logoPathsToSign(logoSources, companyId);
+      const signed = paths.length > 0 ? await signBrandLogoPaths(paths) : {};
+      setLogoUrls(resolveBrandLogoUrls(logoSources, companyId, signed));
       setMembers(membersData);
       setReviewQueue(queue);
       setReviewQueueTotal(queueTotal);
@@ -64,7 +75,14 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
     }
   };
 
+  // Troca de workspace: marcas, linhas e URLs de logo em memória pertenciam ao workspace
+  // anterior. São descartados ANTES de carregar os novos — nenhum asset do workspace
+  // antigo pode sobreviver por estado React.
   useEffect(() => {
+    setBrands([]);
+    setLines([]);
+    setLogoUrls({});
+    setExpanded(new Set());
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId]);
@@ -163,6 +181,7 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
                 <PanelSection padding="md" className="flex items-center justify-between gap-3">
                   <button type="button" onClick={() => toggleExpanded(brand.id)} className="flex items-center gap-2 min-w-0 text-left">
                     {isOpen ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
+                    <BrandMark name={brand.name} url={logoUrls[brand.id]} size="md" />
                     <span className="font-medium text-fg">{brand.name}</span>
                     {brand.code && <Badge variant="neutral">{brand.code}</Badge>}
                     {!brand.active && <Badge variant="warning">Inativa</Badge>}
@@ -285,6 +304,7 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
           defaultBrandId={formModal.defaultBrandId}
           onClose={() => setFormModal(null)}
           onSaved={() => { setFormModal(null); load(); }}
+          onRefresh={load}
         />
       )}
     </Page>

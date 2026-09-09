@@ -16,6 +16,9 @@ import {
   calculateImportSummary,
 } from '../lib/productImportUtils';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
+import { classifyCompanyProducts } from '../lib/productBrands/productBrandService';
+import { syncActiveInventoryScope } from '../lib/productBrands/inventoryScopeSync';
 
 interface ProductImportPageProps {
   onBack: () => void;
@@ -36,6 +39,11 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   isAdmin,
   onRequestAdmin,
 }) => {
+  // Mesmo identificador de empresa nas duas pontas: inventory_brands.company_id é text e
+  // product_brands/product_lines.company_id é uuid, mas o valor é o mesmo — o contexto de auth
+  // já entrega o companyId ativo (que respeita a troca de workspace).
+  const { profile, companyId } = useAuth();
+
   const [status, setStatus] = useState<ImportStatus>('upload');
   const [isReading, setIsReading] = useState(false);
   const [products, setProducts] = useState<ProductValidated[]>([]);
@@ -365,6 +373,31 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
       }
     }
 
+    // Classificação Marca > Linha e reconciliação do inventário ativo. Vem DEPOIS de os
+    // produtos estarem gravados (o classificador precisa dos ids) e antes de a tela declarar
+    // a importação concluída — era exatamente esta etapa que faltava: SKU novo entrava no
+    // catálogo e nunca aparecia como pendente, deixando a linha em 100% sem ter sido contada.
+    //
+    // `onlyUnclassified` preenche o que falta sem reprocessar o que já está resolvido, e
+    // curadoria manual nunca é sobrescrita. Falha aqui não invalida a importação: os produtos
+    // já estão salvos, então isto vira aviso, não erro.
+    if (companyId) {
+      try {
+        setProgress({
+          current: total, total, percentage: 100, status: 'importing',
+          message: 'Classificando marcas e linhas...',
+        });
+        await classifyCompanyProducts(companyId, profile?.id ?? '', profile?.email ?? '', { onlyUnclassified: true });
+        await syncActiveInventoryScope(companyId);
+      } catch (syncErr) {
+        console.warn('[handleConfirmImport] Classificação/reconciliação não concluída:', syncErr);
+        executionErrors.push({
+          row: 0,
+          error: 'Produtos importados, mas a classificação por marca/linha e a atualização das pendências do inventário não foram concluídas. Reprocesse em Produtos → Linhas e Marcas.',
+        });
+      }
+    }
+
     setSummary(prev => prev ? {
       ...prev,
       newProducts: newCount,
@@ -393,7 +426,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
       });
       setStatus('complete');
     }
-  }, [products, summary, columnMapping, isAdmin, existingProducts, errors.length]);
+  }, [products, summary, columnMapping, isAdmin, existingProducts, errors.length, companyId, profile?.id, profile?.email]);
 
   // Create import history record
   const createImportHistory = async (): Promise<string | null> => {

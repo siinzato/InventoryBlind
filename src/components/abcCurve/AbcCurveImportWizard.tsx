@@ -3,16 +3,19 @@
 // Mesmo esqueleto de passos de SalesImportWizard.tsx, generalizado para múltiplos arquivos.
 
 import { useMemo, useState } from 'react';
-import { Upload, AlertTriangle, CheckCircle2, ArrowRight, Loader2, X } from 'lucide-react';
-import { Modal, Button, Select, Badge } from '../ui';
+import { Upload, AlertTriangle, CheckCircle2, ArrowRight, Loader2, X, ChevronDown, ChevronUp } from 'lucide-react';
+import { Modal, Button, Select, Badge, Notice } from '../ui';
 import {
-  detectColumns, suggestMapping, applyMapping, parseTabularFile, computeFileHash, normalizeSku,
-  VENDAS_FIELDS, PRECOS_CUSTOS_FIELDS, ESTOQUE_FIELDS,
+  detectColumns, suggestMapping, applyMapping, parseTabularFile, computeFileHash, normalizeSku, parseNumber,
+  missingRequiredFields, VENDAS_FIELDS, PRECOS_CUSTOS_FIELDS, ESTOQUE_FIELDS, ABC_TINY_FIELDS,
   type ColumnMapping, type RawRow, type FieldDef,
 } from '../../lib/abcCurve/abcCurveParsing';
 import {
   aggregateVendas, buildPricingMap, buildStockMap, buildSkuSnapshots, type SkuSnapshot,
 } from '../../lib/abcCurve/abcCurveEngine';
+import { DEFAULT_ABC_POLICY, validateAbcPolicy, type AbcCommercialPolicy } from '../../lib/abcCurve/abcCurvePolicy';
+import { evaluateSignals } from '../../lib/abcCurve/abcCurveSignals';
+import { normalizeTinyClass, type TinyFileValues } from '../../lib/abcCurve/abcCurveTiny';
 import { evaluateRecommendation, type Recommendation } from '../../lib/abcCurve/abcCurveRecommendations';
 import { findBatchesByFileHash, matchProductIds, publishAnalysis, type AbcFileKind, type AbcProvider } from '../../lib/abcCurve/abcCurveService';
 
@@ -41,6 +44,18 @@ const emptySlot = (fields: FieldDef[]): FileSlot => ({
 
 const ORIGIN_LABEL: Record<AbcProvider, string> = { tiny: 'Tiny ERP', bling: 'Bling', totvs: 'TOTVS', sap: 'SAP', custom: 'Planilha própria' };
 
+// Os 7 parâmetros da política, na ordem em que se leem. Rótulos com a unidade explícita, para
+// ninguém digitar 0,15 num campo que espera 15.
+const POLICY_FIELDS: { key: keyof AbcCommercialPolicy; label: string; max: number; step: number }[] = [
+  { key: 'thresholdA', label: 'Classe A até (% acumulado)', max: 100, step: 1 },
+  { key: 'thresholdB', label: 'Classe B até (% acumulado)', max: 100, step: 1 },
+  { key: 'lowCoverageDays', label: 'Baixa cobertura (dias)', max: 3650, step: 1 },
+  { key: 'healthyCoverageDays', label: 'Cobertura saudável (dias)', max: 3650, step: 1 },
+  { key: 'excessCoverageDays', label: 'Excesso de cobertura (dias)', max: 3650, step: 1 },
+  { key: 'lowMarginPct', label: 'Margem baixa (%)', max: 100, step: 1 },
+  { key: 'strongMarginPct', label: 'Margem forte (%)', max: 100, step: 1 },
+];
+
 export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, onPublished }: AbcCurveImportWizardProps) {
   const [step, setStep] = useState<Step>('config');
   const [error, setError] = useState<string | null>(null);
@@ -51,13 +66,17 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
   const [salesPeriodEnd, setSalesPeriodEnd] = useState('');
   const [pricingSnapshotDate, setPricingSnapshotDate] = useState('');
   const [stockSnapshotDate, setStockSnapshotDate] = useState('');
-  const [thresholdA, setThresholdA] = useState(80);
-  const [thresholdB, setThresholdB] = useState(95);
+  // Política comercial desta análise. Começa nos mesmos valores que estavam fixos no código,
+  // então quem não abrir a seção publica exatamente o comportamento anterior.
+  const [policy, setPolicy] = useState<AbcCommercialPolicy>(DEFAULT_ABC_POLICY);
+  const [policyOpen, setPolicyOpen] = useState(false);
+  const setPolicyField = (key: keyof AbcCommercialPolicy, value: number) =>
+    setPolicy(prev => ({ ...prev, [key]: value }));
 
   const [vendas, setVendas] = useState<FileSlot>(emptySlot(VENDAS_FIELDS));
   const [precos, setPrecos] = useState<FileSlot>(emptySlot(PRECOS_CUSTOS_FIELDS));
   const [estoque, setEstoque] = useState<FileSlot>(emptySlot(ESTOQUE_FIELDS));
-  const [abcTiny, setAbcTiny] = useState<{ file: File | null; rowCount: number }>({ file: null, rowCount: 0 });
+  const [abcTiny, setAbcTiny] = useState<FileSlot>(emptySlot(ABC_TINY_FIELDS));
   const [publishing, setPublishing] = useState(false);
 
   const loadFile = async (file: File, fields: FieldDef[], setSlot: (slot: FileSlot) => void) => {
@@ -77,10 +96,30 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
     });
   };
 
+  // Campos obrigatórios sem coluna escolhida — bloqueiam o avanço do próprio passo, com o
+  // nome do campo na tela, em vez de virar análise silenciosamente incompleta.
+  const vendasMissing = vendas.file ? missingRequiredFields(VENDAS_FIELDS, vendas.mapping) : [];
+  const precosMissing = precos.file ? missingRequiredFields(PRECOS_CUSTOS_FIELDS, precos.mapping) : [];
+  const estoqueMissing = estoque.file ? missingRequiredFields(ESTOQUE_FIELDS, estoque.mapping) : [];
+  const tinyMissing = abcTiny.file ? missingRequiredFields(ABC_TINY_FIELDS, abcTiny.mapping) : [];
+  const thresholdError = validateAbcPolicy(policy);
+
   const preview = useMemo(() => {
     if (step !== 'preview' && step !== 'publishing' && step !== 'done') return null;
+    const invalidPolicy = validateAbcPolicy(policy);
+    if (invalidPolicy) return { blocked: true, message: invalidPolicy } as const;
     if (!salesPeriodStart || !salesPeriodEnd || salesPeriodStart > salesPeriodEnd) {
       return { blocked: true, message: 'Período de vendas inválido.' } as const;
+    }
+
+    const missing = [
+      ...missingRequiredFields(VENDAS_FIELDS, vendas.mapping).map(l => `Vendas → ${l}`),
+      ...missingRequiredFields(PRECOS_CUSTOS_FIELDS, precos.mapping).map(l => `Preços/custos → ${l}`),
+      ...(estoque.file ? missingRequiredFields(ESTOQUE_FIELDS, estoque.mapping).map(l => `Estoque → ${l}`) : []),
+      ...(abcTiny.file ? missingRequiredFields(ABC_TINY_FIELDS, abcTiny.mapping).map(l => `Curva ABC do Tiny → ${l}`) : []),
+    ];
+    if (missing.length > 0) {
+      return { blocked: true, message: `Mapeie os campos obrigatórios antes de gerar a prévia: ${missing.join(', ')}.` } as const;
     }
 
     const mappedVendas = applyMapping(vendas.rawRows, vendas.mapping);
@@ -102,13 +141,50 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
     warnings.push(...pricingWarnings);
 
     const hasStockFile = estoque.file !== null;
-    const stockMap = hasStockFile ? buildStockMap(applyMapping(estoque.rawRows, estoque.mapping)) : null;
+    const mappedEstoque = hasStockFile ? applyMapping(estoque.rawRows, estoque.mapping) : [];
+    const stockResult = hasStockFile ? buildStockMap(mappedEstoque) : null;
+    const stockMap = stockResult?.map ?? null;
+    if (stockResult) warnings.push(...stockResult.warnings);
 
     const periodDays = Math.max(1, Math.round((new Date(salesPeriodEnd).getTime() - new Date(salesPeriodStart).getTime()) / 86400000) + 1);
-    const snapshots = buildSkuSnapshots({ vendas: aggregated, pricing: pricingMap, stock: stockMap, periodDays, thresholdA, thresholdB });
+    const snapshots = buildSkuSnapshots({ vendas: aggregated, pricing: pricingMap, stock: stockMap, periodDays, thresholdA: policy.thresholdA, thresholdB: policy.thresholdB });
 
+    // Recomendação principal (uma por SKU) e sinais associados (vários) usam a MESMA política
+    // desta análise, calculados aqui uma única vez — depois de publicados, nunca são reavaliados.
     const recommendationsBySku = new Map<string, Recommendation>();
-    snapshots.forEach(s => { const rec = evaluateRecommendation(s); if (rec) recommendationsBySku.set(s.sku, rec); });
+    const signalsBySku = new Map<string, string[]>();
+    snapshots.forEach(s => {
+      const rec = evaluateRecommendation(s, policy);
+      if (rec) recommendationsBySku.set(s.sku, rec);
+      const signals = evaluateSignals(s, policy);
+      if (signals.length > 0) signalsBySku.set(s.sku, signals);
+    });
+
+    // Referência do Tiny: casada SOMENTE por SKU normalizado exato. Nada de fuzzy, nada de
+    // match por nome de produto — e SKU do Tiny que não existe na análise não cria produto.
+    const tinyBySku = new Map<string, TinyFileValues>();
+    let tinyFileRows = 0;
+    let tinyUnmatched = 0;
+    if (abcTiny.file) {
+      const mappedTiny = applyMapping(abcTiny.rawRows, abcTiny.mapping);
+      const snapshotSkus = new Set(snapshots.map(s => s.sku));
+      for (const row of mappedTiny) {
+        const sku = normalizeSku(row.sku);
+        if (!sku) continue;
+        tinyFileRows += 1;
+        if (!snapshotSkus.has(sku)) { tinyUnmatched += 1; continue; }
+        tinyBySku.set(sku, {
+          quantity: parseNumber(row.quantidade),
+          value: parseNumber(row.valor),
+          individualPct: parseNumber(row.percentualIndividual),
+          cumulativePct: parseNumber(row.percentualAcumulado),
+          classification: normalizeTinyClass(row.classificacao !== undefined ? String(row.classificacao) : null),
+        });
+      }
+      if (tinyUnmatched > 0) {
+        warnings.push(`Curva ABC do Tiny: ${tinyUnmatched} SKUs do arquivo não existem nesta análise — ficam de fora do comparativo.`);
+      }
+    }
 
     const withCost = snapshots.filter(s => s.cost !== null).length;
     const withStock = hasStockFile ? snapshots.filter(s => s.stockAvailable !== null).length : 0;
@@ -116,17 +192,35 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
       warnings.push('Data do snapshot de preços/custos fora do período de vendas — cobertura pode ficar parcial.');
     }
 
+    // Linhas VÁLIDAS por arquivo (não o total recebido): é isso que vai para importedCount, e
+    // é isso que a aba Fontes de dados precisa mostrar para "recebidas ≠ válidas" fazer sentido.
+    const validRows = {
+      vendas: Math.max(0, mappedVendas.length - vendasErrors.length),
+      precos: mappedPrecos.filter(r => normalizeSku(r.sku) !== null).length,
+      estoque: hasStockFile ? mappedEstoque.filter(r => normalizeSku(r.sku) !== null).length : 0,
+    };
+
+    const revenueClassCounts = { A: 0, B: 0, C: 0 };
+    snapshots.forEach(s => { if (s.revenueClass) revenueClassCounts[s.revenueClass] += 1; });
+
     return {
       blocked: false as const,
-      vendasErrors, warnings, snapshots, recommendationsBySku,
+      vendasErrors, warnings, snapshots, recommendationsBySku, signalsBySku, validRows, revenueClassCounts,
+      tinyBySku, tinyFileRows, tinyMatched: tinyBySku.size, tinyUnmatched,
+      signalCount: signalsBySku.size,
+      pricingWarningCount: pricingWarnings.length,
+      stockWarningCount: stockResult?.warnings.length ?? 0,
       costCoveragePct: snapshots.length > 0 ? (withCost / snapshots.length) * 100 : null,
       stockCoveragePct: hasStockFile && snapshots.length > 0 ? (withStock / snapshots.length) * 100 : null,
       hasStockFile,
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [step, vendas, precos, estoque, salesPeriodStart, salesPeriodEnd, pricingSnapshotDate, thresholdA, thresholdB]);
+  }, [step, vendas, precos, estoque, abcTiny, salesPeriodStart, salesPeriodEnd, pricingSnapshotDate, policy]);
 
-  const canGoToPreview = vendas.file !== null && precos.file !== null && !!name.trim() && !!salesPeriodStart && !!salesPeriodEnd && !!pricingSnapshotDate;
+  const canGoToPreview = vendas.file !== null && precos.file !== null && !!name.trim()
+    && !!salesPeriodStart && !!salesPeriodEnd && !!pricingSnapshotDate
+    && vendasMissing.length === 0 && precosMissing.length === 0 && estoqueMissing.length === 0
+    && tinyMissing.length === 0
+    && thresholdError === null;
 
   const handlePublish = async () => {
     if (!preview || preview.blocked) return;
@@ -138,21 +232,26 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
       const productIdBySku = await matchProductIds(companyId, skus);
 
       const batches = [
-        { fileKind: 'vendas' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: vendas.file?.name ?? null, fileHash: vendas.hash, rowCount: vendas.rawRows.length, importedCount: preview.snapshots.length, warningCount: preview.vendasErrors.length },
-        { fileKind: 'precos_custos' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: precos.file?.name ?? null, fileHash: precos.hash, rowCount: precos.rawRows.length, importedCount: precos.rawRows.length, warningCount: 0 },
+        { fileKind: 'vendas' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: vendas.file?.name ?? null, fileHash: vendas.hash, rowCount: vendas.rawRows.length, importedCount: preview.validRows.vendas, warningCount: preview.vendasErrors.length },
+        { fileKind: 'precos_custos' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: precos.file?.name ?? null, fileHash: precos.hash, rowCount: precos.rawRows.length, importedCount: preview.validRows.precos, warningCount: preview.pricingWarningCount },
       ];
       if (estoque.file) {
-        batches.push({ fileKind: 'estoque' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: estoque.file.name, fileHash: estoque.hash, rowCount: estoque.rawRows.length, importedCount: estoque.rawRows.length, warningCount: 0 });
+        batches.push({ fileKind: 'estoque' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: estoque.file.name, fileHash: estoque.hash, rowCount: estoque.rawRows.length, importedCount: preview.validRows.estoque, warningCount: preview.stockWarningCount });
       }
       if (abcTiny.file) {
-        batches.push({ fileKind: 'abc_tiny' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: abcTiny.file.name, fileHash: null, rowCount: abcTiny.rowCount, importedCount: abcTiny.rowCount, warningCount: 0 });
+        // A referência não entra no cálculo da curva, mas agora alimenta o comparativo: as
+        // contagens do lado do Tiny (linhas com SKU, correspondentes, sem correspondência)
+        // cabem nas colunas que o batch já tem — nenhuma estrutura nova.
+        batches.push({ fileKind: 'abc_tiny' as AbcFileKind, sourceType: 'file' as const, provider: origin, fileName: abcTiny.file.name, fileHash: abcTiny.hash, rowCount: preview.tinyFileRows, importedCount: preview.tinyMatched, warningCount: preview.tinyUnmatched });
       }
 
       await publishAnalysis({
         companyId, userId, userEmail, name: name.trim(),
         salesPeriodStart, salesPeriodEnd, pricingSnapshotDate, stockSnapshotDate: stockSnapshotDate || null,
-        thresholdA, thresholdB, batches, snapshots: preview.snapshots, productIdBySku,
+        policy, batches, snapshots: preview.snapshots, productIdBySku,
         recommendationsBySku: preview.recommendationsBySku,
+        signalsBySku: preview.signalsBySku,
+        tinyBySku: preview.tinyBySku,
         costCoveragePct: preview.costCoveragePct, stockCoveragePct: preview.stockCoveragePct,
         warningCount: preview.warnings.length,
       });
@@ -166,7 +265,7 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
   };
 
   const renderUploadStep = (
-    label: string, fields: FieldDef[], slot: FileSlot, setSlot: (slot: FileSlot) => void,
+    label: string, fields: FieldDef[], slot: FileSlot, setSlot: (slot: FileSlot) => void, missing: string[] = [],
   ) => (
     <div className="space-y-4">
       {!slot.file && (
@@ -200,6 +299,11 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
               </div>
             ))}
           </div>
+          {missing.length > 0 && (
+            <Notice tone="warning">
+              Campos obrigatórios sem coluna escolhida: {missing.join(', ')}. Escolha a coluna correspondente para continuar.
+            </Notice>
+          )}
         </>
       )}
     </div>
@@ -258,19 +362,53 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
                 <input type="date" value={stockSnapshotDate} onChange={e => setStockSnapshotDate(e.target.value)} className="w-full p-2 border border-edge rounded-lg bg-surface text-fg text-sm" />
               </div>
             </div>
-            <div className="grid grid-cols-2 gap-3">
-              <div>
-                <label className="block text-sm font-medium text-fg mb-1">Limite classe A (% acumulado)</label>
-                <input type="number" min={1} max={99} value={thresholdA} onChange={e => setThresholdA(Number(e.target.value))} className="w-full p-2 border border-edge rounded-lg bg-surface text-fg text-sm" />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-fg mb-1">Limite classe B (% acumulado)</label>
-                <input type="number" min={1} max={99} value={thresholdB} onChange={e => setThresholdB(Number(e.target.value))} className="w-full p-2 border border-edge rounded-lg bg-surface text-fg text-sm" />
-              </div>
+            {/* Política comercial: fechada por padrão, com os mesmos valores que eram fixos no
+                código. Quem não abrir publica exatamente o comportamento anterior. */}
+            <div className="rounded-container border border-edge">
+              <button
+                type="button"
+                aria-expanded={policyOpen}
+                onClick={() => setPolicyOpen(open => !open)}
+                className="flex w-full items-center justify-between gap-2 p-3 text-left"
+              >
+                <span className="text-sm font-medium text-fg">Política comercial</span>
+                <span className="flex items-center gap-2 text-xs text-fg-subtle">
+                  {!policyOpen && `A ${policy.thresholdA}% · B ${policy.thresholdB}% · ${policy.lowCoverageDays}/${policy.healthyCoverageDays}/${policy.excessCoverageDays}d · ${policy.lowMarginPct}%/${policy.strongMarginPct}%`}
+                  {policyOpen ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                </span>
+              </button>
+              {policyOpen && (
+                <div className="space-y-3 border-t border-edge p-3">
+                  <p className="text-xs text-fg-subtle">
+                    Estes parâmetros afetam recomendações desta análise e ficam registrados no histórico.
+                  </p>
+                  <div className="grid grid-cols-2 gap-3">
+                    {POLICY_FIELDS.map(field => (
+                      <div key={field.key}>
+                        <label className="block text-sm font-medium text-fg mb-1" htmlFor={`abc-policy-${field.key}`}>{field.label}</label>
+                        <input
+                          id={`abc-policy-${field.key}`}
+                          type="number"
+                          min={0}
+                          max={field.max}
+                          step={field.step}
+                          value={policy[field.key]}
+                          onChange={e => setPolicyField(field.key, Number(e.target.value))}
+                          className="w-full p-2 border border-edge rounded-lg bg-surface text-fg text-sm"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
             </div>
+            {/* Política incoerente (95/80, margem baixa acima da forte, cobertura saudável
+                acima do excesso...) produziria recomendação sem significado — bloqueio antes
+                de importar qualquer arquivo. */}
+            {thresholdError && <Notice tone="danger">{thresholdError}</Notice>}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={onClose}>Cancelar</Button>
-              <Button onClick={() => setStep('vendas')} disabled={!name.trim() || !salesPeriodStart || !salesPeriodEnd || !pricingSnapshotDate}>
+              <Button onClick={() => setStep('vendas')} disabled={!name.trim() || !salesPeriodStart || !salesPeriodEnd || !pricingSnapshotDate || thresholdError !== null}>
                 Continuar <ArrowRight size={14} />
               </Button>
             </div>
@@ -280,10 +418,10 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
         {step === 'vendas' && (
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">Vendas do período (obrigatório).</p>
-            {renderUploadStep('vendas', VENDAS_FIELDS, vendas, setVendas)}
+            {renderUploadStep('vendas', VENDAS_FIELDS, vendas, setVendas, vendasMissing)}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setStep('config')}>Voltar</Button>
-              <Button onClick={() => setStep('precos')} disabled={!vendas.file}>Continuar <ArrowRight size={14} /></Button>
+              <Button onClick={() => setStep('precos')} disabled={!vendas.file || vendasMissing.length > 0}>Continuar <ArrowRight size={14} /></Button>
             </div>
           </div>
         )}
@@ -291,10 +429,10 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
         {step === 'precos' && (
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">Preços e custos (obrigatório para calcular rentabilidade).</p>
-            {renderUploadStep('preços e custos', PRECOS_CUSTOS_FIELDS, precos, setPrecos)}
+            {renderUploadStep('preços e custos', PRECOS_CUSTOS_FIELDS, precos, setPrecos, precosMissing)}
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setStep('vendas')}>Voltar</Button>
-              <Button onClick={() => setStep('estoque')} disabled={!precos.file}>Continuar <ArrowRight size={14} /></Button>
+              <Button onClick={() => setStep('estoque')} disabled={!precos.file || precosMissing.length > 0}>Continuar <ArrowRight size={14} /></Button>
             </div>
           </div>
         )}
@@ -302,25 +440,13 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
         {step === 'estoque' && (
           <div className="space-y-4">
             <p className="text-sm text-fg-muted">Estoque (opcional — sem ele, a análise comercial funciona normalmente e a reposição não é calculada).</p>
-            {renderUploadStep('estoque', ESTOQUE_FIELDS, estoque, setEstoque)}
+            {renderUploadStep('estoque', ESTOQUE_FIELDS, estoque, setEstoque, estoqueMissing)}
+            {/* A referência do Tiny passa pelo MESMO fluxo de mapeamento dos outros arquivos
+                (detectColumns/suggestMapping/applyMapping) — nenhum parser paralelo. Ela não
+                entra no cálculo da curva; alimenta o comparativo, casada por SKU exato. */}
             <div className="border-t border-edge pt-3">
-              <p className="text-sm text-fg-muted mb-2">Curva ABC do Tiny (opcional — referência informativa, não substitui o cálculo desta análise).</p>
-              {!abcTiny.file ? (
-                <label className="flex items-center gap-2 text-xs text-fg-subtle underline decoration-dotted cursor-pointer">
-                  Anexar planilha de Curva ABC do Tiny
-                  <input type="file" accept=".csv,.xls,.xlsx" className="hidden" onChange={async e => {
-                    const f = e.target.files?.[0];
-                    if (!f) return;
-                    const { rows } = await parseTabularFile(f);
-                    setAbcTiny({ file: f, rowCount: rows.length });
-                  }} />
-                </label>
-              ) : (
-                <div className="flex items-center justify-between text-sm">
-                  <span>{abcTiny.file.name} — {abcTiny.rowCount} linhas</span>
-                  <Button variant="ghost" size="sm" onClick={() => setAbcTiny({ file: null, rowCount: 0 })}><X size={14} /></Button>
-                </div>
-              )}
+              <p className="text-sm text-fg-muted mb-2">Curva ABC do Tiny (opcional — referência para comparação, não entra no cálculo desta análise).</p>
+              {renderUploadStep('Curva ABC do Tiny', ABC_TINY_FIELDS, abcTiny, setAbcTiny, tinyMissing)}
             </div>
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setStep('precos')}>Voltar</Button>
@@ -332,35 +458,88 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
         {step === 'preview' && preview && (
           <div className="space-y-4">
             {preview.blocked ? (
-              <div className="flex items-center gap-2 rounded-lg bg-red-500/10 p-3 text-sm text-red-700 dark:text-red-400">
-                <AlertTriangle size={16} /> {preview.message}
-              </div>
+              <Notice tone="danger">{preview.message}</Notice>
             ) : (
               <>
-                <div className="grid grid-cols-3 gap-3 text-sm">
-                  <div className="rounded-lg bg-emerald-500/10 p-3 text-emerald-700 dark:text-emerald-400">
-                    <p className="font-semibold text-lg">{preview.snapshots.length}</p><p>SKUs analisados</p>
+                {/* Superfície clara, borda fina, cor só no badge de status — a prévia é uma
+                    conferência, não um painel colorido. */}
+                <div className="rounded-container border border-edge divide-y divide-edge">
+                  <dl className="grid grid-cols-3 divide-x divide-edge">
+                    <div className="p-3">
+                      <dt className="text-label">SKUs analisados</dt>
+                      <dd className="font-display text-xl font-semibold tabular-nums text-fg mt-0.5">{preview.snapshots.length.toLocaleString('pt-BR')}</dd>
+                    </div>
+                    <div className="p-3">
+                      <dt className="text-label">Avisos</dt>
+                      <dd className={`font-display text-xl font-semibold tabular-nums mt-0.5 ${preview.warnings.length > 0 ? 'text-amber-600 dark:text-amber-400' : 'text-fg'}`}>{preview.warnings.length.toLocaleString('pt-BR')}</dd>
+                    </div>
+                    <div className="p-3">
+                      <dt className="text-label">Linhas rejeitadas</dt>
+                      <dd className={`font-display text-xl font-semibold tabular-nums mt-0.5 ${preview.vendasErrors.length > 0 ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>{preview.vendasErrors.length.toLocaleString('pt-BR')}</dd>
+                    </div>
+                  </dl>
+                  <dl className="grid grid-cols-2 divide-x divide-edge">
+                    <div className="p-3">
+                      <dt className="text-label">Cobertura de custo</dt>
+                      <dd className="text-sm tabular-nums text-fg mt-0.5">{preview.costCoveragePct !== null ? `${preview.costCoveragePct.toFixed(1)}%` : '—'}</dd>
+                    </div>
+                    <div className="p-3">
+                      <dt className="text-label">Cobertura de estoque</dt>
+                      <dd className="text-sm text-fg mt-0.5">
+                        {preview.hasStockFile
+                          ? `${preview.stockCoveragePct?.toFixed(1) ?? '—'}%`
+                          : 'Sem snapshot — reposição não calculada'}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="p-3">
+                    <p className="text-label mb-1.5">Classificação por faturamento</p>
+                    <div className="flex flex-wrap items-center gap-2 text-sm text-fg">
+                      <Badge variant="success">A</Badge> {preview.revenueClassCounts.A.toLocaleString('pt-BR')}
+                      <Badge variant="warning">B</Badge> {preview.revenueClassCounts.B.toLocaleString('pt-BR')}
+                      <Badge variant="danger">C</Badge> {preview.revenueClassCounts.C.toLocaleString('pt-BR')}
+                    </div>
                   </div>
-                  <div className="rounded-lg bg-amber-500/10 p-3 text-amber-700 dark:text-amber-400">
-                    <p className="font-semibold text-lg">{preview.warnings.length}</p><p>Avisos</p>
-                  </div>
-                  <div className="rounded-lg bg-red-500/10 p-3 text-red-700 dark:text-red-400">
-                    <p className="font-semibold text-lg">{preview.vendasErrors.length}</p><p>Linhas de vendas rejeitadas</p>
-                  </div>
+                  {abcTiny.file && (
+                    <dl className="grid grid-cols-3 divide-x divide-edge">
+                      <div className="p-3">
+                        <dt className="text-label">SKUs no arquivo do Tiny</dt>
+                        <dd className="text-sm tabular-nums text-fg mt-0.5">{preview.tinyFileRows.toLocaleString('pt-BR')}</dd>
+                      </div>
+                      <div className="p-3">
+                        <dt className="text-label">Correspondentes</dt>
+                        <dd className="text-sm tabular-nums text-fg mt-0.5">{preview.tinyMatched.toLocaleString('pt-BR')}</dd>
+                      </div>
+                      <div className="p-3">
+                        <dt className="text-label">Sem correspondência</dt>
+                        <dd className="text-sm tabular-nums text-fg mt-0.5">{preview.tinyUnmatched.toLocaleString('pt-BR')}</dd>
+                      </div>
+                    </dl>
+                  )}
                 </div>
-                <p className="text-sm text-fg-muted">
-                  Cobertura de custo: {preview.costCoveragePct?.toFixed(1)}%
-                  {preview.hasStockFile && ` · Cobertura de estoque: ${preview.stockCoveragePct?.toFixed(1)}%`}
-                  {!preview.hasStockFile && ' · Sem snapshot de estoque — reposição não calculada.'}
-                </p>
+
+                {/* Contagem primeiro, lista limitada e rolável depois: 260 avisos não podem
+                    empurrar o botão de publicar para fora da tela. */}
                 {preview.warnings.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto text-xs text-amber-700 dark:text-amber-400 space-y-0.5">
-                    {preview.warnings.slice(0, 20).map((w: string, i: number) => <p key={i}>{w}</p>)}
+                  <div className="space-y-1">
+                    <p className="text-sm text-fg-muted">
+                      {preview.warnings.length.toLocaleString('pt-BR')} {preview.warnings.length === 1 ? 'aviso' : 'avisos'}
+                      {preview.warnings.length > 20 && ' — mostrando os 20 primeiros'}
+                    </p>
+                    <div className="max-h-32 overflow-y-auto rounded-control border border-edge p-2 text-xs text-fg-muted space-y-0.5">
+                      {preview.warnings.slice(0, 20).map((w: string, i: number) => <p key={i}>{w}</p>)}
+                    </div>
                   </div>
                 )}
                 {preview.vendasErrors.length > 0 && (
-                  <div className="max-h-32 overflow-y-auto text-xs text-red-700 dark:text-red-400 space-y-0.5">
-                    {preview.vendasErrors.slice(0, 20).map((e: { rowIndex: number; message: string }, i: number) => <p key={i}>Linha {e.rowIndex + 1}: {e.message}</p>)}
+                  <div className="space-y-1">
+                    <p className="text-sm text-fg-muted">
+                      {preview.vendasErrors.length.toLocaleString('pt-BR')} {preview.vendasErrors.length === 1 ? 'linha rejeitada' : 'linhas rejeitadas'} no arquivo de vendas
+                      {preview.vendasErrors.length > 20 && ' — mostrando as 20 primeiras'}
+                    </p>
+                    <div className="max-h-32 overflow-y-auto rounded-control border border-edge p-2 text-xs text-fg-muted space-y-0.5">
+                      {preview.vendasErrors.slice(0, 20).map((e: { rowIndex: number; message: string }, i: number) => <p key={i}>Linha {e.rowIndex + 1}: {e.message}</p>)}
+                    </div>
                   </div>
                 )}
               </>

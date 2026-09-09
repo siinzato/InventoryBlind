@@ -1,6 +1,8 @@
 import { supabase } from './supabase';
 
 export type AuditAction =
+  | 'product_brand.logo_uploaded'
+  | 'product_brand.logo_removed'
   | 'login'
   | 'logout'
   | 'products.import'

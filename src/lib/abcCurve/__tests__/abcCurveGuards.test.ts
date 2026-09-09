@@ -64,3 +64,119 @@ describe('wizard — origem via API visível e desabilitada', () => {
     expect(WIZARD).toMatch(/disabled/);
   });
 });
+
+// Garantias do Wizard e da página que não são função pura — mesmo mecanismo estático acima.
+const PAGE = COMPONENTS[Object.keys(COMPONENTS).find(p => p.endsWith('AbcCurvePage.tsx')) ?? ''] ?? '';
+
+describe('wizard — bloqueios de mapeamento e de limites', () => {
+  it('bloqueia o avanço de cada passo quando falta campo obrigatório', () => {
+    expect(WIZARD).toContain('disabled={!vendas.file || vendasMissing.length > 0}');
+    expect(WIZARD).toContain('disabled={!precos.file || precosMissing.length > 0}');
+    expect(WIZARD).toContain('estoqueMissing.length === 0');
+    // E a prévia não é gerada com mapeamento incompleto, com o nome do campo na mensagem.
+    expect(WIZARD).toMatch(/Mapeie os campos obrigatórios antes de gerar a prévia/);
+  });
+
+  it('bloqueia política comercial inválida antes de importar e antes da prévia', () => {
+    // Fase 2: a validação passou de dois limiares para a política inteira, no mesmo lugar.
+    expect(WIZARD).toContain('const thresholdError = validateAbcPolicy(policy)');
+    expect(WIZARD).toContain('thresholdError !== null');
+    expect(WIZARD).toContain('const invalidPolicy = validateAbcPolicy(policy)');
+  });
+
+  it('importedCount usa as linhas VÁLIDAS de cada arquivo, nunca rawRows.length', () => {
+    expect(WIZARD).toContain('importedCount: preview.validRows.vendas');
+    expect(WIZARD).toContain('importedCount: preview.validRows.precos');
+    expect(WIZARD).toContain('importedCount: preview.validRows.estoque');
+    expect(WIZARD).not.toMatch(/importedCount: (precos|estoque|vendas)\.rawRows\.length/);
+    // O ABC do Tiny não participa do cálculo: nenhuma linha "importada".
+    expect(WIZARD).not.toMatch(/importedCount: abcTiny\.rowCount/);
+  });
+
+  it('avisos do estoque duplicado chegam à contagem de avisos da análise', () => {
+    expect(WIZARD).toContain('warnings.push(...stockResult.warnings)');
+  });
+
+  it('a prévia mostra contagem antes da lista de avisos, com lista limitada', () => {
+    expect(WIZARD).toMatch(/warnings\.length\.toLocaleString\('pt-BR'\)/);
+    expect(WIZARD).toContain('max-h-32 overflow-y-auto');
+    expect(WIZARD).toContain('preview.warnings.slice(0, 20)');
+  });
+});
+
+describe('página — sem recálculo na UI e sem dado de análise/workspace anterior', () => {
+  it('não reavalia recomendação nem reclassifica em tela', () => {
+    expect(PAGE).not.toMatch(/evaluateRecommendation|buildSkuSnapshots|classifyInPlace/);
+  });
+
+  it('as contas pesadas passam por useMemo', () => {
+    // Espaço normalizado: algumas dessas chamadas quebram linha por largura.
+    const flat = PAGE.replace(/\s+/g, ' ');
+    for (const fn of ['buildPareto', 'buildAbcDistribution', 'buildCurveComparison', 'filterSnapshots', 'observedProfit']) {
+      const memoized = flat.includes(`useMemo(() => ${fn}(`) || flat.includes(`useMemo( () => ${fn}(`);
+      expect(memoized, `${fn} deve estar dentro de useMemo`).toBe(true);
+    }
+  });
+
+  it('troca de workspace limpa análises, snapshots, filtros e paginação', () => {
+    const effect = PAGE.slice(PAGE.indexOf('useEffect(() => {\n    setAnalyses([]);'), PAGE.indexOf('}, [companyId]);'));
+    expect(effect).toContain('setAnalyses([])');
+    expect(effect).toContain('setSnapshots([])');
+    expect(effect).toContain('setRecommendations([])');
+    expect(effect).toContain('setBatches([])');
+    expect(effect).toContain('setFilters(EMPTY_PRODUCT_FILTERS)');
+    expect(effect).toContain('setPage(0)');
+  });
+
+  it('troca de análise reseta página, expandidos e filtros', () => {
+    const effect = PAGE.slice(PAGE.indexOf("if (!selectedId)"), PAGE.indexOf('}, [companyId, selectedId]);'));
+    expect(effect).toContain('setPage(0)');
+    expect(effect).toContain('setExpandedSnapshotId(null)');
+    expect(effect).toContain('setExpandedGroup(null)');
+    expect(effect).toContain('setFilters(EMPTY_PRODUCT_FILTERS)');
+  });
+
+  it('a paginação fatia o conjunto filtrado, não a lista completa', () => {
+    expect(PAGE).toContain('filtered.slice(safePage * PAGE_SIZE');
+    expect(PAGE).toContain('Math.ceil(filtered.length / PAGE_SIZE)');
+    expect(PAGE).not.toMatch(/snapshots\.slice\(page \* PAGE_SIZE/);
+  });
+
+  it('o contador mostra "filtrados de total" quando há filtro', () => {
+    expect(PAGE).toContain('${fmtInt(filtered.length)} de ${fmtInt(snapshots.length)} SKUs');
+  });
+
+  it('preserva as quatro visões de Produtos e os detalhes expansíveis', () => {
+    for (const view of ['Resumo', 'Comercial', 'Rentabilidade', 'Classificação']) {
+      expect(PAGE).toContain(`label: '${view}'`);
+    }
+    expect(PAGE).toContain('abc-curve-product-detail-');
+  });
+
+  it('diz explicitamente que o ABC do Tiny não participa do cálculo', () => {
+    // Fase 2: o texto passou a distinguir referência aproveitada de referência sem
+    // correspondência, mas as duas continuam dizendo que ela não entra no cálculo.
+    expect(PAGE).toContain('Curva ABC do Tiny — referência utilizada no comparativo');
+    expect(PAGE).toContain('Curva ABC do Tiny — referência sem dados comparáveis');
+    expect(PAGE).toMatch(/Não participa do cálculo desta análise/);
+  });
+
+  it('não usa IA e não introduz dependência de gráfico', () => {
+    expect(PAGE).not.toMatch(/anthropic|openai|claude-|gpt-|messages\.create/i);
+    expect(PAGE).not.toMatch(/from 'recharts'|from 'chart\.js'|from 'd3'/);
+  });
+});
+
+describe('serviço — leitura completa dos snapshots', () => {
+  it('pagina a leitura em blocos, com desempate estável, em vez de aceitar o corte de 1000 linhas', () => {
+    expect(SERVICE).toContain('const FETCH_PAGE = 1000;');
+    const fn = SERVICE.slice(SERVICE.indexOf('export async function listSkuSnapshots'), SERVICE.indexOf('export async function listRecommendations'));
+    expect(fn).toContain('.range(from, from + FETCH_PAGE - 1)');
+    expect(fn).toContain(".order('sku', { ascending: true })");
+    expect(fn).toContain('if (page.length < FETCH_PAGE) return rows;');
+  });
+
+  it('não busca snapshot por SKU (nada de N+1)', () => {
+    expect(SERVICE).not.toMatch(/from\('abc_curve_sku_snapshots'\)[\s\S]{0,120}\.eq\('sku'/);
+  });
+});

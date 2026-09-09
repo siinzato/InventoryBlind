@@ -7,6 +7,8 @@ import { supabase } from '../supabase';
 import { logAuditEvent } from '../auditLogService';
 import type { SkuSnapshot } from './abcCurveEngine';
 import type { Recommendation } from './abcCurveRecommendations';
+import { DEFAULT_ABC_POLICY, type AbcCommercialPolicy } from './abcCurvePolicy';
+import type { TinyFileValues } from './abcCurveTiny';
 
 export type AbcSourceType = 'file' | 'api';
 export type AbcProvider = 'tiny' | 'bling' | 'totvs' | 'sap' | 'custom';
@@ -21,6 +23,9 @@ export interface AbcCurveAnalysis {
   totalSkuCount: number; totalQuantity: number; totalRevenue: number;
   costCoveragePct: number | null; stockCoveragePct: number | null; warningCount: number;
   publishedAt: string | null; createdAt: string;
+  /** Política comercial gravada com a análise (migration 109). Análise anterior à Fase 2 traz
+   *  os DEFAULTs, que são exatamente os limiares que o código usava antes. */
+  policy: AbcCommercialPolicy;
 }
 
 export interface AbcCurveImportBatch {
@@ -36,6 +41,8 @@ interface AnalysisRow {
   status: 'draft' | 'published'; total_sku_count: number; total_quantity: number; total_revenue: number;
   cost_coverage_pct: number | null; stock_coverage_pct: number | null; warning_count: number;
   published_at: string | null; created_at: string;
+  low_coverage_days?: number | null; healthy_coverage_days?: number | null;
+  excess_coverage_days?: number | null; low_margin_pct?: number | null; strong_margin_pct?: number | null;
 }
 interface BatchRow {
   id: string; analysis_id: string; file_kind: AbcFileKind; source_type: AbcSourceType;
@@ -52,6 +59,18 @@ const analysisFromRow = (row: AnalysisRow): AbcCurveAnalysis => ({
   totalSkuCount: row.total_sku_count, totalQuantity: row.total_quantity, totalRevenue: row.total_revenue,
   costCoveragePct: row.cost_coverage_pct, stockCoveragePct: row.stock_coverage_pct, warningCount: row.warning_count,
   publishedAt: row.published_at, createdAt: row.created_at,
+  // A política LIDA é a da análise, nunca o padrão atual do produto: mudar o default no
+  // futuro não pode reescrever o critério de uma análise já publicada. O fallback só cobre
+  // banco sem a 109 aplicada, e resolve nos mesmos valores que a regra antiga usava.
+  policy: {
+    thresholdA: row.threshold_a,
+    thresholdB: row.threshold_b,
+    lowCoverageDays: row.low_coverage_days ?? DEFAULT_ABC_POLICY.lowCoverageDays,
+    healthyCoverageDays: row.healthy_coverage_days ?? DEFAULT_ABC_POLICY.healthyCoverageDays,
+    excessCoverageDays: row.excess_coverage_days ?? DEFAULT_ABC_POLICY.excessCoverageDays,
+    lowMarginPct: row.low_margin_pct ?? DEFAULT_ABC_POLICY.lowMarginPct,
+    strongMarginPct: row.strong_margin_pct ?? DEFAULT_ABC_POLICY.strongMarginPct,
+  },
 });
 
 const batchFromRow = (row: BatchRow): AbcCurveImportBatch => ({
@@ -95,24 +114,51 @@ export interface SkuSnapshotRow {
   profit_class: string | null; cost_state: string; stock_available: number | null; stock_reserved: number | null;
   stock_in_transit: number | null; lead_time_days: number | null; safety_stock: number | null;
   daily_demand: number | null; coverage_days: number | null; reorder_point: number | null; suggested_purchase: number | null;
+  // Fase 2 (migration 109). Opcionais no tipo porque snapshot gravado antes dela não tem
+  // esses campos preenchidos — e nada na leitura pode assumir que tem.
+  signal_codes?: string[] | null;
+  tiny_quantity?: number | null;
+  tiny_value?: number | null;
+  tiny_individual_pct?: number | null;
+  tiny_cumulative_pct?: number | null;
+  tiny_classification?: string | null;
 }
 
+// O PostgREST corta a resposta em 1000 linhas por padrão. Uma análise de 1.034 SKUs voltava
+// truncada em silêncio, e todo total da tela (lucro observado, Pareto, distribuição A/B/C)
+// era calculado sobre um recorte. Paginação em blocos de 1000 — são ceil(n/1000) consultas
+// em lote, não uma consulta por SKU. A ordenação leva um critério de desempate estável, senão
+// linhas com a mesma métrica podem repetir ou desaparecer na virada de bloco.
+const FETCH_PAGE = 1000;
+
 export async function listSkuSnapshots(companyId: string, analysisId: string): Promise<(SkuSnapshotRow & { id: string })[]> {
-  const { data, error } = await supabase
-    .from('abc_curve_sku_snapshots').select('*')
-    .eq('company_id', companyId).eq('analysis_id', analysisId)
-    .order('revenue', { ascending: false });
-  if (error) throw error;
-  return data ?? [];
+  const rows: (SkuSnapshotRow & { id: string })[] = [];
+  for (let from = 0; ; from += FETCH_PAGE) {
+    const { data, error } = await supabase
+      .from('abc_curve_sku_snapshots').select('*')
+      .eq('company_id', companyId).eq('analysis_id', analysisId)
+      .order('revenue', { ascending: false }).order('sku', { ascending: true })
+      .range(from, from + FETCH_PAGE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as (SkuSnapshotRow & { id: string })[];
+    rows.push(...page);
+    if (page.length < FETCH_PAGE) return rows;
+  }
 }
 
 export async function listRecommendations(companyId: string, analysisId: string) {
-  const { data, error } = await supabase
-    .from('abc_curve_recommendations').select('*')
-    .eq('company_id', companyId).eq('analysis_id', analysisId)
-    .order('priority', { ascending: true });
-  if (error) throw error;
-  return data ?? [];
+  const rows: Record<string, unknown>[] = [];
+  for (let from = 0; ; from += FETCH_PAGE) {
+    const { data, error } = await supabase
+      .from('abc_curve_recommendations').select('*')
+      .eq('company_id', companyId).eq('analysis_id', analysisId)
+      .order('priority', { ascending: true }).order('sku', { ascending: true })
+      .range(from, from + FETCH_PAGE - 1);
+    if (error) throw error;
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < FETCH_PAGE) return rows;
+  }
 }
 
 // Só leitura — usada para preencher product_id no snapshot quando o SKU já existe no catálogo.
@@ -137,11 +183,16 @@ const chunk = <T,>(items: T[], size: number): T[][] => {
 export interface PublishAnalysisInput {
   companyId: string; userId: string; userEmail: string; name: string;
   salesPeriodStart: string; salesPeriodEnd: string; pricingSnapshotDate: string; stockSnapshotDate: string | null;
-  thresholdA: number; thresholdB: number;
+  /** Política comercial completa desta análise — vira snapshot histórico junto dela. */
+  policy: AbcCommercialPolicy;
   batches: { fileKind: AbcFileKind; sourceType: AbcSourceType; provider: AbcProvider | null; fileName: string | null; fileHash: string | null; rowCount: number; importedCount: number; warningCount: number }[];
   snapshots: SkuSnapshot[];
   productIdBySku: Map<string, string>;
   recommendationsBySku: Map<string, Recommendation>;
+  /** Sinais calculados uma vez, na publicação. Não são recalculados na leitura. */
+  signalsBySku: Map<string, string[]>;
+  /** Dados da referência do Tiny, só para os SKUs com match exato de SKU. */
+  tinyBySku: Map<string, TinyFileValues>;
   costCoveragePct: number | null;
   stockCoveragePct: number | null;
   warningCount: number;
@@ -156,7 +207,13 @@ export async function publishAnalysis(input: PublishAnalysisInput): Promise<AbcC
       company_id: input.companyId, name: input.name,
       sales_period_start: input.salesPeriodStart, sales_period_end: input.salesPeriodEnd,
       pricing_snapshot_date: input.pricingSnapshotDate, stock_snapshot_date: input.stockSnapshotDate,
-      threshold_a: input.thresholdA, threshold_b: input.thresholdB, status: 'draft',
+      threshold_a: input.policy.thresholdA, threshold_b: input.policy.thresholdB,
+      low_coverage_days: input.policy.lowCoverageDays,
+      healthy_coverage_days: input.policy.healthyCoverageDays,
+      excess_coverage_days: input.policy.excessCoverageDays,
+      low_margin_pct: input.policy.lowMarginPct,
+      strong_margin_pct: input.policy.strongMarginPct,
+      status: 'draft',
       total_sku_count: input.snapshots.length,
       total_quantity: input.snapshots.reduce((s, r) => s + r.quantity, 0),
       total_revenue: input.snapshots.reduce((s, r) => s + r.revenue, 0),
@@ -183,7 +240,9 @@ export async function publishAnalysis(input: PublishAnalysisInput): Promise<AbcC
     const snapshotIdBySku = new Map<string, string>();
     for (const group of chunk(input.snapshots, 500)) {
       const { data, error } = await supabase.from('abc_curve_sku_snapshots').insert(
-        group.map(s => ({
+        group.map(s => {
+          const tiny = input.tinyBySku.get(s.sku) ?? null;
+          return {
           company_id: input.companyId, analysis_id: analysisId, sku: s.sku,
           product_id: input.productIdBySku.get(s.sku) ?? null, product_name: s.productName,
           quantity: s.quantity, revenue: s.revenue, freight: s.freight, avg_price: s.avgPrice,
@@ -194,7 +253,16 @@ export async function publishAnalysis(input: PublishAnalysisInput): Promise<AbcC
           stock_reserved: s.stockReserved, stock_in_transit: s.stockInTransit, lead_time_days: s.leadTimeDays,
           safety_stock: s.safetyStock, daily_demand: s.dailyDemand, coverage_days: s.coverageDays,
           reorder_point: s.reorderPoint, suggested_purchase: s.suggestedPurchase,
-        }))
+          signal_codes: input.signalsBySku.get(s.sku) ?? [],
+          // Nulos quando o SKU não tem correspondência exata no arquivo do Tiny — nunca zero,
+          // que significaria "o Tiny disse zero".
+          tiny_quantity: tiny?.quantity ?? null,
+          tiny_value: tiny?.value ?? null,
+          tiny_individual_pct: tiny?.individualPct ?? null,
+          tiny_cumulative_pct: tiny?.cumulativePct ?? null,
+          tiny_classification: tiny?.classification ?? null,
+          };
+        })
       ).select('id, sku');
       if (error) throw error;
       (data ?? []).forEach((row: { id: string; sku: string }) => snapshotIdBySku.set(row.sku, row.id));

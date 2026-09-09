@@ -174,12 +174,50 @@ export const normalizeSku = (value: string | number | undefined): string | null 
   return trimmed === '' ? null : trimmed;
 };
 
+// Converte texto de planilha em número de forma determinística, aceitando os dois padrões
+// (pt-BR e internacional) sem heurística de idioma. A regra é a posição do ÚLTIMO separador:
+// ele é o decimal, e todos os anteriores são de milhar. Isso corrige o bug anterior, que
+// removia todos os pontos antes de converter e transformava "4002.80" em 400280.
+//
+// Ambiguidade real: um único separador seguido de exatamente 3 dígitos ("1.234" / "1,234")
+// é milhar nos dois padrões — tratado como milhar, mas só quando a parte inteira tem a forma
+// de um grupo de milhar (1 a 3 dígitos, sem zero à esquerda), para "0.500" continuar 0,5.
 export const parseNumber = (value: string | number | undefined): number | null => {
-  if (value === undefined || value === '') return null;
-  if (typeof value === 'number') return isNaN(value) ? null : value;
-  const normalized = String(value).trim().replace(/\./g, '').replace(',', '.');
-  const num = parseFloat(normalized);
-  if (!isNaN(num)) return num;
-  const plain = parseFloat(String(value));
-  return isNaN(plain) ? null : plain;
+  if (value === undefined || value === null || value === '') return null;
+  if (typeof value === 'number') return Number.isFinite(value) ? value : null;
+
+  const raw = String(value).trim();
+  if (raw === '') return null;
+
+  const firstDigit = raw.search(/[0-9]/);
+  if (firstDigit === -1) return null;
+  // Sinal negativo é o que aparece antes do primeiro dígito ("-10", "R$ -10", "-R$ 10").
+  const negative = raw.slice(0, firstDigit).includes('-');
+
+  // Descarta símbolo monetário, espaço (inclusive NBSP), % e qualquer outro ruído.
+  const digits = raw.replace(/[^0-9.,]/g, '');
+  if (digits === '') return null;
+
+  const separatorCount = (digits.match(/[.,]/g) ?? []).length;
+  const decimalPos = Math.max(digits.lastIndexOf('.'), digits.lastIndexOf(','));
+
+  let normalized: string;
+  if (decimalPos === -1) {
+    normalized = digits;
+  } else {
+    const intPart = digits.slice(0, decimalPos).replace(/[.,]/g, '');
+    const fracPart = digits.slice(decimalPos + 1);
+    if (fracPart === '' || !/^[0-9]+$/.test(fracPart)) return null;
+    const looksLikeThousands = separatorCount === 1 && fracPart.length === 3 && /^[1-9][0-9]{0,2}$/.test(intPart);
+    normalized = looksLikeThousands ? `${intPart}${fracPart}` : `${intPart === '' ? '0' : intPart}.${fracPart}`;
+  }
+
+  const num = Number(normalized);
+  if (!Number.isFinite(num)) return null;
+  return negative ? -num : num;
 };
+
+// Campos obrigatórios do tipo de arquivo que ainda não têm coluna escolhida. Usado para
+// bloquear prévia/publicação com mensagem explícita, em vez de gerar análise incompleta.
+export const missingRequiredFields = (fields: FieldDef[], mapping: ColumnMapping): string[] =>
+  fields.filter(f => f.required && !mapping[f.key]).map(f => f.label);

@@ -10,6 +10,10 @@ export interface ClassifierLine {
   name: string;
   keywords: string[];
   active: boolean;
+  /** Termos que ELIMINAM a linha mesmo com keyword positiva presente (migration 110). */
+  excludeKeywords?: string[];
+  /** Ordem de avaliação dentro da marca; menor avalia primeiro. Default 100. */
+  matchPriority?: number;
 }
 
 export interface ClassifierBrand {
@@ -100,25 +104,42 @@ export function classifyProductTitle(title: string, brands: ClassifierBrand[]): 
   const { brand, matchedKeyword } = brandMatches[0];
   const activeLines = brand.lines.filter(l => l.active);
 
-  // Tags mais longas primeiro: uma tag específica ("Linha Tote Daily GC") não deve
-  // perder para uma mais curta e genérica que também bata no mesmo título.
-  const lineMatches: { line: ClassifierLine }[] = [];
+  // O nome da linha conta como palavra-chave, igual ao que já valia para marca — uma linha
+  // chamada "Puffer" deve casar "Capa Puffer" sem exigir alias cadastrado.
+  //
+  // Tags mais longas primeiro dentro da MESMA linha: uma tag específica ("tote daily") não
+  // deve perder para uma mais curta e genérica que também bata no mesmo título.
+  const lineMatches: { line: ClassifierLine; keyword: string; priority: number }[] = [];
   for (const line of activeLines) {
-    const sortedKeywords = [...line.keywords].sort((a, b) => b.length - a.length);
-    if (firstMatch(textNormalized, sortedKeywords)) lineMatches.push({ line });
+    const excluded = firstMatch(textNormalized, line.excludeKeywords ?? []);
+    if (excluded) continue;
+    const sortedKeywords = [line.name, ...line.keywords].sort((a, b) => b.length - a.length);
+    const keyword = firstMatch(textNormalized, sortedKeywords);
+    if (keyword) lineMatches.push({ line, keyword, priority: line.matchPriority ?? 100 });
   }
 
   if (lineMatches.length === 0) {
     return { status: 'auto', brandId: brand.id, lineId: null, matchedKeyword, brandCandidates: [], lineCandidates: [] };
   }
 
-  if (lineMatches.length > 1) {
+  // Mais de uma linha batendo é o caso normal, não erro: "Lancheira Puffer Rosa" bate em
+  // Lancheiras (categoria) e em Puffer (modelo). A prioridade da linha decide — categoria do
+  // que o produto É vence o nome que ele TEM. Só quando duas linhas empatam em prioridade E
+  // em especificidade do termo é que a ambiguidade é real e vai para revisão manual, em vez
+  // de o sistema escolher uma às cegas.
+  const sorted = [...lineMatches].sort((a, b) =>
+    a.priority !== b.priority ? a.priority - b.priority : b.keyword.length - a.keyword.length
+  );
+  const best = sorted[0];
+  const tied = sorted.filter(m => m.priority === best.priority && m.keyword.length === best.keyword.length);
+
+  if (tied.length > 1) {
     return {
       status: 'needs_review', brandId: brand.id, lineId: null, matchedKeyword,
       brandCandidates: [],
-      lineCandidates: lineMatches.map(m => ({ lineId: m.line.id, lineName: m.line.name })),
+      lineCandidates: tied.map(m => ({ lineId: m.line.id, lineName: m.line.name })),
     };
   }
 
-  return { status: 'auto', brandId: brand.id, lineId: lineMatches[0].line.id, matchedKeyword, brandCandidates: [], lineCandidates: [] };
+  return { status: 'auto', brandId: brand.id, lineId: best.line.id, matchedKeyword: best.keyword, brandCandidates: [], lineCandidates: [] };
 }

@@ -16,7 +16,7 @@ import { recomputeAbcXyzForCompany } from '../../lib/abcXyzService';
 import { RcaClassificationModal, PendingRcaItem } from '../rca/RcaClassificationModal';
 import { generateClosingReport } from '../../lib/closingReports/closingReportService';
 import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
-import { ClosingSummaryModal } from './closing/ClosingSummaryModal';
+import { CountClosingSummaryModal } from './closing/CountClosingSummaryModal';
 import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
 
 type ImportStep = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete';
@@ -383,7 +383,7 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
         />
       )}
 
-      <ClosingSummaryModal
+      <CountClosingSummaryModal
         open={!!closingReport}
         onClose={() => setClosingReport(null)}
         brandName={closingBrandName}

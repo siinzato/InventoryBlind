@@ -20,6 +20,55 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-08-linhas-gocase-outlet-ventosa-bases',
+    date: '2026-09-08',
+    category: 'correcao',
+    title: 'Linhas da GoCase: Outlet passa na frente, Ventosa e Bases de garrafa aparecem',
+    description: 'Em Produtos → Linhas e Marcas, três ajustes na classificação da GoCase. Primeiro: produto de Outlet agora pertence à linha Outlet, e só a ela. Antes, um item de outlet ia para a linha do produto original — uma lancheira puffer de outlet caía em Lancheiras, uma garrafa de outlet caía em Térmicos —, o que misturava mercadoria com leve defeito com a linha regular na hora de contar. Agora "Outlet" vem antes de qualquer outra regra: 346 produtos foram movidos para a linha Outlet e saíram das linhas antigas, então Térmicos, Lancheiras e Necessários, Mochilas e Tote Daily, Joy, Puffer e Capas passam a mostrar números menores e corretos. Segundo: a linha Ventosa deixou de ficar vazia e agora recebe as ventosas de silicone. Terceiro: as bases de garrafa não apareciam em nenhuma linha porque o nome delas não traz a marca no título ("Base de Silicone Garrafa Fresh 650ml"); agora são reconhecidas como GoCase e a linha Bases mostra 69 produtos, sem serem confundidas com Térmicos por causa da palavra "garrafa". Os contadores da tela continuam vindo direto das associações reais — nada é digitado à mão. Classificação que você confirmou manualmente não foi alterada, e as mesmas regras já valem para as próximas importações de planilha: um produto novo com "Outlet" no nome entra direto na linha Outlet.',
+  },
+  {
+    id: '2026-09-08-linhas-de-produto-classificacao',
+    date: '2026-09-08',
+    category: 'correcao',
+    title: 'Linhas e Marcas: as linhas deixam de aparecer com zero produtos',
+    description: 'Em Produtos → Linhas e Marcas, as linhas da GoCase mostravam "0 produtos" mesmo com a marca tendo 1.608 produtos associados. O motivo era o preenchimento das palavras-chave de cada linha: elas continham os nomes das linhas de contagem do inventário, que não aparecem no título dos produtos, então nenhum produto casava com nenhuma linha. Agora cada linha tem suas próprias palavras de identificação e uma ordem de prioridade, e os produtos do catálogo já existentes foram classificados: Capas, Térmicos, Lancheiras e Necessários, Mochilas e Tote Daily, Joy e Puffer passaram a mostrar a contagem real, e "Ver produtos" abre exatamente os produtos daquela linha. A prioridade resolve os casos ambíguos pelo que o produto é, não pela palavra que aparece no nome: uma lancheira que tenha "Puffer" no título vai para Lancheiras e Necessários, e uma base com "Puffer" no nome vai para Bases. Produtos que não dão para classificar com segurança ficam em "Produtos sem linha", para revisão, em vez de entrarem numa linha errada. Marcas sem linhas cadastradas (Ringke, Nillkin, ESR, DUX, X-Level, Dexnor, AZ) continuam funcionando normalmente, só com a marca. Daqui para frente, toda importação de planilha já classifica marca e linha dos produtos novos automaticamente, sem precisar abrir a tela de gerenciamento — e uma classificação que você tenha confirmado à mão nunca é sobrescrita por uma importação.',
+  },
+  {
+    id: '2026-09-08-curva-abc-comparacao-historica',
+    date: '2026-09-08',
+    category: 'novidade',
+    title: 'Curva ABC: comparação com o período anterior, política registrada e conferência com o Tiny',
+    description: 'A Visão geral da Curva ABC agora compara a análise selecionada com uma análise anterior do mesmo workspace — por padrão a imediatamente anterior, e você pode escolher outra. Aparecem as variações de faturamento, lucro observado, unidades, SKUs e classe A, sempre com indicador discreto ao lado do número. Quando os dois períodos têm durações diferentes, a leitura principal passa a ser por dia e o painel avisa, em vez de comparar totais que não são equivalentes; a cobertura de custo e de estoque é comparada em pontos percentuais, num bloco separado, porque é qualidade de cadastro e não crescimento. Há ainda o quadro de mudança na classificação e as movimentações: quantos SKUs subiram para A, saíram de A, entraram na análise ou não apareceram no período atual — cada grupo abre a lista com classe e valor de antes e de agora. Também novo: cada análise passa a registrar a política comercial que gerou suas recomendações (limites das classes, o que é baixa cobertura, cobertura saudável, excesso, margem baixa e margem forte). Você pode ajustá-la ao criar uma análise, na seção "Política comercial", e ela fica gravada no histórico — mudar o padrão daqui para frente não altera nenhuma análise já publicada. Cada produto agora mostra, além da recomendação principal, os sinais observados (sem custo, prejuízo, ruptura, baixa cobertura, estoque parado, excesso de cobertura, margem baixa ou forte, alto giro, faturamento ou lucro), com filtro por sinal na lista e contagem por sinal na Matriz de decisão. Por fim, se você anexar a Curva ABC do Tiny, ela deixa de ser só um arquivo guardado: aparece a aba "Comparativo Tiny", com quantos SKUs coincidem, quantos ficam em classe diferente e quantos não têm correspondência, além da tabela SKU a SKU. A diferença é tratada como comparação de referência, não como erro — período, base e critério podem ser diferentes.',
+  },
+  {
+    id: '2026-09-08-curva-abc-visao-executiva',
+    date: '2026-09-08',
+    category: 'novidade',
+    title: 'Curva ABC: visão executiva, gráfico de concentração e filtros nos produtos',
+    description: 'A Visão geral da Curva ABC passou a responder o que importa de uma olhada: faturamento, lucro bruto observado (com a informação de sobre quantos SKUs a conta foi feita), unidades vendidas e SKUs analisados, mais um bloco separado com a qualidade dos dados daquela análise. Abaixo entrou o gráfico de concentração ABC, alternando entre Giro, Faturamento e Lucro, com o acumulado percentual e os limites das classes; ao lado dele, quantos SKUs estão em A, B e C e quanto cada classe representa de verdade. Há também a comparação das três curvas lado a lado e as prioridades da análise (prejuízo, sem custo, compra urgente e estoque parado), que levam direto para a lista já filtrada. Em Produtos, agora há busca por SKU ou produto e filtros por classe nas três curvas, status de custo, recomendação e estoque, com a paginação e o contador respeitando o que está filtrado. Na Matriz de decisão, cada grupo mostra a regra que o gerou e os valores observados dos SKUs daquele grupo. Em Fontes de dados ficou explícito quantas linhas cada arquivo trouxe e quantas foram realmente aproveitadas.',
+  },
+  {
+    id: '2026-09-08-curva-abc-correcoes',
+    date: '2026-09-08',
+    category: 'correcao',
+    title: 'Curva ABC: leitura de números, classificação e estoque sem venda',
+    description: 'Corrigimos a leitura de valores nas planilhas: números escritos no padrão internacional (como 4002.80) eram interpretados errado e podiam inflar o faturamento de um produto. A classificação também ficou mais fiel à realidade — um produto que sozinho concentra a maior parte do resultado agora entra na classe A, como se espera, em vez de cair na B. Produtos que aparecem só na planilha de estoque, sem nenhuma venda no período, passaram a constar na análise para o diagnóstico de estoque parado funcionar, sem receber classificação ABC que não faz sentido para eles. Planilha de estoque com o mesmo código repetido agora avisa, em vez de sobrescrever em silêncio. E o assistente de importação passou a barrar limites de classe inconsistentes e campos obrigatórios sem coluna escolhida antes de gerar a prévia.',
+  },
+  {
+    id: '2026-09-08-resultados-por-linha-historico',
+    date: '2026-09-08',
+    category: 'novidade',
+    title: 'Resultados por Linha: histórico, exportação e feedback ao responsável',
+    description: 'A tela deixou de mostrar só o ciclo em andamento. Agora há três conjuntos no topo — Ciclo atual, Concluídos e Arquivados — com filtros de período, inventário e linha/marca, além da busca. Abrir um fechamento é somente leitura: o resultado que você vê é o que foi gravado no dia, sem recalcular nada. No fechamento aberto você encontra os seis indicadores, as categorias com as observações reais, a exportação do relatório em PDF ou Word e a preparação de um feedback formal ao responsável pela linha — informe o nome, o cargo se quiser e uma observação, e o texto sai pronto para copiar, sempre com o mesmo formato e apenas com os números do fechamento.',
+  },
+  {
+    id: '2026-09-08-logo-da-marca',
+    date: '2026-09-08',
+    category: 'novidade',
+    title: 'Logo da marca no cadastro de Linhas e Marcas',
+    description: 'Em Produtos → Linhas e Marcas, cada marca agora aceita um logo: edite a marca, escolha uma imagem PNG, JPEG ou WEBP de até 5 MB, e troque ou remova quando quiser. O logo aparece na lista de marcas, ao lado do nome em Resultados por Linha, no fechamento da linha e nas exportações em PDF e Word. Os logos pertencem só ao workspace onde foram cadastrados — outro workspace usa os dele, mesmo que tenha uma marca com o nome igual. Marca sem logo continua aparecendo normalmente, com as iniciais do nome.',
+  },
+  {
     id: '2026-09-04-auditorias-performance-reincidencia',
     date: '2026-09-04',
     category: 'melhoria',

@@ -5,7 +5,10 @@ import { AnimatePresence, motion } from 'motion/react';
 interface ModalProps {
   open: boolean;
   onClose: () => void;
-  title?: string;
+  /** Texto do título; aceita nó para casos que precisam de um selo ao lado do texto
+   *  (ex.: logo da marca no resumo de fechamento). Todos os usos de string seguem
+   *  renderizando exatamente igual. */
+  title?: ReactNode;
   children: ReactNode;
   maxWidth?: string;
 }

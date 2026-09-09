@@ -239,6 +239,144 @@ export async function listCurrentReportsForCycle(companyId: string): Promise<Clo
   return ((data as ReportRow[]) ?? []).map(reportFromRow);
 }
 
+/**
+ * Histórico de fechamentos da empresa — todos os ciclos, não só o atual. Traz a versão
+ * vigente de cada linha/ciclo (`is_current`), que é a que o índice único parcial da
+ * migration 073 garante ser única por linha+ciclo. Company-scoped como todo o resto;
+ * `listCurrentReportsForCycle` continua existindo e intocada para o ciclo atual.
+ *
+ * Só metadados do relatório: as observações de um fechamento são lidas apenas quando ele
+ * é aberto (getObservationsForReport), nunca em lote para a listagem inteira.
+ */
+export async function listClosingReportsHistory(companyId: string): Promise<ClosingReport[]> {
+  const { data, error } = await supabase
+    .from('inventory_closing_reports')
+    .select('*')
+    .eq('company_id', companyId)
+    .eq('is_current', true)
+    .order('generated_at', { ascending: false });
+
+  if (error) {
+    console.error('[ClosingReport] Error listing closing history:', error);
+    return [];
+  }
+  return ((data as ReportRow[]) ?? []).map(reportFromRow);
+}
+
+/** Uma linha/marca dentro de um inventário já arquivado, como o histórico a persistiu. */
+export interface ArchivedInventoryClosing {
+  snapshotId: string;
+  snapshotName: string;
+  startDate: string | null;
+  endDate: string | null;
+  brand: string;
+  totalSku: number;
+  doneSku: number;
+  divergences: number;
+  accuracy: number | null;
+  status: string | null;
+}
+
+/** O inventário arquivado em si (o cabeçalho do snapshot), com os totais que ele já
+ *  gravou. Existe mesmo quando o snapshot não tem detalhamento por linha. */
+export interface ArchivedInventorySummary {
+  id: string;
+  name: string;
+  startDate: string | null;
+  endDate: string | null;
+  totalSku: number | null;
+  totalDone: number | null;
+  totalDivergences: number | null;
+  accuracy: number | null;
+  status: string | null;
+}
+
+export interface ArchivedInventoryData {
+  inventories: ArchivedInventorySummary[];
+  lines: ArchivedInventoryClosing[];
+}
+
+/**
+ * Inventários arquivados, direto da infraestrutura histórica que já existe
+ * (inventory_snapshots + inventory_brand_history) — nenhuma segunda estrutura de
+ * histórico, nenhum snapshot duplicado, nenhuma geração de relatório antigo.
+ *
+ * Devolve os dois níveis separados de propósito: `inventories` é o que o snapshot
+ * gravou sobre o inventário inteiro, `lines` é o detalhamento por linha/marca. Um
+ * snapshot antigo pode existir sem nenhuma linha em inventory_brand_history — nesse
+ * caso `lines` vem vazio e nada é fabricado para preencher a tabela.
+ *
+ * Duas queries em lote (snapshots, depois as linhas de todos eles), sem N+1. As duas
+ * filtram company_id: um workspace nunca recebe o histórico de outro.
+ */
+export async function listArchivedInventoryClosings(companyId: string): Promise<ArchivedInventoryData> {
+  const { data: snapshots, error: snapshotError } = await supabase
+    .from('inventory_snapshots')
+    .select('id, name, start_date, end_date, total_sku, total_done, total_divergences, accuracy, status')
+    .eq('company_id', companyId)
+    .order('end_date', { ascending: false });
+
+  if (snapshotError || !snapshots || snapshots.length === 0) {
+    if (snapshotError) console.error('[ClosingReport] Error listing snapshots:', snapshotError);
+    return { inventories: [], lines: [] };
+  }
+
+  type SnapshotRow = {
+    id: string; name: string; start_date: string | null; end_date: string | null;
+    total_sku: number | null; total_done: number | null; total_divergences: number | null;
+    accuracy: number | null; status: string | null;
+  };
+
+  const inventories: ArchivedInventorySummary[] = (snapshots as SnapshotRow[]).map(s => ({
+    id: s.id,
+    name: s.name,
+    startDate: s.start_date,
+    endDate: s.end_date,
+    totalSku: s.total_sku,
+    totalDone: s.total_done,
+    totalDivergences: s.total_divergences,
+    accuracy: s.accuracy,
+    status: s.status,
+  }));
+
+  const snapshotById = new Map((snapshots as SnapshotRow[]).map(s => [s.id, s]));
+
+  const { data: history, error: historyError } = await supabase
+    .from('inventory_brand_history')
+    .select('snapshot_id, brand, total_sku, done_sku, divergences, accuracy, status')
+    .eq('company_id', companyId)
+    .in('snapshot_id', [...snapshotById.keys()]);
+
+  if (historyError) {
+    console.error('[ClosingReport] Error listing brand history:', historyError);
+    return { inventories, lines: [] };
+  }
+
+  type HistoryRow = {
+    snapshot_id: string; brand: string; total_sku: number; done_sku: number;
+    divergences: number; accuracy: number | null; status: string | null;
+  };
+
+  const lines = ((history as HistoryRow[]) ?? []).flatMap(row => {
+    const snapshot = snapshotById.get(row.snapshot_id);
+    if (!snapshot) return [];
+    return [{
+      snapshotId: snapshot.id,
+      snapshotName: snapshot.name,
+      startDate: snapshot.start_date,
+      endDate: snapshot.end_date,
+      brand: row.brand,
+      totalSku: row.total_sku,
+      doneSku: row.done_sku,
+      divergences: row.divergences,
+      accuracy: row.accuracy,
+      status: row.status,
+    }];
+  });
+
+  return { inventories, lines };
+}
+
 export interface ClosingResultRow {
   brandId: string;
   brandName: string;

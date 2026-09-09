@@ -11,7 +11,7 @@ import type { LiveCountStats } from './CountSidePanel';
 import { useAuth } from '../../lib/auth';
 import { generateClosingReport } from '../../lib/closingReports/closingReportService';
 import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
-import { ClosingSummaryModal } from './closing/ClosingSummaryModal';
+import { CountClosingSummaryModal } from './closing/CountClosingSummaryModal';
 import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
 
 interface ManualCountTabProps {
@@ -338,7 +338,7 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
         </form>
       </PanelSection>
 
-      <ClosingSummaryModal
+      <CountClosingSummaryModal
         open={!!closingReport}
         onClose={() => setClosingReport(null)}
         brandName={closingBrandName}

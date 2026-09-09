@@ -143,11 +143,19 @@ export interface StockInfo {
   leadTimeDays: number | null; safetyStock: number | null;
 }
 
-export const buildStockMap = (rows: RawRow[]): Map<string, StockInfo> => {
+// Mesmo contrato de buildPricingMap: SKU duplicado mantém a última ocorrência, mas nunca em
+// silêncio — gera aviso explícito, para o usuário saber que o arquivo tem linha repetida.
+export const buildStockMap = (rows: RawRow[]): { map: Map<string, StockInfo>; warnings: string[] } => {
   const map = new Map<string, StockInfo>();
-  rows.forEach(row => {
+  const warnings: string[] = [];
+
+  rows.forEach((row, idx) => {
     const sku = normalizeSku(row.sku);
-    if (!sku) return;
+    if (!sku) {
+      warnings.push(`Estoque linha ${idx + 1}: sem SKU, ignorada.`);
+      return;
+    }
+    if (map.has(sku)) warnings.push(`Estoque: SKU "${sku}" duplicado, mantida a última ocorrência.`);
     map.set(sku, {
       stockAvailable: parseNumber(row.estoqueDisponivel),
       stockReserved: parseNumber(row.estoqueReservado),
@@ -156,7 +164,18 @@ export const buildStockMap = (rows: RawRow[]): Map<string, StockInfo> => {
       safetyStock: parseNumber(row.estoqueSeguranca),
     });
   });
-  return map;
+
+  return { map, warnings };
+};
+
+// Limites das classes A/B, validados antes de qualquer cálculo/publicação. Uma análise com
+// limites inconsistentes produziria classificação sem significado, então é bloqueio, não aviso.
+export const validateThresholds = (thresholdA: number, thresholdB: number): string | null => {
+  if (!Number.isFinite(thresholdA) || !Number.isFinite(thresholdB)) return 'Informe os limites das classes A e B em percentual.';
+  if (thresholdA <= 0) return 'O limite da classe A deve ser maior que 0%.';
+  if (thresholdA >= thresholdB) return 'O limite da classe A deve ser menor que o limite da classe B.';
+  if (thresholdB > 100) return 'O limite da classe B deve ser no máximo 100%.';
+  return null;
 };
 
 const round2 = (value: number): number => Math.round(value * 100) / 100;
@@ -173,7 +192,17 @@ export interface BuildSnapshotsInput {
 // Monta um snapshot por SKU com métricas de rentabilidade + estoque (quando houver) + as três
 // classes ABC (giro/faturamento/lucro), calculadas de forma independente entre si.
 export const buildSkuSnapshots = ({ vendas, pricing, stock, periodDays, thresholdA = 80, thresholdB = 95 }: BuildSnapshotsInput): SkuSnapshot[] => {
-  const snapshots: SkuSnapshot[] = vendas.map(v => {
+  // Universo = vendas ∪ estoque. Um SKU que só existe no arquivo de estoque (zero venda no
+  // período) precisa aparecer na análise para o diagnóstico de estoque parado funcionar — ele
+  // fica NÃO ELEGÍVEL para as três curvas (métrica zero), nunca é empurrado para a classe C.
+  const soldSkus = new Set(vendas.map(v => v.sku));
+  const stockOnly: AggregatedSales[] = stock
+    ? Array.from(stock.keys())
+        .filter(sku => !soldSkus.has(sku))
+        .map(sku => ({ sku, productName: null, quantity: 0, revenue: 0, freight: 0 }))
+    : [];
+
+  const snapshots: SkuSnapshot[] = [...vendas, ...stockOnly].map(v => {
     const priceInfo = pricing.get(v.sku) ?? null;
     const stockInfo = stock?.get(v.sku) ?? null;
     const avgPrice = v.quantity > 0 ? v.revenue / v.quantity : null;
@@ -256,8 +285,11 @@ export const buildSkuSnapshots = ({ vendas, pricing, stock, periodDays, threshol
   return snapshots;
 };
 
-// Ordena decrescente pela métrica, calcula % acumulado e classifica A (até thresholdA%),
-// B (até thresholdB%) ou C (acima) — só entre os itens elegíveis (valor > 0 por padrão).
+// Ordena decrescente pela métrica e classifica pelo acumulado ANTES do próprio item: enquanto
+// o que veio antes não fechou thresholdA, o item é A; depois, enquanto não fechou thresholdB,
+// é B; o resto é C. Usar o acumulado depois do item (como antes) fazia um SKU que sozinho
+// representa 85% da métrica cair em B — matematicamente coerente, operacionalmente absurdo.
+// Consequência desejada: o primeiro item elegível é sempre A, e população vazia não gera classe.
 function classifyInPlace<T>(
   items: T[],
   metric: (item: T) => number,
@@ -270,8 +302,8 @@ function classifyInPlace<T>(
   const total = ranked.reduce((sum, item) => sum + metric(item), 0);
   let cumulative = 0;
   for (const item of ranked) {
+    const pctBefore = total > 0 ? (cumulative / total) * 100 : 0;
+    assign(item, pctBefore < thresholdA ? 'A' : pctBefore < thresholdB ? 'B' : 'C');
     cumulative += metric(item);
-    const pct = total > 0 ? (cumulative / total) * 100 : 0;
-    assign(item, pct <= thresholdA ? 'A' : pct <= thresholdB ? 'B' : 'C');
   }
 }

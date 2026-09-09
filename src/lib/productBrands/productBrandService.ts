@@ -9,11 +9,19 @@ import { classifyProductTitle, type ClassifierBrand } from './brandClassifier';
 export interface ProductBrand {
   id: string; companyId: string; name: string; code: string | null; keywords: string[];
   primaryResponsibleId: string | null; additionalResponsibleIds: string[]; active: boolean;
+  /** Caminho do logo no bucket privado `brand-logos` (migration 108), nunca URL assinada.
+   *  A URL de exibição é resolvida sob demanda em brandLogoService.ts. */
+  logoPath: string | null;
   createdAt: string; updatedAt: string;
 }
 export interface ProductLine {
   id: string; companyId: string; brandId: string; name: string; keywords: string[];
   primaryResponsibleId: string | null; additionalResponsibleIds: string[]; active: boolean;
+  /** Regras de classificação da linha (migration 110).  são termos de TÍTULO;
+   *   eliminam a linha;  decide a ordem (menor primeiro). */
+  excludeKeywords: string[]; matchPriority: number;
+  /** Nomes em  alimentados por esta linha — ponte por nome, sem FK. */
+  inventoryBrandNames: string[];
   createdAt: string; updatedAt: string;
 }
 export interface ProductBrandAssociation {
@@ -27,11 +35,13 @@ export interface ProductBrandAssociation {
 interface BrandRow {
   id: string; company_id: string; name: string; code: string | null; keywords: string[];
   primary_responsible_id: string | null; additional_responsible_ids: string[]; active: boolean;
+  logo_path: string | null;
   created_at: string; updated_at: string;
 }
 interface LineRow {
   id: string; company_id: string; brand_id: string; name: string; keywords: string[];
   primary_responsible_id: string | null; additional_responsible_ids: string[]; active: boolean;
+  exclude_keywords?: string[] | null; match_priority?: number | null; inventory_brand_names?: string[] | null;
   created_at: string; updated_at: string;
 }
 interface AssociationRow {
@@ -45,14 +55,18 @@ function brandFromRow(row: BrandRow): ProductBrand {
   return {
     id: row.id, companyId: row.company_id, name: row.name, code: row.code, keywords: row.keywords ?? [],
     primaryResponsibleId: row.primary_responsible_id, additionalResponsibleIds: row.additional_responsible_ids ?? [],
-    active: row.active, createdAt: row.created_at, updatedAt: row.updated_at,
+    active: row.active, logoPath: row.logo_path ?? null,
+    createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
 function lineFromRow(row: LineRow): ProductLine {
   return {
     id: row.id, companyId: row.company_id, brandId: row.brand_id, name: row.name, keywords: row.keywords ?? [],
     primaryResponsibleId: row.primary_responsible_id, additionalResponsibleIds: row.additional_responsible_ids ?? [],
-    active: row.active, createdAt: row.created_at, updatedAt: row.updated_at,
+    active: row.active,
+    excludeKeywords: row.exclude_keywords ?? [], matchPriority: row.match_priority ?? 100,
+    inventoryBrandNames: row.inventory_brand_names ?? [],
+    createdAt: row.created_at, updatedAt: row.updated_at,
   };
 }
 function associationFromRow(row: AssociationRow): ProductBrandAssociation {
@@ -243,7 +257,10 @@ async function buildClassifierBrands(companyId: string): Promise<ClassifierBrand
   }
   return brands.map(b => ({
     id: b.id, name: b.name, keywords: b.keywords, active: b.active,
-    lines: (linesByBrand.get(b.id) ?? []).map(l => ({ id: l.id, name: l.name, keywords: l.keywords, active: l.active })),
+    lines: (linesByBrand.get(b.id) ?? []).map(l => ({
+      id: l.id, name: l.name, keywords: l.keywords, active: l.active,
+      excludeKeywords: l.excludeKeywords, matchPriority: l.matchPriority,
+    })),
   }));
 }
 
@@ -287,33 +304,75 @@ export async function confirmProductAssociation(
   });
 }
 
-export interface ClassifyBatchResult { classified: number; needsReview: number; unmatched: number }
+export interface ClassifyBatchResult { classified: number; needsReview: number; unmatched: number; skippedManual: number }
+
+export interface ClassifyOptions {
+  batchSize?: number;
+  /** Quando true, só toca em produto SEM linha resolvida (novo, unmatched ou needs_review).
+   *  É o modo usado depois de uma importação: preenche o que falta e não reprocessa o que
+   *  já está classificado. */
+  onlyUnclassified?: boolean;
+}
 
 /**
  * Classifica os produtos da empresa chamadora contra as marcas/linhas ATIVAS dela
  * mesma — nunca lê nem grava em outro tenant. Roda em lotes para não carregar o
  * catálogo inteiro de uma vez. Idempotente: recalcula a mesma linha por produto
  * (UNIQUE product_id), nunca duplica.
+ *
+ * Associação com match_status 'manual' NUNCA é sobrescrita: decisão do usuário vale mais que
+ * regra automática, e uma reimportação de planilha não pode desfazer curadoria. Antes da
+ * migration 110 esse upsert reescrevia tudo, inclusive o que tinha sido confirmado à mão.
  */
-export async function classifyCompanyProducts(companyId: string, userId: string, userEmail: string, batchSize = 500): Promise<ClassifyBatchResult> {
+export async function classifyCompanyProducts(
+  companyId: string, userId: string, userEmail: string, options: ClassifyOptions | number = {}
+): Promise<ClassifyBatchResult> {
+  // Assinatura antiga aceitava batchSize posicional — preservada para não quebrar chamador.
+  const { batchSize = 500, onlyUnclassified = false } = typeof options === 'number' ? { batchSize: options, onlyUnclassified: false } : options;
   const classifierBrands = await buildClassifierBrands(companyId);
-  const result: ClassifyBatchResult = { classified: 0, needsReview: 0, unmatched: 0 };
+  const result: ClassifyBatchResult = { classified: 0, needsReview: 0, unmatched: 0, skippedManual: 0 };
   if (classifierBrands.length === 0) return result;
+
+  // Estado atual das associações, para respeitar manual e para o modo onlyUnclassified.
+  const existing = new Map<string, { status: string; lineId: string | null }>();
+  for (let from = 0; ; from += 1000) {
+    const { data, error } = await supabase
+      .from('product_brand_associations')
+      .select('product_id, match_status, line_id')
+      .eq('company_id', companyId)
+      .order('product_id', { ascending: true })
+      .range(from, from + 999);
+    if (error) throw error;
+    const page = data ?? [];
+    for (const row of page) existing.set(row.product_id, { status: row.match_status, lineId: row.line_id });
+    if (page.length < 1000) break;
+  }
 
   const brandNameById = new Map(classifierBrands.map(b => [b.id, b.name]));
   const lineNameById = new Map(classifierBrands.flatMap(b => b.lines.map(l => [l.id, l.name] as const)));
 
   let from = 0;
   for (;;) {
+    // A ordenação é obrigatória: `.range()` sem `order by` não tem ordem garantida entre
+    // chamadas, então páginas se sobrepõem e produto some do percurso — o lote parava antes
+    // de varrer o catálogo inteiro e parte do backfill nunca acontecia.
     const { data: products, error } = await supabase
       .from('products')
       .select('id, name')
       .eq('company_id', companyId)
+      .order('id', { ascending: true })
       .range(from, from + batchSize - 1);
     if (error) throw error;
     if (!products || products.length === 0) break;
 
-    const upsertRows = products.map(product => {
+    const upsertRows = products.flatMap(product => {
+      const current = existing.get(product.id);
+
+      // Curadoria manual é intocável.
+      if (current?.status === 'manual') { result.skippedManual += 1; return []; }
+      // Modo "só o que falta": produto que já tem linha resolvida automaticamente fica como está.
+      if (onlyUnclassified && current && current.lineId !== null) return [];
+
       const classification = classifyProductTitle(product.name, classifierBrands);
       if (classification.status === 'auto') result.classified += 1;
       else if (classification.status === 'needs_review') result.needsReview += 1;
@@ -324,15 +383,17 @@ export async function classifyCompanyProducts(companyId: string, userId: string,
         ...classification.lineCandidates.map(c => ({ type: 'line' as const, id: c.lineId, name: lineNameById.get(c.lineId) ?? c.lineName })),
       ];
 
-      return {
+      return [{
         company_id: companyId, product_id: product.id, brand_id: classification.brandId, line_id: classification.lineId,
         match_status: classification.status, matched_keyword: classification.matchedKeyword, candidate_matches: candidateMatches,
         updated_at: new Date().toISOString(),
-      };
+      }];
     });
 
-    const { error: upsertError } = await supabase.from('product_brand_associations').upsert(upsertRows, { onConflict: 'product_id' });
-    if (upsertError) throw upsertError;
+    if (upsertRows.length > 0) {
+      const { error: upsertError } = await supabase.from('product_brand_associations').upsert(upsertRows, { onConflict: 'product_id' });
+      if (upsertError) throw upsertError;
+    }
 
     if (products.length < batchSize) break;
     from += batchSize;

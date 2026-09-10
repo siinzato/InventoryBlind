@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
-import { ClipboardList, Upload, Tablet, Repeat2 } from 'lucide-react';
-import { Page, PageHeader, SegmentedControl, type SegmentedOption } from '../ui';
+import { ClipboardList, Upload, Tablet, Repeat2, Printer } from 'lucide-react';
+import { Button, Page, PageHeader, SegmentedControl, type SegmentedOption } from '../ui';
 import { BrandData } from '../../lib/supabase';
 import { ManualCountTab } from './ManualCountTab';
 import { ImportCountTab } from './ImportCountTab';
@@ -15,6 +15,10 @@ interface CountManagementCenterProps {
   brandsData: BrandData[];
   companyId: string;
   onBrandsUpdated: (brands: BrandData[]) => void;
+  /** Abre a ferramenta Emitir Relatório — a folha de contagem que o operador
+   *  leva ao estoque antes de registrar a contagem aqui. É a MESMA tela do item
+   *  em Ferramentas; esta é só a segunda entrada, dentro do fluxo de contagem. */
+  onEmitReport?: () => void;
 }
 
 type Mode = 'manual' | 'import' | 'physical' | 'auto-recount';
@@ -30,7 +34,7 @@ const MODES: SegmentedOption<Mode>[] = [
 
 const EMPTY_STATS: LiveCountStats = { linha: '', totalSku: 0, contados: 0, divergencias: 0, acuracidade: null, active: false };
 
-export function CountManagementCenter({ brandsData, companyId, onBrandsUpdated }: CountManagementCenterProps) {
+export function CountManagementCenter({ brandsData, companyId, onBrandsUpdated, onEmitReport }: CountManagementCenterProps) {
   const { profile } = useAuth();
   const [mode, setMode] = useState<Mode>('manual');
   const [liveStats, setLiveStats] = useState<LiveCountStats>(EMPTY_STATS);
@@ -46,7 +50,18 @@ export function CountManagementCenter({ brandsData, companyId, onBrandsUpdated }
 
   return (
     <Page>
-      <PageHeader title="Centro de Gestão da Contagem" description="Registre contagens manuais ou importe planilhas para auditar o estoque." />
+      <PageHeader
+        title="Centro de Gestão da Contagem"
+        description="Registre contagens manuais ou importe planilhas para auditar o estoque."
+        actions={
+          onEmitReport && (
+            <Button variant="secondary" onClick={onEmitReport}>
+              <Printer size={16} />
+              Emitir Relatório
+            </Button>
+          )
+        }
+      />
 
       <SegmentedControl
         label="Modo de contagem"

@@ -57,7 +57,9 @@
 .ib-sidebar * { box-sizing: border-box; }
 
 .ib-sidebar a,
-.ib-sidebar button { font-family: inherit; }
+/* Itens de navegação são <a href> de verdade (nova guia, Ctrl+clique, copiar link);
+   as regras abaixo valem para os dois elementos para o visual não mudar. */
+.ib-sidebar :is(button, a) { font-family: inherit; text-decoration: none; }
 
 .ib-sidebar.is-collapsed {
   width: var(--ib-collapsed);
@@ -576,7 +578,7 @@
   pointer-events: none;
 }
 
-.ib-submenu-list button {
+.ib-submenu-list :is(button, a) {
   position: relative;
   display: grid;
   width: 100%;
@@ -594,7 +596,7 @@
   text-align: left;
 }
 
-.ib-submenu-list button::before {
+.ib-submenu-list :is(button, a)::before {
   position: absolute;
   top: 50%;
   left: -12px;
@@ -607,12 +609,12 @@
   transform: translateY(-50%);
 }
 
-.ib-submenu-list button span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-.ib-submenu-list button:hover,
-.ib-submenu-list button:focus-visible { background: rgb(var(--surface-3)); color: rgb(var(--fg)); outline: none; }
-.ib-submenu-list button.is-active { background: rgb(var(--rail)); color: #fff; }
-.ib-submenu-list button.is-active small { color: #73a0ff; }
-.ib-submenu-list button.is-active::before {
+.ib-submenu-list :is(button, a) span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ib-submenu-list :is(button, a):hover,
+.ib-submenu-list :is(button, a):focus-visible { background: rgb(var(--surface-3)); color: rgb(var(--fg)); outline: none; }
+.ib-submenu-list :is(button, a).is-active { background: rgb(var(--rail)); color: #fff; }
+.ib-submenu-list :is(button, a).is-active small { color: #73a0ff; }
+.ib-submenu-list :is(button, a).is-active::before {
   left: -15px;
   width: 13px;
   height: 20px;
@@ -621,7 +623,7 @@
   background: rgb(var(--accent));
   clip-path: polygon(0 0, 56% 0, 100% 50%, 56% 100%, 0 100%, 42% 50%);
 }
-.ib-submenu-list button:disabled { cursor: not-allowed; opacity: .42; }
+.ib-submenu-list :is(button, a):disabled { cursor: not-allowed; opacity: .42; }
 
 @keyframes ib-popover-in {
   from { opacity: 0; transform: translateX(-5px) scale(.985); }

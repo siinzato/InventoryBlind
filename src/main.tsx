@@ -1,5 +1,6 @@
 import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
 import App from './App.tsx';
 import { AuthProvider } from './lib/auth.tsx';
 import { ThemeProvider, applyThemeClass, getInitialTheme } from './lib/useTheme.tsx';
@@ -19,6 +20,9 @@ applyThemeClass(getInitialTheme());
 // não haver router.
 const legalRoute = currentLegalRoute();
 
+// O BrowserRouter envolve só o app autenticado/público: as páginas legais continuam
+// resolvidas por pathname acima, sem router, exatamente como antes.
+
 createRoot(document.getElementById('root')!).render(
   <StrictMode>
     <ThemeProvider>
@@ -27,10 +31,12 @@ createRoot(document.getElementById('root')!).render(
       ) : legalRoute === 'terms' ? (
         <TermsOfUse />
       ) : (
-        <AuthProvider>
-          <App />
-          <CookieConsentBanner />
-        </AuthProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <App />
+            <CookieConsentBanner />
+          </AuthProvider>
+        </BrowserRouter>
       )}
     </ThemeProvider>
   </StrictMode>

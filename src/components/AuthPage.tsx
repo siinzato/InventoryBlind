@@ -28,7 +28,11 @@ import { LogoMark } from './landing/landingUi';
 import { motion, MagneticButton, useReducedMotion } from './landing/landingMotion';
 import { LEGAL_ROUTES } from '../lib/legal/legalRoutes';
 import { recordAcceptance } from '../lib/legal/legalService';
-import { useGSAP, gsap } from './landing/landingScroll';
+// gsap direto do pacote, não de landing/landingScroll: esta tela é carregada de forma
+// eager pelo App e só usa timelines simples, então puxar o barril da landing traria
+// ScrollTrigger/SplitText/DrawSVG para o bundle inicial de quem nunca vê a landing.
+import { gsap } from 'gsap';
+import { useGSAP } from '@gsap/react';
 
 // ── Shared input component ────────────────────────────────────────────────────
 

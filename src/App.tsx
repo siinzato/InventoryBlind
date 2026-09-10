@@ -1,4 +1,14 @@
-import React, { useState, useMemo, useEffect, useCallback } from 'react';
+import React, { useState, useMemo, useEffect, useCallback, useRef } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import {
+  APP_ROUTE_BY_TAB,
+  DEFAULT_TAB,
+  PUBLIC_PATH_BY_VIEW,
+  isAppPath,
+  normalizePath,
+  pathForTab,
+  tabForPath,
+} from './lib/appRoutes';
 import {
   Package,
   AlertTriangle,
@@ -61,6 +71,7 @@ import {
   ShoppingCart,
   PackageX,
   Layers,
+  Boxes,
   FileBarChart2
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
@@ -76,7 +87,7 @@ import { CountManagementCenter } from './components/counting/CountManagementCent
 import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
-import { getWorkspaceLogoSignedUrl } from './lib/workspace/workspaceService';
+import { signWorkspaceLogoPaths } from './lib/workspace/workspaceService';
 import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
 import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations } from './lib/permissionService';
 import type { DrillTarget } from './lib/intelligence/contracts';
@@ -114,6 +125,8 @@ const BarcodeLabPage = React.lazy(() => import('./components/BarcodeLabPage').th
 const PdfCenterPage = React.lazy(() => import('./components/pdfCenter/PdfCenterPage').then(m => ({ default: m.PdfCenterPage })));
 const PalletCalcPage = React.lazy(() => import('./components/palletCalc/PalletCalcPage').then(m => ({ default: m.PalletCalcPage })));
 const SpreadsheetComparatorPage = React.lazy(() => import('./components/SpreadsheetComparatorPage').then(m => ({ default: m.SpreadsheetComparatorPage })));
+const InventoryReportPage = React.lazy(() => import('./components/reports/InventoryReportPage').then(m => ({ default: m.InventoryReportPage })));
+const BalanceSourcePage = React.lazy(() => import('./components/balanceSource/BalanceSourcePage').then(m => ({ default: m.BalanceSourcePage })));
 const TasksPage = React.lazy(() => import('./components/TasksPage').then(m => ({ default: m.TasksPage })));
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
 const InventoryFullPage = React.lazy(() => import('./components/InventoryFullPage').then(m => ({ default: m.InventoryFullPage })));
@@ -204,27 +217,77 @@ function formatLastLoaded(atMs: number | null): string | null {
   return `Atualizado em ${date} às ${time}`;
 }
 
+/** Módulo que o papel atual não alcança pelo menu — as MESMAS condições já usadas para
+ *  montar navGroups, nenhuma regra de permissão nova. Existe porque agora há URL: sem
+ *  isto, uma seção que o menu esconde passaria a abrir por endereço digitado, o que
+ *  seria afrouxar o acesso em nome do roteamento. A defesa real continua sendo o RLS no
+ *  banco (e o AccessDeniedPage nas telas que já o usam); aqui só evitamos a tela abrir. */
+export function isTabOutOfReach(tab: string, role: string | undefined): boolean {
+  if (tab === 'users') return !canManageUsers(role);
+  if (tab === 'security') return !hasPermission(role, 'security.view');
+  if (tab === 'barcode-lab') return !hasPermission(role, 'labels.use');
+  if (tab.startsWith('config-')) return !canManageUsers(role);
+  return false;
+}
+
 function AppContent() {
   const { user, profile, company, companyId, companies, switchCompany, switchingCompany, createWorkspace, refreshProfile, signOut } = useAuth();
   const { theme, toggleTheme } = useTheme();
-  const [activeTab, setActiveTab] = useState('dashboard');
+  // A URL é a fonte de verdade da navegação. O activeTab continua existindo com o mesmo
+  // nome e o mesmo contrato — mas derivado do pathname —, e setActiveTab virou um
+  // adaptador que navega. Assim os ~100 pontos que já chamavam setActiveTab(id) (atalhos
+  // do Dashboard, botões "voltar", notificações, links entre módulos) passaram a mudar a
+  // URL sem nenhuma alteração local, e não existe segundo estado capaz de divergir dela.
+  const location = useLocation();
+  const navigate = useNavigate();
+  const activeTab = tabForPath(location.pathname) ?? DEFAULT_TAB;
+  const setActiveTab = useCallback((tab: string) => {
+    const path = pathForTab(tab);
+    if (path && path !== normalizePath(window.location.pathname)) navigate(path);
+  }, [navigate]);
+
+  // Trocar de workspace remonta AppContent (key={companyId}) e, antes da URL virar fonte
+  // de verdade, isso sozinho zerava o activeTab para o dashboard — a seção aberta
+  // descrevia o contexto da empresa anterior. Agora a volta ao dashboard é explícita,
+  // preservando o comportamento de antes.
+  const switchWorkspace = useCallback((id: string) => {
+    navigate(APP_ROUTE_BY_TAB[DEFAULT_TAB], { replace: true });
+    return switchCompany(id);
+  }, [navigate, switchCompany]);
+
+  // Entrou no app por uma URL que não é de módulo ("/", "/login" logo após entrar, ou
+  // "/app" sem seção): canonicaliza para o dashboard sem criar entrada no histórico.
+  useEffect(() => {
+    if (!tabForPath(location.pathname)) navigate(APP_ROUTE_BY_TAB[DEFAULT_TAB], { replace: true });
+    else if (isTabOutOfReach(activeTab, profile?.role)) navigate(APP_ROUTE_BY_TAB[DEFAULT_TAB], { replace: true });
+  }, [location.pathname, activeTab, profile?.role, navigate]);
   // Logo do workspace (Configurações Avançadas → Workspaces) — bucket privado, então a URL
   // de exibição é assinada e resolvida aqui para os 2 lugares que mostram o ícone do
   // workspace fora daquela página: o avatar do seletor no topo do Sidebar e o dropdown
   // de troca de workspace logo abaixo. Sem foto cadastrada, cai na inicial do nome (como já era).
   const [workspaceLogoUrls, setWorkspaceLogoUrls] = useState<Record<string, string>>({});
+  // Chave textual dos pares id->caminho: company quase sempre também está em companies, e as
+  // duas referências trocam a cada refresh de sessão sem o logo ter mudado. Comparar o texto
+  // evita re-assinar as mesmas URLs a cada troca de referência.
+  const workspaceLogoKey = useMemo(
+    () => [...new Set([company, ...companies].filter(c => c?.logoPath).map(c => `${c!.id}:${c!.logoPath}`))].sort().join('|'),
+    [company, companies]
+  );
   useEffect(() => {
+    if (!workspaceLogoKey) { setWorkspaceLogoUrls({}); return; }
     let cancelled = false;
-    const withLogo = [company, ...companies].filter((c): c is typeof companies[number] => !!c && !!c.logoPath);
-    Promise.all(withLogo.map(async c => [c.id, await getWorkspaceLogoSignedUrl(c.logoPath as string)] as const))
-      .then(entries => {
-        if (cancelled) return;
-        const next: Record<string, string> = {};
-        for (const [id, url] of entries) if (url) next[id] = url;
-        setWorkspaceLogoUrls(next);
-      });
+    const pairs = workspaceLogoKey.split('|').map(entry => {
+      const at = entry.indexOf(':');
+      return [entry.slice(0, at), entry.slice(at + 1)] as const;
+    });
+    signWorkspaceLogoPaths(pairs.map(([, path]) => path)).then(signed => {
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      for (const [id, path] of pairs) if (signed[path]) next[id] = signed[path];
+      setWorkspaceLogoUrls(next);
+    });
     return () => { cancelled = true; };
-  }, [company, companies]);
+  }, [workspaceLogoKey]);
   // Transferência da ferramenta "Consulta e Download de XML/NFe" pra Conferência
   // por NF-e: guarda o id da nota recém-encontrada só até a página consumir.
   const [nfePendingInvoiceId, setNfePendingInvoiceId] = useState<string | null>(null);
@@ -668,6 +731,7 @@ function AppContent() {
         { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet />, onClick: () => { setActiveTab('import'); setMobileOpen(false); },          active: activeTab === 'import' },
         { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
         { id: 'products',        label: 'Catálogo de Produtos',     icon: <Package />,         onClick: () => { setActiveTab('products'); setMobileOpen(false); },        active: activeTab === 'products' },
+        { id: 'balance-source',  label: 'Fonte de Saldo',           icon: <Boxes />,           onClick: () => { setActiveTab('balance-source'); setMobileOpen(false); },  active: activeTab === 'balance-source' },
         { id: 'product-brands',  label: 'Linhas e Marcas',          icon: <Tag />,             onClick: () => { setActiveTab('product-brands'); setMobileOpen(false); },  active: activeTab === 'product-brands' },
         { id: 'abc-curve',       label: 'Curva ABC',                icon: <BarChart3 />,       onClick: () => { setActiveTab('abc-curve'); setMobileOpen(false); },       active: activeTab === 'abc-curve' },
       ],
@@ -681,6 +745,7 @@ function AppContent() {
         { id: 'nfe-xml-lookup',  label: 'Consulta e Download de XML/NFe', icon: <FileSearch />, onClick: () => { setActiveTab('nfe-xml-lookup'); setMobileOpen(false); }, active: activeTab === 'nfe-xml-lookup' },
         { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
         ...(hasPermission(profile?.role, 'labels.use') ? [{ id: 'barcode-lab', label: 'Códigos de Barras', icon: <Barcode />, onClick: () => { setActiveTab('barcode-lab'); setMobileOpen(false); }, active: activeTab === 'barcode-lab' }] : []),
+        { id: 'inventory-report', label: 'Emitir Relatório', icon: <FileText />, onClick: () => { setActiveTab('inventory-report'); setMobileOpen(false); }, active: activeTab === 'inventory-report' },
         { id: 'spreadsheet-comparator', label: 'Comparador de Planilhas', icon: <GitCompareArrows />, onClick: () => { setActiveTab('spreadsheet-comparator'); setMobileOpen(false); }, active: activeTab === 'spreadsheet-comparator' },
         { id: 'pdf-center',      label: 'Central de PDFs',       icon: <FileStack />, onClick: () => { setActiveTab('pdf-center'); setMobileOpen(false); },    active: activeTab === 'pdf-center' },
         { id: 'pallet-calc',     label: 'Calculadora de Paletização', icon: <Grid3x3 />, onClick: () => { setActiveTab('pallet-calc'); setMobileOpen(false); }, active: activeTab === 'pallet-calc' },
@@ -774,7 +839,7 @@ function AppContent() {
               className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-xl bg-surface-2/70 hover:bg-surface-3 border border-edge/70 transition-colors duration-200 disabled:opacity-60"
             >
               {workspaceLogoUrls[company.id] ? (
-                <img src={workspaceLogoUrls[company.id]} alt="" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
+                <img src={workspaceLogoUrls[company.id]} alt="" decoding="async" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
               ) : (
                 <span className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
                   {company.name.slice(0, 1).toUpperCase()}
@@ -796,14 +861,14 @@ function AppContent() {
               id: c.id,
               label: c.name,
               icon: workspaceLogoUrls[c.id] ? (
-                <img src={workspaceLogoUrls[c.id]} alt="" className="w-5 h-5 rounded-md object-cover" />
+                <img src={workspaceLogoUrls[c.id]} alt="" decoding="async" className="w-5 h-5 rounded-md object-cover" />
               ) : (
                 <span className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white text-[9px] font-semibold">
                   {c.name.slice(0, 1).toUpperCase()}
                 </span>
               ),
               active: c.id === company.id,
-              onClick: () => switchCompany(c.id),
+              onClick: () => switchWorkspace(c.id),
             })),
             {
               id: 'add-company',
@@ -911,14 +976,14 @@ function AppContent() {
               id: c.id,
               label: c.name,
               icon: workspaceLogoUrls[c.id] ? (
-                <img src={workspaceLogoUrls[c.id]} alt="" className="w-5 h-5 rounded-md object-cover" />
+                <img src={workspaceLogoUrls[c.id]} alt="" decoding="async" className="w-5 h-5 rounded-md object-cover" />
               ) : (
                 <span className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white text-[9px] font-semibold">
                   {c.name.slice(0, 1).toUpperCase()}
                 </span>
               ),
               active: c.id === company.id,
-              onClick: () => switchCompany(c.id),
+              onClick: () => switchWorkspace(c.id),
             })),
             {
               id: 'add-company',
@@ -937,7 +1002,7 @@ function AppContent() {
         } : undefined}
         workspaceAvatar={company && (
           workspaceLogoUrls[company.id] ? (
-            <img src={workspaceLogoUrls[company.id]} alt="" className="w-9 h-9 rounded-lg object-cover" />
+            <img src={workspaceLogoUrls[company.id]} alt="" decoding="async" className="w-9 h-9 rounded-lg object-cover" />
           ) : (
             <span className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-white text-sm font-semibold uppercase">
               {company.name.slice(0, 1)}
@@ -1071,6 +1136,20 @@ function AppContent() {
             isAdmin={isLoggedIn}
             onRequestAdmin={() => setActiveTab('admin')}
           />
+          </React.Suspense>
+        )}
+
+        {/* PRODUTOS: FONTE DE SALDO (upload do relatório de estoque do Tiny) */}
+        {activeTab === 'balance-source' && (
+          <React.Suspense fallback={<PageLoader />}>
+          <BalanceSourcePage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        )}
+
+        {/* FERRAMENTAS: EMITIR RELATÓRIO (mesma tela aberta de dentro de Nova Contagem) */}
+        {activeTab === 'inventory-report' && (
+          <React.Suspense fallback={<PageLoader />}>
+          <InventoryReportPage companyId={companyId} onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         )}
 
@@ -1552,6 +1631,7 @@ function AppContent() {
             brandsData={brandsData}
             companyId={companyId}
             onBrandsUpdated={setBrandsData}
+            onEmitReport={() => setActiveTab('inventory-report')}
           />
         )}
 
@@ -1687,7 +1767,7 @@ function AppContent() {
               userId={profile.id}
               userEmail={profile.email}
               switchingCompany={switchingCompany}
-              onSwitchCompany={switchCompany}
+              onSwitchCompany={switchWorkspace}
               onCreateWorkspace={createWorkspace}
               onRefresh={refreshProfile}
             />
@@ -2306,6 +2386,26 @@ function hasPersistedSession(): boolean {
 export default function App() {
   const { view, authLoading, profileLoading, companyId } = useAuth();
   const [hadStoredSession] = useState(hasPersistedSession);
+  const navigate = useNavigate();
+  const previousViewRef = useRef(view);
+
+  // As views públicas com URL própria acompanham a troca de view — mas só quando ela
+  // MUDA, nunca na montagem. É o que faz o logout voltar para "/" e o botão "Entrar"
+  // levar para "/login", sem reescrever a URL de quem abriu "/app/produtos" direto numa
+  // guia nova e caiu no login: aquele caminho é preservado, e depois de autenticar a
+  // própria seção pedida abre. Views de link de e-mail (forgot/update-password/
+  // confirm-email) ficam fora, e nada é feito se houver hash — é onde o Supabase entrega
+  // o token de recuperação.
+  useEffect(() => {
+    const previous = previousViewRef.current;
+    previousViewRef.current = view;
+    if (previous === view) return;
+    if (window.location.hash) return;
+    const publicPath = PUBLIC_PATH_BY_VIEW[view];
+    if (!publicPath) return;
+    if (normalizePath(window.location.pathname) === publicPath) return;
+    navigate(publicPath, { replace: view === 'landing' && isAppPath(window.location.pathname) });
+  }, [view, navigate]);
 
   // Auth error
   if (view === 'auth-error') return <AuthErrorScreen />;

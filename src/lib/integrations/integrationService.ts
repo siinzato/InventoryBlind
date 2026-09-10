@@ -12,6 +12,7 @@
 //    a convenience, never the barrier.
 
 import { supabase } from '../supabase';
+import { isSheetSourceProvider } from './sheetSources';
 import type {
   ConnectionStatus,
   EntityLink,
@@ -118,6 +119,15 @@ export async function listProviders(kind?: ProviderKind): Promise<IntegrationPro
 // Connections
 // ─────────────────────────────────────────────────────────────────────────────
 
+/** As conexões de integração POR API do workspace.
+ *
+ *  Fontes de saldo alimentadas por upload de planilha (ver sheetSources.ts) são
+ *  `integration_connections` pelo mesmo modelo persistido, mas não têm
+ *  credencial, connector nem sincronização — e toda tela que consome esta
+ *  função ("Integrações", Hub, Entidades Fiscais, canal de origem de devolução,
+ *  cartões do Dashboard) trata uma conexão como integração de API. Elas ficam de
+ *  fora daqui para que esse contrato continue verdadeiro; a tela de Fonte de
+ *  Saldo lê a própria conexão pelo provider_key. */
 export async function listConnections(): Promise<IntegrationConnection[]> {
   const { data, error } = await supabase
     .from('integration_connections')
@@ -125,7 +135,12 @@ export async function listConnections(): Promise<IntegrationConnection[]> {
     .order('created_at', { ascending: false });
 
   if (error) throw error;
-  return (data as ConnectionRow[] | null ?? []).map(toConnection);
+  // Recorte em memória, e não um filtro na consulta: a query desta função é a
+  // que cinco telas em produção dependem, e trocar a cláusula por uma sintaxe
+  // nova de filtro seria arriscar todas elas para excluir uma linha.
+  return (data as ConnectionRow[] | null ?? [])
+    .filter(row => !isSheetSourceProvider(row.provider_key))
+    .map(toConnection);
 }
 
 export interface CreateConnectionInput {

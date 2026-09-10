@@ -50,6 +50,12 @@ const LandingPage: FC = () => {
     window.addEventListener('orientationchange', refresh);
     const settleTimer = setTimeout(refresh, 500);
     return () => {
+      // normalizeScroll is GLOBAL: its Observer preventDefaults every wheel/touch on
+      // documentElement and redirects the delta to the window scroller. The
+      // authenticated shell scrolls an inner <main>, not the window — so a normalizer
+      // surviving this unmount freezes the app's scroll until a full reload. It is
+      // owned by this effect, so it dies with it.
+      ScrollTrigger.normalizeScroll(false);
       window.removeEventListener('load', refresh);
       window.removeEventListener('orientationchange', refresh);
       clearTimeout(settleTimer);

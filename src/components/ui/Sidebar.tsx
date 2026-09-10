@@ -1,9 +1,32 @@
-import type { ReactNode } from 'react';
+import type { MouseEvent as ReactMouseEvent, ReactNode } from 'react';
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ChevronDown, Lock } from 'lucide-react';
 import { SafeDropdown, type DropdownItem } from '../SafeDropdown';
+import { isModifiedClick, pathForTab } from '../../lib/appRoutes';
 import './inventoryblind-sidebar.css';
+
+/** Um item de navegação é um link de verdade. O `href` sai do mapa central de rotas — o
+ *  `id` do item já é o identificador do módulo —, então "abrir link em nova guia",
+ *  Ctrl/Cmd+clique, botão do meio e "copiar endereço do link" passam a funcionar
+ *  nativamente. O clique simples continua SPA: `preventDefault` e o mesmo `onClick` de
+ *  antes. Item ou grupo bloqueado NÃO vira link: segue `<button disabled>`, sem href
+ *  para abrir ou copiar. Retorna `null` quando o item não deve ser link.
+ *
+ *  Este componente segue sem depender de router: só do mapa de caminhos. */
+function navLinkProps(item: SidebarNavItem, locked: boolean | undefined, onActivate = item.onClick) {
+  if (locked) return null;
+  const href = pathForTab(item.id);
+  if (!href) return null;
+  return {
+    href,
+    onClick: (event: ReactMouseEvent<HTMLAnchorElement>) => {
+      if (isModifiedClick(event)) return;
+      event.preventDefault();
+      onActivate();
+    },
+  };
+}
 
 export interface SidebarNavItem {
   id: string;
@@ -142,7 +165,7 @@ function WorkspaceMark({ workspace, compact = false }: { workspace: SidebarWorks
   if (workspace.logoUrl) {
     return (
       <span className={`ib-workspace-mark${compact ? ' is-compact' : ''}`}>
-        <img src={workspace.logoUrl} alt="" />
+        <img src={workspace.logoUrl} alt="" decoding="async" />
       </span>
     );
   }
@@ -311,7 +334,25 @@ export function Sidebar({ groups, header, footer, collapsed: controlledCollapsed
                   const locked = group.locked || item.locked;
                   const itemIndex = group.items.indexOf(item);
                   const coordinate = `${String(sectionNumber).padStart(2, '0')}.${itemIndex + 1}`;
-                  return (
+                  const link = navLinkProps(item, locked);
+                  const rowContent = (
+                    <>
+                      <Icon name={itemIconName(group.id, item.id)} />
+                      <span>{item.label}</span>
+                      <small>{coordinate}</small>
+                    </>
+                  );
+                  return link ? (
+                    <a
+                      key={item.id}
+                      className="ib-active-item"
+                      aria-current="page"
+                      href={link.href}
+                      onClick={link.onClick}
+                    >
+                      {rowContent}
+                    </a>
+                  ) : (
                     <button
                       key={item.id}
                       type="button"
@@ -320,9 +361,7 @@ export function Sidebar({ groups, header, footer, collapsed: controlledCollapsed
                       onClick={locked ? undefined : item.onClick}
                       disabled={locked}
                     >
-                      <Icon name={itemIconName(group.id, item.id)} />
-                      <span>{item.label}</span>
-                      <small>{coordinate}</small>
+                      {rowContent}
                     </button>
                   );
                 })}
@@ -485,7 +524,26 @@ export function SubmenuPanelContents({ group, sectionNumber, onSelect }: {
         {group.items.map((item, index) => {
           const locked = group.locked || item.locked;
           const coordinate = `${prefix}.${index + 1}`;
-          return (
+          const link = navLinkProps(item, locked, () => onSelect(item));
+          const rowContent = (
+            <>
+              <span>{item.label}</span>
+              <small>{coordinate}</small>
+            </>
+          );
+          return link ? (
+            <a
+              key={item.id}
+              role="menuitem"
+              className={item.active ? 'is-active' : ''}
+              title={item.label}
+              aria-current={item.active ? 'page' : undefined}
+              href={link.href}
+              onClick={link.onClick}
+            >
+              {rowContent}
+            </a>
+          ) : (
             <button
               key={item.id}
               type="button"
@@ -495,8 +553,7 @@ export function SubmenuPanelContents({ group, sectionNumber, onSelect }: {
               disabled={locked}
               onClick={() => { if (!locked) onSelect(item); }}
             >
-              <span>{item.label}</span>
-              <small>{coordinate}</small>
+              {rowContent}
             </button>
           );
         })}
@@ -620,20 +677,38 @@ function LegacyMobileSidebar({ groups, header, footer, railHelp, railAvatar, wor
                   <div className="space-y-0.5 pt-1 pb-2">
                     {group.items.map(item => {
                       const locked = group.locked || item.locked;
-                      return (
+                      const link = navLinkProps(item, locked);
+                      const rowClass = `group w-full flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-control text-xs font-normal no-underline transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
+                        locked ? 'text-fg-subtle/60 cursor-not-allowed' : item.active ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-surface-3 hover:text-fg'
+                      }`;
+                      const rowContent = (
+                        <>
+                          <span className="flex-shrink-0 flex items-center justify-center [&>svg]:w-4 [&>svg]:h-4">{item.icon}</span>
+                          <span className="flex-1 min-w-0 truncate text-left">{item.label}</span>
+                          {locked && <Lock size={11} className="flex-shrink-0 ml-auto" />}
+                        </>
+                      );
+                      return link ? (
+                        <a
+                          key={item.id}
+                          href={link.href}
+                          onClick={link.onClick}
+                          title={item.label}
+                          aria-current={item.active ? 'page' : undefined}
+                          className={rowClass}
+                        >
+                          {rowContent}
+                        </a>
+                      ) : (
                         <button
                           key={item.id}
                           onClick={locked ? undefined : item.onClick}
                           title={locked ? LOCKED_TOOLTIP : item.label}
                           disabled={locked}
                           aria-current={item.active ? 'page' : undefined}
-                          className={`group w-full flex items-center gap-2.5 pl-9 pr-3 py-2 rounded-control text-xs font-normal transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 ${
-                            locked ? 'text-fg-subtle/60 cursor-not-allowed' : item.active ? 'bg-accent/10 text-accent' : 'text-fg-muted hover:bg-surface-3 hover:text-fg'
-                          }`}
+                          className={rowClass}
                         >
-                          <span className="flex-shrink-0 flex items-center justify-center [&>svg]:w-4 [&>svg]:h-4">{item.icon}</span>
-                          <span className="flex-1 min-w-0 truncate text-left">{item.label}</span>
-                          {locked && <Lock size={11} className="flex-shrink-0 ml-auto" />}
+                          {rowContent}
                         </button>
                       );
                     })}

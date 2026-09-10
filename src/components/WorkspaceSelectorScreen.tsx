@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { motion } from 'motion/react';
 import { Building2, LogOut, ArrowRight } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { setRememberedWorkspaceDevice } from '../lib/workspacePrefs';
-import { getWorkspaceLogoSignedUrl } from '../lib/workspace/workspaceService';
+import { signWorkspaceLogoPaths } from '../lib/workspace/workspaceService';
 import { Panel, Button } from './ui';
 import { LogoMark } from './landing/landingUi';
 
@@ -24,20 +24,28 @@ export default function WorkspaceSelectorScreen() {
   const [enteringId, setEnteringId] = useState<string | null>(null);
   const [logoUrls, setLogoUrls] = useState<Record<string, string>>({});
 
-  // Bucket é privado — resolve a URL assinada de cada workspace com foto cadastrada
-  // (mesmo padrão de App.tsx/WorkspacesSettingsPage.tsx). Sem foto, cai no ícone/emoji.
+  // Bucket é privado — resolve as URLs assinadas em uma única chamada (mesmo padrão de
+  // App.tsx). Sem foto, cai no ícone/emoji. A chave textual evita re-assinar quando a
+  // lista troca de referência sem nenhum logo ter mudado.
+  const logoKey = useMemo(
+    () => companies.filter(c => c.logoPath).map(c => `${c.id}:${c.logoPath}`).sort().join('|'),
+    [companies]
+  );
   useEffect(() => {
+    if (!logoKey) { setLogoUrls({}); return; }
     let cancelled = false;
-    const withLogo = companies.filter(c => c.logoPath);
-    Promise.all(withLogo.map(async c => [c.id, await getWorkspaceLogoSignedUrl(c.logoPath as string)] as const))
-      .then(entries => {
-        if (cancelled) return;
-        const next: Record<string, string> = {};
-        for (const [id, url] of entries) if (url) next[id] = url;
-        setLogoUrls(next);
-      });
+    const pairs = logoKey.split('|').map(entry => {
+      const at = entry.indexOf(':');
+      return [entry.slice(0, at), entry.slice(at + 1)] as const;
+    });
+    signWorkspaceLogoPaths(pairs.map(([, path]) => path)).then(signed => {
+      if (cancelled) return;
+      const next: Record<string, string> = {};
+      for (const [id, path] of pairs) if (signed[path]) next[id] = signed[path];
+      setLogoUrls(next);
+    });
     return () => { cancelled = true; };
-  }, [companies]);
+  }, [logoKey]);
 
   const handleEnter = async (companyId: string) => {
     setEnteringId(companyId);

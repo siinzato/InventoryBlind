@@ -124,3 +124,14 @@ O banco remoto é compartilhado. Não aplique migration sem autorização explí
 
 `src/App.tsx` e `src/components/AuthPage.tsx` são os mais editados pelas duas sessões. `src/lib/whatsNew.ts` e o union `AuditAction` em `src/lib/auditLogService.ts` são listas aditivas: as duas sessões inserem no topo sem conflito de merge, então releia antes de editar. Nunca apague arquivo criado pela outra sessão — se houver contradição de produto, reporte ao usuário e deixe a decisão com ele.
 
+
+REGRA DE BRANCH — INVENTORYBLIND
+- A branch padrão de desenvolvimento deste projeto é `main` (é a branch usada pelo deploy do Wasmer).
+- Trabalhe sempre na branch `main`.
+- Não crie novas branches sem solicitação explícita do usuário.
+- Não troque de branch sem solicitação explícita.
+- Nunca faça commit ou push automaticamente.
+- Commit e push somente quando o usuário solicitar explicitamente.
+- Quando solicitado push da versão aprovada, envie `main` para `origin/main`.
+- Nunca inclua .env, node_modules, dist, arquivos temporários ou a pasta não rastreada `~/` em commits.
+- Antes de qualquer commit solicitado, confirme que a branch atual é `main`.

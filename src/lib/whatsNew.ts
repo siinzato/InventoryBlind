@@ -20,6 +20,48 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-10-emitir-relatorio-usa-fonte-de-saldo',
+    date: '2026-09-10',
+    category: 'melhoria',
+    title: 'Emitir Relatório passou a usar o saldo da Fonte de Saldo, sem pedir a planilha de novo',
+    description: 'Em Emitir Relatório, o passo "Fonte do saldo" agora oferece "Tiny — Estoque diário" no lugar de "Importar estoque do Tiny". A planilha é enviada uma única vez, em Produtos → Fonte de Saldo, e o relatório apenas usa o saldo que já está lá: não pede upload outra vez. Abaixo da opção você vê a data e a hora da última atualização da fonte e quantos produtos têm saldo, e ao montar a folha aparece quantos saldos foram encontrados e quantos não foram. Quando você importar um arquivo novo na Fonte de Saldo, o relatório passa a usar o saldo novo sozinho, sem precisar refazer nada. Produto com saldo zero na fonte imprime 0; produto que não existe na fonte sai com a célula em branco para contagem à mão, nunca como zero. O mesmo saldo aparece igual na pré-visualização, na impressão, no PDF e no Excel. Se a fonte ainda não tiver recebido nenhum arquivo, a tela avisa e indica onde importar, em vez de falhar. Seleção por local, por linha/marca, seleção manual, saldo em branco, saldo manual e o layout da folha A4 paisagem continuam exatamente como estavam.',
+  },
+  {
+    id: '2026-09-10-fonte-de-saldo-tiny-estoque-diario',
+    date: '2026-09-10',
+    category: 'novidade',
+    title: 'Fonte de Saldo: envie o estoque diário do Tiny por planilha',
+    description: 'Produtos ganhou a seção Fonte de Saldo, com a fonte "Tiny — Estoque diário". Você ativa a fonte uma vez no seu workspace e, a partir daí, basta arrastar ou selecionar o arquivo de estoque exportado do Tiny (.xls ou .xlsx) todos os dias — sem precisar editar nada na planilha antes. O sistema confere o formato do arquivo antes de qualquer coisa: se faltar uma coluna, se alguma estiver renomeada, fora de ordem ou sobrando, o arquivo é recusado por inteiro e nenhum saldo é alterado. Passando a conferência, você vê quantas linhas o arquivo tem, quantas têm saldo para importar, quantas estão com o saldo em branco e quantas foram recusadas, além das primeiras linhas lidas, e só então confirma a importação. Cada envio é uma leitura nova do estoque atual: o saldo da fonte é substituído, nunca somado ao do dia anterior. Cada linha é associada a um produto por código exato — primeiro pelo identificador do Tiny já conhecido, depois pelo SKU e depois pelo EAN; nome de produto nunca associa, e quando há empate ou código repetido a linha fica marcada como ambígua em vez de receber o saldo de outro produto. SKU e código de barras são lidos como texto, então zeros à esquerda são preservados e nada vira notação científica. Saldo zero é lido como zero; célula em branco não é tratada como zero. No fim aparece o resumo com linhas processadas, produtos associados, não associados, ambíguos, ignoradas e recusadas, e o histórico guarda todos os envios anteriores da fonte. O saldo da fonte é referência de conferência: ele não altera o cadastro dos produtos, o estoque do InventoryBlind, as contagens e não cria movimentação.',
+  },
+  {
+    id: '2026-09-10-emitir-relatorio-contagem',
+    date: '2026-09-10',
+    category: 'novidade',
+    title: 'Emitir Relatório: folha de contagem pronta para levar ao estoque',
+    description: 'Chegou a ferramenta Emitir Relatório, para gerar a folha que o time leva na prancheta durante o inventário físico. Você escolhe os produtos de três formas: por faixa de endereço (de P1-A002-A até P1-A002-P, por exemplo, com o primeiro e o último entrando no relatório), por uma ou várias linhas e marcas, ou marcando produto por produto depois de buscar por nome, SKU, EAN ou local. Antes de imprimir você vê exatamente as linhas que vão sair e pode remover uma delas da folha sem alterar o cadastro do produto. A coluna de saldo pode sair em branco para preencher à mão, pode ser digitada na tela ou pode vir da planilha de estoque geral exportada do Tiny — nesse caso o sistema associa cada linha pelo SKU e, quando o SKU não resolve, pelo EAN, sempre por código exato. Se um código estiver repetido na planilha, aquela linha é marcada como ambígua e sai em branco em vez de receber o número de outro produto, e o resumo mostra quantos saldos foram encontrados, quantos não foram e quantos ficaram ambíguos. O saldo importado é apenas referência impressa: ele não altera o estoque, o produto, a contagem nem cria movimentação. A folha sai em A4 preto e branco, com a coluna de produto mais larga, espaço de sobra para anotar a contagem à mão, cabeçalho repetido em cada página e a numeração de páginas no pé. Você pode imprimir direto ou gerar o PDF. A ferramenta está em dois lugares: no menu Ferramentas e também no topo da tela de Nova Contagem.',
+  },
+  {
+    id: '2026-09-10-endereco-proprio-por-secao',
+    date: '2026-09-10',
+    category: 'novidade',
+    title: 'Cada seção do sistema agora tem endereço próprio',
+    description: 'Cada tela do InventoryBlind passou a ter um endereço na barra do navegador. Isso libera tudo o que se espera de um sistema na web: clicar com o botão direito em um item do menu e escolher abrir em nova guia, usar Ctrl+clique (ou Cmd+clique no Mac) e o clique com o botão do meio para abrir em outra guia, copiar o endereço de uma seção e mandar para um colega, e usar voltar e avançar do navegador para percorrer o que você abriu. Atualizar a página com F5 agora mantém você exatamente na mesma seção, em vez de voltar para o Dashboard. Abrir um endereço interno direto em uma guia nova também funciona: se você já estiver conectado, a seção pedida abre na hora; se não estiver, aparece a tela de entrada e, depois de entrar, o sistema leva você para a seção que você havia pedido. Quem não tem acesso a uma seção continua sem acesso, mesmo digitando o endereço. Nada mudou no visual, no menu ou na forma de usar as telas.',
+  },
+  {
+    id: '2026-09-10-scroll-travado-apos-login',
+    date: '2026-09-10',
+    category: 'correcao',
+    title: 'Corrigido o scroll travado ao entrar no sistema logo depois do login',
+    description: 'Quem entrava pela página inicial, fazia login e caía direto no Dashboard não conseguia rolar a tela: a roda do mouse e o gesto de arrastar no celular não respondiam, e só recarregando a página (F5) o scroll voltava. Isso acontecia porque o controle de rolagem usado pelas animações da página inicial continuava ligado depois de você entrar no sistema, e ele bloqueava a rolagem da área do Dashboard. Agora esse controle é desligado no momento em que a página inicial sai da tela, então a rolagem funciona na hora, sem recarregar. Sair e entrar de novo quantas vezes quiser continua funcionando, e as animações da página inicial seguem exatamente como eram.',
+  },
+  {
+    id: '2026-09-10-entrada-mais-rapida-logos',
+    date: '2026-09-10',
+    category: 'melhoria',
+    title: 'Entrada no sistema mais rápida e logos de workspace aparecendo antes',
+    description: 'A entrada no sistema ficou mais leve. Os dados do seu workspace e a lista dos workspaces em que você participa passaram a ser carregados ao mesmo tempo, em vez de um esperar o outro, então o Dashboard fica pronto para uso mais cedo. As fotos dos workspaces agora são preparadas todas de uma vez, e não uma por uma, e ficam reaproveitadas enquanto valem — o logo aparece no seletor, no menu de troca e no topo do menu lateral sem aquele atraso, e sem repetir o mesmo trabalho a cada atualização de sessão. Quem não tem foto cadastrada continua vendo a inicial do nome, como antes. Nada mudou no visual nem no jeito de usar.',
+  },
+  {
     id: '2026-09-09-cards-cantos-retos',
     date: '2026-09-09',
     category: 'melhoria',

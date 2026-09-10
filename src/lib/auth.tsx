@@ -16,6 +16,7 @@ import React, {
 import { supabase } from './supabase';
 import type { User, Session } from '@supabase/supabase-js';
 import { getRememberedWorkspaceDevice } from './workspacePrefs';
+import { isAppPath, publicViewForPath } from './appRoutes';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -167,6 +168,23 @@ export function clearPendingInviteCode() {
   sessionStorage.removeItem(PENDING_INVITE_CODE_KEY);
 }
 
+/** View inicial deduzida da URL — única concessão do AuthProvider ao roteamento.
+ *
+ *  Quem abre `/app/...` direto (guia nova, link colado, F5) não pode ver a Homepage:
+ *  se houver sessão persistida, o gate em App.tsx cobre a espera com o loading e
+ *  `resolveView` leva para o app já na seção pedida pela URL; se não houver, a primeira
+ *  tela é o login — e a URL pedida é preservada, então autenticar abre a seção certa.
+ *  `/login` e `/cadastro` também sobrevivem ao F5 por aqui. Nenhuma regra de sessão,
+ *  convite, onboarding ou recuperação muda: só o ponto de partida quando a URL já diz
+ *  para onde o usuário quer ir. */
+function initialViewFromUrl(): AuthView {
+  if (typeof window === 'undefined') return 'landing';
+  const { pathname } = window.location;
+  if (isAppPath(pathname)) return 'login';
+  const publicView = publicViewForPath(pathname);
+  return publicView === 'login' || publicView === 'signup' ? publicView : 'landing';
+}
+
 // ── Provider ──────────────────────────────────────────────────────────────────
 
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -179,7 +197,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [authLoading, setAuthLoading]         = useState(true);
   const [profileLoading, setProfileLoading]   = useState(false);
   const [authError, setAuthError]             = useState<string | null>(null);
-  const [view, setView]                       = useState<AuthView>('landing');
+  const [view, setView]                       = useState<AuthView>(initialViewFromUrl);
   const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
 
   const mountedRef    = useRef(true);
@@ -357,12 +375,13 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
       setProfile(prof);
 
-      if (prof?.company_id) {
-        const comp = await doLoadCompany(prof.company_id);
-        if (mountedRef.current) setCompany(comp);
-      }
-
-      const memberships = await doLoadMemberships(u.id);
+      // Consultas independentes (companies por id, company_members por user_id) — nenhuma
+      // usa o resultado da outra, então vão juntas em vez de uma esperar a outra.
+      const [comp, memberships] = await Promise.all([
+        prof?.company_id ? doLoadCompany(prof.company_id) : Promise.resolve(null),
+        doLoadMemberships(u.id),
+      ]);
+      if (mountedRef.current && prof?.company_id) setCompany(comp);
       if (mountedRef.current) setCompanies(memberships);
 
       if (mountedRef.current) {

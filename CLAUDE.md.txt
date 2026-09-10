@@ -1,0 +1,45 @@
+# Regras do Projeto
+
+## Princípio da Estabilidade
+
+- Nunca refatore código funcionando.
+- Nunca reescreva componentes completos.
+- Altere somente os arquivos necessários.
+- Preserve arquitetura existente.
+
+## Antes de modificar
+
+Sempre:
+
+1. Identifique os arquivos envolvidos.
+2. Explique quais arquivos serão alterados.
+3. Aguarde confirmação se a alteração for grande.
+
+## Economia de contexto
+
+- Não leia arquivos inteiros.
+- Não abra pastas desnecessárias.
+- Não explique código já existente.
+- Responda de forma objetiva.
+
+## Código
+
+- Gere apenas o trecho alterado.
+- Evite duplicações.
+- Não mova arquivos sem necessidade.
+
+## UI
+
+- Preserve design existente.
+- Mantenha cores atuais.
+- Não alterar componentes não relacionados.
+
+## Se houver dúvida
+
+Pergunte antes de assumir.
+
+Nunca leia o projeto inteiro.
+
+Leia somente arquivos diretamente relacionados ao problema.
+
+Se precisar abrir outro arquivo, explique por quê.

@@ -30,10 +30,10 @@ const TABS: { id: FullTab; label: string; icon: React.ReactNode; adminOnly?: boo
 const Breadcrumb: React.FC<{ tab: FullTab }> = ({ tab }) => {
   const t = TABS.find(t => t.id === tab);
   return (
-    <div className="flex items-center gap-1.5 text-xs text-zinc-400">
+    <div className="flex items-center gap-1.5 text-xs text-fg-subtle">
       <span>Full Manager</span>
       <ChevronRight size={12} />
-      <span className={`font-semibold ${tab === 'admin' ? 'text-red-400' : 'text-zinc-300'}`}>
+      <span className={`font-semibold ${tab === 'admin' ? 'text-red-600 dark:text-red-400' : 'text-fg-muted'}`}>
         {t?.label}
       </span>
     </div>
@@ -64,23 +64,23 @@ const FullManagerPage: React.FC<FullManagerPageProps> = ({ onBack }) => {
   };
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="sticky top-0 z-50 bg-zinc-950 text-white shadow-xl">
+      <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-7xl mx-auto px-4 py-4">
           {/* Top row */}
           <div className="flex items-center gap-3 mb-3">
             <button onClick={onBack}
-              className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition text-sm font-medium">
+              className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition text-sm font-medium">
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Voltar</span>
             </button>
             <div className="flex items-center gap-2">
-              <div className={`p-1.5 rounded-lg ${activeTab === 'admin' ? 'bg-red-600' : 'bg-emerald-500'} transition`}>
-                {activeTab === 'admin' ? <ShieldAlert size={18} className="text-white" /> : <Package size={18} className="text-white" />}
+              <div className={`p-1.5 rounded-lg ${activeTab === 'admin' ? 'bg-red-500/10' : 'bg-accent/10'} transition`}>
+                {activeTab === 'admin' ? <ShieldAlert size={18} className="text-red-600 dark:text-red-400" /> : <Package size={18} className="text-accent" />}
               </div>
               <div>
-                <h1 className="font-black text-base leading-tight">Full Manager</h1>
+                <h1 className="text-title leading-tight">Full Manager</h1>
                 <Breadcrumb tab={activeTab} />
               </div>
             </div>
@@ -98,11 +98,11 @@ const FullManagerPage: React.FC<FullManagerPageProps> = ({ onBack }) => {
                   className={`flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-semibold whitespace-nowrap transition flex-shrink-0 ${
                     isActive
                       ? isAdmin
-                        ? 'bg-red-600 text-white'
-                        : 'bg-emerald-600 text-white'
+                        ? 'bg-red-500/10 text-red-600 dark:text-red-400'
+                        : 'bg-accent/10 text-accent'
                       : isAdmin
-                        ? 'text-red-400 hover:text-white hover:bg-red-700/50 border border-red-800/40'
-                        : 'text-zinc-400 hover:text-white hover:bg-zinc-800'
+                        ? 'text-red-600/70 dark:text-red-400/70 hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10'
+                        : 'text-fg-muted hover:text-fg hover:bg-surface-3'
                   }`}
                 >
                   {tab.icon}

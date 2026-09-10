@@ -2,6 +2,7 @@
 
 import React from 'react';
 import { Info } from 'lucide-react';
+import { Card } from './ui';
 
 export const HeatmapLegend: React.FC = () => {
   const legendItems = [
@@ -18,8 +19,10 @@ export const HeatmapLegend: React.FC = () => {
       description: 'Acuracidade entre 70% e 89%',
     },
     {
-      color: 'bg-orange-500',
-      border: 'border-orange-300',
+      // accent em vez de laranja (fora da paleta aprovada, §5/§23) — precisa
+      // continuar distinguível de "Atenção" (âmbar) nesta legenda de 5 itens.
+      color: 'bg-accent',
+      border: 'border-accent/40',
       label: 'Risco',
       description: 'Acuracidade entre 50% e 69%',
     },
@@ -30,19 +33,18 @@ export const HeatmapLegend: React.FC = () => {
       description: 'Acuracidade < 50% ou alta divergência',
     },
     {
-      color: 'bg-zinc-400',
-      border: 'border-zinc-300',
+      color: 'bg-fg-subtle',
+      border: 'border-edge',
       label: 'Não iniciado',
       description: 'Área ainda não contabilizada',
     },
   ];
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-4 mb-6">
-      <div className="flex items-center gap-2 mb-3">
-        <Info size={18} className="text-zinc-500" />
-        <h4 className="text-sm font-semibold text-zinc-700">Legenda de Criticidade</h4>
-      </div>
+    <Card className="mb-6">
+      <p className="text-section flex items-center gap-1.5 mb-3">
+        <Info size={12} /> Legenda de Criticidade
+      </p>
 
       <div className="flex flex-wrap gap-4">
         {legendItems.map((item) => (
@@ -51,14 +53,14 @@ export const HeatmapLegend: React.FC = () => {
               className={`w-4 h-4 rounded ${item.color} ${item.border} border-2`}
             />
             <div>
-              <span className="text-sm font-medium text-zinc-700">{item.label}</span>
-              <span className="text-xs text-zinc-500 ml-1 hidden sm:inline">
+              <span className="text-sm font-medium text-fg-muted">{item.label}</span>
+              <span className="text-xs text-fg-subtle ml-1 hidden sm:inline">
                 ({item.description})
               </span>
             </div>
           </div>
         ))}
       </div>
-    </div>
+    </Card>
   );
 };

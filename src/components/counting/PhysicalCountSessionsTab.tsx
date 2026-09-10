@@ -1,0 +1,609 @@
+import { useEffect, useMemo, useState } from 'react';
+import { Plus, PlayCircle, BarChart3, Archive } from 'lucide-react';
+import { Panel, PanelSection, Button, Badge, Table, Thead, Tr, Th, Td, Input, Select } from '../ui';
+import { useAuth } from '../../lib/auth';
+import { listDistinctLocations } from '../../lib/physicalCount/locationAddressing';
+import { classifyScopeAvailability } from '../../lib/physicalCount/physicalCountAlgorithm';
+import {
+  createSession,
+  startSession,
+  listSessions,
+  listArchivedSessions,
+  fetchCompanyProducts,
+  resolveProductsInRange,
+  createRecountSession,
+  listPendingRecountEvents,
+} from '../../lib/physicalCount/physicalCountService';
+import { canManageSessionHistory } from '../../lib/physicalCount/physicalCountAdmin';
+import { logAuditEvent } from '../../lib/auditLogService';
+import { PhysicalCountSessionAdminActions } from './PhysicalCountSessionAdminActions';
+import { PhysicalCountSessionView } from './PhysicalCountSessionView';
+import { PhysicalCountResultPanel } from './PhysicalCountResultPanel';
+import { PhysicalCountApprovalPanel } from './PhysicalCountApprovalPanel';
+import type { PhysicalCountCandidateProduct, PhysicalCountItem, PhysicalCountSession, RecountEvent } from '../../lib/physicalCount/physicalCountTypes';
+
+interface PhysicalCountSessionsTabProps {
+  companyId: string;
+}
+
+const STATUS_LABEL: Record<PhysicalCountSession['status'], string> = {
+  draft: 'Rascunho',
+  in_progress: 'Em andamento',
+  completed: 'Concluída',
+  with_divergences: 'Com divergências',
+};
+
+const STATUS_VARIANT: Record<PhysicalCountSession['status'], 'neutral' | 'accent' | 'success' | 'warning' | 'danger'> = {
+  draft: 'neutral',
+  in_progress: 'accent',
+  completed: 'success',
+  with_divergences: 'warning',
+};
+
+/** Referência curta de uma sessão para a UI. O id é uuid e mostrá-lo inteiro numa
+ *  célula de tabela empurra tudo para o lado; os 8 primeiros caracteres bastam para
+ *  a pessoa correlacionar duas linhas na mesma tela. */
+function shortSessionRef(sessionId: string): string {
+  return sessionId.slice(0, 8);
+}
+
+export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTabProps) {
+  const { profile } = useAuth();
+  const [sessions, setSessions] = useState<PhysicalCountSession[]>([]);
+  const [products, setProducts] = useState<PhysicalCountCandidateProduct[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creating, setCreating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  // Avaliações automáticas pendentes, para marcar na lista quais sessões nasceram
+  // sozinhas. Sem isto, uma recontagem gerada pelo servidor apareceria como uma
+  // sessão qualquer e a equipe descobriria trabalho novo sem saber de onde veio.
+  const [recountEvents, setRecountEvents] = useState<RecountEvent[]>([]);
+  // Confirmação visual das ações administrativas. Some sozinha: é um aviso de
+  // "deu certo", não uma informação que a pessoa precise reler.
+  const [adminNotice, setAdminNotice] = useState<string | null>(null);
+  // Falha ao CARREGAR a tela, que é coisa diferente de "não há dados". Sem esta
+  // distinção, qualquer erro numa das leituras deixava sessions e products
+  // vazios e a tela afirmava "esta empresa ainda não tem nenhum produto
+  // cadastrado" — uma conclusão sobre o estoque do cliente quando o que houve
+  // foi uma consulta que não voltou.
+  const [loadError, setLoadError] = useState<string | null>(null);
+  // Arquivados: carregado só quando alguém abre a área, porque é consulta extra
+  // que a grande maioria das visitas à tela não precisa.
+  const [showArchived, setShowArchived] = useState(false);
+  const [archived, setArchived] = useState<PhysicalCountSession[] | null>(null);
+  const [archivedError, setArchivedError] = useState<string | null>(null);
+
+  const [warehouse, setWarehouse] = useState('');
+  const [area, setArea] = useState('');
+  const [locationFrom, setLocationFrom] = useState('');
+  const [locationTo, setLocationTo] = useState('');
+  const [brandFilter, setBrandFilter] = useState('');
+  const [observation, setObservation] = useState('');
+
+  const [activeSessionId, setActiveSessionId] = useState<string | null>(null);
+  const [activeView, setActiveView] = useState<'count' | 'result' | null>(null);
+  const [activeItems, setActiveItems] = useState<PhysicalCountItem[]>([]);
+
+  const refresh = () => {
+    setLoading(true);
+    setLoadError(null);
+    Promise.all([
+      listSessions(companyId),
+      fetchCompanyProducts(companyId),
+      // Não bloqueia a tela: se a leitura dos avisos falhar, a lista de sessões
+      // continua funcionando sem a marcação de origem.
+      listPendingRecountEvents().catch(() => [] as RecountEvent[]),
+    ])
+      .then(([s, p, events]) => {
+        setSessions(s);
+        setProducts(p);
+        setRecountEvents(events);
+      })
+      .catch(err => {
+        setLoadError(err instanceof Error ? err.message : 'Falha ao carregar as contagens desta empresa.');
+      })
+      .finally(() => setLoading(false));
+  };
+
+  useEffect(() => {
+    refresh();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [companyId]);
+
+  useEffect(() => {
+    if (adminNotice == null) return;
+    const timer = window.setTimeout(() => setAdminNotice(null), 6000);
+    return () => window.clearTimeout(timer);
+  }, [adminNotice]);
+
+  /** Autorização do banco (pc_admin_*) espelhada na tela só para decidir o que
+   *  mostrar. Esconder botão não é barreira: as RPCs revalidam papel e empresa. */
+  const canManageHistory = canManageSessionHistory(profile?.role);
+
+  const loadArchived = () => {
+    setArchivedError(null);
+    listArchivedSessions(companyId)
+      .then(setArchived)
+      .catch(err => {
+        // Antes da migration ser aplicada a RPC/coluna não existe. Mostrar a
+        // falha aqui é melhor do que uma lista vazia que parece "nada arquivado".
+        setArchivedError(err instanceof Error ? err.message : 'Não foi possível carregar os arquivados.');
+        setArchived([]);
+      });
+  };
+
+  const toggleArchived = () => {
+    const next = !showArchived;
+    setShowArchived(next);
+    if (next && archived == null) loadArchived();
+  };
+
+  /** Sessões que nasceram da avaliação automática. Só as `created` entram — uma
+   *  avaliação ignorada ou falha não produziu sessão nenhuma para marcar. */
+  const autoGeneratedIds = useMemo(
+    () =>
+      new Set(
+        recountEvents
+          .filter(e => e.status === 'created' && e.recountSessionId != null)
+          .map(e => e.recountSessionId as string)
+      ),
+    [recountEvents]
+  );
+
+  // 3 estados que antes viravam uma única mensagem ("nenhuma localização
+  // cadastrada"): sem produto nenhum (provável empresa errada no seletor de
+  // workspace) vs. produtos sem localização preenchida (estado real) vs. tudo
+  // certo — ver physicalCountAlgorithm.ts::classifyScopeAvailability.
+  const locatedProducts = useMemo(() => products.filter(p => p.location?.trim()), [products]);
+  const scopeAvailability = useMemo(
+    () => classifyScopeAvailability({ totalProducts: products.length, locatedProducts: locatedProducts.length }),
+    [products, locatedProducts]
+  );
+
+  // Locations that actually exist for real, registered products — the only
+  // values the range picker below is allowed to offer, so a product can
+  // never be "not found" due to a format mismatch (see locationAddressing.ts).
+  const locations = useMemo(() => listDistinctLocations(locatedProducts), [locatedProducts]);
+
+  useEffect(() => {
+    if (locations.length === 0) return;
+    if (!locationFrom || !locations.includes(locationFrom)) setLocationFrom(locations[0]);
+    if (!locationTo || !locations.includes(locationTo)) setLocationTo(locations[locations.length - 1]);
+  }, [locations, locationFrom, locationTo]);
+
+  const matchedByLocation = useMemo(
+    () => (locationFrom && locationTo ? resolveProductsInRange(products, locationFrom, locationTo) : []),
+    [products, locationFrom, locationTo]
+  );
+
+  // Marca é enriquecimento best-effort (ver getBrandByProductId) — o filtro só
+  // reduz a faixa já resolvida por localização, nunca a substitui como eixo
+  // principal de seleção, exatamente por não haver cobertura garantida.
+  const knownBrands = useMemo(() => {
+    const set = new Set<string>();
+    matchedByLocation.forEach(p => p.brand && set.add(p.brand));
+    return [...set].sort((a, b) => a.localeCompare(b, 'pt-BR'));
+  }, [matchedByLocation]);
+
+  useEffect(() => {
+    if (brandFilter && !knownBrands.includes(brandFilter)) setBrandFilter('');
+  }, [knownBrands, brandFilter]);
+
+  const matched = useMemo(
+    () => (brandFilter ? matchedByLocation.filter(p => p.brand === brandFilter) : matchedByLocation),
+    [matchedByLocation, brandFilter]
+  );
+
+  const handleCreate = async () => {
+    if (!locationFrom || !locationTo) {
+      setFormError('Selecione a localização inicial e final.');
+      return;
+    }
+    if (matched.length === 0) {
+      setFormError('Nenhum produto encontrado nessa faixa — verifique se a seleção está correta.');
+      return;
+    }
+    setCreating(true);
+    setFormError(null);
+    try {
+      const sessionId = await createSession({
+        warehouse: warehouse.trim() || null,
+        area: area.trim() || null,
+        streetFrom: locationFrom,
+        streetTo: locationTo,
+        responsibleId: profile?.id ?? null,
+        observation: observation.trim() || null,
+        productIds: matched.map(p => p.id),
+      });
+      await startSession(sessionId);
+      if (profile) {
+        logAuditEvent({
+          companyId,
+          userId: profile.id,
+          userEmail: profile.email ?? '',
+          action: 'physical_count.session_started',
+          resourceType: 'physical_count_session',
+          resourceId: sessionId,
+        });
+      }
+      setWarehouse('');
+      setArea('');
+      setObservation('');
+      refresh();
+      setActiveSessionId(sessionId);
+      setActiveView('count');
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Não foi possível criar a sessão.');
+    } finally {
+      setCreating(false);
+    }
+  };
+
+  const handleOpenSession = (session: PhysicalCountSession) => {
+    setActiveSessionId(session.id);
+    setActiveView(session.status === 'in_progress' || session.status === 'draft' ? 'count' : 'result');
+  };
+
+  const handleCreateRecount = async (parentId: string) => {
+    try {
+      const newId = await createRecountSession(parentId, profile?.id ?? null);
+      if (profile) {
+        logAuditEvent({
+          companyId,
+          userId: profile.id,
+          userEmail: profile.email ?? '',
+          action: 'physical_count.recount_created',
+          resourceType: 'physical_count_session',
+          resourceId: newId,
+          metadata: { parentSessionId: parentId },
+        });
+      }
+      refresh();
+      setActiveSessionId(newId);
+      setActiveView('count');
+    } catch (err) {
+      setFormError(err instanceof Error ? err.message : 'Não foi possível criar a recontagem.');
+    }
+  };
+
+  if (activeView === 'count' && activeSessionId) {
+    return (
+      <PhysicalCountSessionView
+        sessionId={activeSessionId}
+        companyId={companyId}
+        onDone={() => {
+          setActiveView('result');
+          refresh();
+        }}
+      />
+    );
+  }
+
+  if (activeView === 'result' && activeSessionId) {
+    const session = sessions.find(s => s.id === activeSessionId);
+    return (
+      <div className="space-y-6">
+        <div className="flex items-center justify-between">
+          <h2 className="text-base font-semibold text-fg">Resultado da contagem</h2>
+          <Button
+            variant="ghost"
+            onClick={() => {
+              setActiveView(null);
+              setActiveSessionId(null);
+            }}
+          >
+            Voltar
+          </Button>
+        </div>
+        <PhysicalCountResultPanel
+          sessionId={activeSessionId}
+          countNumber={session?.countNumber ?? 1}
+          onCreateRecount={() => handleCreateRecount(activeSessionId)}
+          onItemsLoaded={setActiveItems}
+        />
+        {session && (session.status === 'completed' || session.status === 'with_divergences') && !session.approvedAt && (
+          <PhysicalCountApprovalPanel
+            sessionId={activeSessionId}
+            companyId={companyId}
+            divergentItems={activeItems.filter(i => i.resultStatus && i.resultStatus !== 'ok')}
+            onApproved={refresh}
+          />
+        )}
+      </div>
+    );
+  }
+
+  return (
+    <div className="space-y-6">
+      <Panel>
+        <PanelSection>
+          <h2 className="mb-4 text-sm font-semibold text-fg">Nova Contagem Física</h2>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <Input
+              value={warehouse}
+              onChange={e => setWarehouse(e.target.value)}
+              placeholder="Depósito"
+              aria-label="Depósito"
+            />
+            <Input
+              value={area}
+              onChange={e => setArea(e.target.value)}
+              placeholder="Área (opcional)"
+              aria-label="Área"
+            />
+            <Select
+              value={locationFrom}
+              onChange={e => setLocationFrom(e.target.value)}
+              disabled={locations.length === 0}
+              aria-label="Localização inicial"
+            >
+              {locations.length === 0 && <option value="">Nenhuma localização cadastrada</option>}
+              {locations.map(loc => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </Select>
+            <Select
+              value={locationTo}
+              onChange={e => setLocationTo(e.target.value)}
+              disabled={locations.length === 0}
+              aria-label="Localização final"
+            >
+              {locations.length === 0 && <option value="">Nenhuma localização cadastrada</option>}
+              {locations.map(loc => (
+                <option key={loc} value={loc}>
+                  {loc}
+                </option>
+              ))}
+            </Select>
+            {knownBrands.length > 0 && (
+              <Select
+                value={brandFilter}
+                onChange={e => setBrandFilter(e.target.value)}
+                aria-label="Filtro de marca"
+              >
+                <option value="">Todas as marcas</option>
+                {knownBrands.map(brand => (
+                  <option key={brand} value={brand}>
+                    {brand}
+                  </option>
+                ))}
+              </Select>
+            )}
+            <Input
+              value={observation}
+              onChange={e => setObservation(e.target.value)}
+              placeholder="Observação (opcional)"
+              aria-label="Observação"
+              className="sm:col-span-2"
+            />
+          </div>
+          {/* Enquanto houver falha de leitura, nenhuma conclusão sobre o
+              cadastro do cliente é confiável — a tela diz o que aconteceu de
+              verdade em vez de acusar o estoque de estar vazio. */}
+          {loadError && (
+            <p className="mt-3 text-sm text-red-600 dark:text-red-400">
+              Não foi possível carregar os dados desta tela: {loadError}
+            </p>
+          )}
+          {!loadError && scopeAvailability === 'no_products' && (
+            <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+              Esta empresa ainda não tem nenhum produto cadastrado. Se você esperava ver produtos aqui, confira se a empresa certa está selecionada no seletor de workspace.
+            </p>
+          )}
+          {!loadError && scopeAvailability === 'no_locations' && (
+            <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
+              Esta empresa tem {products.length} produto(s) cadastrado(s), mas nenhum com o campo Localização preenchido. Cadastre a localização dos produtos (edição do produto ou importação de planilha) antes de iniciar uma contagem física.
+            </p>
+          )}
+          {!loadError && scopeAvailability === 'ok' && (
+            <>
+              <div className="mt-3 max-h-40 overflow-y-auto rounded-lg border border-edge">
+                {matched.length === 0 ? (
+                  <p className="p-3 text-sm text-fg-muted">Nenhum produto cadastrado nessa faixa específica — tente outra faixa.</p>
+                ) : (
+                  matched.map(p => (
+                    <div key={p.id} className="flex items-center justify-between border-b border-edge/60 px-3 py-2 text-sm last:border-0">
+                      <span className="text-fg">{p.sku}</span>
+                      <span className="text-fg-muted">
+                        {p.brand && <span className="mr-2">{p.brand}</span>}
+                        {p.location}
+                      </span>
+                    </div>
+                  ))
+                )}
+              </div>
+              <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <p className="text-xs text-fg-muted">{matched.length} produto(s) nesta faixa.</p>
+                <Button onClick={handleCreate} disabled={creating || matched.length === 0}>
+                  <Plus size={16} /> {creating ? 'Criando…' : 'Iniciar Contagem Cega'}
+                </Button>
+              </div>
+            </>
+          )}
+          {formError && <p className="mt-2 text-sm text-red-500">{formError}</p>}
+        </PanelSection>
+      </Panel>
+
+      <Panel>
+        <PanelSection>
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-sm font-semibold text-fg">Sessões</h2>
+            {canManageHistory && (
+              <Button variant="ghost" size="sm" onClick={toggleArchived}>
+                <Archive size={14} /> {showArchived ? 'Ocultar arquivados' : 'Ver arquivados'}
+              </Button>
+            )}
+          </div>
+          <div aria-live="polite">
+            {adminNotice && <p className="mt-2 text-sm text-emerald-600 dark:text-emerald-400">{adminNotice}</p>}
+          </div>
+        </PanelSection>
+        <div className="overflow-x-auto">
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>Faixa</Th>
+                <Th>Depósito</Th>
+                <Th>Contagem</Th>
+                <Th>Itens</Th>
+                <Th>Status</Th>
+                <Th />
+              </Tr>
+            </Thead>
+            <tbody>
+              {loading && (
+                <Tr>
+                  <Td colSpan={6}>Carregando…</Td>
+                </Tr>
+              )}
+              {!loading && loadError && (
+                <Tr>
+                  <Td colSpan={6} className="text-red-600 dark:text-red-400">
+                    Não foi possível carregar o histórico de sessões.
+                  </Td>
+                </Tr>
+              )}
+              {!loading && !loadError && sessions.length === 0 && (
+                <Tr>
+                  <Td colSpan={6} className="text-fg-muted">
+                    Nenhuma sessão criada ainda.
+                  </Td>
+                </Tr>
+              )}
+              {sessions.map(session => (
+                <Tr key={session.id}>
+                  <Td>
+                    {session.streetFrom} → {session.streetTo}
+                  </Td>
+                  <Td>{session.warehouse ?? '—'}</Td>
+                  <Td>
+                    {session.countNumber}ª contagem
+                    {/* Requisito 4: o vínculo com a contagem de origem, visível na
+                        lista. O dado (linked_session_id) já existia desde a 039 e
+                        nunca era mostrado — quem abria o histórico via "2ª
+                        contagem" sem saber 2ª de quê. */}
+                    {session.linkedSessionId && (
+                      <span className="mt-0.5 block text-xs text-fg-subtle">
+                        recontagem de {shortSessionRef(session.linkedSessionId)}
+                        {autoGeneratedIds.has(session.id) && (
+                          <span className="ml-1 text-accent">· automática</span>
+                        )}
+                      </span>
+                    )}
+                  </Td>
+                  <Td className="tabular-nums">{session.totalItems}</Td>
+                  <Td>
+                    <Badge variant={STATUS_VARIANT[session.status]}>
+                      {STATUS_LABEL[session.status]}
+                      {session.approvedAt ? ' · Aprovada' : ''}
+                    </Badge>
+                  </Td>
+                  <Td>
+                    {/* Sem `justify-*`: o botão de abrir a sessão continua na
+                        mesma posição de antes (a célula é alinhada à esquerda),
+                        e o menu apenas o acompanha. */}
+                    <div className="flex items-center gap-1">
+                      <Button variant="ghost" size="sm" onClick={() => handleOpenSession(session)}>
+                        {session.status === 'in_progress' ? (
+                          <>
+                            <PlayCircle size={14} /> Continuar
+                          </>
+                        ) : (
+                          <>
+                            <BarChart3 size={14} /> Ver
+                          </>
+                        )}
+                      </Button>
+                      {canManageHistory && (
+                        <PhysicalCountSessionAdminActions
+                          session={session}
+                          statusLabel={STATUS_LABEL[session.status]}
+                          onDone={message => {
+                            setAdminNotice(message);
+                            refresh();
+                          }}
+                        />
+                      )}
+                    </div>
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      </Panel>
+
+      {canManageHistory && showArchived && (
+        <Panel>
+          <PanelSection>
+            <h2 className="text-sm font-semibold text-fg">Sessões arquivadas</h2>
+            <p className="mt-1 text-xs text-fg-muted">
+              Removidas do histórico, mas nada foi apagado: contagens, eventos e recontagens continuam
+              guardados. Restaurar devolve a sessão à lista acima.
+            </p>
+          </PanelSection>
+          <div className="overflow-x-auto">
+            <Table>
+              <Thead>
+                <Tr>
+                  <Th>Faixa</Th>
+                  <Th>Depósito</Th>
+                  <Th>Contagem</Th>
+                  <Th>Itens</Th>
+                  <Th>Motivo da remoção</Th>
+                  <Th />
+                </Tr>
+              </Thead>
+              <tbody>
+                {archived == null && (
+                  <Tr>
+                    <Td colSpan={6}>Carregando…</Td>
+                  </Tr>
+                )}
+                {archivedError && (
+                  <Tr>
+                    <Td colSpan={6} className="text-red-600 dark:text-red-400">
+                      {archivedError}
+                    </Td>
+                  </Tr>
+                )}
+                {archived != null && !archivedError && archived.length === 0 && (
+                  <Tr>
+                    <Td colSpan={6} className="text-fg-muted">
+                      Nenhuma sessão arquivada.
+                    </Td>
+                  </Tr>
+                )}
+                {(archived ?? []).map(session => (
+                  <Tr key={session.id}>
+                    <Td>
+                      {session.streetFrom} → {session.streetTo}
+                    </Td>
+                    <Td>{session.warehouse ?? '—'}</Td>
+                    <Td>{session.countNumber}ª contagem</Td>
+                    <Td className="tabular-nums">{session.totalItems}</Td>
+                    <Td className="max-w-xs text-fg-muted">{session.deletionReason ?? '—'}</Td>
+                    <Td>
+                      <PhysicalCountSessionAdminActions
+                        session={session}
+                        statusLabel={STATUS_LABEL[session.status]}
+                        mode="archived"
+                        onDone={message => {
+                          setAdminNotice(message);
+                          refresh();
+                          loadArchived();
+                        }}
+                      />
+                    </Td>
+                  </Tr>
+                ))}
+              </tbody>
+            </Table>
+          </div>
+        </Panel>
+      )}
+    </div>
+  );
+}

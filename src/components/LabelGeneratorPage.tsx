@@ -24,9 +24,10 @@ import { jsPDF } from 'jspdf';
 import {
   ArrowLeft, Search, Printer, Download, Tag, Package,
   AlertTriangle, X, CheckSquare, Square, RefreshCw, Layers,
-  CheckCircle2, AlertCircle, RotateCcw,
+  CheckCircle2, RotateCcw,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
+import { ToastStack, useToasts } from './ui';
 import ShelfLabel100x40, {
   SHELF_FONT_DEFAULTS,
 } from './ShelfLabel100x40';
@@ -39,11 +40,7 @@ import type { ExcessFontSettings } from './ExcessLabel100x150';
 // ─── Types ────────────────────────────────────────────────────────────────────
 
 type LabelType = 'shelf' | 'excess';
-type ToastType = 'success' | 'error' | 'info';
-interface Toast { id: number; message: string; type: ToastType }
 interface DbProduct extends LabelProduct { id: string; price: number | null }
-
-let _tid = 0;
 
 // ── localStorage persistence ─────────────────────────────────────────────────
 
@@ -138,6 +135,12 @@ async function captureEl(el: HTMLElement): Promise<HTMLCanvasElement> {
   });
 }
 
+// company_id/user_id are filled by the DB (get_my_company_id()/auth.uid() defaults) — no auth context needed here.
+async function logLabelGeneration(sku: string, labelType: LabelType, quantity: number) {
+  const { error } = await supabase.from('label_generation_log').insert({ sku, label_type: labelType, quantity });
+  if (error) console.warn('[LabelGen] Failed to log label generation:', error.message);
+}
+
 function downloadURL(url: string, filename: string) {
   const a = document.createElement('a');
   a.href = url; a.download = filename;
@@ -208,7 +211,7 @@ interface FontSliderProps {
 
 const FontSlider: React.FC<FontSliderProps> = ({ label, value, min, max, onChange }) => (
   <div className="flex items-center gap-3">
-    <span className="text-xs text-zinc-500 w-24 font-medium flex-shrink-0">{label}</span>
+    <span className="text-xs text-fg-subtle w-24 font-medium flex-shrink-0">{label}</span>
     <input
       type="range"
       min={min}
@@ -216,9 +219,9 @@ const FontSlider: React.FC<FontSliderProps> = ({ label, value, min, max, onChang
       step={1}
       value={value}
       onChange={e => onChange(Number(e.target.value))}
-      className="flex-1 accent-zinc-800 h-1.5 cursor-pointer"
+      className="flex-1 accent-accent h-1.5 cursor-pointer"
     />
-    <span className="text-xs font-mono font-bold text-zinc-700 w-10 text-right flex-shrink-0">
+    <span className="text-xs font-mono font-bold text-fg-muted w-10 text-right flex-shrink-0">
       {value}px
     </span>
   </div>
@@ -232,7 +235,7 @@ interface LabelGeneratorPageProps {
 
 export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }) => {
   const [mode, setMode] = useState<'single' | 'batch'>('single');
-  const [toasts, setToasts] = useState<Toast[]>([]);
+  const { toasts, toast } = useToasts();
 
   // Font settings — loaded from localStorage on mount
   const [shelfFonts, setShelfFonts] = useState<ShelfFontSettings>(SHELF_FONT_DEFAULTS);
@@ -272,12 +275,6 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
   useEffect(() => { savePrefs(shelfFonts, excessFonts); }, [shelfFonts, excessFonts]);
 
   // ── Helpers ───────────────────────────────────────────────────────────
-  const toast = useCallback((message: string, type: ToastType = 'info') => {
-    const id = ++_tid;
-    setToasts(p => [...p, { id, message, type }]);
-    setTimeout(() => setToasts(p => p.filter(t => t.id !== id)), 4500);
-  }, []);
-
   const updateShelf = (key: keyof ShelfFontSettings, val: number) =>
     setShelfFonts(f => ({ ...f, [key]: val }));
 
@@ -327,6 +324,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
     try {
       console.log('[LabelGen] PNG start');
       await downloadPNG(captureRef.current, product.sku, labelType);
+      await logLabelGeneration(product.sku, labelType, 1);
       toast('PNG baixado com sucesso.', 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -342,6 +340,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
     try {
       console.log('[LabelGen] PDF start, copies:', copies);
       await downloadPDF(captureRef.current, product.sku, labelType, copies);
+      await logLabelGeneration(product.sku, labelType, copies);
       toast('PDF gerado com sucesso.', 'success');
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
@@ -392,7 +391,11 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
     ));
     setTimeout(() => {
       window.print();
-      window.addEventListener('afterprint', () => { root.unmount(); removePrintStyle(); toast(`${allLabels.length} etiqueta(s) impressa(s).`, 'success'); }, { once: true });
+      window.addEventListener('afterprint', () => {
+        root.unmount(); removePrintStyle();
+        Promise.all(selected.map(p => logLabelGeneration(p.sku, batchLabelType, batchCopies)));
+        toast(`${allLabels.length} etiqueta(s) impressa(s).`, 'success');
+      }, { once: true });
     }, 250);
   }, [batchProducts, selectedIds, batchLabelType, batchCopies, batchExcessQty, shelfFonts, excessFonts, toast]);
 
@@ -414,6 +417,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
         }
       }
       pdf.save(`etiquetas-lote-${new Date().toISOString().slice(0, 10)}.pdf`);
+      await Promise.all(selected.map(p => logLabelGeneration(p.sku, batchLabelType, batchCopies)));
       toast(`PDF com ${pg} etiqueta(s) gerado.`, 'success');
     } catch (err: unknown) {
       console.error('[LabelGen] Batch PDF error:', err);
@@ -429,7 +433,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
   const activeFonts = labelType === 'shelf' ? shelfFonts : excessFonts;
 
   return (
-    <div className="min-h-screen bg-zinc-50">
+    <div className="min-h-screen bg-surface-3">
 
       {/* OFF-SCREEN CAPTURE TARGET — real mm size, read by html2canvas */}
       {labelProduct && (
@@ -441,36 +445,27 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
         </div>
       )}
 
-      {/* TOASTS */}
-      <div className="fixed bottom-6 right-6 z-[9999] flex flex-col gap-2 pointer-events-none">
-        {toasts.map(t => (
-          <div key={t.id} className={`flex items-center gap-2 px-4 py-3 rounded-xl shadow-lg text-sm font-semibold max-w-xs pointer-events-auto ${
-            t.type === 'success' ? 'bg-emerald-600 text-white' : t.type === 'error' ? 'bg-red-600 text-white' : 'bg-zinc-800 text-white'}`}>
-            {t.type === 'success' ? <CheckCircle2 size={15} /> : t.type === 'error' ? <AlertCircle size={15} /> : null}
-            {t.message}
-          </div>
-        ))}
-      </div>
+      <ToastStack toasts={toasts} />
 
       {/* HEADER */}
-      <div className="sticky top-0 z-50 bg-zinc-950 text-white shadow-xl">
+      <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 bg-zinc-800 hover:bg-zinc-700 rounded-lg transition text-sm font-medium">
+            <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition text-sm font-medium">
               <ArrowLeft size={16} /><span className="hidden sm:inline">Voltar</span>
             </button>
             <div className="flex items-center gap-2">
-              <Tag size={22} className="text-emerald-400" />
+              <Tag size={22} className="text-accent" />
               <div>
-                <h1 className="font-bold text-base leading-tight">Gerador de Etiquetas</h1>
-                <p className="text-xs text-zinc-400 hidden sm:block">Vão 100×40mm · Excesso 100×150mm</p>
+                <h1 className="text-title leading-tight">Gerador de Etiquetas</h1>
+                <p className="text-xs text-fg-subtle hidden sm:block">Vão 100×40mm · Excesso 100×150mm</p>
               </div>
             </div>
           </div>
-          <div className="flex items-center bg-zinc-800 rounded-lg p-1 gap-1">
+          <div className="flex items-center bg-surface-3 rounded-lg p-1 gap-1">
             {(['single', 'batch'] as const).map(m => (
               <button key={m} onClick={() => setMode(m)}
-                className={`px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1.5 ${mode === m ? 'bg-emerald-600 text-white' : 'text-zinc-400 hover:text-white'}`}>
+                className={`px-3 py-1.5 rounded-md text-sm font-medium transition flex items-center gap-1.5 ${mode === m ? 'bg-accent text-white' : 'text-fg-muted hover:text-fg'}`}>
                 {m === 'batch' ? <><Layers size={14} />Lote</> : 'Unitário'}
               </button>
             ))}
@@ -488,14 +483,14 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
             <div className="space-y-4">
 
               {/* SEARCH */}
-              <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5">
-                <h2 className="font-bold text-zinc-800 text-sm mb-4 flex items-center gap-2">
-                  <Search size={16} className="text-zinc-500" />Buscar Produto
+              <div className="bg-surface-2 rounded-xl border border-edge p-5">
+                <h2 className="font-bold text-fg text-sm mb-4 flex items-center gap-2">
+                  <Search size={16} className="text-fg-subtle" />Buscar Produto
                 </h2>
                 <div className="flex gap-2 mb-3">
                   {(['sku', 'ean'] as const).map(t => (
                     <button key={t} onClick={() => setSearchType(t)}
-                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${searchType === t ? 'bg-zinc-900 text-white border-zinc-900' : 'bg-white text-zinc-600 border-zinc-200 hover:bg-zinc-50'}`}>
+                      className={`flex-1 py-2 rounded-lg text-sm font-semibold border transition ${searchType === t ? 'bg-accent text-white border-accent' : 'bg-surface-2 text-fg-muted border-edge hover:bg-surface-3'}`}>
                       Por {t.toUpperCase()}
                     </button>
                   ))}
@@ -506,15 +501,15 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                     value={searchQuery}
                     onChange={e => { setSearchQuery(e.target.value); setNotFound(false); }}
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
-                    className="flex-1 px-4 py-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+                    className="flex-1 px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
                   <button onClick={handleSearch} disabled={searching || !searchQuery.trim()}
-                    className="px-4 py-2.5 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center gap-2 transition">
+                    className="px-4 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center gap-2 transition">
                     {searching ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
                   </button>
                 </div>
                 {notFound && (
-                  <div className="mt-3 flex items-center gap-2 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
+                  <div className="mt-3 flex items-center gap-2 p-3 bg-red-500/10 text-red-700 dark:text-red-400 rounded-lg text-sm">
                     <AlertTriangle size={16} />Produto não encontrado. Verifique o SKU ou EAN.
                   </div>
                 )}
@@ -522,22 +517,22 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
 
               {/* PRODUCT INFO */}
               {product && (
-                <div className="bg-white rounded-xl border border-emerald-200 shadow-sm p-5">
+                <div className="bg-surface-2 rounded-xl border border-emerald-500/20 p-5">
                   <div className="flex items-center justify-between mb-3">
-                    <h2 className="font-bold text-emerald-800 text-sm flex items-center gap-2">
-                      <CheckCircle2 size={16} className="text-emerald-600" />Produto Encontrado
+                    <h2 className="font-bold text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
+                      <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />Produto Encontrado
                     </h2>
-                    <button onClick={handleClear} className="text-zinc-400 hover:text-zinc-700"><X size={16} /></button>
+                    <button onClick={handleClear} className="text-fg-subtle hover:text-fg-muted"><X size={16} /></button>
                   </div>
-                  <div className="p-2.5 bg-zinc-50 rounded-lg mb-2">
-                    <p className="text-xs text-zinc-400 font-semibold uppercase mb-0.5">Nome</p>
-                    <p className="font-bold text-zinc-800 text-sm">{product.name}</p>
+                  <div className="mb-3">
+                    <p className="text-xs text-fg-subtle font-semibold uppercase mb-0.5">Nome</p>
+                    <p className="font-bold text-fg text-sm">{product.name}</p>
                   </div>
-                  <div className="grid grid-cols-3 gap-2">
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 pt-3 border-t border-edge">
                     {[['SKU', product.sku], ['EAN', product.ean || '—'], ['Local', product.location || '—']].map(([l, v]) => (
-                      <div key={l} className="p-2.5 bg-zinc-50 rounded-lg">
-                        <p className="text-xs text-zinc-400 font-semibold uppercase mb-0.5">{l}</p>
-                        <p className="font-mono font-bold text-zinc-800 text-xs">{v}</p>
+                      <div key={l} className="min-w-0">
+                        <p className="text-xs text-fg-subtle font-semibold uppercase mb-0.5">{l}</p>
+                        <p className="font-mono font-bold text-fg text-xs truncate">{v}</p>
                       </div>
                     ))}
                   </div>
@@ -545,24 +540,24 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
               )}
 
               {/* LABEL TYPE + CONFIG */}
-              <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5">
-                <h2 className="font-bold text-zinc-800 text-sm mb-4 flex items-center gap-2">
-                  <Tag size={16} className="text-zinc-500" />Configurações
+              <div className="bg-surface-2 rounded-xl border border-edge p-5">
+                <h2 className="font-bold text-fg text-sm mb-4 flex items-center gap-2">
+                  <Tag size={16} className="text-fg-subtle" />Configurações
                 </h2>
 
                 {/* Type */}
                 <div className="mb-4">
-                  <label className="block text-xs font-semibold text-zinc-500 uppercase mb-2">Tipo de Etiqueta</label>
+                  <label className="block text-xs font-semibold text-fg-subtle uppercase mb-2">Tipo de Etiqueta</label>
                   <div className="grid grid-cols-2 gap-2">
                     <button onClick={() => setLabelType('shelf')}
-                      className={`p-3 rounded-lg border-2 text-left transition ${labelType === 'shelf' ? 'border-emerald-500 bg-emerald-50' : 'border-zinc-200 bg-white hover:border-zinc-300'}`}>
-                      <p className={`font-bold text-xs ${labelType === 'shelf' ? 'text-emerald-700' : 'text-zinc-700'}`}>Etiqueta de Vão</p>
-                      <p className="text-xs text-zinc-400 mt-0.5">100 × 40mm</p>
+                      className={`p-3 rounded-lg border-2 text-left transition ${labelType === 'shelf' ? 'border-accent bg-accent/10' : 'border-edge bg-surface-2 hover:border-fg-subtle'}`}>
+                      <p className={`font-bold text-xs ${labelType === 'shelf' ? 'text-accent' : 'text-fg-muted'}`}>Etiqueta de Vão</p>
+                      <p className="text-xs text-fg-subtle mt-0.5">100 × 40mm</p>
                     </button>
                     <button onClick={() => setLabelType('excess')}
-                      className={`p-3 rounded-lg border-2 text-left transition ${labelType === 'excess' ? 'border-red-500 bg-red-50' : 'border-zinc-200 bg-white hover:border-zinc-300'}`}>
-                      <p className={`font-bold text-xs ${labelType === 'excess' ? 'text-red-700' : 'text-zinc-700'}`}>Excesso de Estoque</p>
-                      <p className="text-xs text-zinc-400 mt-0.5">100 × 150mm</p>
+                      className={`p-3 rounded-lg border-2 text-left transition ${labelType === 'excess' ? 'border-accent bg-accent/10' : 'border-edge bg-surface-2 hover:border-fg-subtle'}`}>
+                      <p className={`font-bold text-xs ${labelType === 'excess' ? 'text-accent' : 'text-fg-muted'}`}>Excesso de Estoque</p>
+                      <p className="text-xs text-fg-subtle mt-0.5">100 × 150mm</p>
                     </button>
                   </div>
                 </div>
@@ -570,28 +565,28 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                 {/* Excess qty */}
                 {labelType === 'excess' && (
                   <div className="mb-4">
-                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Quantidade em Excesso</label>
+                    <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Quantidade em Excesso</label>
                     <input type="number" min="0" value={excessQty} onChange={e => setExcessQty(Number(e.target.value))}
-                      className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 font-mono" />
+                      className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
                   </div>
                 )}
 
                 {/* Copies */}
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Quantidade de Cópias</label>
+                  <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Quantidade de Cópias</label>
                   <input type="number" min="1" max="999" value={copies} onChange={e => setCopies(Math.max(1, Number(e.target.value)))}
-                    className="w-full px-4 py-2.5 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 font-mono" />
+                    className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
                 </div>
               </div>
 
               {/* FONT SETTINGS */}
-              <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5">
+              <div className="bg-surface-2 rounded-xl border border-edge p-5">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-bold text-zinc-800 text-sm flex items-center gap-2">
+                  <h2 className="font-bold text-fg text-sm flex items-center gap-2">
                     <span className="text-base">Aa</span> Tamanho das Fontes
                   </h2>
                   <button onClick={resetFonts}
-                    className="flex items-center gap-1.5 text-xs text-zinc-500 hover:text-zinc-800 font-semibold transition border border-zinc-200 rounded-lg px-2.5 py-1.5 hover:bg-zinc-50">
+                    className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-fg font-semibold transition border border-edge rounded-lg px-2.5 py-1.5 hover:bg-surface-3">
                     <RotateCcw size={12} />Restaurar padrão
                   </button>
                 </div>
@@ -609,38 +604,38 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                     <FontSlider label="Localização" value={excessFonts.locationSize} min={8} max={20} onChange={v => updateExcess('locationSize', v)} />
                     <FontSlider label="SKU" value={excessFonts.skuSize} min={8} max={18} onChange={v => updateExcess('skuSize', v)} />
                     <FontSlider label="EAN / GTIN" value={excessFonts.eanSize} min={10} max={26} onChange={v => updateExcess('eanSize', v)} />
-                    <div className="pt-1 border-t border-zinc-100">
+                    <div className="pt-1 border-t border-edge">
                       <FontSlider label="Qtd Excesso" value={excessFonts.qtySize} min={20} max={80} onChange={v => updateExcess('qtySize', v)} />
                     </div>
                   </div>
                 )}
 
-                <p className="mt-3 text-xs text-zinc-400">
+                <p className="mt-3 text-xs text-fg-subtle">
                   Ajustes salvos automaticamente. Aplicados em pré-visualização, impressão, PNG e PDF.
                 </p>
               </div>
 
               {/* ACTIONS */}
               {product && (
-                <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5">
-                  <h2 className="font-bold text-zinc-800 text-sm mb-3">Ações</h2>
+                <div className="bg-surface-2 rounded-xl border border-edge p-5">
+                  <h2 className="font-bold text-fg text-sm mb-3">Ações</h2>
                   <div className="space-y-2">
                     <button onClick={handlePrint} disabled={busy}
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+                      className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
                       <Printer size={16} />Imprimir {copies > 1 ? `(${copies} cópias)` : ''}
                     </button>
                     <div className="grid grid-cols-2 gap-2">
                       <button onClick={handlePNG} disabled={busy}
-                        className="flex items-center justify-center gap-2 py-2.5 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                        className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
                         {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}Download PNG
                       </button>
                       <button onClick={handlePDF} disabled={busy}
-                        className="flex items-center justify-center gap-2 py-2.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                        className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
                         {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}Download PDF
                       </button>
                     </div>
                     <button onClick={handleClear}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-sm font-semibold transition">
+                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
                       <X size={14} />Limpar
                     </button>
                   </div>
@@ -650,14 +645,14 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
 
             {/* RIGHT — PREVIEW */}
             <div>
-              <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5 sticky top-28">
+              <div className="bg-surface-2 rounded-xl border border-edge p-5 sticky top-28">
                 <div className="flex items-center justify-between mb-4">
-                  <h2 className="font-bold text-zinc-800 text-sm">Pré-visualização</h2>
-                  <span className="text-xs text-zinc-400">{labelType === 'shelf' ? '100 × 40mm' : '100 × 150mm'}</span>
+                  <h2 className="font-bold text-fg text-sm">Pré-visualização</h2>
+                  <span className="text-xs text-fg-subtle">{labelType === 'shelf' ? '100 × 40mm' : '100 × 150mm'}</span>
                 </div>
 
                 {!labelProduct ? (
-                  <div className="flex flex-col items-center justify-center py-16 text-zinc-300">
+                  <div className="flex flex-col items-center justify-center py-16 text-fg-subtle">
                     <Tag size={48} className="mb-3 opacity-20" />
                     <p className="text-sm text-center">Busque um produto para visualizar</p>
                   </div>
@@ -691,7 +686,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                             { l: 'SKU', v: shelfFonts.skuSize },
                             { l: 'EAN', v: shelfFonts.eanSize },
                           ].map(({ l, v }) => (
-                            <span key={l} className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-mono">
+                            <span key={l} className="text-xs bg-surface-3 text-fg-muted px-2 py-0.5 rounded-full font-mono">
                               {l}: {v}px
                             </span>
                           ))}
@@ -705,7 +700,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                             { l: 'EAN', v: excessFonts.eanSize },
                             { l: 'Qtd', v: excessFonts.qtySize },
                           ].map(({ l, v }) => (
-                            <span key={l} className="text-xs bg-zinc-100 text-zinc-600 px-2 py-0.5 rounded-full font-mono">
+                            <span key={l} className="text-xs bg-surface-3 text-fg-muted px-2 py-0.5 rounded-full font-mono">
                               {l}: {v}px
                             </span>
                           ))}
@@ -713,7 +708,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                       )}
                     </div>
 
-                    <p className="text-xs text-zinc-400 text-center">
+                    <p className="text-xs text-fg-subtle text-center">
                       Visualização ampliada. Download e impressão saem em tamanho real.
                     </p>
                   </div>
@@ -726,9 +721,9 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
         {/* ══ BATCH MODE ════════════════════════════════════════════════════ */}
         {mode === 'batch' && (
           <div className="space-y-4">
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm p-5">
-              <h2 className="font-bold text-zinc-800 text-sm mb-4 flex items-center gap-2">
-                <Search size={16} className="text-zinc-500" />Filtros
+            <div className="bg-surface-2 rounded-xl border border-edge p-5">
+              <h2 className="font-bold text-fg text-sm mb-4 flex items-center gap-2">
+                <Search size={16} className="text-fg-subtle" />Filtros
               </h2>
               <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
                 {[
@@ -736,103 +731,103 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                   { label: 'Localização', value: batchLocation, onChange: setBatchLocation, placeholder: 'Ex: A-01...' },
                 ].map(f => (
                   <div key={f.label}>
-                    <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">{f.label}</label>
+                    <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">{f.label}</label>
                     <input type="text" value={f.value} onChange={e => f.onChange(e.target.value)} placeholder={f.placeholder}
-                      className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400" />
+                      className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
                   </div>
                 ))}
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Tipo</label>
+                  <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Tipo</label>
                   <select value={batchLabelType} onChange={e => setBatchLabelType(e.target.value as LabelType)}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 bg-white">
+                    className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg">
                     <option value="shelf">Vão — 100×40mm</option>
                     <option value="excess">Excesso — 100×150mm</option>
                   </select>
                 </div>
                 <div>
-                  <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Cópias/produto</label>
+                  <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Cópias/produto</label>
                   <input type="number" min="1" max="99" value={batchCopies} onChange={e => setBatchCopies(Math.max(1, Number(e.target.value)))}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 font-mono" />
+                    className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
                 </div>
               </div>
               {batchLabelType === 'excess' && (
                 <div className="mt-3 max-w-xs">
-                  <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Qtd em Excesso (padrão)</label>
+                  <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Qtd em Excesso (padrão)</label>
                   <input type="number" min="0" value={batchExcessQty} onChange={e => setBatchExcessQty(Number(e.target.value))}
-                    className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 font-mono" />
+                    className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 font-mono" />
                 </div>
               )}
               <div className="mt-4">
                 <button onClick={loadBatch} disabled={batchLoading}
-                  className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-sm font-semibold transition disabled:opacity-50">
+                  className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition disabled:opacity-50">
                   {batchLoading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}Buscar
                 </button>
               </div>
             </div>
 
             {selectedIds.size > 0 && (
-              <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
-                <p className="text-sm font-semibold text-emerald-800">
+              <div className="bg-accent/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm font-semibold text-accent">
                   {selectedIds.size} produto(s) · {selectedIds.size * batchCopies} etiqueta(s)
-                  <span className="ml-2 text-xs font-normal text-emerald-600">
+                  <span className="ml-2 text-xs font-normal text-fg-muted">
                     (fontes: {batchLabelType === 'shelf' ? `Nome ${shelfFonts.nameSize}px · EAN ${shelfFonts.eanSize}px` : `Qtd ${excessFonts.qtySize}px`})
                   </span>
                 </p>
                 <div className="flex gap-2">
                   <button onClick={handleBatchPrint} disabled={busy}
-                    className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                    className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition disabled:opacity-60">
                     {busy ? <RefreshCw size={14} className="animate-spin" /> : <Printer size={14} />}Imprimir
                   </button>
                   <button onClick={handleBatchPDF} disabled={busy}
-                    className="flex items-center gap-2 px-4 py-2 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                    className="flex items-center gap-2 px-4 py-2 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
                     {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}PDF
                   </button>
-                  <button onClick={() => setSelectedIds(new Set())} className="px-3 py-2 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 rounded-lg">
+                  <button onClick={() => setSelectedIds(new Set())} className="px-3 py-2 bg-edge hover:bg-fg-subtle/30 text-fg-muted rounded-lg">
                     <X size={14} />
                   </button>
                 </div>
               </div>
             )}
 
-            <div className="bg-white rounded-xl border border-zinc-200 shadow-sm overflow-hidden">
-              <div className="bg-zinc-50 px-4 py-3 border-b border-zinc-200 flex items-center justify-between">
-                <h2 className="font-bold text-zinc-800 text-sm">Produtos ({batchProducts.length})</h2>
-                <button onClick={toggleAll} className="text-xs text-zinc-600 hover:text-zinc-900 flex items-center gap-1.5 font-medium">
+            <div className="bg-surface-2 rounded-xl border border-edge overflow-hidden">
+              <div className="bg-surface-3 px-4 py-3 border-b border-edge flex items-center justify-between">
+                <h2 className="font-bold text-fg text-sm">Produtos ({batchProducts.length})</h2>
+                <button onClick={toggleAll} className="text-xs text-fg-muted hover:text-fg flex items-center gap-1.5 font-medium">
                   {selectedIds.size === batchProducts.length && batchProducts.length > 0
                     ? <><CheckSquare size={14} />Desmarcar todos</>
                     : <><Square size={14} />Marcar todos</>}
                 </button>
               </div>
               {batchLoading ? (
-                <div className="flex items-center justify-center py-12 text-zinc-400 gap-2">
+                <div className="flex items-center justify-center py-12 text-fg-subtle gap-2">
                   <RefreshCw size={20} className="animate-spin" />Carregando...
                 </div>
               ) : batchProducts.length === 0 ? (
-                <div className="flex flex-col items-center justify-center py-12 text-zinc-300">
+                <div className="flex flex-col items-center justify-center py-12 text-fg-subtle">
                   <Package size={40} className="mb-2 opacity-30" />
                   <p className="text-sm">Nenhum produto encontrado.</p>
                 </div>
               ) : (
                 <div className="overflow-x-auto">
                   <table className="w-full text-sm">
-                    <thead className="bg-zinc-50 border-b border-zinc-200">
+                    <thead className="bg-surface-3 border-b border-edge">
                       <tr>
                         {['', 'Nome', 'SKU', 'EAN', 'Local'].map(h => (
-                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">{h}</th>
+                          <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-fg-subtle uppercase">{h}</th>
                         ))}
                       </tr>
                     </thead>
-                    <tbody className="divide-y divide-zinc-100">
+                    <tbody className="divide-y divide-edge">
                       {batchProducts.map(p => (
                         <tr key={p.id} onClick={() => toggleSelect(p.id)}
-                          className={`cursor-pointer transition ${selectedIds.has(p.id) ? 'bg-emerald-50 hover:bg-emerald-100' : 'hover:bg-zinc-50'}`}>
+                          className={`cursor-pointer transition ${selectedIds.has(p.id) ? 'bg-emerald-50 hover:bg-emerald-100' : 'hover:bg-surface-3'}`}>
                           <td className="px-4 py-3">
-                            {selectedIds.has(p.id) ? <CheckSquare size={16} className="text-emerald-600" /> : <Square size={16} className="text-zinc-300" />}
+                            {selectedIds.has(p.id) ? <CheckSquare size={16} className="text-emerald-600" /> : <Square size={16} className="text-fg-subtle" />}
                           </td>
-                          <td className="px-4 py-3 font-medium text-zinc-800 max-w-[200px] truncate">{p.name}</td>
-                          <td className="px-4 py-3 font-mono text-zinc-600 text-xs">{p.sku}</td>
-                          <td className="px-4 py-3 font-mono text-zinc-500 text-xs">{p.ean || '—'}</td>
-                          <td className="px-4 py-3 text-zinc-600">{p.location || '—'}</td>
+                          <td className="px-4 py-3 font-medium text-fg max-w-[200px] truncate">{p.name}</td>
+                          <td className="px-4 py-3 font-mono text-fg-muted text-xs">{p.sku}</td>
+                          <td className="px-4 py-3 font-mono text-fg-subtle text-xs">{p.ean || '—'}</td>
+                          <td className="px-4 py-3 text-fg-muted">{p.location || '—'}</td>
                         </tr>
                       ))}
                     </tbody>

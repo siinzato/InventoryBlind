@@ -12,6 +12,13 @@ import type {
 } from './nfeTypes';
 import { parseNfeXml } from './nfeXmlParser';
 import {
+  buildCountCorrectionRpcArgs,
+  buildInvoiceReasonRpcArgs,
+  filterActiveInvoices,
+  filterArchivedInvoices,
+  isInvoiceArchived,
+} from './nfeAdmin';
+import {
   buildProductLookups,
   collectItemCodes,
   resolveAssociation,
@@ -31,7 +38,7 @@ const PAGE_SIZE = 1000;
 // ── Products catalog (global/shared) ─────────────────────────────────────────
 
 /** Fetches only catalog products related to the codes/EANs referenced in a note. */
-async function fetchCandidateProducts(skus: string[], eans: string[]): Promise<CatalogProduct[]> {
+export async function fetchCandidateProducts(skus: string[], eans: string[]): Promise<CatalogProduct[]> {
   const found = new Map<string, CatalogProduct>();
 
   const chunk = <T,>(arr: T[], size: number): T[][] => {
@@ -98,7 +105,7 @@ export async function searchCatalog(term: string, limit = 20): Promise<CatalogPr
 
 // ── Learned associations (company-scoped) ────────────────────────────────────
 
-async function fetchLearned(skus: string[], eans: string[]): Promise<LearnedLookup> {
+export async function fetchLearned(skus: string[], eans: string[]): Promise<LearnedLookup> {
   const bySku = new Map<string, string>();
   const byEan = new Map<string, string>();
   const values = [...skus, ...eans];
@@ -218,15 +225,35 @@ export async function importNfeXml(xml: string): Promise<ImportResult> {
 
 // ── Read ───────────────────────────────────────────────────────────────────
 
+/** O histórico visível: notas não arquivadas.
+ *
+ *  O filtro é aplicado no RESULTADO, nunca dentro da query. Um
+ *  `.is('deleted_at', null)` aqui referencia uma coluna que só existe depois da
+ *  migration 062; contra um banco sem ela o PostgREST devolve erro e a tela
+ *  inteira cai. Pré-migration `deleted_at` chega `undefined`, o que conta como
+ *  nota ativa, e o comportamento é idêntico ao de antes desta funcionalidade. */
 export async function listInvoices(): Promise<NfeInvoice[]> {
   const { data, error } = await supabase
     .from('nfe_invoices')
     .select('*')
     .order('created_at', { ascending: false });
   if (error) throw error;
-  return (data ?? []) as NfeInvoice[];
+  return filterActiveInvoices((data ?? []) as NfeInvoice[]);
 }
 
+/** As notas arquivadas, para a área de Arquivados. Pré-migration volta vazia,
+ *  que é a resposta correta. */
+export async function listArchivedInvoices(): Promise<NfeInvoice[]> {
+  const { data, error } = await supabase
+    .from('nfe_invoices')
+    .select('*')
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return filterArchivedInvoices((data ?? []) as NfeInvoice[]);
+}
+
+/** Uma nota arquivada devolve `null`, como uma que não existe — nenhuma tela
+ *  deve conseguir abrir pelo id o que saiu do histórico. */
 export async function getInvoice(id: string): Promise<NfeInvoice | null> {
   const { data, error } = await supabase
     .from('nfe_invoices')
@@ -234,7 +261,9 @@ export async function getInvoice(id: string): Promise<NfeInvoice | null> {
     .eq('id', id)
     .maybeSingle();
   if (error) throw error;
-  return (data as NfeInvoice) ?? null;
+  if (!data) return null;
+  const invoice = data as NfeInvoice;
+  return isInvoiceArchived(invoice) ? null : invoice;
 }
 
 export async function getInvoiceItems(invoiceId: string): Promise<NfeInvoiceItem[]> {
@@ -245,6 +274,58 @@ export async function getInvoiceItems(invoiceId: string): Promise<NfeInvoiceItem
     .order('line_number', { ascending: true });
   if (error) throw error;
   return (data ?? []) as NfeInvoiceItem[];
+}
+
+export interface InvoiceProgress {
+  totalLines: number;
+  countedLines: number;
+  divergentLines: number;
+  /** Maior `updated_at` entre os itens — última leitura real, sem consulta extra. */
+  lastActivityAt: string | null;
+}
+
+/** Progresso real de uma conferência, a partir dos próprios itens (nunca
+ *  inventa total: `totalLines` é a contagem de linhas existentes). Usada só
+ *  para a nota selecionada e para os cards "Em contagem"/"Em revisão" da
+ *  visualização por etapas — nunca para a lista inteira. */
+export async function getInvoiceProgress(invoiceId: string): Promise<InvoiceProgress> {
+  const { data, error } = await supabase
+    .from('nfe_invoice_items')
+    .select('result_status, updated_at')
+    .eq('invoice_id', invoiceId);
+  if (error) throw error;
+  const rows = data ?? [];
+  let countedLines = 0;
+  let divergentLines = 0;
+  let lastActivityAt: string | null = null;
+  for (const r of rows) {
+    if (r.result_status && r.result_status !== 'unlinked' && r.result_status !== 'pending') countedLines += 1;
+    if (r.result_status === 'missing' || r.result_status === 'surplus') divergentLines += 1;
+    if (r.updated_at && (!lastActivityAt || r.updated_at > lastActivityAt)) lastActivityAt = r.updated_at;
+  }
+  return { totalLines: rows.length, countedLines, divergentLines, lastActivityAt };
+}
+
+export interface InvoiceCountEvent {
+  id: string;
+  sku: string | null;
+  ean: string | null;
+  delta: number;
+  resulting_quantity: number;
+  source: CountSource;
+  created_at: string;
+}
+
+/** Histórico completo (imutável) de contagem de uma nota — usado só quando o
+ *  operador pede "Ver histórico completo", nunca carregado de antemão. */
+export async function getInvoiceCountEvents(invoiceId: string): Promise<InvoiceCountEvent[]> {
+  const { data, error } = await supabase
+    .from('nfe_count_events')
+    .select('id, sku, ean, delta, resulting_quantity, source, created_at')
+    .eq('invoice_id', invoiceId)
+    .order('created_at', { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as InvoiceCountEvent[];
 }
 
 // ── Mutations (preparation stage — before real start) ────────────────────────
@@ -299,4 +380,46 @@ export async function finalizeConference(invoiceId: string): Promise<string> {
 export async function reopenConference(invoiceId: string): Promise<void> {
   const { error } = await supabase.rpc('nfe_reopen_conference', { p_invoice_id: invoiceId });
   if (error) throw error;
+}
+
+// ── Controles administrativos (migration 062) ────────────────────────────────
+//
+// Todas revalidam papel (owner/admin), empresa e estado no servidor. O papel e a
+// empresa NÃO são enviados daqui. A nota nunca é editada: chave, número, série,
+// emitente, valores e XML são documento fiscal.
+
+/** Remove a nota do histórico visível. Nada é apagado. */
+export async function archiveInvoiceAdmin(invoiceId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('nfe_admin_archive_invoice', buildInvoiceReasonRpcArgs(invoiceId, reason));
+  if (error) throw error;
+}
+
+export async function restoreInvoiceAdmin(invoiceId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc('nfe_admin_restore_invoice', buildInvoiceReasonRpcArgs(invoiceId, reason));
+  if (error) throw error;
+}
+
+/** Exclusão física — o banco só aceita nota `not_started`, sem nenhum evento de
+ *  contagem e sem nenhum item já conferido. O XML vai junto, e é por isso que a
+ *  condição é tão estreita. */
+export async function hardDeleteDraftInvoiceAdmin(invoiceId: string, reason: string): Promise<void> {
+  const { error } = await supabase.rpc(
+    'nfe_admin_hard_delete_draft_invoice',
+    buildInvoiceReasonRpcArgs(invoiceId, reason)
+  );
+  if (error) throw error;
+}
+
+/** Corrige uma quantidade conferida numa nota já finalizada.
+ *
+ *  Não sobrescreve o log: entra uma linha nova em nfe_count_events com valor
+ *  anterior, valor novo, motivo e autor, e o status do item e da nota são
+ *  recalculados. Devolve a quantidade gravada. */
+export async function correctCountAdmin(itemId: string, quantity: number, reason: string): Promise<number> {
+  const { data, error } = await supabase.rpc(
+    'nfe_admin_correct_count',
+    buildCountCorrectionRpcArgs(itemId, quantity, reason)
+  );
+  if (error) throw error;
+  return Number(data);
 }

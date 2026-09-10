@@ -15,6 +15,7 @@ import React, {
 } from 'react';
 import { supabase } from './supabase';
 import type { User, Session } from '@supabase/supabase-js';
+import { getRememberedWorkspaceDevice } from './workspacePrefs';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -24,6 +25,14 @@ export interface Company {
   slug: string;
   plan: 'starter' | 'professional' | 'enterprise';
   settings: Record<string, unknown>;
+  icon: string | null;
+  description: string | null;
+  logoPath: string | null;
+  createdAt: string;
+}
+
+export interface CompanyMembership extends Company {
+  lastAccessedAt: string | null;
 }
 
 export interface Profile {
@@ -31,7 +40,7 @@ export interface Profile {
   name: string | null;
   email: string | null;
   company_id: string | null;
-  role: 'owner' | 'admin' | 'manager' | 'counter' | 'viewer';
+  role: 'owner' | 'admin' | 'manager' | 'lead' | 'counter' | 'viewer';
   must_change_password: boolean;
 }
 
@@ -40,9 +49,11 @@ export type AuthView =
   | 'login'
   | 'signup'
   | 'forgot'
+  | 'update-password'
   | 'confirm-email'
   | 'link-company'
   | 'complete-profile'
+  | 'select-workspace'
   | 'auth-error'
   | 'app';
 
@@ -52,6 +63,8 @@ interface AuthContextValue {
   profile: Profile | null;
   company: Company | null;
   companyId: string;
+  companies: CompanyMembership[];
+  switchingCompany: boolean;
   authLoading: boolean;
   profileLoading: boolean;
   authError: string | null;
@@ -61,12 +74,98 @@ interface AuthContextValue {
   refreshProfile: () => Promise<void>;
   retryAuth: () => void;
   linkToAZ: () => Promise<void>;
+  createCompany: (companyName: string, userName?: string) => Promise<void>;
+  /** Cria um workspace ADICIONAL para um usuário que já tem um workspace ativo
+   *  (diferente de createCompany, que é só o onboarding de primeiro acesso e
+   *  rejeita quem já está vinculado) — e já troca para ele em seguida. */
+  createWorkspace: (companyName: string) => Promise<void>;
+  switchCompany: (companyId: string) => Promise<void>;
+  /** Erro de um código de convite pendente (definido no cadastro) que falhou ao ser resolvido
+   *  automaticamente em runAuthSequence — mostrado em LinkCompanyScreen junto com o formulário
+   *  manual de código, para nunca cair silenciosamente em "criar empresa". */
+  inviteCodeError: string | null;
+  clearInviteCodeError: () => void;
+  /** Entrada manual de código em LinkCompanyScreen — mesmo caminho usado pelo código pendente do
+   *  cadastro, só que disparado pelo próprio usuário em vez de automaticamente. */
+  joinByInviteCode: (code: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextValue | null>(null);
 
 const AZ_COMPANY_ID = '00000000-0000-0000-0000-000000000001';
 const AUTH_TIMEOUT_MS = 8000;
+
+// Set by AuthPage's signup form right before calling supabase.auth.signUp(),
+// consumed once inside runAuthSequence on the very next profile load for this
+// user. This has to live in the ONE authoritative auth sequence rather than
+// as a second, separate RPC call fired from AuthPage after signUp() resolves:
+// two independent async paths both trying to set `view` after signup race,
+// and whichever finishes last always wins — confirmed live, the background
+// sequence (triggered by the same SIGNED_IN event) finished after AuthPage's
+// own call and overwrote the correct post-onboarding view with a stale,
+// pre-onboarding snapshot it had already read.
+const PENDING_ONBOARDING_KEY = 'inventoryblind.pending-company-onboarding';
+const PENDING_EMAIL_KEY = 'inventoryblind.pending-email';
+
+function readPendingCompanyOnboarding(): { companyName: string; userName?: string } | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    const stored = sessionStorage.getItem(PENDING_ONBOARDING_KEY);
+    return stored ? JSON.parse(stored) : null;
+  } catch {
+    return null;
+  }
+}
+
+let pendingCompanyOnboarding: { companyName: string; userName?: string } | null = readPendingCompanyOnboarding();
+
+export function setPendingCompanyOnboarding(companyName: string, userName?: string) {
+  pendingCompanyOnboarding = { companyName, userName };
+  sessionStorage.setItem(PENDING_ONBOARDING_KEY, JSON.stringify(pendingCompanyOnboarding));
+}
+
+export function clearPendingCompanyOnboarding() {
+  pendingCompanyOnboarding = null;
+  sessionStorage.removeItem(PENDING_ONBOARDING_KEY);
+}
+
+export function setPendingSignupEmail(email: string) {
+  sessionStorage.setItem(PENDING_EMAIL_KEY, email);
+}
+
+export function getPendingSignupEmail(): string {
+  return sessionStorage.getItem(PENDING_EMAIL_KEY) ?? '';
+}
+
+export function clearPendingSignupEmail() {
+  sessionStorage.removeItem(PENDING_EMAIL_KEY);
+}
+
+// Mesmo mecanismo de pendingCompanyOnboarding acima, para o modo "tenho um código de convite" do
+// cadastro (migration 082): guardado antes do signUp(), sobrevive ao redirect da confirmação de
+// e-mail, consumido uma vez dentro de runAuthSequence.
+const PENDING_INVITE_CODE_KEY = 'inventoryblind.pending-invite-code';
+
+function readPendingInviteCode(): string | null {
+  if (typeof window === 'undefined') return null;
+  try {
+    return sessionStorage.getItem(PENDING_INVITE_CODE_KEY);
+  } catch {
+    return null;
+  }
+}
+
+let pendingInviteCode: string | null = readPendingInviteCode();
+
+export function setPendingInviteCode(code: string) {
+  pendingInviteCode = code;
+  sessionStorage.setItem(PENDING_INVITE_CODE_KEY, code);
+}
+
+export function clearPendingInviteCode() {
+  pendingInviteCode = null;
+  sessionStorage.removeItem(PENDING_INVITE_CODE_KEY);
+}
 
 // ── Provider ──────────────────────────────────────────────────────────────────
 
@@ -75,19 +174,28 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const [session, setSession]                 = useState<Session | null>(null);
   const [profile, setProfile]                 = useState<Profile | null>(null);
   const [company, setCompany]                 = useState<Company | null>(null);
+  const [companies, setCompanies]             = useState<CompanyMembership[]>([]);
+  const [switchingCompany, setSwitchingCompany] = useState(false);
   const [authLoading, setAuthLoading]         = useState(true);
   const [profileLoading, setProfileLoading]   = useState(false);
   const [authError, setAuthError]             = useState<string | null>(null);
   const [view, setView]                       = useState<AuthView>('landing');
+  const [inviteCodeError, setInviteCodeError] = useState<string | null>(null);
 
   const mountedRef    = useRef(true);
   const timeoutRef    = useRef<ReturnType<typeof setTimeout> | null>(null);
   const loadingRef    = useRef(false); // prevents concurrent profile loads
+  const authLoadingRef = useRef(authLoading); // live value for the one-shot timeout effect below
+  const recoveryModeRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
     return () => { mountedRef.current = false; };
   }, []);
+
+  useEffect(() => {
+    authLoadingRef.current = authLoading;
+  }, [authLoading]);
 
   // ── Fetch profile + company ────────────────────────────────────────────────
   const doLoadProfile = useCallback(async (u: User): Promise<Profile | null> => {
@@ -114,17 +222,31 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const doLoadCompany = useCallback(async (companyId: string): Promise<Company | null> => {
     const { data, error } = await supabase
       .from('companies')
-      .select('id, name, slug, plan, settings')
+      .select('id, name, slug, plan, settings, icon, description, logo_path, created_at')
       .eq('id', companyId)
       .maybeSingle();
 
     if (import.meta.env.DEV && error) console.warn('[Auth] Company error:', error.message);
     if (import.meta.env.DEV) console.log('[Auth] Company result:', data);
-    return (data ?? null) as Company | null;
+    return (data ? { ...data, createdAt: data.created_at, logoPath: data.logo_path } : null) as Company | null;
+  }, []);
+
+  const doLoadMemberships = useCallback(async (userId: string): Promise<CompanyMembership[]> => {
+    const { data, error } = await supabase
+      .from('company_members')
+      .select('last_accessed_at, companies(id, name, slug, plan, settings, icon, description, logo_path, created_at)')
+      .eq('user_id', userId);
+
+    if (import.meta.env.DEV && error) console.warn('[Auth] Memberships error:', error.message);
+
+    const rows = (data ?? []) as unknown as { last_accessed_at: string | null; companies: (Omit<Company, 'createdAt' | 'logoPath'> & { created_at: string; logo_path: string | null }) | null }[];
+    return rows
+      .filter((r): r is { last_accessed_at: string | null; companies: Omit<Company, 'createdAt' | 'logoPath'> & { created_at: string; logo_path: string | null } } => !!r.companies)
+      .map(r => ({ ...r.companies, createdAt: r.companies.created_at, logoPath: r.companies.logo_path, lastAccessedAt: r.last_accessed_at }));
   }, []);
 
   // ── Resolve which view to show ─────────────────────────────────────────────
-  const resolveView = useCallback((u: User, prof: Profile | null) => {
+  const resolveView = useCallback((u: User, prof: Profile | null, memberships: CompanyMembership[]) => {
     if (import.meta.env.DEV) console.log('[Auth] Resolving view — user:', u.email, 'profile:', prof, 'email_confirmed:', u.email_confirmed_at);
 
     if (!u.email_confirmed_at) {
@@ -140,6 +262,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     if (!prof.company_id) {
       if (import.meta.env.DEV) console.log('[Auth] → link-company (no company_id in profile)');
       setView('link-company');
+      return;
+    }
+    if (memberships.length > 1 && !getRememberedWorkspaceDevice()) {
+      if (import.meta.env.DEV) console.log('[Auth] → select-workspace (', memberships.length, 'workspaces, not remembered on this device)');
+      setView('select-workspace');
       return;
     }
     if (import.meta.env.DEV) console.log('[Auth] → app ✓  role:', prof.role, 'company_id:', prof.company_id);
@@ -158,8 +285,75 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     setProfileLoading(true);
 
     try {
-      const prof = await doLoadProfile(u);
+      let prof = await doLoadProfile(u);
       if (!mountedRef.current) return;
+
+      // Resolve any invitation pending for this user's email (migration 080,
+      // company_invitations/accept_pending_invitations) BEFORE resolveView decides between the app
+      // and the company onboarding screen — same reasoning as the pendingCompanyOnboarding block
+      // right below: the membership has to exist before the redirect decision, not after. Runs on
+      // every authenticated sequence (not only when company_id is null) so a user who already has
+      // a company still picks up an invite to a SECOND company; the RPC is a cheap index lookup and
+      // a no-op when there is nothing pending for that email.
+      if (prof) {
+        try {
+          const { data: accepted, error: acceptErr } = await supabase.rpc('accept_pending_invitations');
+          if (import.meta.env.DEV && acceptErr) console.warn('[Auth] accept_pending_invitations error:', acceptErr.message);
+          const activated = accepted?.some((r: { out_activated: boolean }) => r.out_activated);
+          if (!prof.company_id && activated) {
+            // Re-fetch instead of hand-patching: the RPC also sets role and
+            // must_change_password server-side, and patching only company_id here would leave a
+            // stale role ('viewer') in the client's copy of the profile.
+            prof = await doLoadProfile(u);
+          }
+        } catch (acceptThrow) {
+          if (import.meta.env.DEV) console.error('[Auth] accept_pending_invitations threw:', acceptThrow);
+        }
+      }
+      if (!mountedRef.current) return;
+
+      // A signup-time invite code (migration 082, "tenho um código de convite" em SignupView) is
+      // resolved here too, before pendingCompanyOnboarding — same ordering reasoning as the
+      // invitation block above. Unlike that block, a failed code must NOT be swallowed: showing
+      // "criar empresa" without any indication the code failed would be exactly the silent
+      // fallback this whole fix exists to avoid, so the message survives in inviteCodeError for
+      // LinkCompanyScreen to display.
+      if (prof && !prof.company_id && pendingInviteCode) {
+        const code = pendingInviteCode;
+        try {
+          const { data: joined, error: joinErr } = await supabase.rpc('join_company_by_invite_code', { p_code: code });
+          if (joinErr) {
+            setInviteCodeError(joinErr.message || 'Código de convite inválido.');
+          } else if (joined?.[0]?.out_activated) {
+            prof = await doLoadProfile(u);
+          }
+          clearPendingInviteCode();
+        } catch (joinThrow) {
+          if (import.meta.env.DEV) console.error('[Auth] join_company_by_invite_code threw:', joinThrow);
+          setInviteCodeError('Não foi possível validar o código de convite. Tente novamente.');
+          clearPendingInviteCode();
+        }
+      }
+      if (!mountedRef.current) return;
+
+      if (prof && !prof.company_id && pendingCompanyOnboarding) {
+        const { companyName, userName } = pendingCompanyOnboarding;
+        try {
+          const { data, error } = await supabase.rpc('create_company_onboarding', {
+            p_company_name: companyName,
+            p_user_name: userName ?? null,
+          });
+          if (!error && data?.[0]?.out_company_id) {
+            prof = { ...prof, company_id: data[0].out_company_id, role: 'owner' };
+            clearPendingCompanyOnboarding();
+            clearPendingSignupEmail();
+          } else if (import.meta.env.DEV) {
+            console.error('[Auth] create_company_onboarding failed:', error?.message);
+          }
+        } catch (onboardErr) {
+          if (import.meta.env.DEV) console.error('[Auth] create_company_onboarding threw:', onboardErr);
+        }
+      }
 
       setProfile(prof);
 
@@ -168,8 +362,11 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (mountedRef.current) setCompany(comp);
       }
 
+      const memberships = await doLoadMemberships(u.id);
+      if (mountedRef.current) setCompanies(memberships);
+
       if (mountedRef.current) {
-        resolveView(u, prof);
+        resolveView(u, prof, memberships);
       }
     } catch (err) {
       if (import.meta.env.DEV) console.error('[Auth] runAuthSequence error:', err);
@@ -185,14 +382,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         if (timeoutRef.current) clearTimeout(timeoutRef.current);
       }
     }
-  }, [doLoadProfile, doLoadCompany, resolveView]);
+  }, [doLoadProfile, doLoadCompany, doLoadMemberships, resolveView]);
 
   // ── onAuthStateChange — sets state, defers DB work via setTimeout(0) ──────
   useEffect(() => {
     // Hard timeout so authLoading never stays true forever
     timeoutRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
-      if (authLoading) {
+      if (authLoadingRef.current) {
         if (import.meta.env.DEV) console.warn('[Auth] Timeout reached');
         setAuthLoading(false);
         setAuthError('O carregamento demorou demais. Verifique sua conexão.');
@@ -208,10 +405,32 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       setSession(s);
       setUser(s?.user ?? null);
 
+      // A recovery link creates a temporary session. Keep it on the password
+      // form instead of resolving the normal workspace/app route.
+      if (event === 'PASSWORD_RECOVERY' && s?.user) {
+        recoveryModeRef.current = true;
+        loadingRef.current = false;
+        setProfileLoading(false);
+        setAuthLoading(false);
+        setAuthError(null);
+        setView('update-password');
+        if (timeoutRef.current) clearTimeout(timeoutRef.current);
+        return;
+      }
+
+      // updateUser emits USER_UPDATED; recovery remains active until sign-out.
+      if (recoveryModeRef.current && s?.user) {
+        setAuthLoading(false);
+        setView('update-password');
+        return;
+      }
+
       if (!s?.user) {
         // Signed out or no session
+        recoveryModeRef.current = false;
         setProfile(null);
         setCompany(null);
+        setCompanies([]);
         loadingRef.current = false;
         setProfileLoading(false);
         setAuthLoading(false);
@@ -219,11 +438,21 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
 
         // Go to landing unless already on an auth sub-page
         setView(curr => {
-          const authPages: AuthView[] = ['login', 'signup', 'forgot', 'confirm-email'];
+          const authPages: AuthView[] = ['login', 'signup', 'forgot', 'update-password', 'confirm-email'];
           return authPages.includes(curr) ? curr : 'landing';
         });
         return;
       }
+
+      // TOKEN_REFRESHED fires on every background session revalidation —
+      // including regaining tab focus, since Supabase re-checks the session
+      // on visibilitychange — with the same still-valid user. session/user
+      // state is already updated above; re-running the full profile/company/
+      // workspace resolution here would force `view` back through
+      // resolveView's workspace-selector gate even though the user is
+      // already settled in 'app'. That is what caused the workspace
+      // selector to reappear on tab-switch-and-return.
+      if (event === 'TOKEN_REFRESHED') return;
 
       // User exists — defer DB queries so JWT is committed first
       const capturedUser = s.user;
@@ -242,10 +471,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   // ── signOut ────────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {
     loadingRef.current = false;
+    recoveryModeRef.current = false;
     await supabase.auth.signOut();
     if (!mountedRef.current) return;
     setProfile(null);
     setCompany(null);
+    setCompanies([]);
     setAuthError(null);
     setAuthLoading(false);
     setView('landing');
@@ -315,6 +546,76 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     await runAuthSequence(user);
   }, [user, runAuthSequence]);
 
+  // ── createCompany — onboarding for a brand-new, company-less user ─────────
+  const createCompany = useCallback(async (companyName: string, userName?: string) => {
+    if (!user) throw new Error('No authenticated user');
+
+    const { error } = await supabase.rpc('create_company_onboarding', {
+      p_company_name: companyName,
+      p_user_name: userName ?? null,
+    });
+
+    if (error) throw new Error(error.message);
+
+    loadingRef.current = false;
+    await runAuthSequence(user);
+  }, [user, runAuthSequence]);
+
+  // ── createWorkspace — "Adicionar empresa" a partir de um workspace já ativo ───────────────
+  const createWorkspace = useCallback(async (companyName: string) => {
+    if (!user) throw new Error('No authenticated user');
+
+    const { data, error } = await supabase.rpc('create_additional_company', {
+      p_company_name: companyName,
+    });
+    if (error) throw new Error(error.message);
+
+    const newCompanyId = data?.[0]?.out_company_id;
+    if (newCompanyId) {
+      const { error: switchErr } = await supabase.rpc('switch_active_company', { target_company_id: newCompanyId });
+      if (switchErr && import.meta.env.DEV) console.error('[Auth] createWorkspace switch error:', switchErr.message);
+    }
+
+    loadingRef.current = false;
+    await runAuthSequence(user);
+  }, [user, runAuthSequence]);
+
+  // ── joinByInviteCode — manual fallback on LinkCompanyScreen (migration 082) ───────────────
+  // Same RPC the signup-time pending code resolves automatically in runAuthSequence; this is the
+  // path for someone who already has an account (or whose signup-time code failed) typing a code
+  // directly.
+  const joinByInviteCode = useCallback(async (code: string) => {
+    if (!user) throw new Error('No authenticated user');
+
+    const { error } = await supabase.rpc('join_company_by_invite_code', { p_code: code });
+    if (error) throw new Error(error.message);
+
+    setInviteCodeError(null);
+    loadingRef.current = false;
+    await runAuthSequence(user);
+  }, [user, runAuthSequence]);
+
+  const clearInviteCodeError = useCallback(() => setInviteCodeError(null), []);
+
+  // ── switchCompany ─────────────────────────────────────────────────────────
+  const switchCompany = useCallback(async (targetCompanyId: string) => {
+    if (!user) return;
+    if (profile?.company_id === targetCompanyId) return;
+
+    setSwitchingCompany(true);
+    try {
+      const { error } = await supabase.rpc('switch_active_company', { target_company_id: targetCompanyId });
+      if (error) {
+        if (import.meta.env.DEV) console.error('[Auth] switchCompany error:', error.message);
+        return;
+      }
+      loadingRef.current = false;
+      await runAuthSequence(user);
+    } finally {
+      if (mountedRef.current) setSwitchingCompany(false);
+    }
+  }, [user, profile?.company_id, runAuthSequence]);
+
   // ── Value ──────────────────────────────────────────────────────────────────
   const value: AuthContextValue = {
     user,
@@ -322,6 +623,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     profile,
     company,
     companyId: profile?.company_id ?? '',
+    companies,
+    switchingCompany,
     authLoading,
     profileLoading,
     authError,
@@ -331,6 +634,12 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     refreshProfile,
     retryAuth,
     linkToAZ,
+    createCompany,
+    createWorkspace,
+    switchCompany,
+    inviteCodeError,
+    clearInviteCodeError,
+    joinByInviteCode,
   };
 
   return <AuthContext.Provider value={value}>{children}</AuthContext.Provider>;

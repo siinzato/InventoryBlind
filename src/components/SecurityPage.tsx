@@ -1,16 +1,19 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
-  ShieldCheck, Shield, ShieldAlert, ShieldX,
+  ShieldCheck, Shield, ShieldAlert,
   CheckCircle2, AlertTriangle, XCircle, Info,
   Lock, Unlock, Users, Activity, Database,
   Eye, RefreshCw, ChevronDown, ChevronUp,
   FileText, Globe, Clock, Server, Key,
-  Upload, Link, Settings, Zap, ArrowLeft,
+  Upload, Link, Settings, KeyRound, ArrowLeft, Check,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { hasPermission, getRoleLabel, getRoleBadgeColor } from '../lib/permissionService';
 import type { AuditLog, SecurityLog } from '../lib/auditLogService';
+import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button, Stat, StatRow, StatCell, ListRow } from './ui';
+import AccessDeniedPage from './AccessDeniedPage';
+import { AdminSessionsPanel } from './security/AdminSessionsPanel';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -35,33 +38,35 @@ interface SecuritySettings {
 
 function StatusBadge({ status }: { status: HealthStatus }) {
   if (status === 'loading') return (
-    <span className="flex items-center gap-1 text-zinc-400 text-xs"><RefreshCw size={12} className="animate-spin" /> Verificando...</span>
+    <span className="flex items-center gap-1 text-fg-subtle text-xs"><RefreshCw size={12} className="animate-spin" /> Verificando...</span>
   );
   if (status === 'ok') return (
-    <span className="flex items-center gap-1 text-emerald-400 text-xs font-semibold"><CheckCircle2 size={14} /> OK</span>
+    <Badge variant="success"><CheckCircle2 size={12} /> OK</Badge>
   );
   if (status === 'warning') return (
-    <span className="flex items-center gap-1 text-amber-400 text-xs font-semibold"><AlertTriangle size={14} /> Atenção</span>
+    <Badge variant="warning"><AlertTriangle size={12} /> Atenção</Badge>
   );
   return (
-    <span className="flex items-center gap-1 text-red-400 text-xs font-semibold"><XCircle size={14} /> Crítico</span>
+    <Badge variant="danger"><XCircle size={12} /> Crítico</Badge>
   );
 }
 
+const SEVERITY_VARIANT: Record<string, 'neutral' | 'warning' | 'danger'> = {
+  info: 'neutral',
+  warning: 'warning',
+  high: 'danger',
+  critical: 'danger',
+};
+
+const SEVERITY_LABEL: Record<string, string> = {
+  info: 'Info', warning: 'Atenção', high: 'Alto', critical: 'Crítico',
+};
+
 function SeverityBadge({ severity }: { severity: string }) {
-  const map: Record<string, string> = {
-    info:     'bg-blue-500/15 text-blue-400 border-blue-500/30',
-    warning:  'bg-amber-500/15 text-amber-400 border-amber-500/30',
-    high:     'bg-orange-500/15 text-orange-400 border-orange-500/30',
-    critical: 'bg-red-500/15 text-red-400 border-red-500/30',
-  };
-  const labels: Record<string, string> = {
-    info: 'Info', warning: 'Atenção', high: 'Alto', critical: 'Crítico',
-  };
   return (
-    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full border ${map[severity] ?? map.info}`}>
-      {labels[severity] ?? severity}
-    </span>
+    <Badge variant={SEVERITY_VARIANT[severity] ?? 'neutral'}>
+      {SEVERITY_LABEL[severity] ?? severity}
+    </Badge>
   );
 }
 
@@ -149,44 +154,42 @@ function HealthCheck({ companyId }: { companyId: string }) {
   const critCount = items.filter(i => i.status === 'critical').length;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-      <div className="flex items-center justify-between mb-5">
+    <Panel>
+      <PanelSection className="flex items-center justify-between">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-            <ShieldCheck size={20} className="text-emerald-400" />
-          </div>
+          <ShieldCheck size={20} className="text-fg-muted" />
           <div>
-            <h3 className="font-bold text-white">Security Health Check</h3>
-            <p className="text-zinc-500 text-xs">InventoryBlind Security Audit</p>
+            <h3 className="text-sm font-semibold text-fg">Security Health Check</h3>
+            <p className="text-fg-subtle text-xs">InventoryBlind Security Audit</p>
           </div>
         </div>
         {!loading && (
           <div className="flex gap-3 text-xs">
-            <span className="text-emerald-400 font-semibold">{okCount} OK</span>
-            {warnCount > 0 && <span className="text-amber-400 font-semibold">{warnCount} Atenção</span>}
-            {critCount > 0 && <span className="text-red-400 font-semibold">{critCount} Crítico</span>}
+            <span className="text-emerald-600 dark:text-emerald-400 font-semibold">{okCount} OK</span>
+            {warnCount > 0 && <span className="text-amber-600 dark:text-amber-400 font-semibold">{warnCount} Atenção</span>}
+            {critCount > 0 && <span className="text-red-600 dark:text-red-400 font-semibold">{critCount} Crítico</span>}
           </div>
         )}
-      </div>
-      <div className="space-y-2">
+      </PanelSection>
+      <PanelSection className="space-y-2">
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-zinc-800/50 animate-pulse">
-                <div className="h-3 w-48 bg-zinc-700 rounded" />
-                <div className="h-3 w-16 bg-zinc-700 rounded" />
+              <div key={i} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-surface-3 animate-pulse">
+                <div className="h-3 w-48 bg-edge rounded" />
+                <div className="h-3 w-16 bg-edge rounded" />
               </div>
             ))
           : items.map((item) => (
-              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-zinc-800/40 hover:bg-zinc-800/70 transition-colors">
+              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-surface-3">
                 <div>
-                  <span className="text-zinc-200 text-sm">{item.label}</span>
-                  {item.detail && <span className="text-zinc-500 text-xs ml-2">— {item.detail}</span>}
+                  <span className="text-fg text-sm">{item.label}</span>
+                  {item.detail && <span className="text-fg-subtle text-xs ml-2">— {item.detail}</span>}
                 </div>
                 <StatusBadge status={item.status} />
               </div>
             ))}
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -225,78 +228,70 @@ function OverviewCards({ companyId }: { companyId: string }) {
     if (companyId) load();
   }, [companyId]);
 
-  const cards = [
+  const skeleton = <span className="inline-block w-8 h-5 bg-surface-3 rounded animate-pulse" />;
+  const cards: { icon: React.ReactNode; label: string; value: React.ReactNode; sub: string; critical: boolean }[] = [
     {
-      icon: <Shield size={20} />,
-      iconBg: 'bg-emerald-500/15',
-      iconColor: 'text-emerald-400',
+      icon: <Shield size={14} />,
       label: 'RLS Status',
-      value: data?.rlsActive ? 'Ativo' : 'FALHA',
+      value: data ? (data.rlsActive ? 'Ativo' : 'FALHA') : skeleton,
       sub: 'Isolamento multiempresa',
-      status: data?.rlsActive ? 'ok' : 'critical',
+      critical: !!data && !data.rlsActive,
     },
     {
-      icon: <FileText size={20} />,
-      iconBg: 'bg-blue-500/15',
-      iconColor: 'text-blue-400',
+      icon: <FileText size={14} />,
       label: 'Logs de Auditoria',
-      value: data?.auditCount?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.auditCount.toLocaleString('pt-BR') : skeleton,
       sub: 'Eventos registrados',
-      status: 'ok',
+      critical: false,
     },
     {
-      icon: <ShieldAlert size={20} />,
-      iconBg: data?.criticalAlerts ? 'bg-red-500/15' : 'bg-zinc-800',
-      iconColor: data?.criticalAlerts ? 'text-red-400' : 'text-zinc-500',
+      icon: <ShieldAlert size={14} />,
       label: 'Alertas Críticos',
-      value: data?.criticalAlerts?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.criticalAlerts.toLocaleString('pt-BR') : skeleton,
       sub: 'Severidade alta/crítica',
-      status: (data?.criticalAlerts ?? 0) > 0 ? 'critical' : 'ok',
+      critical: (data?.criticalAlerts ?? 0) > 0,
     },
     {
-      icon: <Users size={20} />,
-      iconBg: 'bg-violet-500/15',
-      iconColor: 'text-violet-400',
+      icon: <Users size={14} />,
       label: 'Usuários da Empresa',
-      value: data?.profileCount?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.profileCount.toLocaleString('pt-BR') : skeleton,
       sub: 'Perfis vinculados',
-      status: 'ok',
+      critical: false,
     },
     {
-      icon: <Database size={20} />,
-      iconBg: 'bg-teal-500/15',
-      iconColor: 'text-teal-400',
+      icon: <Database size={14} />,
       label: 'Logs de Segurança',
-      value: data?.secCount?.toLocaleString('pt-BR') ?? '—',
+      value: data ? data.secCount.toLocaleString('pt-BR') : skeleton,
       sub: 'Eventos de segurança',
-      status: 'ok',
+      critical: false,
     },
     {
-      icon: <Lock size={20} />,
-      iconBg: 'bg-amber-500/15',
-      iconColor: 'text-amber-400',
+      icon: <Lock size={14} />,
       label: 'Backup',
       value: 'Supabase',
       sub: 'Gerenciado automaticamente',
-      status: 'ok',
+      critical: false,
     },
   ];
 
   return (
-    <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-6 gap-4">
-      {cards.map((card) => (
-        <div key={card.label} className="bg-zinc-900 border border-zinc-800 rounded-2xl p-4">
-          <div className={`w-9 h-9 ${card.iconBg} rounded-xl flex items-center justify-center mb-3`}>
-            <span className={card.iconColor}>{card.icon}</span>
-          </div>
-          <div className={`text-xl font-black mb-0.5 ${card.status === 'critical' ? 'text-red-400' : card.status === 'warning' ? 'text-amber-400' : 'text-white'}`}>
-            {data ? card.value : <span className="inline-block w-8 h-5 bg-zinc-700 rounded animate-pulse" />}
-          </div>
-          <div className="text-zinc-400 text-xs font-semibold">{card.label}</div>
-          <div className="text-zinc-600 text-xs mt-0.5">{card.sub}</div>
-        </div>
-      ))}
-    </div>
+    <Panel>
+      <PanelSection>
+        <StatRow className="md:grid-cols-3 lg:grid-cols-6">
+          {cards.map(card => (
+            <StatCell key={card.label}>
+              <Stat
+                icon={card.icon}
+                label={card.label}
+                value={card.value}
+                context={card.sub}
+                valueTone={card.critical ? 'critical' : 'default'}
+              />
+            </StatCell>
+          ))}
+        </StatRow>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -325,75 +320,70 @@ function AuditLogsTable({ companyId }: { companyId: string }) {
     setLoading(false);
   }, [companyId, page, filter]);
 
-  useEffect(() => { if (companyId) load(); }, [load]);
+  useEffect(() => { if (companyId) load(); }, [load, companyId]);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-blue-500/15 rounded-xl flex items-center justify-center">
-            <FileText size={18} className="text-blue-400" />
-          </div>
-          <h3 className="font-bold text-white">Logs de Auditoria</h3>
-        </div>
+    <Panel>
+      <PanelSection className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-fg">Logs de Auditoria</h3>
         <div className="flex items-center gap-2">
           <input
             value={filter}
             onChange={e => { setFilter(e.target.value); setPage(0); }}
             placeholder="Filtrar por ação..."
-            className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 placeholder-zinc-500 focus:outline-none focus:border-zinc-500 w-44"
+            className="bg-surface-3 border border-edge rounded-lg px-3 py-1.5 text-sm text-fg placeholder-fg-subtle focus:outline-none focus:border-accent w-44 max-w-full"
           />
-          <button onClick={load} className="p-1.5 text-zinc-500 hover:text-zinc-300 transition">
+          <button onClick={load} className="p-1.5 text-fg-subtle hover:text-fg-muted transition">
             <RefreshCw size={16} />
           </button>
         </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-800/40">
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Data/Hora</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Usuário</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Ação</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Recurso</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Descrição</th>
-            </tr>
-          </thead>
+      </PanelSection>
+      <div className="border-t border-edge overflow-x-auto">
+        <Table>
+          <Thead>
+            <Tr>
+              <Th>Data/Hora</Th>
+              <Th>Usuário</Th>
+              <Th>Ação</Th>
+              <Th>Recurso</Th>
+              <Th>Descrição</Th>
+            </Tr>
+          </Thead>
           <tbody>
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-zinc-800/50">
+                  <Tr key={i}>
                     {Array.from({ length: 5 }).map((__, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-3 bg-zinc-800 rounded animate-pulse" /></td>
+                      <Td key={j}><div className="h-3 bg-surface-3 rounded animate-pulse" /></Td>
                     ))}
-                  </tr>
+                  </Tr>
                 ))
               : logs.length === 0
               ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-500 text-sm">Nenhum log encontrado.</td></tr>
+                  <Tr><Td colSpan={5} className="text-center py-8 text-fg-subtle text-sm">Nenhum log encontrado.</Td></Tr>
                 )
               : logs.map((log) => (
-                  <tr key={log.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-4 py-3 text-zinc-500 text-xs whitespace-nowrap">{formatDate(log.created_at)}</td>
-                    <td className="px-4 py-3 text-zinc-300 text-xs">{truncate(log.user_email, 28)}</td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs bg-zinc-800 px-2 py-0.5 rounded text-emerald-400">{log.action}</span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-500 text-xs">{log.resource_type ?? '—'}</td>
-                    <td className="px-4 py-3 text-zinc-400 text-xs">{truncate(log.description)}</td>
-                  </tr>
+                  <Tr key={log.id}>
+                    <Td className="text-fg-subtle text-xs whitespace-nowrap">{formatDate(log.created_at)}</Td>
+                    <Td className="text-fg-muted text-xs">{truncate(log.user_email, 28)}</Td>
+                    <Td>
+                      <span className="font-mono text-xs bg-surface-3 px-2 py-0.5 rounded text-fg-muted">{log.action}</span>
+                    </Td>
+                    <Td className="text-fg-subtle text-xs">{log.resource_type ?? '—'}</Td>
+                    <Td className="text-fg-subtle text-xs">{truncate(log.description)}</Td>
+                  </Tr>
                 ))}
           </tbody>
-        </table>
+        </Table>
       </div>
-      <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800">
-        <span className="text-zinc-500 text-xs">Página {page + 1}</span>
+      <PanelSection padding="sm" className="flex items-center justify-between">
+        <span className="text-fg-subtle text-xs">Página {page + 1}</span>
         <div className="flex gap-2">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 transition">Anterior</button>
-          <button disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)} className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 transition">Próxima</button>
+          <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+          <Button variant="secondary" size="sm" disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)}>Próxima</Button>
         </div>
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -422,22 +412,17 @@ function SecurityLogsTable({ companyId }: { companyId: string }) {
     setLoading(false);
   }, [companyId, page, severityFilter]);
 
-  useEffect(() => { if (companyId) load(); }, [load]);
+  useEffect(() => { if (companyId) load(); }, [load, companyId]);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between p-5 border-b border-zinc-800">
-        <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-red-500/15 rounded-xl flex items-center justify-center">
-            <ShieldAlert size={18} className="text-red-400" />
-          </div>
-          <h3 className="font-bold text-white">Logs de Segurança</h3>
-        </div>
+    <Panel>
+      <PanelSection className="flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold text-fg">Logs de Segurança</h3>
         <div className="flex items-center gap-2">
           <select
             value={severityFilter}
             onChange={e => { setSeverityFilter(e.target.value); setPage(0); }}
-            className="bg-zinc-800 border border-zinc-700 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-zinc-500"
+            className="bg-surface-3 border border-edge rounded-lg px-3 py-1.5 text-sm text-fg focus:outline-none focus:border-accent"
           >
             <option value="all">Todos</option>
             <option value="info">Info</option>
@@ -445,93 +430,105 @@ function SecurityLogsTable({ companyId }: { companyId: string }) {
             <option value="high">Alto</option>
             <option value="critical">Crítico</option>
           </select>
-          <button onClick={load} className="p-1.5 text-zinc-500 hover:text-zinc-300 transition">
+          <button onClick={load} className="p-1.5 text-fg-subtle hover:text-fg-muted transition">
             <RefreshCw size={16} />
           </button>
         </div>
-      </div>
-      <div className="overflow-x-auto">
-        <table className="w-full text-sm">
-          <thead>
-            <tr className="border-b border-zinc-800 bg-zinc-800/40">
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Data/Hora</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Severidade</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Evento</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">Descrição</th>
-              <th className="text-left px-4 py-3 text-zinc-500 font-semibold text-xs">IP</th>
-            </tr>
-          </thead>
+      </PanelSection>
+      <div className="border-t border-edge overflow-x-auto">
+        <Table>
+          <Thead>
+            <Tr>
+              <Th>Data/Hora</Th>
+              <Th>Severidade</Th>
+              <Th>Evento</Th>
+              <Th>Descrição</Th>
+              <Th>IP</Th>
+            </Tr>
+          </Thead>
           <tbody>
             {loading
               ? Array.from({ length: 5 }).map((_, i) => (
-                  <tr key={i} className="border-b border-zinc-800/50">
+                  <Tr key={i}>
                     {Array.from({ length: 5 }).map((__, j) => (
-                      <td key={j} className="px-4 py-3"><div className="h-3 bg-zinc-800 rounded animate-pulse" /></td>
+                      <Td key={j}><div className="h-3 bg-surface-3 rounded animate-pulse" /></Td>
                     ))}
-                  </tr>
+                  </Tr>
                 ))
               : logs.length === 0
               ? (
-                  <tr><td colSpan={5} className="px-4 py-8 text-center text-zinc-500 text-sm">Nenhum evento de segurança registrado.</td></tr>
+                  <Tr><Td colSpan={5} className="text-center py-8 text-fg-subtle text-sm">Nenhum evento de segurança registrado.</Td></Tr>
                 )
               : logs.map((log) => (
-                  <tr key={log.id} className="border-b border-zinc-800/50 hover:bg-zinc-800/30 transition-colors">
-                    <td className="px-4 py-3 text-zinc-500 text-xs whitespace-nowrap">{formatDate(log.created_at)}</td>
-                    <td className="px-4 py-3"><SeverityBadge severity={log.severity} /></td>
-                    <td className="px-4 py-3">
-                      <span className="font-mono text-xs bg-zinc-800 px-2 py-0.5 rounded text-amber-400">{log.event_type}</span>
-                    </td>
-                    <td className="px-4 py-3 text-zinc-400 text-xs">{truncate(log.description)}</td>
-                    <td className="px-4 py-3 text-zinc-600 text-xs font-mono">{log.ip_address ?? '—'}</td>
-                  </tr>
+                  <Tr key={log.id}>
+                    <Td className="text-fg-subtle text-xs whitespace-nowrap">{formatDate(log.created_at)}</Td>
+                    <Td><SeverityBadge severity={log.severity} /></Td>
+                    <Td>
+                      <span className="font-mono text-xs bg-surface-3 px-2 py-0.5 rounded text-fg-muted">{log.event_type}</span>
+                    </Td>
+                    <Td className="text-fg-subtle text-xs">{truncate(log.description)}</Td>
+                    <Td className="text-fg-subtle text-xs font-mono">{log.ip_address ?? '—'}</Td>
+                  </Tr>
                 ))}
           </tbody>
-        </table>
+        </Table>
       </div>
-      <div className="flex items-center justify-between px-4 py-3 border-t border-zinc-800">
-        <span className="text-zinc-500 text-xs">Página {page + 1}</span>
+      <PanelSection padding="sm" className="flex items-center justify-between">
+        <span className="text-fg-subtle text-xs">Página {page + 1}</span>
         <div className="flex gap-2">
-          <button disabled={page === 0} onClick={() => setPage(p => p - 1)} className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 transition">Anterior</button>
-          <button disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)} className="text-xs px-3 py-1 rounded bg-zinc-800 hover:bg-zinc-700 disabled:opacity-40 text-zinc-300 transition">Próxima</button>
+          <Button variant="secondary" size="sm" disabled={page === 0} onClick={() => setPage(p => p - 1)}>Anterior</Button>
+          <Button variant="secondary" size="sm" disabled={logs.length < PAGE_SIZE} onClick={() => setPage(p => p + 1)}>Próxima</Button>
         </div>
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
-// ── Section: Active Sessions (visual) ────────────────────────────────────────
+// ── Section: Active Sessions ─────────────────────────────────────────────────
 
 function ActiveSessions() {
-  const { user, profile } = useAuth();
-  const sessionStart = new Date(Date.now() - Math.random() * 3600000).toLocaleString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const { user, profile, session } = useAuth();
+
+  // `last_sign_in_at` do próprio usuário no Supabase Auth, e o vencimento real do token.
+  // Antes o horário de início era `Date.now() - Math.random() * 3600000`: um número
+  // inventado a cada render, numa tela de segurança — o pior lugar possível para um dado
+  // falso, porque é exatamente onde alguém vai olhar para decidir se houve acesso
+  // indevido. Sem o dado, não mostra nada em vez de preencher.
+  const startedAt = user?.last_sign_in_at
+    ? new Date(user.last_sign_in_at).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null;
+  const expiresAt = session?.expires_at
+    ? new Date(session.expires_at * 1000).toLocaleString('pt-BR', { dateStyle: 'short', timeStyle: 'short' })
+    : null;
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-violet-500/15 rounded-xl flex items-center justify-center">
-          <Activity size={18} className="text-violet-400" />
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-4">
+          <Activity size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Sessões Ativas</h3>
+            <p className="text-fg-subtle text-xs">Dispositivos com acesso ativo</p>
+          </div>
         </div>
         <div>
-          <h3 className="font-bold text-white">Sessões Ativas</h3>
-          <p className="text-zinc-500 text-xs">Dispositivos com acesso ativo</p>
-        </div>
-      </div>
-      <div className="space-y-3">
-        <div className="flex items-center justify-between p-3 bg-zinc-800/50 rounded-xl border border-emerald-500/20">
-          <div className="flex items-center gap-3">
-            <div className="w-2 h-2 rounded-full bg-emerald-400 animate-pulse" />
-            <div>
-              <p className="text-zinc-200 text-sm font-semibold">{profile?.email ?? user?.email}</p>
-              <p className="text-zinc-500 text-xs">Sessão atual · Iniciada {sessionStart}</p>
+          <ListRow value={<Badge variant="neutral">Atual</Badge>}>
+            <div className="flex items-center gap-2">
+              <div className="w-2 h-2 rounded-full bg-emerald-500 flex-shrink-0" />
+              <div>
+                <p className="text-fg text-sm font-semibold">{profile?.email ?? user?.email}</p>
+                <p className="text-fg-subtle text-xs">
+                  Sessão atual
+                  {startedAt && ` · Último acesso ${startedAt}`}
+                  {expiresAt && ` · Expira ${expiresAt}`}
+                </p>
+              </div>
             </div>
-          </div>
-          <span className="text-xs text-zinc-500 bg-zinc-700/50 px-2 py-0.5 rounded-full">Atual</span>
+          </ListRow>
+          <p className="text-fg-subtle text-xs text-center py-2">Veja e gerencie todas as sessões na aba "Sessões"</p>
         </div>
-        <div className="p-3 bg-zinc-800/20 rounded-xl border border-zinc-800 text-center">
-          <p className="text-zinc-500 text-xs">Gerenciamento avançado de sessões em breve</p>
-        </div>
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -569,71 +566,67 @@ function SecuritySettingsPanel({ companyId }: { companyId: string }) {
   }
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-amber-500/15 rounded-xl flex items-center justify-center">
-          <Settings size={18} className="text-amber-400" />
-        </div>
-        <div>
-          <h3 className="font-bold text-white">Configurações de Segurança</h3>
-          <p className="text-zinc-500 text-xs">Políticas de acesso da empresa</p>
-        </div>
-      </div>
-      {!settings
-        ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-zinc-800 rounded-xl animate-pulse" />)}</div>
-        : (
-          <div className="space-y-4">
-            <Row label="Confirmação de e-mail obrigatória" sub="Usuários devem confirmar o e-mail">
-              <Toggle value={settings.require_email_confirmation} disabled={!canEdit}
-                onChange={v => setSettings(s => s ? { ...s, require_email_confirmation: v } : s)} />
-            </Row>
-            <Row label="Autenticação 2FA" sub="Em breve">
-              <span className="text-xs text-zinc-500 bg-zinc-800 px-2 py-1 rounded-lg">Em breve</span>
-            </Row>
-            <Row label="Timeout de sessão" sub={`${settings.session_timeout_minutes} min`}>
-              <input type="number" value={settings.session_timeout_minutes} disabled={!canEdit}
-                onChange={e => setSettings(s => s ? { ...s, session_timeout_minutes: Number(e.target.value) } : s)}
-                className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-sm text-zinc-200 text-center focus:outline-none" />
-            </Row>
-            <Row label="Máx. tentativas de login" sub="Antes do bloqueio temporário">
-              <input type="number" value={settings.max_failed_login_attempts} disabled={!canEdit}
-                onChange={e => setSettings(s => s ? { ...s, max_failed_login_attempts: Number(e.target.value) } : s)}
-                className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-sm text-zinc-200 text-center focus:outline-none" />
-            </Row>
-            <Row label="Tamanho máx. de upload (MB)" sub="Planilhas de importação">
-              <input type="number" value={settings.max_upload_size_mb} disabled={!canEdit}
-                onChange={e => setSettings(s => s ? { ...s, max_upload_size_mb: Number(e.target.value) } : s)}
-                className="w-20 bg-zinc-800 border border-zinc-700 rounded-lg px-2 py-1 text-sm text-zinc-200 text-center focus:outline-none" />
-            </Row>
-            {canEdit && (
-              <button onClick={save} disabled={saving}
-                className="w-full py-2.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white rounded-xl font-semibold text-sm transition mt-2">
-                {saving ? 'Salvando…' : saved ? '✓ Salvo' : 'Salvar Configurações'}
-              </button>
-            )}
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-5">
+          <Settings size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Configurações de Segurança</h3>
+            <p className="text-fg-subtle text-xs">Políticas de acesso da empresa</p>
           </div>
-        )}
-    </div>
+        </div>
+        {!settings
+          ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-surface-3 rounded-xl animate-pulse" />)}</div>
+          : (
+            <div>
+              <Row label="Confirmação de e-mail obrigatória" sub="Usuários devem confirmar o e-mail">
+                <Toggle value={settings.require_email_confirmation} disabled={!canEdit}
+                  onChange={v => setSettings(s => s ? { ...s, require_email_confirmation: v } : s)} />
+              </Row>
+              <Row label="Autenticação 2FA" sub="Em breve">
+                <Badge variant="neutral">Em breve</Badge>
+              </Row>
+              <Row label="Timeout de sessão" sub={`${settings.session_timeout_minutes} min`}>
+                <input type="number" value={settings.session_timeout_minutes} disabled={!canEdit}
+                  onChange={e => setSettings(s => s ? { ...s, session_timeout_minutes: Number(e.target.value) } : s)}
+                  className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
+              </Row>
+              <Row label="Máx. tentativas de login" sub="Antes do bloqueio temporário">
+                <input type="number" value={settings.max_failed_login_attempts} disabled={!canEdit}
+                  onChange={e => setSettings(s => s ? { ...s, max_failed_login_attempts: Number(e.target.value) } : s)}
+                  className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
+              </Row>
+              <Row label="Tamanho máx. de upload (MB)" sub="Planilhas de importação">
+                <input type="number" value={settings.max_upload_size_mb} disabled={!canEdit}
+                  onChange={e => setSettings(s => s ? { ...s, max_upload_size_mb: Number(e.target.value) } : s)}
+                  className="w-20 bg-surface-3 border border-edge rounded-lg px-2 py-1 text-sm text-fg text-center focus:outline-none" />
+              </Row>
+              {canEdit && (
+                <Button onClick={save} disabled={saving} className="w-full mt-2">
+                  {saving ? 'Salvando…' : saved ? <><Check size={14} /> Salvo</> : 'Salvar Configurações'}
+                </Button>
+              )}
+            </div>
+          )}
+      </PanelSection>
+    </Panel>
   );
 }
 
 function Row({ label, sub, children }: { label: string; sub: string; children: React.ReactNode }) {
   return (
-    <div className="flex items-center justify-between p-3 bg-zinc-800/40 rounded-xl">
-      <div>
-        <p className="text-zinc-200 text-sm">{label}</p>
-        <p className="text-zinc-500 text-xs">{sub}</p>
-      </div>
-      {children}
-    </div>
+    <ListRow value={children}>
+      <p className="text-fg text-sm">{label}</p>
+      <p className="text-fg-subtle text-xs">{sub}</p>
+    </ListRow>
   );
 }
 
 function Toggle({ value, onChange, disabled }: { value: boolean; onChange: (v: boolean) => void; disabled?: boolean }) {
   return (
     <button onClick={() => !disabled && onChange(!value)}
-      className={`relative w-11 h-6 rounded-full transition-colors ${value ? 'bg-emerald-500' : 'bg-zinc-700'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
-      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${value ? 'translate-x-5' : 'translate-x-0'}`} />
+      className={`relative w-11 h-6 rounded-full transition-colors ${value ? 'bg-accent' : 'bg-edge'} ${disabled ? 'opacity-50 cursor-not-allowed' : 'cursor-pointer'}`}>
+      <span className={`absolute top-0.5 left-0.5 w-5 h-5 bg-white rounded-full shadow-control transition-transform ${value ? 'translate-x-5' : 'translate-x-0'}`} />
     </button>
   );
 }
@@ -650,28 +643,32 @@ function BackupStatus() {
   ];
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-teal-500/15 rounded-xl flex items-center justify-center">
-          <Server size={18} className="text-teal-400" />
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-4">
+          <Server size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Status de Backup</h3>
+            <p className="text-fg-subtle text-xs">Gerenciado pelo Supabase</p>
+          </div>
         </div>
         <div>
-          <h3 className="font-bold text-white">Status de Backup</h3>
-          <p className="text-zinc-500 text-xs">Gerenciado pelo Supabase</p>
+          {items.map(item => (
+            <ListRow
+              key={item.label}
+              value={
+                <span className="flex items-center gap-2">
+                  <span className="text-fg text-sm font-semibold">{item.value}</span>
+                  <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400" />
+                </span>
+              }
+            >
+              <span className="text-fg-subtle text-sm">{item.label}</span>
+            </ListRow>
+          ))}
         </div>
-      </div>
-      <div className="space-y-2">
-        {items.map(item => (
-          <div key={item.label} className="flex items-center justify-between p-2.5 bg-zinc-800/40 rounded-xl">
-            <span className="text-zinc-400 text-sm">{item.label}</span>
-            <div className="flex items-center gap-2">
-              <span className="text-zinc-200 text-sm font-semibold">{item.value}</span>
-              <CheckCircle2 size={14} className="text-emerald-400" />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -685,45 +682,49 @@ function ERPIntegrations({ companyId }: { companyId: string }) {
       .then(({ data }) => setIntegrations(data ?? []));
   }, [companyId]);
 
-  const statusColor = (s: string) =>
-    s === 'active' ? 'text-emerald-400' : s === 'error' ? 'text-red-400' : 'text-zinc-500';
+  const statusVariant = (s: string): 'success' | 'danger' | 'neutral' =>
+    s === 'active' ? 'success' : s === 'error' ? 'danger' : 'neutral';
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl p-6">
-      <div className="flex items-center gap-3 mb-5">
-        <div className="w-9 h-9 bg-blue-500/15 rounded-xl flex items-center justify-center">
-          <Link size={18} className="text-blue-400" />
-        </div>
-        <div>
-          <h3 className="font-bold text-white">Integrações ERP</h3>
-          <p className="text-zinc-500 text-xs">Conexões com sistemas externos</p>
-        </div>
-      </div>
-      {integrations.length === 0
-        ? (
-          <div className="text-center py-8">
-            <Globe size={28} className="text-zinc-600 mx-auto mb-2" />
-            <p className="text-zinc-500 text-sm">Nenhuma integração configurada</p>
-            <p className="text-zinc-600 text-xs mt-1">Tiny, Bling, Omie, SAP, TOTVS e outros em breve</p>
+    <Panel>
+      <PanelSection>
+        <div className="flex items-center gap-3 mb-5">
+          <Link size={18} className="text-fg-muted" />
+          <div>
+            <h3 className="text-sm font-semibold text-fg">Integrações ERP</h3>
+            <p className="text-fg-subtle text-xs">Conexões com sistemas externos</p>
           </div>
-        )
-        : (
-          <div className="space-y-2">
-            {integrations.map(i => (
-              <div key={i.provider} className="flex items-center justify-between p-3 bg-zinc-800/40 rounded-xl">
-                <div className="flex items-center gap-2">
-                  <Key size={14} className="text-zinc-500" />
-                  <span className="text-zinc-200 text-sm font-semibold">{i.provider}</span>
-                </div>
-                <div className="flex items-center gap-3">
-                  {i.last_sync_at && <span className="text-zinc-500 text-xs">{formatDate(i.last_sync_at)}</span>}
-                  <span className={`text-xs font-semibold capitalize ${statusColor(i.status)}`}>{i.status}</span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-    </div>
+        </div>
+        {integrations.length === 0
+          ? (
+            <div className="text-center py-8">
+              <Globe size={28} className="text-fg-subtle mx-auto mb-2" />
+              <p className="text-fg-subtle text-sm">Nenhuma integração configurada</p>
+              <p className="text-fg-subtle text-xs mt-1">Tiny, Bling, Omie, SAP, TOTVS e outros em breve</p>
+            </div>
+          )
+          : (
+            <div>
+              {integrations.map(i => (
+                <ListRow
+                  key={i.provider}
+                  value={
+                    <span className="flex items-center gap-3">
+                      {i.last_sync_at && <span className="text-fg-subtle text-xs">{formatDate(i.last_sync_at)}</span>}
+                      <Badge variant={statusVariant(i.status)}>{i.status}</Badge>
+                    </span>
+                  }
+                >
+                  <span className="flex items-center gap-2">
+                    <Key size={14} className="text-fg-subtle" />
+                    <span className="text-fg text-sm font-semibold">{i.provider}</span>
+                  </span>
+                </ListRow>
+              ))}
+            </div>
+          )}
+      </PanelSection>
+    </Panel>
   );
 }
 
@@ -752,53 +753,51 @@ function PermissionMatrix() {
   const [open, setOpen] = useState(false);
 
   return (
-    <div className="bg-zinc-900 border border-zinc-800 rounded-2xl overflow-hidden">
+    <Panel>
       <button onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between p-5 hover:bg-zinc-800/30 transition-colors">
+        className="w-full flex items-center justify-between p-5 hover:bg-surface-3/60 transition-colors">
         <div className="flex items-center gap-3">
-          <div className="w-9 h-9 bg-violet-500/15 rounded-xl flex items-center justify-center">
-            <Zap size={18} className="text-violet-400" />
-          </div>
+          <KeyRound size={18} className="text-fg-muted" />
           <div className="text-left">
-            <h3 className="font-bold text-white">Matriz de Permissões</h3>
-            <p className="text-zinc-500 text-xs">Permissões por role</p>
+            <h3 className="text-sm font-semibold text-fg">Matriz de Permissões</h3>
+            <p className="text-fg-subtle text-xs">Permissões por role</p>
           </div>
         </div>
-        {open ? <ChevronUp size={16} className="text-zinc-500" /> : <ChevronDown size={16} className="text-zinc-500" />}
+        {open ? <ChevronUp size={16} className="text-fg-subtle" /> : <ChevronDown size={16} className="text-fg-subtle" />}
       </button>
       {open && (
-        <div className="overflow-x-auto border-t border-zinc-800">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-zinc-800/50">
-                <th className="text-left px-4 py-3 text-zinc-400 font-semibold w-48">Permissão</th>
+        <div className="border-t border-edge overflow-x-auto">
+          <Table>
+            <Thead>
+              <Tr>
+                <Th className="w-48">Permissão</Th>
                 {ROLES.map(r => (
-                  <th key={r} className="px-3 py-3 text-center">
+                  <Th key={r} className="text-center">
                     <span className={`px-2 py-0.5 rounded-full border text-xs font-semibold ${getRoleBadgeColor(r)}`}>
                       {getRoleLabel(r)}
                     </span>
-                  </th>
+                  </Th>
                 ))}
-              </tr>
-            </thead>
+              </Tr>
+            </Thead>
             <tbody>
               {ALL_PERMISSIONS.map(p => (
-                <tr key={p.key} className="border-t border-zinc-800/50 hover:bg-zinc-800/20 transition-colors">
-                  <td className="px-4 py-2.5 text-zinc-300 font-mono">{p.label}</td>
+                <Tr key={p.key}>
+                  <Td className="text-fg-muted font-mono text-xs">{p.label}</Td>
                   {ROLES.map(r => (
-                    <td key={r} className="px-3 py-2.5 text-center">
+                    <Td key={r} className="text-center">
                       {hasPermission(r, p.key)
-                        ? <CheckCircle2 size={14} className="text-emerald-400 mx-auto" />
-                        : <XCircle size={14} className="text-zinc-700 mx-auto" />}
-                    </td>
+                        ? <CheckCircle2 size={14} className="text-emerald-600 dark:text-emerald-400 mx-auto" />
+                        : <XCircle size={14} className="text-fg-subtle mx-auto" />}
+                    </Td>
                   ))}
-                </tr>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
       )}
-    </div>
+    </Panel>
   );
 }
 
@@ -815,18 +814,7 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
   const [tab, setTab] = useState<SecurityTab>('overview');
 
   if (!hasPermission(profile?.role, 'security.view')) {
-    return (
-      <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
-        <div className="text-center">
-          <ShieldX size={48} className="text-red-400 mx-auto mb-4" />
-          <h2 className="text-xl font-bold text-white mb-2">Acesso negado</h2>
-          <p className="text-zinc-400 text-sm mb-6">Você não tem permissão para ver esta seção.</p>
-          <button onClick={onBack} className="px-4 py-2 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl text-sm font-semibold transition">
-            Voltar ao Dashboard
-          </button>
-        </div>
-      </div>
-    );
+    return <AccessDeniedPage onBack={onBack} />;
   }
 
   const tabs: { id: SecurityTab; label: string; icon: React.ReactNode }[] = [
@@ -839,21 +827,19 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
   ];
 
   return (
-    <div className="min-h-screen bg-zinc-950">
+    <div className="min-h-screen bg-surface">
       {/* Header */}
-      <div className="border-b border-zinc-800 bg-zinc-900/80 backdrop-blur-sm sticky top-0 z-10">
+      <div className="border-b border-edge bg-surface/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center gap-4 py-4">
-            <button onClick={onBack} className="p-2 text-zinc-500 hover:text-zinc-200 hover:bg-zinc-800 rounded-xl transition">
+            <button onClick={onBack} className="p-2 text-fg-subtle hover:text-fg hover:bg-surface-3 rounded-xl transition">
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-3">
-              <div className="w-9 h-9 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-                <ShieldCheck size={18} className="text-emerald-400" />
-              </div>
+              <ShieldCheck size={20} className="text-fg-muted" />
               <div>
-                <h1 className="text-white font-black text-lg">Central de Segurança</h1>
-                <p className="text-zinc-500 text-xs">Monitoramento e controle de acesso</p>
+                <h1 className="text-fg font-semibold text-lg">Central de Segurança</h1>
+                <p className="text-fg-subtle text-xs">Monitoramento e controle de acesso</p>
               </div>
             </div>
           </div>
@@ -862,8 +848,8 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
               <button key={t.id} onClick={() => setTab(t.id)}
                 className={`flex items-center gap-1.5 px-4 py-2.5 text-sm font-semibold border-b-2 transition-colors whitespace-nowrap ${
                   tab === t.id
-                    ? 'border-emerald-500 text-emerald-400'
-                    : 'border-transparent text-zinc-500 hover:text-zinc-300'
+                    ? 'border-accent text-fg'
+                    : 'border-transparent text-fg-subtle hover:text-fg-muted'
                 }`}>
                 {t.icon} {t.label}
               </button>
@@ -889,7 +875,7 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
         )}
         {tab === 'audit'         && <AuditLogsTable companyId={companyId} />}
         {tab === 'security-logs' && <SecurityLogsTable companyId={companyId} />}
-        {tab === 'sessions'      && <ActiveSessions />}
+        {tab === 'sessions'      && <AdminSessionsPanel />}
         {tab === 'erp'           && <ERPIntegrations companyId={companyId} />}
         {tab === 'settings'      && <SecuritySettingsPanel companyId={companyId} />}
       </div>

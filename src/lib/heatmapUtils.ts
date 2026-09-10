@@ -1,6 +1,7 @@
 // Heatmap Utilities
 
 import type { HeatmapArea, HeatmapStats, CriticalityLevel, HeatmapFilters, BrandData, RiskLevel, RiskDiagnosis } from './heatmapTypes';
+import type { BrandCountDetail } from './heatmapService';
 
 // Calculate progress percentage
 export const calculateProgress = (concluidos: number, totalSku: number): number => {
@@ -50,25 +51,32 @@ export const getRiskLevelLabel = (level: RiskLevel): string => {
   }
 };
 
-// Get risk level color class
+// Get risk level color class. Só as cores semânticas aprovadas (§5/§23) — antes
+// "high" usava laranja, fora da paleta. Mesmo mapeamento de RiskBadge.tsx
+// (crítico=danger/vermelho, alto=warning/âmbar, médio=accent/azul, baixo=
+// success/verde), que já resolve um problema equivalente de 4 níveis sem
+// precisar de uma 5ª cor.
 export const getRiskLevelColor = (level: RiskLevel): string => {
   switch (level) {
-    case 'none': return 'bg-zinc-100 text-zinc-600 border-zinc-300';
-    case 'low': return 'bg-emerald-100 text-emerald-700 border-emerald-300';
-    case 'medium': return 'bg-amber-100 text-amber-700 border-amber-300';
-    case 'high': return 'bg-orange-100 text-orange-700 border-orange-300';
-    case 'critical': return 'bg-red-100 text-red-700 border-red-300';
+    case 'none': return 'bg-surface-3 text-fg-muted border-edge';
+    case 'low': return 'bg-emerald-500/10 text-emerald-700 dark:text-emerald-400 border-emerald-500/30';
+    case 'medium': return 'bg-accent/10 text-accent border-accent/30';
+    case 'high': return 'bg-amber-500/10 text-amber-700 dark:text-amber-400 border-amber-500/30';
+    case 'critical': return 'bg-red-500/10 text-red-700 dark:text-red-400 border-red-500/30';
   }
 };
 
-// Get risk bg gradient for cards
+/** Risk surface for heatmap cards. Flat tint, not a gradient: the hue already
+ *  encodes the risk level, so a gradient added no information and read as
+ *  decoration. Border tints are kept subtler than the badge scale above so the
+ *  card body stays calm while the badge carries the signal. */
 export const getRiskGradient = (level: RiskLevel): string => {
   switch (level) {
-    case 'none': return 'bg-gradient-to-br from-zinc-50 to-zinc-100 border-zinc-200';
-    case 'low': return 'bg-gradient-to-br from-emerald-50 to-emerald-100 border-emerald-300';
-    case 'medium': return 'bg-gradient-to-br from-amber-50 to-amber-100 border-amber-300';
-    case 'high': return 'bg-gradient-to-br from-orange-50 to-orange-100 border-orange-300';
-    case 'critical': return 'bg-gradient-to-br from-red-50 to-red-100 border-red-300';
+    case 'none': return 'bg-surface-2 border-edge';
+    case 'low': return 'bg-emerald-500/[0.07] border-emerald-500/20';
+    case 'medium': return 'bg-accent/[0.07] border-accent/20';
+    case 'high': return 'bg-amber-500/[0.07] border-amber-500/20';
+    case 'critical': return 'bg-red-500/[0.07] border-red-500/25';
   }
 };
 
@@ -183,27 +191,31 @@ export const getCriticalityLevel = (area: HeatmapArea): CriticalityLevel => {
   }
 };
 
-// Get background color class based on criticality
+// Get background color class based on criticality. "danger" (risco médio,
+// abaixo de "critical") agrupado com "warning" em âmbar — laranja não é uma
+// cor aprovada (§5/§23), e reservar o vermelho só para "critical" (o nível
+// mais grave) preserva a distinção que mais importa: o pior caso continua
+// visualmente único.
 export const getCriticalityBgClass = (level: CriticalityLevel): string => {
   switch (level) {
-    case 'success': return 'bg-emerald-100 border-emerald-300';
-    case 'warning': return 'bg-amber-100 border-amber-300';
-    case 'danger': return 'bg-orange-100 border-orange-300';
-    case 'critical': return 'bg-red-100 border-red-300';
-    case 'neutral': return 'bg-zinc-100 border-zinc-300';
-    default: return 'bg-zinc-100 border-zinc-300';
+    case 'success': return 'bg-emerald-500/10 border-emerald-500/30';
+    case 'warning': return 'bg-amber-500/10 border-amber-500/30';
+    case 'danger': return 'bg-amber-500/10 border-amber-500/30';
+    case 'critical': return 'bg-red-500/10 border-red-500/30';
+    case 'neutral': return 'bg-surface-3 border-edge';
+    default: return 'bg-surface-3 border-edge';
   }
 };
 
 // Get text color class based on criticality
 export const getCriticalityTextClass = (level: CriticalityLevel): string => {
   switch (level) {
-    case 'success': return 'text-emerald-700';
-    case 'warning': return 'text-amber-700';
-    case 'danger': return 'text-orange-700';
-    case 'critical': return 'text-red-700';
-    case 'neutral': return 'text-zinc-500';
-    default: return 'text-zinc-700';
+    case 'success': return 'text-emerald-700 dark:text-emerald-400';
+    case 'warning': return 'text-amber-700 dark:text-amber-400';
+    case 'danger': return 'text-amber-700 dark:text-amber-400';
+    case 'critical': return 'text-red-700 dark:text-red-400';
+    case 'neutral': return 'text-fg-muted';
+    default: return 'text-fg-muted';
   }
 };
 
@@ -212,10 +224,10 @@ export const getProgressBgClass = (level: CriticalityLevel): string => {
   switch (level) {
     case 'success': return 'bg-emerald-500';
     case 'warning': return 'bg-amber-500';
-    case 'danger': return 'bg-orange-500';
+    case 'danger': return 'bg-amber-500';
     case 'critical': return 'bg-red-500';
-    case 'neutral': return 'bg-zinc-400';
-    default: return 'bg-zinc-400';
+    case 'neutral': return 'bg-fg-subtle';
+    default: return 'bg-fg-subtle';
   }
 };
 
@@ -324,28 +336,37 @@ export const calculateHeatmapStats = (areas: HeatmapArea[]): HeatmapStats => {
   };
 };
 
-// Generate mock heatmap data from brands
-export const generateMockHeatmapData = (brands: BrandData[]): HeatmapArea[] => {
-  return brands.map((brand, index) => {
+/** Monta as áreas do heatmap a partir das marcas reais.
+ *
+ *  Substituiu generateMockHeatmapData, que fabricava responsável, SKUs divergentes e
+ *  locais físicos a partir do ÍNDICE da marca no array — nomes de uma lista fixa
+ *  (Ana/João/Maria…), SKUs `SKU-ABC-1000` e endereços `Rua A / Vão 2` que nunca
+ *  existiram no banco. As métricas sempre foram reais; o que estava inventado era a
+ *  atribuição ao redor delas, que é justamente o que alguém usa para decidir com quem
+ *  falar e onde ir recontar.
+ *
+ *  `details` vem de heatmapService.getBrandCountDetails. Marca sem contagem registrada
+ *  fica com os campos vazios — a tela já trata isso ("Não definido", listas escondidas),
+ *  que é a leitura correta de "ainda não foi contado". */
+export const buildHeatmapAreas = (
+  brands: BrandData[],
+  details?: Map<string, BrandCountDetail>
+): HeatmapArea[] => {
+  return brands.map(brand => {
     const concluidos = brand.done_sku;
     const totalSku = brand.total_sku;
     const divergencias = brand.divergences;
     const progresso = calculateProgress(concluidos, totalSku);
     const acuracidade = calculateAccuracy(concluidos, divergencias);
-
-    const locaisFisicos: { id: string; nome: string; descricao: string }[] = [];
-
-    // Generate mock physical locations based on brand
-    const ruas = ['A', 'B', 'C', 'D'];
-    const ruaBase = ruas[index % ruas.length];
-    const vao = Math.floor(index / 2) + 1;
-
-    const tipos = ['linha', 'rua', 'vao', 'setor', 'excesso'] as const;
+    const detail = details?.get(brand.id);
 
     return {
       id: `area-${brand.id}`,
       nome: brand.brand,
-      tipo: tipos[index % tipos.length],
+      // Uma área do heatmap é uma MARCA, não um endereço do armazém. O tipo ciclava
+      // entre linha/rua/vão/setor/excesso pelo índice, o que rotulava a mesma marca de
+      // forma diferente só por ter mudado de posição na lista.
+      tipo: 'setor',
       marcaId: brand.id,
       marcaNome: brand.brand,
       totalSku,
@@ -353,17 +374,11 @@ export const generateMockHeatmapData = (brands: BrandData[]): HeatmapArea[] => {
       divergencias,
       acuracidade: parseFloat(acuracidade.toFixed(1)),
       progresso: parseFloat(progresso.toFixed(1)),
-      responsavel: ['Ana', 'João', 'Maria', 'Carlos', 'Pedro', 'Lucia'][index % 6],
-      ultimaAtualizacao: brand.updated_at || new Date().toISOString(),
-      observacoes: '',
-      produtosDivergentes: divergencias > 0
-        ? Array(Math.min(divergencias, 5)).fill(0).map((_, i) => `SKU-${brand.brand.slice(0, 3).toUpperCase()}-${1000 + i}`)
-        : [],
-      locaisFisicos: locaisFisicos.length > 0 ? locaisFisicos : [
-        { id: `lf-${brand.id}-1`, nome: `Rua ${ruaBase}`, descricao: `Corredor principal, vao ${vao}` },
-        { id: `lf-${brand.id}-2`, nome: `Vão ${vao}`, descricao: `Altura: 3 prateleiras` },
-        { id: `lf-${brand.id}-3`, nome: `Prateleira ${vao + 1}`, descricao: `Estoque de reserva` }
-      ]
+      responsavel: detail?.responsavel ?? '',
+      ultimaAtualizacao: detail?.ultimaAtualizacao || brand.updated_at || '',
+      observacoes: detail?.observacoes ?? '',
+      produtosDivergentes: detail?.produtosDivergentes ?? [],
+      locaisFisicos: detail?.locaisFisicos ?? [],
     };
   });
 };

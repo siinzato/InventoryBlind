@@ -14,19 +14,22 @@
  * - Exportar lista como CSV
  */
 
-import React, { useState, useEffect, useCallback, useRef } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
+import { SafeDropdown } from './SafeDropdown';
 import {
   ShieldAlert, RefreshCw, Search, Filter, ChevronDown, ChevronUp,
   Edit2, Trash2, XCircle, RotateCcw, Check, X, Download,
   AlertTriangle, Package, User, Calendar, Clock, ArrowUpDown,
-  ChevronRight, Save, Ban, PlayCircle, CheckCircle2,
+  ChevronRight, Save,
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem, FullStatus } from '../lib/fullManagerTypes';
 import {
   STATUS_LABEL, STATUS_COLOR, STATUS_DOT, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR,
   ALL_STATUSES, MARKETPLACES, formatFullDate,
 } from '../lib/fullManagerTypes';
+import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Button, Modal } from './ui';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -65,29 +68,24 @@ const ConfirmDialog: React.FC<{
   onConfirm: () => void;
   onCancel: () => void;
 }> = ({ title, message, confirmLabel = 'Confirmar', danger, onConfirm, onCancel }) => (
-  <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-    <div className="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-6">
-      <div className="flex items-start gap-3 mb-4">
-        <div className={`flex-shrink-0 p-2 rounded-xl ${danger ? 'bg-red-100' : 'bg-amber-100'}`}>
-          <AlertTriangle size={20} className={danger ? 'text-red-600' : 'text-amber-600'} />
-        </div>
-        <div>
-          <h3 className="font-bold text-zinc-900 text-base">{title}</h3>
-          <p className="text-sm text-zinc-600 mt-1">{message}</p>
-        </div>
+  <Modal open onClose={onCancel} title={title} maxWidth="max-w-sm">
+    <div className="flex items-start gap-3">
+      <div className={`flex-shrink-0 p-2 rounded-xl ${danger ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
+        <AlertTriangle size={20} className={danger ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} />
       </div>
-      <div className="flex gap-2 justify-end">
-        <button onClick={onCancel}
-          className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-sm font-semibold transition">
-          Cancelar
-        </button>
-        <button onClick={onConfirm}
-          className={`px-4 py-2 rounded-lg text-sm font-bold text-white transition ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
-          {confirmLabel}
-        </button>
-      </div>
+      <p className="text-sm text-fg-muted">{message}</p>
     </div>
-  </div>
+    <div className="flex gap-2 justify-end mt-5">
+      <button onClick={onCancel}
+        className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+        Cancelar
+      </button>
+      <button onClick={onConfirm}
+        className={`px-4 py-2 rounded-lg text-sm font-bold text-white transition ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
+        {confirmLabel}
+      </button>
+    </div>
+  </Modal>
 );
 
 // ── Status selector dropdown ──────────────────────────────────────────────────
@@ -98,43 +96,26 @@ const StatusSelector: React.FC<{
   onSelect: (s: FullStatus) => void;
   loading?: boolean;
 }> = ({ current, options, onSelect, loading }) => {
-  const [open, setOpen] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    const handler = (e: MouseEvent) => {
-      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
-    };
-    document.addEventListener('mousedown', handler);
-    return () => document.removeEventListener('mousedown', handler);
-  }, []);
-
   return (
-    <div className="relative" ref={ref}>
-      <button
-        onClick={() => setOpen(v => !v)}
-        disabled={loading}
-        className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border transition cursor-pointer hover:opacity-80 ${STATUS_COLOR[current]}`}
-      >
-        {loading ? <RefreshCw size={11} className="animate-spin" /> : <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[current]}`} />}
-        {STATUS_LABEL[current]}
-        <ChevronDown size={11} />
-      </button>
-      {open && (
-        <div className="absolute top-full left-0 mt-1 z-50 bg-white border border-zinc-200 rounded-xl shadow-xl min-w-[160px] py-1 overflow-hidden">
-          {options.map(s => (
-            <button
-              key={s}
-              onClick={() => { onSelect(s); setOpen(false); }}
-              className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold hover:bg-zinc-50 transition text-left ${s === current ? 'opacity-50 pointer-events-none' : ''}`}
-            >
-              <span className={`w-2 h-2 rounded-full flex-shrink-0 ${STATUS_DOT[s]}`} />
-              {STATUS_LABEL[s]}
-            </button>
-          ))}
-        </div>
-      )}
-    </div>
+    <SafeDropdown
+      trigger={
+        <button
+          disabled={loading}
+          className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border transition cursor-pointer hover:opacity-80 ${STATUS_COLOR[current]}`}
+        >
+          {loading ? <RefreshCw size={11} className="animate-spin" /> : <span className={`w-1.5 h-1.5 rounded-full ${STATUS_DOT[current]}`} />}
+          {STATUS_LABEL[current]}
+          <ChevronDown size={11} />
+        </button>
+      }
+      items={options.map(s => ({
+        id: s,
+        label: STATUS_LABEL[s],
+        icon: <span className={`w-2 h-2 rounded-full ${STATUS_DOT[s]}`} />,
+        disabled: s === current,
+        onClick: () => onSelect(s),
+      }))}
+    />
   );
 };
 
@@ -173,59 +154,49 @@ const EditOperationForm: React.FC<{
 
   const field = (label: string, key: keyof EditState, type = 'text', opts?: { options?: string[] }) => (
     <div key={key}>
-      <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1">{label}</label>
       {opts?.options ? (
         <select value={form[key]} onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-          className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 bg-white">
+          className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
           {opts.options.map(o => <option key={o} value={o}>{key === 'status' ? STATUS_LABEL[o as FullStatus] : o}</option>)}
         </select>
       ) : (
         <input type={type} value={form[key]}
           onChange={e => setForm(f => ({ ...f, [key]: e.target.value }))}
-          className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
+          className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
       )}
     </div>
   );
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full p-6 max-h-[90vh] overflow-y-auto">
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h3 className="font-black text-zinc-900 text-lg">Editar Operação</h3>
-            <p className="text-xs text-zinc-400 mt-0.5">FULL #{op.full_number}</p>
-          </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 p-1.5 rounded-lg hover:bg-zinc-100">
-            <X size={18} />
-          </button>
-        </div>
-        <div className="space-y-3">
-          {field('Número Full', 'full_number')}
-          {field('Marketplace', 'marketplace', 'text', { options: [...MARKETPLACES] })}
-          {field('Responsável', 'responsible')}
-          {field('Data Agendada', 'scheduled_date', 'date')}
-          {field('Horário Agendado', 'scheduled_time', 'time')}
-          {field('Status', 'status', 'text', { options: ALL_STATUSES })}
-          <div>
-            <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1">Observações</label>
-            <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3}
-              className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 resize-none" />
-          </div>
-        </div>
-        <div className="flex gap-2 mt-5 justify-end">
-          <button onClick={onClose} disabled={saving}
-            className="px-4 py-2 bg-zinc-100 hover:bg-zinc-200 text-zinc-700 rounded-lg text-sm font-semibold transition">
-            Cancelar
-          </button>
-          <button onClick={handleSave} disabled={saving || !form.full_number.trim()}
-            className="flex items-center gap-2 px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
-            {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
-            Salvar
-          </button>
+    <Modal open onClose={onClose} title="Editar Operação" maxWidth="max-w-lg">
+      <p className="text-xs text-fg-subtle -mt-3 mb-4">FULL #{op.full_number}</p>
+      <div className="space-y-3">
+        {field('Número Full', 'full_number')}
+        {field('Marketplace', 'marketplace', 'text', { options: [...MARKETPLACES] })}
+        {field('Responsável', 'responsible')}
+        {field('Data Agendada', 'scheduled_date', 'date')}
+        {field('Horário Agendado', 'scheduled_time', 'time')}
+        {field('Status', 'status', 'text', { options: ALL_STATUSES })}
+        <div>
+          <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1">Observações</label>
+          <textarea value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} rows={3}
+            className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
         </div>
       </div>
-    </div>
+      <div className="flex gap-2 mt-5 justify-end">
+        <button onClick={onClose} disabled={saving}
+          className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+          Cancelar
+        </button>
+        <button onClick={handleSave} disabled={saving || !form.full_number.trim()}
+          className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+          {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
+          Salvar
+        </button>
+      </div>
+    </Modal>
   );
 };
 
@@ -267,81 +238,77 @@ const ItemsPanel: React.FC<{
   const ITEM_STATUSES = ['found', 'picked', 'skipped', 'no_location', 'insufficient_stock', 'not_found', 'picking_error'] as const;
 
   return (
-    <div className="fixed inset-0 z-[9998] flex items-center justify-center bg-black/60 backdrop-blur-sm px-4">
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 flex-shrink-0">
-          <div>
-            <h3 className="font-black text-zinc-900">Itens — FULL #{op.full_number}</h3>
-            <p className="text-xs text-zinc-400">{items.length} item(ns) · {op.marketplace}</p>
-          </div>
-          <button onClick={onClose} className="text-zinc-400 hover:text-zinc-700 p-1.5 rounded-lg hover:bg-zinc-100">
-            <X size={18} />
-          </button>
-        </div>
+    <Modal open onClose={onClose} title={`Itens — FULL #${op.full_number}`} maxWidth="max-w-3xl">
+      <p className="text-xs text-fg-subtle -mt-3 mb-4">{items.length} item(ns) · {op.marketplace}</p>
 
-        <div className="overflow-y-auto flex-1">
-          {loading ? (
-            <div className="flex items-center justify-center py-12 gap-2 text-zinc-400">
-              <RefreshCw size={18} className="animate-spin" />Carregando itens...
-            </div>
-          ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center py-12 text-zinc-300">
-              <Package size={40} className="mb-2 opacity-30" />
-              <p className="text-sm">Nenhum item nesta operação.</p>
-            </div>
-          ) : (
-            <table className="w-full text-sm">
-              <thead className="bg-zinc-50 border-b border-zinc-200 sticky top-0">
-                <tr>
-                  {['Produto', 'SKU', 'Local', 'Req.', 'Sep.', 'Status', ''].map(h => (
-                    <th key={h} className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase whitespace-nowrap">{h}</th>
-                  ))}
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-zinc-100">
-                {items.map(item => (
-                  <tr key={item.id} className="hover:bg-zinc-50 transition">
-                    <td className="px-4 py-2.5 max-w-[180px]">
-                      <p className="font-medium text-zinc-800 text-xs truncate">{item.product_name || '—'}</p>
-                    </td>
-                    <td className="px-4 py-2.5 font-mono text-xs text-zinc-500 whitespace-nowrap">{item.sku || '—'}</td>
-                    <td className="px-4 py-2.5 text-xs text-zinc-600 whitespace-nowrap">{item.location || '—'}</td>
-                    <td className="px-4 py-2.5 text-center">
-                      <span className="font-mono font-bold text-zinc-700 text-xs">{item.quantity_requested}</span>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <input
-                        type="number" min="0" max={item.quantity_requested + 999}
-                        value={item.quantity_picked}
-                        onChange={e => updateQty(item.id, Number(e.target.value))}
-                        onBlur={e => supabase.from('full_operation_items').update({ quantity_picked: Number(e.target.value) }).eq('id', item.id)}
-                        className="w-14 text-center px-1 py-1 border border-zinc-200 rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-zinc-400"
-                      />
-                    </td>
-                    <td className="px-4 py-2.5">
-                      <select
-                        value={item.status}
-                        disabled={updatingId === item.id}
-                        onChange={e => updateItemStatus(item.id, e.target.value)}
-                        className="text-xs border border-zinc-200 rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-zinc-400 bg-white cursor-pointer"
-                      >
-                        {ITEM_STATUSES.map(s => (
-                          <option key={s} value={s}>{ITEM_STATUS_LABEL[s]}</option>
-                        ))}
-                      </select>
-                    </td>
-                    <td className="px-4 py-2.5">
-                      {updatingId === item.id && <RefreshCw size={13} className="animate-spin text-zinc-400" />}
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          )}
+      {loading ? (
+        <div className="flex items-center justify-center py-12 gap-2 text-fg-subtle">
+          <RefreshCw size={18} className="animate-spin" />Carregando itens...
         </div>
+      ) : items.length === 0 ? (
+        <div className="flex flex-col items-center justify-center py-12 text-fg-subtle">
+          <Package size={40} className="mb-2 opacity-30" />
+          <p className="text-sm">Nenhum item nesta operação.</p>
+        </div>
+      ) : (
+        <div className="overflow-x-auto overflow-y-auto max-h-[55vh]">
+          <Table>
+            <Thead className="sticky top-0">
+              <Tr>
+                <Th>Produto</Th>
+                <Th>SKU</Th>
+                <Th>Local</Th>
+                <Th className="text-center">Req.</Th>
+                <Th>Sep.</Th>
+                <Th>Status</Th>
+                <Th />
+              </Tr>
+            </Thead>
+            <tbody className="divide-y divide-edge/60">
+              {items.map(item => (
+                <Tr key={item.id}>
+                  <Td className="max-w-[180px]">
+                    <p className="font-medium text-fg text-xs truncate">{item.product_name || '—'}</p>
+                  </Td>
+                  <Td className="font-mono text-xs text-fg-subtle whitespace-nowrap">{item.sku || '—'}</Td>
+                  <Td className="text-xs text-fg-muted whitespace-nowrap">{item.location || '—'}</Td>
+                  <Td className="text-center">
+                    <span className="font-mono font-bold text-fg-muted text-xs">{item.quantity_requested}</span>
+                  </Td>
+                  <Td>
+                    <input
+                      type="number" min="0" max={item.quantity_requested + 999}
+                      value={item.quantity_picked}
+                      onChange={e => updateQty(item.id, Number(e.target.value))}
+                      onBlur={e => supabase.from('full_operation_items').update({ quantity_picked: Number(e.target.value) }).eq('id', item.id)}
+                      className="w-14 text-center px-1 py-1 border border-edge rounded text-xs font-mono focus:outline-none focus:ring-1 focus:ring-accent/40"
+                    />
+                  </Td>
+                  <Td>
+                    <select
+                      value={item.status}
+                      disabled={updatingId === item.id}
+                      onChange={e => updateItemStatus(item.id, e.target.value)}
+                      className="text-xs border border-edge rounded-lg px-2 py-1 focus:outline-none focus:ring-1 focus:ring-accent/40 bg-surface-2 cursor-pointer"
+                    >
+                      {ITEM_STATUSES.map(s => (
+                        <option key={s} value={s}>{ITEM_STATUS_LABEL[s]}</option>
+                      ))}
+                    </select>
+                  </Td>
+                  <Td>
+                    {updatingId === item.id && <RefreshCw size={13} className="animate-spin text-fg-subtle" />}
+                  </Td>
+                </Tr>
+              ))}
+            </tbody>
+          </Table>
+        </div>
+      )}
 
-        <div className="px-6 py-4 border-t border-zinc-100 flex justify-between items-center flex-shrink-0">
-          <div className="flex gap-3 text-xs text-zinc-500">
+      {!loading && items.length > 0 && (
+        <div className="mt-4 pt-4 border-t border-edge flex flex-wrap justify-between items-center gap-3">
+          <div className="flex flex-wrap gap-3 text-xs text-fg-subtle">
             {['picked', 'skipped', 'not_found', 'no_location', 'insufficient_stock'].map(s => {
               const count = items.filter(i => i.status === s).length;
               if (!count) return null;
@@ -352,19 +319,17 @@ const ItemsPanel: React.FC<{
               );
             })}
           </div>
-          <button onClick={onClose}
-            className="px-4 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-sm font-semibold transition">
-            Fechar
-          </button>
+          <Button size="sm" onClick={onClose}>Fechar</Button>
         </div>
-      </div>
-    </div>
+      )}
+    </Modal>
   );
 };
 
 // ─── Main Admin Panel ─────────────────────────────────────────────────────────
 
 const FullAdminPanel: React.FC = () => {
+  const { companyId } = useAuth();
   const [operations, setOperations] = useState<FullOperation[]>([]);
   const [loading, setLoading] = useState(true);
   const [refreshKey, setRefreshKey] = useState(0);
@@ -388,15 +353,17 @@ const FullAdminPanel: React.FC = () => {
 
   // ── Load ────────────────────────────────────────────────────────────────────
   const load = useCallback(async () => {
+    if (!companyId) return;
     setLoading(true);
     const { data, error } = await supabase
       .from('full_operations').select('id, company_id, full_number, marketplace, responsible, scheduled_date, scheduled_time, status, total_sku, total_pieces, notes, checker, checker_notes, checked_at, completed_at, created_at, updated_at')
+      .eq('company_id', companyId)
       .order(sortField, { ascending: sortDir === 'asc' })
       .limit(100);
     if (error) console.error('[FullAdmin] Load error:', error);
     setOperations((data as FullOperation[]) || []);
     setLoading(false);
-  }, [sortField, sortDir, refreshKey]);
+  }, [companyId, sortField, sortDir, refreshKey]);
 
   useEffect(() => { load(); }, [load]);
 
@@ -504,8 +471,8 @@ const FullAdminPanel: React.FC = () => {
 
   const SortIcon: React.FC<{ field: SortField }> = ({ field }) =>
     sortField === field
-      ? <ArrowUpDown size={12} className="text-emerald-400" />
-      : <ArrowUpDown size={12} className="text-zinc-500 opacity-40" />;
+      ? <ArrowUpDown size={12} className="text-accent" />
+      : <ArrowUpDown size={12} className="text-fg-subtle opacity-40" />;
 
   return (
     <div className="space-y-5">
@@ -536,183 +503,185 @@ const FullAdminPanel: React.FC = () => {
       )}
 
       {/* Header banner */}
-      <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-2xl p-5 flex items-center justify-between gap-4">
+      <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-red-500/20 rounded-xl">
-            <ShieldAlert size={22} className="text-red-400" />
+          <div className="p-2.5 bg-red-500/10 rounded-xl">
+            <ShieldAlert size={22} className="text-red-600 dark:text-red-400" />
           </div>
           <div>
-            <h2 className="font-black text-white text-lg">Painel Administrativo</h2>
-            <p className="text-xs text-zinc-400 mt-0.5">
+            <h2 className="text-title">Painel Administrativo</h2>
+            <p className="text-xs text-fg-subtle mt-0.5">
               Gestão completa das operações Full — edite, cancele ou exclua qualquer registro.
             </p>
           </div>
         </div>
         <button onClick={() => setRefreshKey(k => k + 1)} disabled={loading}
-          className="flex items-center gap-2 px-3 py-2 bg-zinc-700 hover:bg-zinc-600 text-zinc-200 rounded-lg text-sm font-semibold transition">
+          className="flex items-center gap-2 px-3 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
           <RefreshCw size={14} className={loading ? 'animate-spin' : ''} />
           <span className="hidden sm:inline">Atualizar</span>
         </button>
       </div>
 
       {/* Stats */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-        {[
-          { label: 'Total de Operações', value: stats.total, icon: <Package size={18} />, color: 'text-zinc-700 bg-zinc-100' },
-          { label: 'Operações Ativas', value: stats.active, icon: <PlayCircle size={18} />, color: 'text-emerald-700 bg-emerald-100' },
-          { label: 'Finalizadas', value: stats.completed, icon: <CheckCircle2 size={18} />, color: 'text-blue-700 bg-blue-100' },
-          { label: 'Canceladas', value: stats.cancelled, icon: <Ban size={18} />, color: 'text-red-700 bg-red-100' },
-        ].map(s => (
-          <div key={s.label} className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm">
-            <div className={`w-9 h-9 rounded-xl flex items-center justify-center mb-2 ${s.color}`}>{s.icon}</div>
-            <p className="text-2xl font-black text-zinc-900">{s.value}</p>
-            <p className="text-xs text-zinc-500 mt-0.5">{s.label}</p>
+      <Panel>
+        <PanelSection>
+          <div className="grid grid-cols-2 lg:grid-cols-4 divide-y divide-edge lg:divide-y-0 lg:divide-x">
+            {[
+              { label: 'Total de Operações', value: stats.total },
+              { label: 'Operações Ativas', value: stats.active, cls: 'text-emerald-700 dark:text-emerald-400' },
+              { label: 'Finalizadas', value: stats.completed, cls: 'text-accent' },
+              { label: 'Canceladas', value: stats.cancelled, cls: stats.cancelled > 0 ? 'text-red-700 dark:text-red-400' : '' },
+            ].map((s, i) => (
+              <div key={s.label} className={`px-0 lg:px-6 py-3 lg:py-0 ${i === 0 ? 'lg:pl-0' : ''}`}>
+                <p className={`text-display ${s.cls ?? ''}`}>{s.value}</p>
+                <p className="text-caption mt-1">{s.label}</p>
+              </div>
+            ))}
           </div>
-        ))}
-      </div>
+        </PanelSection>
+      </Panel>
 
-      {/* Filters */}
-      <div className="bg-white border border-zinc-200 rounded-xl p-4 shadow-sm">
-        <div className="flex flex-wrap gap-3 items-end">
-          {/* Search */}
-          <div className="flex-1 min-w-[200px]">
-            <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Buscar</label>
-            <div className="relative">
-              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-              <input
-                type="text"
-                placeholder="Número FULL, responsável, marketplace..."
-                value={searchQuery}
-                onChange={e => setSearchQuery(e.target.value)}
-                className="w-full pl-8 pr-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400"
-              />
+      {/* Filters + table — one panel, not stacked boxes */}
+      <Panel>
+        <PanelSection>
+          <div className="flex flex-wrap gap-3 items-end">
+            {/* Search */}
+            <div className="flex-1 min-w-[200px]">
+              <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Buscar</label>
+              <div className="relative">
+                <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
+                <input
+                  type="text"
+                  placeholder="Número FULL, responsável, marketplace..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                  className="w-full pl-8 pr-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                />
+              </div>
             </div>
-          </div>
-          {/* Status filter */}
-          <div className="w-40">
-            <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Status</label>
-            <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as FullStatus | 'all')}
-              className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 bg-white">
-              <option value="all">Todos</option>
-              {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
-            </select>
-          </div>
-          {/* Marketplace filter */}
-          <div className="w-44">
-            <label className="block text-xs font-semibold text-zinc-500 uppercase mb-1.5">Marketplace</label>
-            <select value={filterMarketplace} onChange={e => setFilterMarketplace(e.target.value)}
-              className="w-full px-3 py-2 border border-zinc-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-zinc-400 bg-white">
-              <option value="all">Todos</option>
-              {MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}
-            </select>
-          </div>
-          {/* Export */}
-          <button onClick={exportCSV}
-            className="flex items-center gap-2 px-3 py-2 bg-zinc-900 hover:bg-zinc-800 text-white rounded-lg text-sm font-semibold transition">
-            <Download size={14} />
-            <span className="hidden sm:inline">Exportar CSV</span>
-          </button>
-        </div>
-        {(searchQuery || filterStatus !== 'all' || filterMarketplace !== 'all') && (
-          <div className="mt-3 flex items-center gap-2">
-            <span className="text-xs text-zinc-500">{filtered.length} de {operations.length} operações</span>
-            <button onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterMarketplace('all'); }}
-              className="text-xs text-zinc-500 hover:text-zinc-800 flex items-center gap-1 underline underline-offset-2">
-              <X size={10} />Limpar filtros
+            {/* Status filter */}
+            <div className="w-40">
+              <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Status</label>
+              <select value={filterStatus} onChange={e => setFilterStatus(e.target.value as FullStatus | 'all')}
+                className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
+                <option value="all">Todos</option>
+                {ALL_STATUSES.map(s => <option key={s} value={s}>{STATUS_LABEL[s]}</option>)}
+              </select>
+            </div>
+            {/* Marketplace filter */}
+            <div className="w-44">
+              <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Marketplace</label>
+              <select value={filterMarketplace} onChange={e => setFilterMarketplace(e.target.value)}
+                className="w-full px-3 py-2 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface-2">
+                <option value="all">Todos</option>
+                {MARKETPLACES.map(m => <option key={m} value={m}>{m}</option>)}
+              </select>
+            </div>
+            {/* Export */}
+            <button onClick={exportCSV}
+              className="flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition">
+              <Download size={14} />
+              <span className="hidden sm:inline">Exportar CSV</span>
             </button>
           </div>
-        )}
-      </div>
+          {(searchQuery || filterStatus !== 'all' || filterMarketplace !== 'all') && (
+            <div className="mt-3 flex items-center gap-2">
+              <span className="text-xs text-fg-subtle">{filtered.length} de {operations.length} operações</span>
+              <button onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterMarketplace('all'); }}
+                className="text-xs text-fg-subtle hover:text-fg flex items-center gap-1 underline underline-offset-2">
+                <X size={10} />Limpar filtros
+              </button>
+            </div>
+          )}
+        </PanelSection>
 
-      {/* Table */}
-      <div className="bg-white border border-zinc-200 rounded-xl shadow-sm overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-sm">
-            <thead className="bg-zinc-50 border-b border-zinc-200">
-              <tr>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('full_number')} className="flex items-center gap-1 text-xs font-semibold text-zinc-500 uppercase hover:text-zinc-800 transition">
+          <Table>
+            <Thead>
+              <Tr>
+                <Th>
+                  <button onClick={() => toggleSort('full_number')} className="flex items-center gap-1 hover:text-fg transition">
                     FULL # <SortIcon field="full_number" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Marketplace</th>
-                <th className="px-4 py-3 text-left text-xs font-semibold text-zinc-500 uppercase">Responsável</th>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('scheduled_date')} className="flex items-center gap-1 text-xs font-semibold text-zinc-500 uppercase hover:text-zinc-800 transition">
+                </Th>
+                <Th>Marketplace</Th>
+                <Th>Responsável</Th>
+                <Th>
+                  <button onClick={() => toggleSort('scheduled_date')} className="flex items-center gap-1 hover:text-fg transition">
                     Data <SortIcon field="scheduled_date" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('status')} className="flex items-center gap-1 text-xs font-semibold text-zinc-500 uppercase hover:text-zinc-800 transition">
+                </Th>
+                <Th>
+                  <button onClick={() => toggleSort('status')} className="flex items-center gap-1 hover:text-fg transition">
                     Status <SortIcon field="status" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-center text-xs font-semibold text-zinc-500 uppercase">SKU / Pcs</th>
-                <th className="px-4 py-3 text-left">
-                  <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 text-xs font-semibold text-zinc-500 uppercase hover:text-zinc-800 transition">
+                </Th>
+                <Th className="text-center">SKU / Pcs</Th>
+                <Th>
+                  <button onClick={() => toggleSort('created_at')} className="flex items-center gap-1 hover:text-fg transition">
                     Criado <SortIcon field="created_at" />
                   </button>
-                </th>
-                <th className="px-4 py-3 text-right text-xs font-semibold text-zinc-500 uppercase">Ações</th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-zinc-100">
+                </Th>
+                <Th className="text-right">Ações</Th>
+              </Tr>
+            </Thead>
+            <tbody className="divide-y divide-edge/60">
               {loading ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center">
-                    <div className="flex items-center justify-center gap-2 text-zinc-400">
+                <Tr>
+                  <Td colSpan={8} className="py-12 text-center">
+                    <div className="flex items-center justify-center gap-2 text-fg-subtle">
                       <RefreshCw size={18} className="animate-spin" />Carregando operações...
                     </div>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ) : filtered.length === 0 ? (
-                <tr>
-                  <td colSpan={8} className="px-4 py-12 text-center text-zinc-400 text-sm">
+                <Tr>
+                  <Td colSpan={8} className="py-12 text-center text-fg-subtle text-sm">
                     Nenhuma operação encontrada.
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ) : filtered.map(op => (
-                <tr key={op.id} className="hover:bg-zinc-50 transition">
+                <Tr key={op.id}>
                   {/* FULL # */}
-                  <td className="px-4 py-3">
+                  <Td>
                     <div>
-                      <p className="font-black text-zinc-900 text-sm">{op.full_number}</p>
+                      <p className="font-bold text-fg text-sm">{op.full_number}</p>
                       {op.notes && (
-                        <p className="text-xs text-zinc-400 mt-0.5 max-w-[120px] truncate" title={op.notes}>{op.notes}</p>
+                        <p className="text-xs text-fg-subtle mt-0.5 max-w-[120px] truncate" title={op.notes}>{op.notes}</p>
                       )}
                     </div>
-                  </td>
+                  </Td>
                   {/* Marketplace */}
-                  <td className="px-4 py-3 text-zinc-700 text-xs font-medium">{op.marketplace}</td>
+                  <Td className="text-fg-muted text-xs font-medium">{op.marketplace}</Td>
                   {/* Responsible */}
-                  <td className="px-4 py-3 text-zinc-600 text-xs">{op.responsible || '—'}</td>
+                  <Td className="text-fg-muted text-xs">{op.responsible || '—'}</Td>
                   {/* Date */}
-                  <td className="px-4 py-3 text-xs text-zinc-500 whitespace-nowrap">{formatFullDate(op.scheduled_date, op.scheduled_time)}</td>
+                  <Td className="text-xs text-fg-subtle whitespace-nowrap">{formatFullDate(op.scheduled_date, op.scheduled_time)}</Td>
                   {/* Status — inline change */}
-                  <td className="px-4 py-3">
+                  <Td>
                     <StatusSelector
                       current={op.status}
                       options={NEXT_STATUS[op.status]}
                       loading={updatingStatusId === op.id}
                       onSelect={s => updateStatus(op, s)}
                     />
-                  </td>
+                  </Td>
                   {/* SKU / Pieces */}
-                  <td className="px-4 py-3 text-center">
-                    <span className="font-mono text-xs text-zinc-700">{op.total_sku} / {op.total_pieces}</span>
-                  </td>
+                  <Td className="text-center">
+                    <span className="font-mono text-xs text-fg-muted">{op.total_sku} / {op.total_pieces}</span>
+                  </Td>
                   {/* Created */}
-                  <td className="px-4 py-3 text-xs text-zinc-400 whitespace-nowrap">
+                  <Td className="text-xs text-fg-subtle whitespace-nowrap">
                     {new Date(op.created_at).toLocaleDateString('pt-BR')}
-                  </td>
+                  </Td>
                   {/* Actions */}
-                  <td className="px-4 py-3">
+                  <Td>
                     <div className="flex items-center justify-end gap-1">
                       {/* View items */}
                       <button
                         onClick={() => setViewingItemsOp(op)}
                         title="Ver / editar itens"
-                        className="p-1.5 text-zinc-400 hover:text-zinc-700 hover:bg-zinc-100 rounded-lg transition"
+                        className="p-1.5 text-fg-subtle hover:text-fg-muted hover:bg-surface-3 rounded-lg transition"
                       >
                         <Package size={15} />
                       </button>
@@ -720,7 +689,7 @@ const FullAdminPanel: React.FC = () => {
                       <button
                         onClick={() => setEditingOp(op)}
                         title="Editar operação"
-                        className="p-1.5 text-zinc-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition"
+                        className="p-1.5 text-fg-subtle hover:text-accent hover:bg-accent/10 rounded-lg transition"
                       >
                         <Edit2 size={15} />
                       </button>
@@ -729,7 +698,7 @@ const FullAdminPanel: React.FC = () => {
                         <button
                           onClick={() => cancelOperation(op)}
                           title="Cancelar operação"
-                          className="p-1.5 text-zinc-400 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition"
+                          className="p-1.5 text-fg-subtle hover:text-amber-600 dark:hover:text-amber-400 hover:bg-amber-500/10 rounded-lg transition"
                         >
                           <XCircle size={15} />
                         </button>
@@ -737,7 +706,7 @@ const FullAdminPanel: React.FC = () => {
                         <button
                           onClick={() => reopenOperation(op)}
                           title="Reabrir operação"
-                          className="p-1.5 text-zinc-400 hover:text-emerald-600 hover:bg-emerald-50 rounded-lg transition"
+                          className="p-1.5 text-fg-subtle hover:text-emerald-600 dark:hover:text-emerald-400 hover:bg-emerald-500/10 rounded-lg transition"
                         >
                           <RotateCcw size={15} />
                         </button>
@@ -746,27 +715,27 @@ const FullAdminPanel: React.FC = () => {
                       <button
                         onClick={() => deleteOperation(op)}
                         title="Excluir permanentemente"
-                        className="p-1.5 text-zinc-400 hover:text-red-600 hover:bg-red-50 rounded-lg transition"
+                        className="p-1.5 text-fg-subtle hover:text-red-600 dark:hover:text-red-400 hover:bg-red-500/10 rounded-lg transition"
                       >
                         <Trash2 size={15} />
                       </button>
                     </div>
-                  </td>
-                </tr>
+                  </Td>
+                </Tr>
               ))}
             </tbody>
-          </table>
+          </Table>
         </div>
         {!loading && filtered.length > 0 && (
-          <div className="px-4 py-3 border-t border-zinc-100 bg-zinc-50 flex items-center justify-between text-xs text-zinc-500">
+          <PanelSection padding="sm" className="flex items-center justify-between text-xs text-fg-subtle bg-surface-3">
             <span>{filtered.length} operação(ões) exibida(s)</span>
             <span>
               {filtered.reduce((s, o) => s + o.total_sku, 0)} SKUs ·{' '}
               {filtered.reduce((s, o) => s + o.total_pieces, 0)} peças no total
             </span>
-          </div>
+          </PanelSection>
         )}
-      </div>
+      </Panel>
     </div>
   );
 };

@@ -8,6 +8,9 @@ import { getInvoiceItems, registerCount, finalizeConference } from '../../lib/nf
 import { supabase } from '../../lib/supabase';
 import { normalizeEan, buildEanIndex } from '../../lib/nfe/nfeEanUtils';
 import { formatQty } from './nfeUi';
+import { Card, Button, Modal, Input, Notice, SegmentedControl, StatRow, StatCell, Stat } from '../ui';
+import { useAuth } from '../../lib/auth';
+import { RcaClassificationModal, PendingRcaItem } from '../rca/RcaClassificationModal';
 
 interface Props {
   invoice: NfeInvoice;
@@ -18,7 +21,9 @@ interface Props {
 type Filter = 'all' | 'pending' | 'done';
 
 export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
+  const { companyId, profile } = useAuth();
   const [items, setItems] = useState<NfeInvoiceItem[]>([]);
+  const [pendingRcaItems, setPendingRcaItems] = useState<PendingRcaItem[]>([]);
   const [products, setProducts] = useState<Map<string, CatalogProduct>>(new Map());
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -133,6 +138,30 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
     setError(null);
     try {
       await finalizeConference(invoice.id);
+
+      // RCA — recebimento com falta/sobra exige causa antes de fechar a conferência.
+      const finalItems = await getInvoiceItems(invoice.id);
+      const divergentItems = finalItems.filter((it) => it.result_status === 'missing' || it.result_status === 'surplus');
+      if (divergentItems.length > 0) {
+        setPendingRcaItems(divergentItems.map((it) => {
+          const prod = it.product_id ? products.get(it.product_id) : null;
+          return {
+            sourceItemId: it.id,
+            productId: it.product_id,
+            sku: it.snapshot_sku ?? prod?.sku ?? null,
+            productName: it.snapshot_product_name ?? it.description ?? prod?.name ?? null,
+            location: prod?.location ?? null,
+            operatorUserId: null,
+            operatorName: null,
+            supplierName: invoice.supplier_name,
+            supplierCnpj: invoice.supplier_cnpj,
+            divergenceQty: (it.physical_quantity ?? 0) - it.expected_quantity,
+          };
+        }));
+        setFinalizing(false);
+        return;
+      }
+
       onFinalized();
     } catch (e) {
       setError(e instanceof Error ? e.message : 'Não foi possível finalizar.');
@@ -151,32 +180,32 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
 
   return (
     <div className="max-w-4xl mx-auto p-4 sm:p-6 space-y-4">
-      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-zinc-500 hover:text-zinc-800 transition-colors">
+      <button onClick={onBack} className="inline-flex items-center gap-1.5 text-sm text-fg-subtle hover:text-fg transition-colors">
         <ArrowLeft size={16} /> Voltar
       </button>
 
-      <div className="bg-white rounded-2xl border border-zinc-200 p-4 sm:p-5">
+      <Card>
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <h2 className="text-lg font-bold text-zinc-900">Conferência cega</h2>
-            <p className="text-sm text-zinc-500 mt-0.5">
+            <h2 className="text-title">Conferência cega</h2>
+            <p className="text-sm text-fg-muted mt-0.5">
               NF {invoice.invoice_number ?? '—'} · {invoice.supplier_name ?? 'Fornecedor não informado'}
             </p>
           </div>
-          <div className="px-3 py-1.5 rounded-lg bg-zinc-50 border border-zinc-100 text-center">
-            <p className="text-xl font-bold text-zinc-800">{doneCount}<span className="text-zinc-400 text-sm">/{items.length}</span></p>
-            <p className="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold">Conferidos</p>
+          <div className="px-3 py-1.5 rounded-lg bg-surface-3 text-center">
+            <p className="text-xl font-bold text-fg">{doneCount}<span className="text-fg-subtle text-sm">/{items.length}</span></p>
+            <p className="text-caption">Conferidos</p>
           </div>
         </div>
-        <p className="mt-3 text-xs text-zinc-400 bg-zinc-50 rounded-lg px-3 py-2 border border-zinc-100">
+        <p className="mt-3 text-xs text-fg-subtle bg-surface-3 rounded-lg px-3 py-2">
           As quantidades da nota estão ocultas. Você verá apenas o que registrar fisicamente.
         </p>
-      </div>
+      </Card>
 
       {/* Scanner */}
-      <div className="bg-white rounded-2xl border border-zinc-200 p-4">
-        <label className="flex items-center gap-2 text-sm font-semibold text-zinc-800 mb-2">
-          <ScanLine size={16} className="text-emerald-600" /> Leitor de código de barras
+      <Card>
+        <label className="flex items-center gap-2 text-sm font-semibold text-fg mb-2">
+          <ScanLine size={16} className="text-accent" /> Leitor de código de barras
         </label>
         <input
           ref={scanRef}
@@ -184,69 +213,63 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
           onChange={(e) => setScan(e.target.value)}
           onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleScan(); } }}
           placeholder="Foque aqui e escaneie ou digite o EAN, depois Enter"
-          className="w-full px-3 py-2.5 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-full px-3 py-2.5 rounded-lg border border-edge bg-surface text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
           autoFocus
         />
         {scanFeedback && (
-          <p className={`mt-2 text-xs font-medium flex items-center gap-1.5 ${scanFeedback.type === 'ok' ? 'text-emerald-600' : 'text-red-600'}`}>
+          <p className={`mt-2 text-xs font-medium flex items-center gap-1.5 ${scanFeedback.type === 'ok' ? 'text-emerald-600 dark:text-emerald-400' : 'text-red-600 dark:text-red-400'}`}>
             {scanFeedback.type === 'ok' ? <CheckCheck size={14} /> : <AlertCircle size={14} />} {scanFeedback.msg}
           </p>
         )}
-      </div>
+      </Card>
 
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
-          <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
-          <p className="text-sm font-medium">{error}</p>
-        </div>
+        <Notice tone="danger">
+          <span className="flex items-start gap-2">
+            <AlertCircle size={16} className="flex-shrink-0 mt-0.5" /> {error}
+          </span>
+        </Notice>
       )}
 
       {/* Filters + search */}
       <div className="flex flex-wrap items-center gap-2">
-        <div className="flex gap-1 bg-zinc-100 rounded-lg p-1">
-          {([['all', 'Todos'], ['pending', 'Pendentes'], ['done', 'Conferidos']] as [Filter, string][]).map(([f, label]) => (
-            <button
-              key={f}
-              onClick={() => setFilter(f)}
-              className={`px-3 py-1.5 rounded-md text-xs font-semibold transition-colors ${filter === f ? 'bg-white text-zinc-900 shadow-sm' : 'text-zinc-500 hover:text-zinc-800'}`}
-            >
-              {label}
-            </button>
-          ))}
-        </div>
-        <div className="relative flex-1 min-w-[180px]">
-          <Search size={15} className="absolute left-3 top-1/2 -translate-y-1/2 text-zinc-400" />
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Buscar item..."
-            className="w-full pl-9 pr-3 py-2 rounded-lg border border-zinc-200 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500"
-          />
+        <SegmentedControl
+          label="Filtro de itens"
+          value={filter}
+          onChange={setFilter}
+          options={[
+            { value: 'all', label: 'Todos' },
+            { value: 'pending', label: 'Pendentes' },
+            { value: 'done', label: 'Conferidos' },
+          ]}
+        />
+        <div className="flex-1 min-w-[180px]">
+          <Input icon={<Search size={15} />} value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Buscar item..." />
         </div>
       </div>
 
       {loading ? (
-        <div className="flex items-center justify-center py-16 text-zinc-400"><Loader2 size={28} className="animate-spin" /></div>
+        <div className="flex items-center justify-center py-16 text-fg-subtle"><Loader2 size={28} className="animate-spin" /></div>
       ) : (
         <div className="space-y-2">
           {visible.map((it) => {
             const prod = it.product_id ? products.get(it.product_id) : null;
             const ean = displayEan(it);
             return (
-              <div key={it.id} className="bg-white rounded-xl border border-zinc-200 p-3.5">
+              <Card key={it.id} padding="sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="font-semibold text-zinc-900 text-sm flex items-center gap-1.5">
+                    <p className="font-semibold text-fg text-sm flex items-center gap-1.5">
                       {it.physical_quantity != null
-                        ? <PackageCheck size={15} className="text-emerald-500 flex-shrink-0" />
-                        : <PackageSearch size={15} className="text-zinc-300 flex-shrink-0" />}
+                        ? <PackageCheck size={15} className="text-emerald-600 dark:text-emerald-400 flex-shrink-0" />
+                        : <PackageSearch size={15} className="text-fg-subtle flex-shrink-0" />}
                       {it.description || prod?.name || 'Sem descrição'}
                     </p>
-                    <p className="text-xs text-zinc-500 mt-0.5">
+                    <p className="text-xs text-fg-muted mt-0.5">
                       SKU <span className="font-mono">{prod?.sku ?? it.nfe_code ?? '—'}</span>
                       {ean && (
                         <> · EAN <span className="font-mono">{ean}</span>
-                          <button onClick={() => copyEan(it)} className="ml-1 inline-flex items-center text-zinc-400 hover:text-emerald-600 align-middle">
+                          <button onClick={() => copyEan(it)} className="ml-1 inline-flex items-center text-fg-subtle hover:text-accent align-middle">
                             {copiedId === it.id ? <Check size={12} /> : <Copy size={12} />}
                           </button>
                         </>
@@ -254,96 +277,86 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
                     </p>
                   </div>
                   <div className="text-center flex-shrink-0">
-                    <p className="text-2xl font-bold text-zinc-900 leading-none">{it.physical_quantity != null ? formatQty(it.physical_quantity) : '0'}</p>
-                    <p className="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold mt-0.5">Físico</p>
+                    <p className="text-2xl font-bold text-fg leading-none">{it.physical_quantity != null ? formatQty(it.physical_quantity) : '0'}</p>
+                    <p className="text-caption mt-0.5">Físico</p>
                   </div>
                 </div>
                 <CountControls onIncrement={(d) => applyCount(it, 'increment', d, 'manual')} onSet={(v) => applyCount(it, 'set', v, 'manual')} />
-              </div>
+              </Card>
             );
           })}
-          {visible.length === 0 && <p className="text-center text-sm text-zinc-400 py-10">Nenhum item nesta lista.</p>}
+          {visible.length === 0 && <p className="text-center text-sm text-fg-subtle py-10">Nenhum item nesta lista.</p>}
         </div>
       )}
 
-      <div className="sticky bottom-0 bg-gradient-to-t from-zinc-50 via-zinc-50 to-transparent pt-4 pb-2">
-        <button
-          onClick={() => setShowFinalize(true)}
-          className="w-full inline-flex items-center justify-center gap-2 px-5 py-3 rounded-xl bg-zinc-900 hover:bg-zinc-800 text-white font-semibold transition-colors"
-        >
+      <div className="sticky bottom-0 bg-surface border-t border-edge pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">
+        <Button onClick={() => setShowFinalize(true)} className="w-full">
           <Flag size={18} /> Finalizar Conferência
-        </button>
+        </Button>
       </div>
 
-      {duplicateCandidates && (
-        <div className="fixed inset-0 z-[950] bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5">
-            <h3 className="text-lg font-bold text-zinc-900">Este código aparece em mais de um item</h3>
-            <p className="mt-1 text-sm text-zinc-500">Selecione a linha da nota correspondente ao produto em mãos.</p>
-            <div className="mt-4 space-y-2 max-h-80 overflow-y-auto">
-              {duplicateCandidates.map((it) => {
-                const prod = it.product_id ? products.get(it.product_id) : null;
-                return (
-                  <button
-                    key={it.id}
-                    onClick={() => handleSelectDuplicate(it)}
-                    className="w-full text-left p-3 rounded-lg border border-zinc-200 hover:border-emerald-400 hover:bg-emerald-50 transition-colors"
-                  >
-                    <p className="font-semibold text-zinc-900 text-sm">{it.description || prod?.name || 'Sem descrição'}</p>
-                    <p className="text-xs text-zinc-500 mt-0.5">
-                      SKU <span className="font-mono">{prod?.sku ?? it.nfe_code ?? '—'}</span>
-                      {it.line_number != null && <> · Linha {it.line_number}</>}
-                    </p>
-                  </button>
-                );
-              })}
-            </div>
-            <button
-              onClick={() => setDuplicateCandidates(null)}
-              className="mt-4 w-full px-4 py-2.5 rounded-lg border border-zinc-200 text-zinc-700 font-semibold hover:bg-zinc-50"
-            >
-              Cancelar
-            </button>
-          </div>
-        </div>
-      )}
-
-      {showFinalize && (
-        <div className="fixed inset-0 z-[950] bg-zinc-900/60 backdrop-blur-sm flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-md p-5">
-            <h3 className="text-lg font-bold text-zinc-900">Finalizar conferência?</h3>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-center">
-              <Mini label="SKUs" value={items.length} />
-              <Mini label="Conferidos" value={doneCount} tone="emerald" />
-              <Mini label="Não conferidos" value={items.length - doneCount} tone={items.length - doneCount > 0 ? 'amber' : 'zinc'} />
-            </div>
-            <p className="mt-4 text-sm text-amber-700 bg-amber-50 border border-amber-200 rounded-lg p-3">
-              Ao finalizar, as quantidades da nota serão reveladas e comparadas com a contagem física. Esta ação encerra a conferência.
-            </p>
-            {error && <p className="mt-3 text-sm text-red-600">{error}</p>}
-            <div className="mt-4 flex gap-2">
-              <button onClick={() => setShowFinalize(false)} className="flex-1 px-4 py-2.5 rounded-lg border border-zinc-200 text-zinc-700 font-semibold hover:bg-zinc-50">Cancelar</button>
+      <Modal open={!!duplicateCandidates} onClose={() => setDuplicateCandidates(null)} title="Este código aparece em mais de um item" maxWidth="max-w-md">
+        <p className="text-sm text-fg-muted -mt-2 mb-4">Selecione a linha da nota correspondente ao produto em mãos.</p>
+        <div className="space-y-2 max-h-80 overflow-y-auto">
+          {(duplicateCandidates ?? []).map((it) => {
+            const prod = it.product_id ? products.get(it.product_id) : null;
+            return (
               <button
-                disabled={finalizing}
-                onClick={handleFinalize}
-                className="flex-1 inline-flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-semibold disabled:opacity-50"
+                key={it.id}
+                onClick={() => handleSelectDuplicate(it)}
+                className="w-full text-left p-3 rounded-lg border border-edge hover:border-accent/40 hover:bg-accent/5 transition-colors"
               >
-                {finalizing ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Confirmar
+                <p className="font-semibold text-fg text-sm">{it.description || prod?.name || 'Sem descrição'}</p>
+                <p className="text-xs text-fg-muted mt-0.5">
+                  SKU <span className="font-mono">{prod?.sku ?? it.nfe_code ?? '—'}</span>
+                  {it.line_number != null && <> · Linha {it.line_number}</>}
+                </p>
               </button>
-            </div>
-          </div>
+            );
+          })}
         </div>
-      )}
-    </div>
-  );
-}
+        <Button variant="secondary" onClick={() => setDuplicateCandidates(null)} className="w-full mt-4">
+          Cancelar
+        </Button>
+      </Modal>
 
-function Mini({ label, value, tone = 'zinc' }: { label: string; value: number; tone?: 'zinc' | 'emerald' | 'amber' }) {
-  const color = tone === 'emerald' ? 'text-emerald-600' : tone === 'amber' ? 'text-amber-600' : 'text-zinc-800';
-  return (
-    <div className="px-2 py-2 rounded-lg bg-zinc-50 border border-zinc-100">
-      <p className={`text-lg font-bold ${color}`}>{value}</p>
-      <p className="text-[10px] uppercase tracking-wide text-zinc-400 font-semibold">{label}</p>
+      <Modal open={showFinalize} onClose={() => setShowFinalize(false)} title="Finalizar conferência?" maxWidth="max-w-md">
+        <StatRow>
+          <StatCell><Stat label="SKUs" value={items.length} /></StatCell>
+          <StatCell><Stat label="Conferidos" value={doneCount} valueTone="positive" /></StatCell>
+          <StatCell>
+            <Stat
+              label="Não conferidos"
+              value={items.length - doneCount}
+              valueTone={items.length - doneCount > 0 ? 'warning' : 'default'}
+            />
+          </StatCell>
+        </StatRow>
+        <div className="mt-4">
+          <Notice tone="warning">
+            Ao finalizar, as quantidades da nota serão reveladas e comparadas com a contagem física. Esta ação encerra a conferência.
+          </Notice>
+        </div>
+        {error && <p className="mt-3 text-sm text-red-600 dark:text-red-400">{error}</p>}
+        <div className="mt-4 flex gap-2">
+          <Button variant="secondary" onClick={() => setShowFinalize(false)} className="flex-1">Cancelar</Button>
+          <Button disabled={finalizing} onClick={handleFinalize} className="flex-1">
+            {finalizing ? <Loader2 size={16} className="animate-spin" /> : <Check size={16} />} Confirmar
+          </Button>
+        </div>
+      </Modal>
+
+      {profile && companyId && (
+        <RcaClassificationModal
+          open={pendingRcaItems.length > 0}
+          sourceModule="nfe_receiving"
+          items={pendingRcaItems}
+          companyId={companyId}
+          userId={profile.id}
+          userEmail={profile.email ?? ''}
+          onDone={() => { setPendingRcaItems([]); onFinalized(); }}
+        />
+      )}
     </div>
   );
 }
@@ -352,10 +365,10 @@ function CountControls({ onIncrement, onSet }: { onIncrement: (delta: number) =>
   const [manual, setManual] = useState('');
   return (
     <div className="flex items-center gap-2 mt-3">
-      <button onClick={() => onIncrement(-1)} className="p-2 rounded-lg border border-zinc-200 text-zinc-600 hover:bg-zinc-50 active:bg-zinc-100" aria-label="Diminuir">
+      <button onClick={() => onIncrement(-1)} className="p-2 rounded-lg border border-edge text-fg-muted hover:bg-surface-3" aria-label="Diminuir">
         <Minus size={16} />
       </button>
-      <button onClick={() => onIncrement(1)} className="p-2 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white active:bg-emerald-700" aria-label="Aumentar">
+      <button onClick={() => onIncrement(1)} className="p-2 rounded-lg bg-accent hover:bg-accent-strong text-white" aria-label="Aumentar">
         <Plus size={16} />
       </button>
       <div className="flex items-center gap-1.5 ml-auto">
@@ -365,12 +378,12 @@ function CountControls({ onIncrement, onSet }: { onIncrement: (delta: number) =>
           value={manual}
           onChange={(e) => setManual(e.target.value)}
           placeholder="Qtd"
-          className="w-20 px-2 py-1.5 rounded-lg border border-zinc-200 text-sm text-right focus:outline-none focus:ring-2 focus:ring-emerald-500"
+          className="w-20 px-2 py-1.5 rounded-lg border border-edge bg-surface text-fg text-sm text-right focus:outline-none focus:ring-2 focus:ring-accent/40"
         />
         <button
           onClick={() => { const v = Number(manual); if (Number.isFinite(v) && v >= 0) { onSet(v); setManual(''); } }}
           disabled={manual.trim() === ''}
-          className="px-3 py-1.5 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-xs font-semibold disabled:opacity-40"
+          className="px-3 py-1.5 rounded-lg bg-surface-3 hover:bg-edge text-fg text-xs font-semibold disabled:opacity-40"
         >
           Confirmar
         </button>

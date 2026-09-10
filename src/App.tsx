@@ -1,256 +1,381 @@
 import React, { useState, useMemo, useEffect, useCallback } from 'react';
 import {
-  BarChart3,
   Package,
   AlertTriangle,
-  Clock,
-  CheckCircle2,
-  TrendingUp,
   Activity,
   Award,
   X,
-  Save,
+  User,
   ShieldCheck,
-  MinusCircle,
   Lock,
   LogOut,
-  Edit,
-  Trophy,
   Target,
-  Zap,
-  Users,
   Calendar,
-  ArrowUpRight,
-  ArrowDownRight,
-  BarChart2,
+  Clock,
   Plus,
-  Trash2,
   Loader2,
-  Archive,
-  RotateCcw,
   History,
-  Eye,
   Bot,
   MessageCircle,
   Send,
-  Sparkles,
   ChevronDown,
   ChevronUp,
   RefreshCw,
   Map,
   FileSpreadsheet,
-  ChevronRight,
-  Undo2,
   Tag,
   UserCog,
   Building2,
-  Menu,
   Download,
   Smartphone,
   ScanLine,
-  type LucideIcon
+  LayoutDashboard,
+  Gauge,
+  ClipboardCheck,
+  ClipboardList,
+  Monitor,
+  BarChart3,
+  ShieldAlert,
+  Plug,
+  Warehouse,
+  Code2,
+  Webhook,
+  Workflow,
+  FileText,
+  Settings,
+  Sun,
+  Moon,
+  GraduationCap,
+  LayoutGrid,
+  GitBranch,
+  SearchCheck,
+  BookOpen,
+  ArrowRight,
+  HelpCircle,
+  FileSearch,
+  Barcode,
+  GitCompareArrows,
+  ListTodo,
+  FileStack,
+  Grid3x3,
+  ShoppingCart,
+  PackageX,
+  Layers,
+  FileBarChart2
 } from 'lucide-react';
-import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory } from './lib/supabase';
+import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
+import { getTeamProductivity } from './lib/productivityService';
+import { getBlindAISituations } from './lib/blindAIInsightsEngine';
+import { tryFastPath, askBlindAIAgent, getContextualSuggestions, type ChatMessage } from './lib/blindAIAgent';
+import { computeGlobalStats } from './lib/blindAIAgentAlgorithm';
+import { cycleLinesAsBrandData, mergeCurrentCycleCounts, type CycleLineSummary } from './lib/inventoryCycle/inventoryCycleModel';
+import { listLineUniverse } from './lib/inventoryCycle/inventoryCycleService';
+import { KpisIndicadoresPage } from './components/KpisIndicadoresPage';
 import { SafeDropdown } from './components/SafeDropdown';
-import { DashboardRankingPreview } from './components/DashboardRankingPreview';
-import LandingPage from './components/LandingPage';
+import { CountManagementCenter } from './components/counting/CountManagementCenter';
+import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
-import { hasPermission, getRoleLabel } from './lib/permissionService';
+import { getWorkspaceLogoSignedUrl } from './lib/workspace/workspaceService';
+import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
+import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations } from './lib/permissionService';
+import type { DrillTarget } from './lib/intelligence/contracts';
 import { usePWAInstall } from './lib/usePWAInstall';
+import { useTheme } from './lib/useTheme';
+import { LogoMark } from './components/landing/landingUi';
+import { WhatsNewButton } from './components/WhatsNewPanel';
+import { TaskNotificationBell } from './components/tasks/TaskNotificationBell';
+import { useTaskNotifications } from './lib/tasks/hooks';
+import {
+  ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
+  Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
+  SidebarFolderIcon,
+} from './components/ui';
+import type { SidebarNavGroup } from './components/ui';
+import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnosticStorage';
+import { evaluateDiagnosticEligibility } from './lib/dashboardDiagnosticRule';
+import { readBlockedFeatureInterest } from './lib/blockedFeatureInterest';
+import { MyShortcutsCard } from './components/dashboard/MyShortcutsCard';
+import { DashboardPriorities } from './components/dashboard/DashboardPriorities';
+import { DashboardInventoryProgress } from './components/dashboard/DashboardInventoryProgress';
+import { DashboardIntegrationsHealth } from './components/dashboard/DashboardIntegrationsHealth';
+import { listConnections } from './lib/integrations/integrationService';
+import type { IntegrationConnection } from './lib/integrations/types';
 
 // Code-split large page components for smaller initial bundle
+const LandingPage = React.lazy(() => import('./components/LandingPage'));
 const HeatmapEstoque = React.lazy(() => import('./components/HeatmapEstoque').then(m => ({ default: m.HeatmapEstoque })));
 const ProductImportPage = React.lazy(() => import('./components/ProductImportPage').then(m => ({ default: m.ProductImportPage })));
 const ImportedProductsPage = React.lazy(() => import('./components/ImportedProductsPage').then(m => ({ default: m.ImportedProductsPage })));
 const ImportHistoryPage = React.lazy(() => import('./components/ImportHistoryPage').then(m => ({ default: m.ImportHistoryPage })));
 const RankingsPage = React.lazy(() => import('./components/RankingsPage').then(m => ({ default: m.RankingsPage })));
 const LabelGeneratorPage = React.lazy(() => import('./components/LabelGeneratorPage').then(m => ({ default: m.LabelGeneratorPage })));
+const BarcodeLabPage = React.lazy(() => import('./components/BarcodeLabPage').then(m => ({ default: m.BarcodeLabPage })));
+const PdfCenterPage = React.lazy(() => import('./components/pdfCenter/PdfCenterPage').then(m => ({ default: m.PdfCenterPage })));
+const PalletCalcPage = React.lazy(() => import('./components/palletCalc/PalletCalcPage').then(m => ({ default: m.PalletCalcPage })));
+const SpreadsheetComparatorPage = React.lazy(() => import('./components/SpreadsheetComparatorPage').then(m => ({ default: m.SpreadsheetComparatorPage })));
+const TasksPage = React.lazy(() => import('./components/TasksPage').then(m => ({ default: m.TasksPage })));
 const FullManagerPage = React.lazy(() => import('./components/FullManagerPage'));
+const InventoryFullPage = React.lazy(() => import('./components/InventoryFullPage').then(m => ({ default: m.InventoryFullPage })));
+const AdminDashboardPage = React.lazy(() => import('./components/admin/AdminDashboardPage').then(m => ({ default: m.AdminDashboardPage })));
 const UserManagementPage = React.lazy(() => import('./components/UserManagementPage'));
 const SecurityPage = React.lazy(() => import('./components/SecurityPage'));
+// Integrations is lazy for the same reason every other module screen is: it pulls
+// the whole integration service and is opened by a minority of sessions.
+const IntegrationsPage = React.lazy(() => import('./components/integrations/IntegrationsPage').then(m => ({ default: m.IntegrationsPage })));
+const IntegrationsHubPage = React.lazy(() => import('./components/integrations/IntegrationsHubPage').then(m => ({ default: m.IntegrationsHubPage })));
+const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'));
+const AutomationsPage = React.lazy(() => import('./components/automation/AutomationsPage').then(m => ({ default: m.AutomationsPage })));
+// Diagnóstico da operação — opcional, nunca no caminho crítico da autenticação.
+const OperationDiagnostic = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.OperationDiagnostic })));
+const PrivacyLegalPage = React.lazy(() => import('./components/legal/PrivacyLegalPage').then(m => ({ default: m.PrivacyLegalPage })));
+const DiagnosticInvite = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.DiagnosticInvite })));
+// Lazy: pulls the intelligence engines and only renders on the dashboard tab.
+const ErpIntelligenceSection = React.lazy(() => import('./components/intelligence/ErpIntelligenceSection').then(m => ({ default: m.ErpIntelligenceSection })));
 const NFeConferencePage = React.lazy(() => import('./components/nfe/NFeConferencePage'));
+const NFeXmlLookupPage = React.lazy(() => import('./components/nfe/NFeXmlLookupPage'));
+const ProductivityTab = React.lazy(() => import('./components/productivity/ProductivityTab').then(m => ({ default: m.ProductivityTab })));
+const AcademyRouter = React.lazy(() => import('./components/academy/AcademyRouter').then(m => ({ default: m.AcademyRouter })));
+const CBCDashboardPage = React.lazy(() => import('./components/cbc/CBCDashboardPage').then(m => ({ default: m.CBCDashboardPage })));
+const RiskDashboardPage = React.lazy(() => import('./components/risk/RiskDashboardPage').then(m => ({ default: m.RiskDashboardPage })));
+const AbcXyzDashboardPage = React.lazy(() => import('./components/abcxyz/AbcXyzDashboardPage').then(m => ({ default: m.AbcXyzDashboardPage })));
+const WarehouseDigitalTwinPage = React.lazy(() => import('./components/slotting/WarehouseDigitalTwinPage').then(m => ({ default: m.WarehouseDigitalTwinPage })));
+const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardPage').then(m => ({ default: m.RcaDashboardPage })));
+const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
+const PurchaseOrdersPage = React.lazy(() => import('./components/purchaseOrders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
+const ReverseLogisticsPage = React.lazy(() => import('./components/reverseLogistics/ReverseLogisticsPage').then(m => ({ default: m.ReverseLogisticsPage })));
+const ProductBrandsPage = React.lazy(() => import('./components/productBrands/ProductBrandsPage').then(m => ({ default: m.ProductBrandsPage })));
+const AbcCurvePage = React.lazy(() => import('./components/abcCurve/AbcCurvePage').then(m => ({ default: m.AbcCurvePage })));
+const KnowledgeCenterPage = React.lazy(() => import('./components/account/KnowledgeCenterPage').then(m => ({ default: m.KnowledgeCenterPage })));
+const BlindScorePage = React.lazy(() => import('./components/analytics/BlindScorePage').then(m => ({ default: m.BlindScorePage })));
+const InventoryHealthPage = React.lazy(() => import('./components/analytics/InventoryHealthPage').then(m => ({ default: m.InventoryHealthPage })));
+const IaInsightsPage = React.lazy(() => import('./components/analytics/IaInsightsPage').then(m => ({ default: m.IaInsightsPage })));
+const AuditsAnalyticsPage = React.lazy(() => import('./components/analytics/AuditsAnalyticsPage').then(m => ({ default: m.AuditsAnalyticsPage })));
+const ApiKeysPage = React.lazy(() => import('./components/settings/ApiKeysPage').then(m => ({ default: m.ApiKeysPage })));
+const WebhooksPage = React.lazy(() => import('./components/settings/WebhooksPage').then(m => ({ default: m.WebhooksPage })));
+const LogsPage = React.lazy(() => import('./components/settings/LogsPage').then(m => ({ default: m.LogsPage })));
+const FiscalEntitiesPage = React.lazy(() => import('./components/settings/FiscalEntitiesPage').then(m => ({ default: m.FiscalEntitiesPage })));
+const WorkspacesSettingsPage = React.lazy(() => import('./components/settings/WorkspacesSettingsPage').then(m => ({ default: m.WorkspacesSettingsPage })));
+const ClosingResultsPage = React.lazy(() => import('./components/counting/ClosingResultsPage').then(m => ({ default: m.ClosingResultsPage })));
 
 const PageLoader = () => (
   <div className="flex items-center justify-center min-h-[60vh]">
-    <Loader2 size={32} className="animate-spin text-zinc-400" />
+    <Loader2 size={32} className="animate-spin text-accent" />
   </div>
 );
 
-interface StatCardProps {
-  title: string;
-  value: string | number;
-  subtitle?: string;
-  icon: LucideIcon;
-  colorClass: string;
+// Suspense fallback for the lazy-loaded LandingPage — color-matched to its
+// own bg-ink-950 root, no spinner/logo, to avoid a flash-of-white before
+// the chunk (which also carries Motion/GSAP) finishes loading.
+const LandingFallback = () => <div className="min-h-screen w-full bg-ink-950" />;
+
+// Severity reaches the UI through the icon tint (INSIGHT_ICON_TONE) and this
+// badge variant only — the title stays text-fg so the same signal isn't
+// repeated three times in one row.
+const SITUATION_SEVERITY_BADGE: Record<BlindAISituation['severity'], 'neutral' | 'warning' | 'danger'> = {
+  info: 'neutral',
+  warning: 'warning',
+  critical: 'danger',
+};
+
+function greetingPrefix(hour: number): string {
+  if (hour >= 5 && hour < 12) return 'Bom dia';
+  if (hour >= 12 && hour < 18) return 'Boa tarde';
+  return 'Boa noite';
 }
 
-const StatCard = ({ title, value, subtitle, icon: Icon, colorClass }: StatCardProps) => (
-  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5 flex flex-col">
-    <div className="flex justify-between items-start mb-2">
-      <h3 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">{title}</h3>
-      <div className={`p-2 rounded-lg ${colorClass}`}>
-        <Icon size={20} />
-      </div>
-    </div>
-    <div className="mt-2">
-      <span className="text-3xl font-bold text-zinc-900">{value}</span>
-    </div>
-    {subtitle && <p className="text-zinc-400 text-xs mt-2 font-medium">{subtitle}</p>}
-  </div>
-);
-
-interface OpCapa {
-  nome: string;
-  valor: string;
-  resp: string;
+/** Texto de saudação do cabeçalho do Dashboard ("Boa tarde, Victor"). */
+function greetingText(name: string | null): string {
+  const firstName = name?.trim().split(/\s+/)[0] ?? null;
+  const prefix = greetingPrefix(new Date().getHours());
+  return firstName ? `${prefix}, ${firstName}` : prefix;
 }
 
-const initialOpCapas: OpCapa[] = [
-  { nome: 'ESR', valor: '94,1%', resp: 'Davi' },
-  { nome: 'Dexnor', valor: '79,2%', resp: 'Jackson' },
-  { nome: 'X-Level', valor: '66,6%', resp: 'Jackson' },
-  { nome: 'Nillkin', valor: '64,1%', resp: 'Willian' },
-  { nome: 'GoCase Capas', valor: '51,8%', resp: 'Geovanna' },
-  { nome: 'Ringke', valor: '29,2%', resp: 'Leo' },
-  { nome: 'AZ Capas', valor: 'Andamento', resp: 'Giovani' },
-  { nome: 'DUX', valor: 'Andamento', resp: 'Davi' },
-];
-
-interface BrandRow {
-  id: string;
-  brand: string;
-  totalSku: number;
-  doneSku: number;
-  divergences: number;
-  progress: number;
-  accuracy: number | null;
-  status: string;
-}
-
-interface GlobalData {
-  tabela: BrandRow[];
-  totalSku: number;
-  totalDone: number;
-  totalDiv: number;
-  progresso: number;
-  acuracidade: number;
-  melhores: { nome: string; valor: string }[];
-  piores: { nome: string; valor: string }[];
-}
-
-// ── Mobile nav helper ─────────────────────────────────────────────────────────
-
-function MobileNavItem({ label, onClick, active, highlight }: { label: string; onClick: () => void; active?: boolean; highlight?: boolean }) {
-  return (
-    <button
-      onClick={onClick}
-      className={`w-full text-left px-3 py-2.5 rounded-lg text-sm font-medium transition-colors ${
-        highlight
-          ? 'bg-emerald-600 text-white hover:bg-emerald-500'
-          : active
-          ? 'bg-zinc-800 text-white'
-          : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-      }`}
-    >
-      {label}
-    </button>
-  );
+/** "Atualizado hoje às 14:32" / "Atualizado em 27/08 às 14:32" — a partir do
+ *  carimbo real da última leitura bem-sucedida (nunca um valor fixo). */
+function formatLastLoaded(atMs: number | null): string | null {
+  if (atMs == null) return null;
+  const at = new Date(atMs);
+  const now = new Date();
+  const time = at.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
+  const sameDay = at.toDateString() === now.toDateString();
+  if (sameDay) return `Atualizado hoje às ${time}`;
+  const date = at.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' });
+  return `Atualizado em ${date} às ${time}`;
 }
 
 function AppContent() {
-  const { profile, company, companyId, signOut } = useAuth();
+  const { user, profile, company, companyId, companies, switchCompany, switchingCompany, createWorkspace, refreshProfile, signOut } = useAuth();
+  const { theme, toggleTheme } = useTheme();
   const [activeTab, setActiveTab] = useState('dashboard');
+  // Logo do workspace (Configurações Avançadas → Workspaces) — bucket privado, então a URL
+  // de exibição é assinada e resolvida aqui para os 2 lugares que mostram o ícone do
+  // workspace fora daquela página: o avatar do seletor no topo do Sidebar e o dropdown
+  // de troca de workspace logo abaixo. Sem foto cadastrada, cai na inicial do nome (como já era).
+  const [workspaceLogoUrls, setWorkspaceLogoUrls] = useState<Record<string, string>>({});
+  useEffect(() => {
+    let cancelled = false;
+    const withLogo = [company, ...companies].filter((c): c is typeof companies[number] => !!c && !!c.logoPath);
+    Promise.all(withLogo.map(async c => [c.id, await getWorkspaceLogoSignedUrl(c.logoPath as string)] as const))
+      .then(entries => {
+        if (cancelled) return;
+        const next: Record<string, string> = {};
+        for (const [id, url] of entries) if (url) next[id] = url;
+        setWorkspaceLogoUrls(next);
+      });
+    return () => { cancelled = true; };
+  }, [company, companies]);
+  // Transferência da ferramenta "Consulta e Download de XML/NFe" pra Conferência
+  // por NF-e: guarda o id da nota recém-encontrada só até a página consumir.
+  const [nfePendingInvoiceId, setNfePendingInvoiceId] = useState<string | null>(null);
+  // Mesmo padrão: o sino de notificações de tarefas (cabeçalho global) manda
+  // abrir uma tarefa específica dentro de Meu Trabalho — guarda o id só até a
+  // página consumir.
+  const [tasksPendingOpenId, setTasksPendingOpenId] = useState<string | null>(null);
+  const taskNotifications = useTaskNotifications(profile?.id);
+
+  // ── Diagnóstico da operação ───────────────────────────────────────────────
+  // Lido do metadata do próprio usuário, que o AuthProvider já carregou — nenhuma
+  // consulta extra só para decidir se o convite aparece. Quem já respondeu não
+  // vê mais o convite; "Agora não" só vale para a sessão atual (nunca persiste),
+  // então um novo motivo (ex.: nova tentativa de função bloqueada) pode reabrir o
+  // aviso mesmo depois de dispensado. O espaço fixo do topo do dashboard nunca é
+  // do diagnóstico — é sempre "Meus Atalhos"; o diagnóstico, quando elegível,
+  // aparece como um aviso à parte (ver evaluateDiagnosticEligibility).
+  const diagnosticRecord = useMemo(
+    () => readCompletedDiagnostic(user?.user_metadata as Record<string, unknown> | undefined),
+    [user?.user_metadata]
+  );
+  const [diagnosticDone, setDiagnosticDone] = useState(false);
+  const [diagnosticDismissed, setDiagnosticDismissed] = useState(false);
+  const [dashboardProductCount, setDashboardProductCount] = useState<number | null>(null);
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelled = false;
+    supabase.from('products').select('id', { count: 'exact', head: true }).then(({ count }) => {
+      if (!cancelled) setDashboardProductCount(count ?? null);
+    });
+    return () => { cancelled = true; };
+  }, [companyId]);
+  const diagnosticEligibility = evaluateDiagnosticEligibility({
+    diagnosticCompleted: diagnosticRecord != null || diagnosticDone,
+    companyCreatedAt: company?.createdAt ?? null,
+    productCount: dashboardProductCount,
+    hasBlockedFeatureInterest: readBlockedFeatureInterest() != null,
+  });
+  const showDiagnosticInvite = diagnosticEligibility.eligible && !diagnosticDismissed;
 
   const [brandsData, setBrandsData] = useState<BrandData[]>([]);
   const [topVendas, setTopVendas] = useState<TopVenda[]>([]);
   const [customKPIs, setCustomKPIs] = useState<CustomKPI[]>([]);
-  const [opCapas] = useState<OpCapa[]>(initialOpCapas);
+  const [operatorStats, setOperatorStats] = useState<UserProductivityStats[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [showAddBrandModal, setShowAddBrandModal] = useState(false);
-  const [showAddKPIModal, setShowAddKPIModal] = useState(false);
 
   const isLoggedIn = canManageUsers(profile?.role);
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [adminUser] = useState('');
-  const [adminPass] = useState('');
-  const [loginError] = useState(false);
+  // Per-device only — same rationale as workspacePrefs.ts (remembered workspace):
+  // whether the sidebar is collapsed is a device convenience, not an account setting.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
+    try { return localStorage.getItem('ib-sidebar-collapsed') === 'true'; } catch { return false; }
+  });
+  const toggleSidebarCollapsed = () => {
+    setSidebarCollapsed(prev => {
+      const next = !prev;
+      try { localStorage.setItem('ib-sidebar-collapsed', String(next)); } catch { /* private browsing, etc. */ }
+      return next;
+    });
+  };
+  // Escape closes the mobile nav drawer, matching its button/overlay close paths.
+  useEffect(() => {
+    if (!mobileOpen) return;
+    const handleEscape = (e: KeyboardEvent) => { if (e.key === 'Escape') setMobileOpen(false); };
+    document.addEventListener('keydown', handleEscape);
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [mobileOpen]);
   const { canInstall, hasPrompt, promptInstall } = usePWAInstall();
   const [showInstallModal, setShowInstallModal] = useState(false);
 
   const [newBrandName, setNewBrandName] = useState('');
   const [newBrandTotalSku, setNewBrandTotalSku] = useState('');
 
-  const [countBrand, setCountBrand] = useState('');
-  const [countSkusContabilizados, setCountSkusContabilizados] = useState('');
-  const [countDivergences, setCountDivergences] = useState('');
-  const [countSuccess, setCountSuccess] = useState(false);
-
-  const [newKPI, setNewKPI] = useState<Omit<CustomKPI, 'id' | 'order_index' | 'created_at' | 'updated_at'>>({
-    titulo: '',
-    valor: '',
-    unidade: '',
-    variacao: '',
-    tipo_variacao: 'up',
-    cor_icone: 'blue'
-  });
-
   // History states
   const [snapshots, setSnapshots] = useState<InventorySnapshot[]>([]);
   const [showHistoryModal, setShowHistoryModal] = useState(false);
-  const [showResetModal, setShowResetModal] = useState(false);
   const [selectedSnapshot, setSelectedSnapshot] = useState<InventorySnapshot | null>(null);
   const [snapshotBrands, setSnapshotBrands] = useState<InventoryBrandHistory[]>([]);
-  const [resetProgress, setResetProgress] = useState(false);
-  const [inventoryStartDate, setInventoryStartDate] = useState<string | null>(null);
 
   // Load data from Supabase
-  useEffect(() => {
+  // lastLoadedAt: só para o metadado "Atualizado às ..." do cabeçalho do
+  // Dashboard — carimbo do momento real da última leitura bem-sucedida, nunca
+  // um valor fixo. Extraído para useCallback (mesma query de sempre, sem
+  // mudança de lógica) só para que o botão de atualizar do Dashboard possa
+  // chamar a mesma função do efeito inicial.
+  const [lastLoadedAt, setLastLoadedAt] = useState<number | null>(null);
+  // Universo do inventário ativo, uma linha por agrupamento (migration 112). É a fonte
+  // única do Dashboard: os produtos do catálogo com a linha que a classificação já
+  // gravou. Não há segunda taxonomia de reserva — `brandsData` abaixo serve apenas as
+  // telas de contagem agregada e o fechamento, nunca os indicadores do Dashboard.
+  const [lineUniverse, setLineUniverse] = useState<CycleLineSummary[]>([]);
+  const loadData = useCallback(async () => {
     if (!companyId) {
       setLoading(false);
       return;
     }
-    async function loadData() {
-      try {
-        setLoading(true);
+    try {
+      setLoading(true);
 
-        const [brandsRes, vendasRes, kpisRes] = await Promise.all([
-          supabase.from('inventory_brands').select('id, brand, total_sku, done_sku, divergences, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
-          supabase.from('top_vendas').select('id, produto, sku, vendas, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
-          supabase.from('custom_kpis').select('id, titulo, valor, unidade, variacao, tipo_variacao, cor_icone, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index')
-        ]);
+      const [brandsRes, vendasRes, kpisRes, operatorStatsRes] = await Promise.all([
+        supabase.from('inventory_brands').select('id, brand, total_sku, done_sku, divergences, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
+        supabase.from('top_vendas').select('id, produto, sku, vendas, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
+        supabase.from('custom_kpis').select('id, titulo, valor, unidade, variacao, tipo_variacao, cor_icone, order_index, created_at, updated_at, company_id').eq('company_id', companyId).order('order_index'),
+        getTeamProductivity(companyId)
+      ]);
 
-        if (brandsRes.error) throw brandsRes.error;
-        if (vendasRes.error) throw vendasRes.error;
-        if (kpisRes.error) throw kpisRes.error;
+      if (brandsRes.error) throw brandsRes.error;
+      if (vendasRes.error) throw vendasRes.error;
+      if (kpisRes.error) throw kpisRes.error;
 
-        setBrandsData(brandsRes.data || []);
-        setTopVendas(vendasRes.data || []);
-        setCustomKPIs(kpisRes.data || []);
+      setBrandsData(brandsRes.data || []);
+      setTopVendas(vendasRes.data || []);
+      setCustomKPIs(kpisRes.data || []);
+      setOperatorStats(operatorStatsRes);
 
-        // Set inventory start date from oldest brand creation
-        if (brandsRes.data && brandsRes.data.length > 0) {
-          const oldestDate = brandsRes.data.reduce((min, b) => {
-            const created = new Date(b.created_at);
-            return created < min ? created : min;
-          }, new Date());
-          setInventoryStartDate(oldestDate.toISOString());
-        }
+      // O Dashboard lê a view de agrupamento, nunca os itens um a um.
+      setLineUniverse(await listLineUniverse(companyId));
 
-        setError(null);
-      } catch (err) {
-        console.error('Error loading data:', err);
-        setError('Falha ao carregar dados. Tente recarregar a página.');
-      } finally {
-        setLoading(false);
-      }
+      setError(null);
+      setLastLoadedAt(Date.now());
+    } catch (err) {
+      console.error('Error loading data:', err);
+      setError('Falha ao carregar dados. Tente recarregar a página.');
+    } finally {
+      setLoading(false);
     }
-
-    loadData();
   }, [companyId]);
+
+  useEffect(() => {
+    loadData();
+  }, [loadData]);
+
+  // Conexões de integração — carregado uma vez para o Dashboard (item
+  // "Conectar o estoque do ERP" em Prioridades agora + card condensado de
+  // Saúde e integrações). Mesma consulta que IntegrationsPage já usa
+  // (listConnections, escopada por RLS); null = ainda carregando ou usuário
+  // sem permissão de sincronizar integrações, e nesse caso nenhum dos dois
+  // cartões afirma nada sobre conexão.
+  const [erpConnections, setErpConnections] = useState<IntegrationConnection[] | null>(null);
+  useEffect(() => {
+    if (!companyId || !canSyncIntegrations(profile?.role)) { setErpConnections(null); return; }
+    let cancelled = false;
+    listConnections()
+      .then(list => { if (!cancelled) setErpConnections(list); })
+      .catch(() => { if (!cancelled) setErpConnections([]); });
+    return () => { cancelled = true; };
+  }, [companyId, profile?.role]);
 
   // Load snapshots (history)
   const loadSnapshots = useCallback(async () => {
@@ -270,119 +395,6 @@ function AppContent() {
     }
   }, [companyId, loadSnapshots]);
 
-  // Archive current inventory and reset
-  const handleResetInventory = async (inventoryName: string, notes: string) => {
-    setResetProgress(true);
-
-    try {
-      // Calculate current stats
-      const totalSku = brandsData.reduce((sum, b) => sum + b.total_sku, 0);
-      const totalDone = brandsData.reduce((sum, b) => sum + b.done_sku, 0);
-      const totalDivergences = brandsData.reduce((sum, b) => sum + b.divergences, 0);
-      const progress = totalSku > 0 ? (totalDone / totalSku) * 100 : 0;
-      const accuracy = totalDone > 0 ? ((totalDone - totalDivergences) / totalDone) * 100 : 0;
-
-      // Create snapshot
-      const { data: snapshotData, error: snapshotError } = await supabase
-        .from('inventory_snapshots')
-        .insert({
-          company_id: companyId,
-          name: inventoryName,
-          start_date: inventoryStartDate || new Date().toISOString(),
-          end_date: new Date().toISOString(),
-          total_sku: totalSku,
-          total_done: totalDone,
-          total_divergences: totalDivergences,
-          progress,
-          accuracy,
-          status: 'completed',
-          notes
-        })
-        .select()
-        .single();
-
-      if (snapshotError || !snapshotData) throw snapshotError || new Error('Failed to create snapshot');
-
-      const snapshotId = snapshotData.id;
-
-      // Archive brands
-      const brandHistoryData = brandsData.map(b => {
-        const bProgress = b.total_sku > 0 ? (b.done_sku / b.total_sku) * 100 : 0;
-        const bAccuracy = b.done_sku > 0 ? ((b.done_sku - b.divergences) / b.done_sku) * 100 : null;
-        return {
-          snapshot_id: snapshotId,
-          brand: b.brand,
-          total_sku: b.total_sku,
-          done_sku: b.done_sku,
-          divergences: b.divergences,
-          progress: bProgress,
-          accuracy: bAccuracy,
-          status: bProgress >= 100 ? 'CONCLUÍDO' : 'ANDAMENTO'
-        };
-      });
-
-      await supabase.from('inventory_brand_history').insert(brandHistoryData);
-
-      // Archive KPIs
-      const kpiHistoryData = customKPIs.map(k => ({
-        snapshot_id: snapshotId,
-        titulo: k.titulo,
-        valor: k.valor,
-        unidade: k.unidade,
-        variacao: k.variacao,
-        tipo_variacao: k.tipo_variacao,
-        cor_icone: k.cor_icone
-      }));
-
-      if (kpiHistoryData.length > 0) {
-        await supabase.from('inventory_kpi_history').insert(kpiHistoryData);
-      }
-
-      // Archive Top Vendas
-      const topVendasHistoryData = topVendas.map(v => ({
-        snapshot_id: snapshotId,
-        produto: v.produto,
-        sku: v.sku,
-        vendas: v.vendas,
-        order_index: v.order_index
-      }));
-
-      if (topVendasHistoryData.length > 0) {
-        await supabase.from('inventory_top_vendas_history').insert(topVendasHistoryData);
-      }
-
-      // Reset brands data (keep brands but reset counts)
-      const resetData = brandsData.map(b => ({
-        id: b.id,
-        done_sku: 0,
-        divergences: 0,
-        updated_at: new Date().toISOString()
-      }));
-
-      for (const brand of resetData) {
-        await supabase
-          .from('inventory_brands')
-          .update({ done_sku: 0, divergences: 0, updated_at: new Date().toISOString() })
-          .eq('id', brand.id);
-      }
-
-      // Update local state
-      setBrandsData(prev => prev.map(b => ({ ...b, done_sku: 0, divergences: 0 })));
-      setInventoryStartDate(new Date().toISOString());
-
-      // Reload snapshots
-      await loadSnapshots();
-
-      setShowResetModal(false);
-      alert('Inventário arquivado e resetado com sucesso!');
-    } catch (err) {
-      console.error('Error resetting inventory:', err);
-      alert('Erro ao arquivar o inventário. Tente novamente.');
-    } finally {
-      setResetProgress(false);
-    }
-  };
-
   // View snapshot details
   const handleViewSnapshot = async (snapshot: InventorySnapshot) => {
     setSelectedSnapshot(snapshot);
@@ -394,338 +406,98 @@ function AppContent() {
     setSnapshotBrands(data || []);
   };
 
-  const globais: GlobalData = useMemo(() => {
-    let totalSkuGeral = 0;
-    let totalDoneGeral = 0;
-    let totalDivGeral = 0;
+  // Um só inventário: o universo é o catálogo atual agrupado pela linha que a
+  // classificação Marca > Linha já gravou em cada produto, e sobre ele entra o trabalho
+  // já concluído neste ciclo — que foi registrado por linha de contagem, antes da
+  // reorganização. O Dashboard não reclassifica nada e não conhece nome de linha nenhum:
+  // a lista de linhas é o que o inventário tiver. As fórmulas de progresso, acuracidade,
+  // divergência, ritmo e situação seguem sendo as de sempre: `computeGlobalStats`.
+  const globais = useMemo(
+    () => computeGlobalStats(cycleLinesAsBrandData(mergeCurrentCycleCounts(lineUniverse, brandsData).lines)),
+    [lineUniverse, brandsData]
+  );
 
-    const dataProcessada: BrandRow[] = brandsData.map(b => {
-      totalSkuGeral += b.total_sku;
-      totalDoneGeral += b.done_sku;
-      totalDivGeral += b.divergences;
-
-      const progress = b.total_sku > 0 ? Math.min(100, (b.done_sku / b.total_sku) * 100) : 0;
-      const accuracy = b.done_sku > 0 ? Math.max(0, ((b.done_sku - b.divergences) / b.done_sku) * 100) : null;
-
-      return {
-        id: b.id,
-        brand: b.brand,
-        totalSku: b.total_sku,
-        doneSku: b.done_sku,
-        divergences: b.divergences,
-        progress: progress,
-        accuracy: accuracy,
-        status: progress >= 100 ? 'CONCLUÍDO' : 'ANDAMENTO'
-      };
-    });
-
-    const progressoGeral = totalSkuGeral > 0 ? (totalDoneGeral / totalSkuGeral) * 100 : 0;
-    const acuracidadeGeral = totalDoneGeral > 0 ? Math.max(0, ((totalDoneGeral - totalDivGeral) / totalDoneGeral) * 100) : 0;
-
-    const concluidas = dataProcessada.filter(b => b.status === 'CONCLUÍDO' && b.accuracy !== null);
-    const concluidasOrdenadas = [...concluidas].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0));
-
-    const melhores = concluidasOrdenadas.slice(0, 10).map(b => ({ nome: b.brand, valor: `${b.accuracy?.toFixed(1)}%` }));
-    const piores = [...concluidasOrdenadas].reverse().map(b => ({ nome: b.brand, valor: `${b.accuracy?.toFixed(2)}%` }));
-
-    return {
-      tabela: dataProcessada,
-      totalSku: totalSkuGeral,
-      totalDone: totalDoneGeral,
-      totalDiv: totalDivGeral,
-      progresso: progressoGeral,
-      acuracidade: acuracidadeGeral,
-      melhores,
-      piores
-    };
-  }, [brandsData]);
-
-  const healthStatus = useMemo(() => {
-    const acc = globais.acuracidade;
-    if (acc >= 80) {
-      return { label: 'ÓTIMA', color: 'text-emerald-600', border: 'border-l-emerald-500', iconColor: 'text-emerald-500', icon: ShieldCheck };
-    } else if (acc >= 50) {
-      return { label: 'MEDIANA', color: 'text-amber-500', border: 'border-l-amber-500', iconColor: 'text-amber-500', icon: MinusCircle };
-    } else {
-      return { label: 'CRÍTICA', color: 'text-red-600', border: 'border-l-red-500', iconColor: 'text-red-500', icon: AlertTriangle };
+  /** Where an ERP-intelligence drill-down lands.
+   *
+   *  The section emits a typed target and knows nothing about tabs; this maps each
+   *  one to a destination. Targets without a dedicated screen yet go to the
+   *  integrations page, which is where the underlying data and its configuration
+   *  live — better than a dead click, and honest about where the work happens. */
+  const handleIntelligenceDrill = useCallback((target: DrillTarget) => {
+    switch (target) {
+      case 'missing_ean':
+      case 'missing_warehouse':
+        // The imported-products screen is where a catalogue gap gets fixed.
+        setActiveTab('products');
+        break;
+      case 'negative_stock':
+      case 'discrepancies':
+      case 'sync_log':
+      case 'adjustment_queue':
+      case 'integration_settings':
+      case 'minimum_stock_settings':
+        setActiveTab('integracoes');
+        break;
     }
-  }, [globais.acuracidade]);
+  }, []);
 
-  // AI Assistant states
+  // BlindAI states
   const [showAIChat, setShowAIChat] = useState(false);
   const [aiMessages, setAiMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string }>>([]);
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
-  const [aiInsights, setAiInsights] = useState<string[]>([]);
+  const [situations, setSituations] = useState<BlindAISituation[]>([]);
+  const [situationsLoading, setSituationsLoading] = useState(false);
 
-  // Generate automatic insights based on data
-  const generateInsights = useCallback(() => {
-    const insights: string[] = [];
-
-    // Progress analysis
-    if (globais.progresso < 30) {
-      insights.push(`📊 O progresso geral está em ${globais.progresso.toFixed(1)}%. Considere aumentar a equipe ou focar nas linhas com maior volume.`);
-    } else if (globais.progresso > 80) {
-      insights.push(`🎉 Inventário quase completo! ${globais.progresso.toFixed(1)}% concluído. Prepare-se para a revisão final.`);
-    }
-
-    // Accuracy analysis
-    if (globais.acuracidade < 50) {
-      insights.push(`⚠️ Acuracidade baixa (${globais.acuracidade.toFixed(1)}%). Revise o processo de contagem e considere recontagem das linhas críticas.`);
-    } else if (globais.acuracidade >= 80) {
-      insights.push(`✅ Excelente acuracidade de ${globais.acuracidade.toFixed(1)}%! O inventário está bem controlado.`);
-    }
-
-    // Divergence analysis
-    const divRate = globais.totalDone > 0 ? (globais.totalDiv / globais.totalDone) * 100 : 0;
-    if (divRate > 5) {
-      insights.push(`🔍 Taxa de divergência alta: ${divRate.toFixed(1)}%. Analise as causas: erros de contagem, produtos vencidos ou danificados.`);
-    }
-
-    // Identify bottleneck lines
-    const slowLines = globais.tabela.filter(l => l.progress < 50 && l.status === 'ANDAMENTO');
-    if (slowLines.length > 0) {
-      const worstLine = slowLines.reduce((min, l) => l.progress < min.progress ? l : min, slowLines[0]);
-      insights.push(`🐌 "${worstLine.brand}" está com progresso de apenas ${worstLine.progress.toFixed(1)}%. Priorize esta linha.`);
-    }
-
-    // Best performing lines
-    const completedLines = globais.tabela.filter(l => l.status === 'CONCLUÍDO' && l.accuracy !== null);
-    if (completedLines.length > 3) {
-      const topLines = [...completedLines].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).slice(0, 3);
-      insights.push(`🏆 Top 3 linhas mais precisas: ${topLines.map(l => `${l.brand} (${l.accuracy?.toFixed(1)}%)`).join(', ')}`);
-    }
-
-    // Pending volume alert
-    const pending = globais.totalSku - globais.totalDone;
-    if (pending > 0) {
-      const avgDaily = 48;
-      const estimatedDays = Math.ceil(pending / avgDaily);
-      insights.push(`⏱️ ${pending.toLocaleString()} SKUs pendentes. Estimativa: ${estimatedDays} dias restantes (média ${avgDaily} SKUs/dia).`);
-    }
-
-    setAiInsights(insights.length > 0 ? insights : ['📈 Sistema operando normalmente. Nenhum alerta crítico detectado.']);
-  }, [globais]);
+  const loadSituations = useCallback(() => {
+    if (!companyId) return;
+    setSituationsLoading(true);
+    getBlindAISituations(companyId)
+      .then(setSituations)
+      .finally(() => setSituationsLoading(false));
+  }, [companyId]);
 
   useEffect(() => {
-    generateInsights();
-  }, [generateInsights]);
+    loadSituations();
+  }, [loadSituations]);
 
-  // AZBot I.A - Context about AZ ByGocase and GoCase
-  const AZBOT_CONTEXT = `
-    AZBot I.A é o assistente virtual da AZ ByGocase, empresa do grupo GoCase.
+  // Sugestões contextuais: só oferece uma pergunta se o dado por trás dela existir de
+  // verdade (ver generateContextualSuggestions em blindAIAgentAlgorithm.ts).
+  const aiSuggestions = useMemo(
+    () => getContextualSuggestions({ situations, globais }),
+    [situations, globais]
+  );
 
-    **Sobre o Grupo GoCase:**
-    - GoCase é uma empresa brasileira referência em capas e acessórios para smartphones
-    - Produtos: capas anti-impacto, garrafas térmicas, mochilas, bolsas, correias, acessórios tech
-    - Linha Pet com produtos para animais
-    - Presença em Marketplace: Mercado Livre, Amazon, Shopee, TikTok Shop
-    - Site oficial: gocase.com.br
-
-    **Sobre a AZ ByGocase:**
-    - Marca do grupo GoCase focada em produtos minimalistas
-    - Conecte-se com estilo - design, minimalismo e funcionalidade
-    - Produtos: capas, bolsas, térmicos e acessórios
-    - Venda em atacado e varejo
-    - Canais: Mercado Livre, Shopee, Amazon, TikTok Shop
-    - Instagram: @azbygocase
-
-    **Marcas do Grupo:**
-    - Gocase - linha principal de capas e acessórios
-    - AZ by Gocase - linha minimalista
-    - Godaily - produtos minimalistas para o dia a dia
-
-    **Linhas de Produtos mais vendidos:**
-    - ESR, Dexnor, X-Level, Nillkin, GoCase Capas, Ringke, AZ Capas, DUX
-  `;
-
-  // AI Assistant response generator
-  const generateAIResponse = (question: string): string => {
-    const q = question.toLowerCase();
-
-    // Company questions - GoCase/AZ
-    if (q.includes('gocase') || q.includes('go case') || q.includes('a empresa')) {
-      return `📱 **Sobre o Grupo GoCase**\n\n` +
-        `A GoCase é uma empresa brasileira referência em capas e acessórios para smartphones!\n\n` +
-        `**Produtos principais:**\n` +
-        `• Capas anti-impacto (Slim, Air, Glitter, Duo)\n` +
-        `• Garrafas térmicas\n` +
-        `• Mochilas e bolsas\n` +
-        `• Gostrap (correias)\n` +
-        `• Linha Pet\n\n` +
-        `**Canais de venda:**\n` +
-        `• Site: gocase.com.br\n` +
-        `• Mercado Livre, Amazon, Shopee, TikTok Shop\n\n` +
-        `💡 O inventário controla o estoque desses produtos!`;
-    }
-
-    // AZ ByGocase questions
-    if (q.includes('az') || q.includes('bygocase') || q.includes('az by')) {
-      return `✨ **Sobre a AZ ByGocase**\n\n` +
-        `A AZ é a linha minimalista do grupo GoCase!\n\n` +
-        `**Conceito:** Design, Minimalismo e Funcionalidade\n` +
-        `"Conecte-se com estilo"\n\n` +
-        `**Produtos:**\n` +
-        `• Capas minimalistas\n` +
-        `• Bolsas\n` +
-        `• Térmicos\n` +
-        `• Acessórios tech\n\n` +
-        `**Canais:** Mercado Livre, Shopee, Amazon, TikTok Shop\n` +
-        `Instagram: @azbygocase\n\n` +
-        `📊 Este inventário ajuda a manter o controle de estoque da AZ!`;
-    }
-
-    // Product lines questions
-    if (q.includes('linhas') || q.includes('marcas') || q.includes('esr') || q.includes('dexnor') || q.includes('nillkin') || q.includes('ringke')) {
-      const linhasProgress = globais.tabela.map(l =>
-        `• ${l.brand}: ${l.progress.toFixed(1)}% | ${l.status}`
-      ).join('\n');
-
-      return `📦 **Linhas/Marcas no Inventário**\n\n` +
-        `These são as principais linhas de produtos:\n\n` +
-        `**Marcas parceiras:**\n` +
-        `• ESR - Capas premium\n` +
-        `• Dexnor - Proteção anti-impacto\n` +
-        `• X-Level - Capas esportivas\n` +
-        `• Nillkin - Acessórios tech\n` +
-        `• Ringke - Design premium\n` +
-        `• GoCase Capas - Linha própria\n` +
-        `• AZ Capas - Minimalismo\n` +
-        `• DUX - Resistência\n\n` +
-        `**Status atual:**\n${linhasProgress}`;
-    }
-
-    // Progress questions
-    if (q.includes('progresso') || q.includes('andamento') || q.includes('como está')) {
-      return `📈 **Progresso Atual do Inventário AZ ByGocase**\n\n` +
-        `• Total: ${globais.progresso.toFixed(1)}% concluído\n` +
-        `• SKUs processados: ${globais.totalDone.toLocaleString()} de ${globais.totalSku.toLocaleString()}\n` +
-        `• Pendentes: ${(globais.totalSku - globais.totalDone).toLocaleString()} SKUs\n` +
-        `• Linhas em andamento: ${globais.tabela.filter(l => l.status === 'ANDAMENTO').length}\n` +
-        `• Linhas concluídas: ${globais.tabela.filter(l => l.status === 'CONCLUÍDO').length}\n\n` +
-        `🎯 Foco: manter acuracidade alta para garantir estoque correto nos marketplaces!`;
-    }
-
-    // Accuracy questions
-    if (q.includes('acuracidade') || q.includes('precisão') || q.includes('erro')) {
-      return `🎯 **Acuracidade do Inventário**\n\n` +
-        `• Acuracidade geral: ${globais.acuracidade.toFixed(1)}%\n` +
-        `• Total de divergências: ${globais.totalDiv}\n` +
-        `• Taxa de divergência: ${globais.totalDone > 0 ? ((globais.totalDiv / globais.totalDone) * 100).toFixed(2) : 0}%\n\n` +
-        `${globais.acuracidade >= 80 ? '✅ Status: Excelente! Inventário bem controlado.' : globais.acuracidade >= 50 ? '⚠️ Status: Mediano. Requer atenção.' : '🚨 Status: Crítico! Ação imediata necessária.'}\n\n` +
-        `📊 Uma boa acuracidade garante que os produtos estejam disponíveis nos marketplaces!`;
-    }
-
-    // Divergence questions
-    if (q.includes('divergência') || q.includes('divergencias')) {
-      const highDivLines = globais.tabela.filter(l => l.divergences > 10).sort((a, b) => b.divergences - a.divergences).slice(0, 5);
-      return `🔍 **Análise de Divergências**\n\n` +
-        `• Total de divergências: ${globais.totalDiv}\n` +
-        `• Linhas com mais divergências:\n${highDivLines.map(l => `  - ${l.brand}: ${l.divergences} divergências`).join('\n')}\n\n` +
-        `💡 Divergências podem afetar vendas nos marketplaces. Priorize a investigação!`;
-    }
-
-    // Best lines
-    if (q.includes('melhor') || q.includes('top') || q.includes('bom')) {
-      const completedLines = globais.tabela.filter(l => l.status === 'CONCLUÍDO' && l.accuracy !== null);
-      const top5 = [...completedLines].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).slice(0, 5);
-      return `🏆 **Top 5 Linhas por Acuracidade**\n\n` +
-        top5.map((l, i) => `${i + 1}. ${l.brand}: ${l.accuracy?.toFixed(1)}%`).join('\n') +
-        `\n\n✨ Parabéns à equipe responsável! Isso garante estoque preciso nos marketplaces.`;
-    }
-
-    // Worst lines / Attention needed
-    if (q.includes('pior') || q.includes('problema') || q.includes('atenção') || q.includes('crítico')) {
-      const problemLines = globais.tabela
-        .filter(l => l.accuracy !== null && l.accuracy < 70)
-        .sort((a, b) => (a.accuracy ?? 0) - (b.accuracy ?? 0))
-        .slice(0, 5);
-      const slowLines = globais.tabela
-        .filter(l => l.status === 'ANDAMENTO' && l.progress < 30)
-        .sort((a, b) => a.progress - b.progress);
-
-      return `⚠️ **Linhas que Precisam de Atenção**\n\n` +
-        `**Menores acuracidades:**\n${problemLines.map(l => `• ${l.brand}: ${l.accuracy?.toFixed(1)}%`).join('\n')}\n\n` +
-        `**Progresso lento:**\n${slowLines.map(l => `• ${l.brand}: ${l.progress.toFixed(1)}%`).join('\n')}\n\n` +
-        `💡 Ação sugerida: Revisar processos de contagem para não impactar vendas.`;
-    }
-
-    // Estimate / Time remaining
-    if (q.includes('quanto tempo') || q.includes('previsão') || q.includes('estimativa') || q.includes('terminar')) {
-      const pending = globais.totalSku - globais.totalDone;
-      const avgDaily = 48;
-      const daysRemaining = Math.ceil(pending / avgDaily);
-      const etaDate = new Date();
-      etaDate.setDate(etaDate.getDate() + daysRemaining);
-
-      return `⏱️ **Estimativa de Conclusão**\n\n` +
-        `• SKUs pendentes: ${pending.toLocaleString()}\n` +
-        `• Média diária: ~${avgDaily} SKUs\n` +
-        `• Dias estimados: ${daysRemaining} dias\n` +
-        `• Previsão de término: ${etaDate.toLocaleDateString('pt-BR', { day: 'numeric', month: 'long', year: 'numeric' })}\n\n` +
-        `${globais.progresso > 50 ? '✅ Mais da metade concluída!' : '📈 Acelere o ritmo para cumprir o prazo.'}`;
-    }
-
-    // Top sales
-    if (q.includes('vendas') || q.includes('vendidos') || q.includes('produto')) {
-      return `📦 **Top 10 Produtos mais Vendidos**\n\n` +
-        topVendas.slice(0, 5).map((v, i) => `${i + 1}. ${v.produto}\n   SKU: ${v.sku} | ${v.vendas} vendas`).join('\n\n') +
-        `\n\n📊 Esses produtos são essenciais para o inventário - priorize a contagem!`;
-    }
-
-    // Who are you / Help
-    if (q.includes('quem é você') || q.includes('quem e voce') || q.includes('seu nome') || q.includes('azbot')) {
-      return `🤖 **AZBot I.A**\n\n` +
-        `Olá! Sou o AZBot I.A, assistente virtual da AZ ByGocase!\n\n` +
-        `Fui criado para ajudar você e a equipe a:\n` +
-        `• 📊 Monitorar o progresso do inventário\n` +
-        `• 🎯 Analisar acuracidade e divergências\n` +
-        `• ⚠️ Identificar linhas críticas\n` +
-        `• ⏱️ Estimar prazos\n` +
-        `• 📦 Acompanhar produtos mais vendidos\n\n` +
-        `Tudo para manter o estoque da AZ ByGocase e GoCase preciso nos marketplaces!`;
-    }
-
-    // Help / what can you do
-    if (q.includes('ajuda') || q.includes('help') || q.includes('o que você faz') || q.includes('o que voce faz')) {
-      return `🤖 **AZBot I.A - Assistente da AZ ByGocase**\n\n` +
-        `Posso ajudar com:\n` +
-        `• 📊 Status do progresso\n` +
-        `• 🎯 Análise de acuracidade\n` +
-        `• 🔍 Divergências encontradas\n` +
-        `• 🏆 Linhas com melhor desempenho\n` +
-        `• ⚠️ Linhas críticas que precisam atenção\n` +
-        `• ⏱️ Previsão de término\n` +
-        `• 📦 Top produtos vendidos\n` +
-        `• 🏢 Informações sobre a GoCase e AZ ByGocase\n\n` +
-        `Digite sua pergunta!`;
-    }
-
-    // Default response
-    return `🤖 **AZBot I.A**\n\n` +
-      `Analisei sua pergunta sobre "${question}".\n\n` +
-      `📊 **Status Atual do Inventário AZ ByGocase:**\n` +
-      `• Progresso: ${globais.progresso.toFixed(1)}%\n` +
-      `• Acuracidade: ${globais.acuracidade.toFixed(1)}%\n` +
-      `• Divergências: ${globais.totalDiv}\n\n` +
-      `💡 Pergunte sobre progresso, acuracidade, linhas de produtos, ou informações da empresa!`;
-  };
-
+  // Leituras puras (progresso/acuracidade/melhores linhas/produtos mais vendidos) respondem
+  // na hora, sem custo de LLM. Qualquer outra pergunta — priorização, causa raiz, estratégia,
+  // follow-ups, perguntas gerais de logística/e-commerce ou sobre o próprio SaaS — vai para o
+  // agente real (Claude + tool-calling), rodando na Edge Function blindai-agent. O histórico
+  // enviado é o próprio transcript da conversa: essa é a memória do agente, não um objeto à parte.
   const handleSendAIMessage = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!aiInput.trim() || aiLoading) return;
+    if (!aiInput.trim() || aiLoading || !companyId) return;
 
     const userMessage = aiInput.trim();
     setAiInput('');
-    setAiMessages(prev => [...prev, { role: 'user', content: userMessage }]);
-    setAiLoading(true);
+    const nextMessages: ChatMessage[] = [...aiMessages, { role: 'user', content: userMessage }];
+    setAiMessages(nextMessages);
 
-    // Simulate processing delay for better UX
-    setTimeout(() => {
-      const response = generateAIResponse(userMessage);
-      setAiMessages(prev => [...prev, { role: 'assistant', content: response }]);
-      setAiLoading(false);
-    }, 500);
+    const fastAnswer = tryFastPath(userMessage, { globais, topVendas });
+    if (fastAnswer !== null) {
+      setAiMessages(prev => [...prev, { role: 'assistant', content: fastAnswer }]);
+      return;
+    }
+
+    setAiLoading(true);
+    askBlindAIAgent(nextMessages, companyId)
+      .then(reply => {
+        setAiMessages(prev => [...prev, { role: 'assistant', content: reply }]);
+      })
+      .catch(err => {
+        console.error('[BlindAI] Error answering question:', err);
+        setAiMessages(prev => [...prev, { role: 'assistant', content: err instanceof Error ? err.message : 'Não consegui consultar o agente agora. Tente novamente em instantes.' }]);
+      })
+      .finally(() => setAiLoading(false));
   };
 
   const handleAddBrand = async (e: React.FormEvent) => {
@@ -760,81 +532,13 @@ function AppContent() {
     setShowAddBrandModal(false);
   };
 
-  const handleSaveCount = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!countBrand || !countSkusContabilizados || countDivergences === '') return;
-
-    const brandToUpdate = brandsData.find(b => b.brand === countBrand);
-    if (!brandToUpdate) return;
-
-    const qtdContabilizada = parseInt(countSkusContabilizados);
-    const qtdDivergencias = parseInt(countDivergences);
-
-    const newDoneSku = Math.min(brandToUpdate.total_sku, brandToUpdate.done_sku + qtdContabilizada);
-    const newDivergences = brandToUpdate.divergences + qtdDivergencias;
-
-    const { error } = await supabase
-      .from('inventory_brands')
-      .update({
-        done_sku: newDoneSku,
-        divergences: newDivergences,
-        updated_at: new Date().toISOString()
-      })
-      .eq('id', brandToUpdate.id);
-
-    if (error) {
-      console.error('Error updating count:', error);
-      return;
-    }
-
-    setBrandsData(prevData => prevData.map(b => {
-      if (b.id === brandToUpdate.id) {
-        return {
-          ...b,
-          done_sku: newDoneSku,
-          divergences: newDivergences
-        };
-      }
-      return b;
-    }));
-
-    setCountSuccess(true);
-    setCountSkusContabilizados('');
-    setCountDivergences('');
-    setTimeout(() => setCountSuccess(false), 3000);
-  };
-
-  const handleUpdateTopVenda = useCallback(async (index: number, field: keyof TopVenda, value: string) => {
-    const item = topVendas[index];
-    if (!item) return;
-
-    const { error } = await supabase
-      .from('top_vendas')
-      .update({ [field]: value, updated_at: new Date().toISOString() })
-      .eq('id', item.id);
-
-    if (error) {
-      console.error('Error updating venda:', error);
-      return;
-    }
-
-    setTopVendas(prev => {
-      const newVendas = [...prev];
-      newVendas[index] = { ...newVendas[index], [field]: value };
-      return newVendas;
-    });
-  }, [topVendas]);
-
-  const handleAddKPI = async (e: React.FormEvent) => {
-    e.preventDefault();
-    if (!newKPI.titulo || !newKPI.valor) return;
-
+  const handleAddKPI = async (kpi: Omit<CustomKPI, 'id' | 'order_index' | 'created_at' | 'updated_at'>) => {
     const maxOrder = Math.max(0, ...customKPIs.map(k => k.order_index));
 
     const { data, error } = await supabase
       .from('custom_kpis')
       .insert({
-        ...newKPI,
+        ...kpi,
         company_id: companyId,
         order_index: maxOrder + 1
       })
@@ -848,16 +552,6 @@ function AppContent() {
     if (data) {
       setCustomKPIs([...customKPIs, data[0]]);
     }
-
-    setNewKPI({
-      titulo: '',
-      valor: '',
-      unidade: '',
-      variacao: '',
-      tipo_variacao: 'up',
-      cor_icone: 'blue'
-    });
-    setShowAddKPIModal(false);
   };
 
   const handleDeleteKPI = async (id: string) => {
@@ -874,22 +568,12 @@ function AppContent() {
     setCustomKPIs(customKPIs.filter(kpi => kpi.id !== id));
   };
 
-  const getIconColorClass = (cor: string) => {
-    switch (cor) {
-      case 'blue': return 'bg-blue-100 text-blue-700';
-      case 'red': return 'bg-red-100 text-red-700';
-      case 'amber': return 'bg-amber-100 text-amber-700';
-      case 'emerald': return 'bg-emerald-100 text-emerald-700';
-      default: return 'bg-zinc-100 text-zinc-700';
-    }
-  };
-
   if (loading) {
     return (
-      <div className="min-h-screen bg-zinc-100 flex items-center justify-center">
+      <div className="min-h-screen bg-surface flex items-center justify-center">
         <div className="text-center">
-          <Loader2 className="mx-auto animate-spin text-zinc-600" size={48} />
-          <p className="mt-4 text-zinc-600 font-medium">Carregando dados...</p>
+          <Loader2 className="mx-auto animate-spin text-fg-subtle" size={40} />
+          <p className="mt-4 text-fg-muted font-medium">Carregando dados...</p>
         </div>
       </div>
     );
@@ -897,14 +581,14 @@ function AppContent() {
 
   if (error) {
     return (
-      <div className="min-h-screen bg-zinc-100 flex items-center justify-center p-4">
-        <div className="bg-white rounded-xl shadow-sm border border-red-200 p-8 max-w-md text-center">
-          <AlertTriangle className="mx-auto text-red-500" size={48} />
-          <h2 className="mt-4 text-lg font-bold text-zinc-800">Erro ao carregar</h2>
-          <p className="mt-2 text-zinc-600">{error}</p>
+      <div className="min-h-screen bg-surface flex items-center justify-center p-4">
+        <div className="bg-surface-2 rounded-sheet border border-edge p-8 max-w-md text-center">
+          <AlertTriangle className="mx-auto text-red-500" size={40} />
+          <h2 className="mt-4 text-lg font-semibold text-fg">Erro ao carregar</h2>
+          <p className="mt-2 text-fg-muted">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-6 px-6 py-2 bg-zinc-900 text-white rounded-lg hover:bg-black transition"
+            className="mt-6 px-6 py-2 bg-accent text-white rounded-lg hover:bg-accent-strong transition"
           >
             Tentar novamente
           </button>
@@ -913,197 +597,428 @@ function AppContent() {
     );
   }
 
-  return (
-    <div className="min-h-screen bg-zinc-100 font-sans text-zinc-900 flex flex-col">
+  // As 3 seções abaixo (sectionLabel em cada primeiro grupo) são só uma camada visual —
+  // igual ao "Em breve" que já existia acima de financeiro-group. Nenhum id, onClick,
+  // rota ou permissão de item muda: só a posição do grupo no array e a legenda acima dele.
+  const navGroups: SidebarNavGroup[] = [
+    {
+      id: 'dashboard-group',
+      label: 'Dashboard',
+      sectionLabel: 'Visão Geral',
+      railSection: true,
+      icon: <LayoutDashboard />,
+      items: [
+        { id: 'dashboard', label: 'Dashboard',           icon: <LayoutDashboard />, onClick: () => { setActiveTab('dashboard'); setMobileOpen(false); }, active: activeTab === 'dashboard' },
+        { id: 'heatmap',   label: 'Heatmap',              icon: <Map />,             onClick: () => { setActiveTab('heatmap'); setMobileOpen(false); },   active: activeTab === 'heatmap' },
+        { id: 'kpis',      label: 'KPIs e Indicadores',   icon: <Target />,          onClick: () => { setActiveTab('kpis'); setMobileOpen(false); },      active: activeTab === 'kpis' },
+        { id: 'rankings',  label: 'Rankings',             icon: <Award />,           onClick: () => { setActiveTab('rankings'); setMobileOpen(false); },  active: activeTab === 'rankings' },
+        { id: 'closing-results', label: 'Resultados por Linha', icon: <FileBarChart2 />, onClick: () => { setActiveTab('closing-results'); setMobileOpen(false); }, active: activeTab === 'closing-results' },
+      ],
+    },
+    {
+      // Reposicionado de volta para "Visão Geral" (era o 3º grupo, sem sectionLabel
+      // próprio, visualmente dentro de "Operação Inteligente") — pedido explícito do
+      // usuário nesta conversa, revertendo a posição que uma sessão anterior tinha
+      // escolhido. Nenhum id/onClick/rota/permissão de item muda, só a posição.
+      id: 'analytics-group',
+      label: 'Analytics',
+      icon: <Gauge />,
+      items: [
+        { id: 'analytics-blindscore', label: 'BlindScore',             icon: <Gauge />,     onClick: () => { setActiveTab('analytics-blindscore'); setMobileOpen(false); }, active: activeTab === 'analytics-blindscore' },
+        { id: 'analytics-health',     label: 'Inventory Health Score', icon: <Activity />,  onClick: () => { setActiveTab('analytics-health'); setMobileOpen(false); },     active: activeTab === 'analytics-health' },
+        { id: 'analytics-ia',         label: 'IA Insights',            icon: <BarChart3 />, onClick: () => { setActiveTab('analytics-ia'); setMobileOpen(false); },         active: activeTab === 'analytics-ia' },
+        { id: 'analytics-audit',      label: 'Auditorias',             icon: <ShieldAlert />, onClick: () => { setActiveTab('analytics-audit'); setMobileOpen(false); },     active: activeTab === 'analytics-audit' },
+      ],
+    },
+    {
+      id: 'counting-group',
+      label: 'Operações',
+      sectionLabel: 'Operação Inteligente',
+      railSection: true,
+      icon: <SidebarFolderIcon />,
+      items: [
+        { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
+        { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
+        { id: 'purchase-orders', label: 'Ordens de Compra',    icon: <ShoppingCart />, onClick: () => { setActiveTab('purchase-orders'); setMobileOpen(false); }, active: activeTab === 'purchase-orders' },
+        { id: 'reverse-logistics', label: 'Logística Reversa', icon: <PackageX />,    onClick: () => { setActiveTab('reverse-logistics'); setMobileOpen(false); }, active: activeTab === 'reverse-logistics' },
+        { id: 'cbc',            label: 'Confidence Score',     icon: <Gauge />,       onClick: () => { setActiveTab('cbc'); setMobileOpen(false); },            active: activeTab === 'cbc' },
+        { id: 'risk',           label: 'Inventário por Risco', icon: <AlertTriangle />, onClick: () => { setActiveTab('risk'); setMobileOpen(false); },         active: activeTab === 'risk' },
+        { id: 'abcxyz',         label: 'Classificação ABC/XYZ', icon: <LayoutGrid />, onClick: () => { setActiveTab('abcxyz'); setMobileOpen(false); },   active: activeTab === 'abcxyz' },
+        { id: 'slotting',       label: 'Warehouse Digital Twin', icon: <Warehouse />, onClick: () => { setActiveTab('slotting'); setMobileOpen(false); },     active: activeTab === 'slotting' },
+        { id: 'rca',            label: 'Root Cause Analysis',  icon: <GitBranch />, onClick: () => { setActiveTab('rca'); setMobileOpen(false); },        active: activeTab === 'rca' },
+        { id: 'audit',          label: 'Auditoria de Estoque', icon: <SearchCheck />, onClick: () => { setActiveTab('audit'); setMobileOpen(false); },   active: activeTab === 'audit' },
+      ],
+    },
+    {
+      // Grupo próprio e destravado. Não reaproveitei o item 'config-automacoes' que
+      // existia em Configurações Avançadas porque aquele grupo tem lock de grupo — que
+      // torna todo item interno não-interativo.
+      id: 'automacoes-group',
+      label: 'Automações',
+      icon: <SidebarFolderIcon />,
+      items: [
+        { id: 'automacoes', label: 'Agentes e Automações', icon: <Workflow />, onClick: () => { setActiveTab('automacoes'); setMobileOpen(false); }, active: activeTab === 'automacoes' },
+      ],
+    },
+    {
+      id: 'products-group',
+      label: 'Produtos',
+      icon: <SidebarFolderIcon />,
+      items: [
+        { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet />, onClick: () => { setActiveTab('import'); setMobileOpen(false); },          active: activeTab === 'import' },
+        { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
+        { id: 'products',        label: 'Catálogo de Produtos',     icon: <Package />,         onClick: () => { setActiveTab('products'); setMobileOpen(false); },        active: activeTab === 'products' },
+        { id: 'product-brands',  label: 'Linhas e Marcas',          icon: <Tag />,             onClick: () => { setActiveTab('product-brands'); setMobileOpen(false); },  active: activeTab === 'product-brands' },
+        { id: 'abc-curve',       label: 'Curva ABC',                icon: <BarChart3 />,       onClick: () => { setActiveTab('abc-curve'); setMobileOpen(false); },       active: activeTab === 'abc-curve' },
+      ],
+    },
+    {
+      id: 'tools-group',
+      label: 'Ferramentas',
+      icon: <SidebarFolderIcon />,
+      items: [
+        { id: 'tasks',           label: 'Meu Trabalho',         icon: <ListTodo />, onClick: () => { setActiveTab('tasks'); setMobileOpen(false); },         active: activeTab === 'tasks' },
+        { id: 'nfe-xml-lookup',  label: 'Consulta e Download de XML/NFe', icon: <FileSearch />, onClick: () => { setActiveTab('nfe-xml-lookup'); setMobileOpen(false); }, active: activeTab === 'nfe-xml-lookup' },
+        { id: 'label-generator', label: 'Gerador de Etiquetas', icon: <Tag />, onClick: () => { setActiveTab('label-generator'); setMobileOpen(false); }, active: activeTab === 'label-generator' },
+        ...(hasPermission(profile?.role, 'labels.use') ? [{ id: 'barcode-lab', label: 'Códigos de Barras', icon: <Barcode />, onClick: () => { setActiveTab('barcode-lab'); setMobileOpen(false); }, active: activeTab === 'barcode-lab' }] : []),
+        { id: 'spreadsheet-comparator', label: 'Comparador de Planilhas', icon: <GitCompareArrows />, onClick: () => { setActiveTab('spreadsheet-comparator'); setMobileOpen(false); }, active: activeTab === 'spreadsheet-comparator' },
+        { id: 'pdf-center',      label: 'Central de PDFs',       icon: <FileStack />, onClick: () => { setActiveTab('pdf-center'); setMobileOpen(false); },    active: activeTab === 'pdf-center' },
+        { id: 'pallet-calc',     label: 'Calculadora de Paletização', icon: <Grid3x3 />, onClick: () => { setActiveTab('pallet-calc'); setMobileOpen(false); }, active: activeTab === 'pallet-calc' },
+        { id: 'full-manager',    label: 'Full Manager',         icon: <ClipboardCheck />, onClick: () => { setActiveTab('full-manager'); setMobileOpen(false); },    active: activeTab === 'full-manager' },
+        { id: 'inventoryfull',   label: 'InventoryFull',        icon: <Monitor />, onClick: () => { setActiveTab('inventoryfull'); setMobileOpen(false); },     active: activeTab === 'inventoryfull' },
+      ],
+    },
+    {
+      id: 'academy-group',
+      label: 'I.B Academy',
+      sectionLabel: 'Aprendizado e Gestão',
+      railSection: true,
+      icon: <GraduationCap />,
+      items: [
+        { id: 'academy', label: 'I.B Academy', icon: <GraduationCap />, onClick: () => { setActiveTab('academy'); setMobileOpen(false); }, active: activeTab === 'academy' },
+      ],
+    },
+    {
+      id: 'account-group',
+      label: 'Minha Conta',
+      icon: <User />,
+      items: [
+        { id: 'conta', label: 'Produtividade', icon: <User />, onClick: () => { setActiveTab('conta'); setMobileOpen(false); }, active: activeTab === 'conta' },
+        { id: 'knowledge', label: 'Recursos e Conhecimento', icon: <BookOpen />, onClick: () => { setActiveTab('knowledge'); setMobileOpen(false); }, active: activeTab === 'knowledge' },
+        // Entrada permanente: quem já usava o sistema antes do diagnóstico existir
+        // acha por aqui, e quem já respondeu pode refazer quando a operação mudar.
+        { id: 'diagnostico', label: 'Diagnóstico da operação', icon: <ClipboardList />, onClick: () => { setActiveTab('diagnostico'); setMobileOpen(false); }, active: activeTab === 'diagnostico' },
+        // Visível para todo papel: são os documentos e os direitos do próprio
+        // usuário, não uma função administrativa.
+        { id: 'legal', label: 'Privacidade e Legal', icon: <ShieldCheck />, onClick: () => { setActiveTab('legal'); setMobileOpen(false); }, active: activeTab === 'legal' },
+      ],
+    },
+    {
+      id: 'admin-group',
+      label: 'Administração',
+      icon: <Lock />,
+      items: [
+        { id: 'admin', label: 'Acesso Administrativo', icon: <Lock />, onClick: () => { setActiveTab('admin'); setMobileOpen(false); }, active: activeTab === 'admin' },
+        ...(canManageUsers(profile?.role) ? [{ id: 'users', label: 'Usuários', icon: <UserCog />, onClick: () => { setActiveTab('users'); setMobileOpen(false); }, active: activeTab === 'users' }] : []),
+        ...(hasPermission(profile?.role, 'security.view') ? [{ id: 'security', label: 'Segurança', icon: <ShieldCheck />, onClick: () => { setActiveTab('security'); setMobileOpen(false); }, active: activeTab === 'security' }] : []),
+      ],
+    },
+    {
+      // Um item só, abrindo o Hub de Integrações (catálogo + "Minhas
+      // integrações"). O fluxo de gestão do Tiny propriamente dito continua na
+      // tab 'integracoes' de sempre — o Hub só leva até ela — então nenhum
+      // destino existente (inclusive os drill-throughs do Dashboard que apontam
+      // para 'integracoes') muda de lugar.
+      id: 'integracoes-group',
+      label: 'Integrações',
+      icon: <Plug />,
+      items: [
+        { id: 'integracoes-hub', label: 'Integrações', icon: <Plug />, onClick: () => { setActiveTab('integracoes-hub'); setMobileOpen(false); }, active: activeTab === 'integracoes-hub' || activeTab === 'integracoes' },
+      ],
+    },
+    {
+      // Destravado por papel (mesmo mecanismo de group.locked já usado em
+      // Integrações/Financeiro) em vez de travado fixo: quem administra a
+      // conta (owner/admin) vê os 3 itens funcionais; os demais veem o grupo
+      // com cadeado, igual a qualquer outro grupo bloqueado.
+      id: 'config-avancada-group',
+      label: 'Configurações Avançadas',
+      locked: !canManageUsers(profile?.role),
+      icon: <Code2 />,
+      items: [
+        { id: 'config-api',      label: 'API',      icon: <Code2 />,    onClick: () => { setActiveTab('config-api'); setMobileOpen(false); },      active: activeTab === 'config-api' },
+        { id: 'config-webhooks', label: 'Webhooks', icon: <Webhook />,  onClick: () => { setActiveTab('config-webhooks'); setMobileOpen(false); }, active: activeTab === 'config-webhooks' },
+        { id: 'config-logs',     label: 'Logs',      icon: <FileText />, onClick: () => { setActiveTab('config-logs'); setMobileOpen(false); },     active: activeTab === 'config-logs' },
+        { id: 'config-empresas-fiscais', label: 'Empresas e Dados Fiscais', icon: <Building2 />, onClick: () => { setActiveTab('config-empresas-fiscais'); setMobileOpen(false); }, active: activeTab === 'config-empresas-fiscais' },
+        { id: 'config-workspaces', label: 'Workspaces', icon: <Layers />, onClick: () => { setActiveTab('config-workspaces'); setMobileOpen(false); }, active: activeTab === 'config-workspaces' },
+      ],
+    },
+  ];
 
-      {/* ── TOP NAVIGATION ────────────────────────────────────────────────── */}
-      <header className="fixed top-0 left-0 right-0 z-[1000] bg-zinc-950 border-b border-zinc-800/70">
+  const sidebarHeader = (
+    <div className="space-y-3">
+      <div className="flex items-center gap-2 px-1">
+        <div className="w-7 h-7 bg-accent/10 rounded-lg flex items-center justify-center flex-shrink-0">
+          <LogoMark size={15} className="text-accent" />
+        </div>
+        <span className="text-sm font-bold text-fg tracking-tight whitespace-nowrap select-none">
+          Inventory<span className="text-fg-subtle font-normal">Blind</span>
+        </span>
+      </div>
+      {company && (
+        <SafeDropdown
+          className="w-full"
+          trigger={
+            <button
+              disabled={switchingCompany}
+              className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-xl bg-surface-2/70 hover:bg-surface-3 border border-edge/70 transition-colors duration-200 disabled:opacity-60"
+            >
+              {workspaceLogoUrls[company.id] ? (
+                <img src={workspaceLogoUrls[company.id]} alt="" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
+              ) : (
+                <span className="w-6 h-6 rounded-md bg-accent flex items-center justify-center text-white text-[10px] font-semibold flex-shrink-0">
+                  {company.name.slice(0, 1).toUpperCase()}
+                </span>
+              )}
+              <span className="min-w-0 text-left leading-tight">
+                <span className="block truncate text-xs font-semibold text-fg">
+                  {switchingCompany ? 'Trocando...' : company.name}
+                </span>
+                <span className="block text-caption">Workspace</span>
+              </span>
+              {companies.length > 1 && (
+                <ChevronDown size={12} className="text-fg-subtle flex-shrink-0 ml-auto transition-transform duration-200 group-hover:translate-y-0.5" />
+              )}
+            </button>
+          }
+          items={[
+            ...companies.map(c => ({
+              id: c.id,
+              label: c.name,
+              icon: workspaceLogoUrls[c.id] ? (
+                <img src={workspaceLogoUrls[c.id]} alt="" className="w-5 h-5 rounded-md object-cover" />
+              ) : (
+                <span className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white text-[9px] font-semibold">
+                  {c.name.slice(0, 1).toUpperCase()}
+                </span>
+              ),
+              active: c.id === company.id,
+              onClick: () => switchCompany(c.id),
+            })),
+            {
+              id: 'add-company',
+              label: (
+                <span className="flex items-center gap-1.5">
+                  Adicionar empresa
+                  <span className="text-overline bg-surface-3 rounded px-1 py-0.5">Em breve</span>
+                </span>
+              ),
+              icon: <Plus size={14} />,
+              disabled: true,
+              divider: true,
+              onClick: () => {},
+            },
+          ]}
+        />
+      )}
+    </div>
+  );
 
-        {/* Main bar */}
-        <div className="h-14 max-w-screen-2xl mx-auto px-4 flex items-center">
+  // Compartilhado pelo trigger do header (userMenu) e pelo avatar do rodapé do
+  // Sidebar — mesmo menu, dois pontos de entrada, sem duplicar a lógica de permissão.
+  const userMenuItems = [
+    { id: 'conta', label: 'Minha Conta', icon: <User size={14} />, onClick: () => setActiveTab('conta') },
+    ...(hasPermission(profile?.role, 'security.view')
+      ? [{ id: 'config', label: 'Configurações', icon: <Settings size={14} />, onClick: () => setActiveTab('security') }]
+      : []),
+    {
+      id: 'theme',
+      label: theme === 'dark' ? 'Tema claro' : 'Tema escuro',
+      icon: theme === 'dark' ? <Sun size={14} /> : <Moon size={14} />,
+      onClick: toggleTheme,
+      divider: true,
+    },
+    { id: 'empresa', label: company?.name ?? 'Empresa', icon: <Building2 size={14} />, disabled: true, onClick: () => {} },
+    ...(canInstall ? [{ id: 'install', label: 'Instalar InventoryBlind', icon: <Download size={14} />, onClick: () => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } } }] : []),
+    { id: 'signout', label: 'Sair', icon: <LogOut size={14} />, onClick: signOut, divider: true },
+  ];
 
-          {/* Brand + Company */}
-          <div className="flex items-center gap-2 flex-shrink-0">
-            <div className="w-7 h-7 bg-emerald-500/15 rounded-lg flex items-center justify-center">
-              <BarChart3 size={15} className="text-emerald-400" />
-            </div>
-            <span className="text-sm font-bold text-white tracking-tight whitespace-nowrap select-none">
-              Inventory<span className="text-zinc-500 font-normal">Blind</span>
-            </span>
+  const userMenu = (
+    <SafeDropdown
+      trigger={
+        <button className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface-3/70 transition-colors duration-200">
+          <span
+            title={profile?.email ?? undefined}
+            className="relative w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 uppercase"
+          >
+            {(profile?.email ?? '?').slice(0, 1)}
+            <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-surface" />
+          </span>
+          <div className="hidden xl:block text-left leading-tight">
+            <p className="text-xs font-semibold text-fg">{profile?.email?.split('@')[0]}</p>
+            <p className="text-caption mt-0.5">{getRoleLabel(profile?.role ?? '')}</p>
           </div>
+          <ChevronDown size={12} className="text-fg-subtle hidden xl:block transition-transform duration-200 group-hover:translate-y-0.5" />
+        </button>
+      }
+      items={userMenuItems}
+    />
+  );
 
-          {company && (
-            <div className="ml-2.5 flex-shrink-0">
-              <button className="flex items-center gap-1 px-2 py-1 rounded-md bg-zinc-800/60 hover:bg-zinc-800 border border-zinc-700/40 text-[11px] font-semibold text-zinc-300 hover:text-white transition-colors">
-                {company.name}
-                <ChevronDown size={10} className="text-zinc-500 mt-px" />
-              </button>
-            </div>
-          )}
+  const railAvatar = (
+    <SafeDropdown
+      trigger={
+        <button
+          title={profile?.email ?? undefined}
+          className="relative w-9 h-9 flex-shrink-0 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-white uppercase focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+        >
+          {(profile?.email ?? '?').slice(0, 1)}
+          <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 ring-2 ring-surface-2" />
+        </button>
+      }
+      items={userMenuItems}
+    />
+  );
 
-          <div className="w-px h-5 bg-zinc-800 mx-3.5 flex-shrink-0 hidden md:block" />
+  return (
+    // data-app-shell scopes the authenticated app's reduced-motion rules in
+    // index.css — the Landing zone resolves motion itself and is excluded.
+    // pl/pr com os insets laterais: em landscape com notch a lateral esquerda do shell
+    // (a sidebar) ficava embaixo do recorte. Em portrait e no desktop os insets são 0.
+    <div
+      data-app-shell
+      className="h-screen bg-surface font-sans text-fg flex overflow-hidden pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)]"
+    >
 
-          {/* Desktop nav */}
-          <nav className="hidden md:flex items-center gap-0.5 flex-1 min-w-0">
+      {/* ── SIDEBAR (desktop) ─────────────────────────────────────────────── */}
+      {/* O toggle de visibilidade por breakpoint fica no wrapper, não na
+          className do Sidebar — passar "hidden md:flex" direto no elemento
+          colidiria com o `display: grid` que .ib-sidebar já define (mesma
+          especificidade, a última classe declarada no bundle vencia). */}
+      <div className="hidden md:block">
+      <Sidebar
+        groups={navGroups}
+        collapsed={sidebarCollapsed}
+        onToggleCollapsed={toggleSidebarCollapsed}
+        railHelp={{ icon: <HelpCircle size={17} />, label: 'Recursos e Conhecimento', onClick: () => setActiveTab('knowledge') }}
+        railAvatar={railAvatar}
+        workspace={company ? {
+          name: company.name,
+          label: 'Workspace',
+          logoUrl: workspaceLogoUrls[company.id],
+          menuItems: [
+            ...companies.map(c => ({
+              id: c.id,
+              label: c.name,
+              icon: workspaceLogoUrls[c.id] ? (
+                <img src={workspaceLogoUrls[c.id]} alt="" className="w-5 h-5 rounded-md object-cover" />
+              ) : (
+                <span className="w-5 h-5 rounded-md bg-accent flex items-center justify-center text-white text-[9px] font-semibold">
+                  {c.name.slice(0, 1).toUpperCase()}
+                </span>
+              ),
+              active: c.id === company.id,
+              onClick: () => switchCompany(c.id),
+            })),
+            {
+              id: 'add-company',
+              label: (
+                <span className="flex items-center gap-1.5">
+                  Adicionar empresa
+                  <span className="text-overline bg-surface-3 rounded px-1 py-0.5">Em breve</span>
+                </span>
+              ),
+              icon: <Plus size={14} />,
+              disabled: true,
+              divider: true,
+              onClick: () => {},
+            },
+          ],
+        } : undefined}
+        workspaceAvatar={company && (
+          workspaceLogoUrls[company.id] ? (
+            <img src={workspaceLogoUrls[company.id]} alt="" className="w-9 h-9 rounded-lg object-cover" />
+          ) : (
+            <span className="w-9 h-9 rounded-lg bg-accent flex items-center justify-center text-white text-sm font-semibold uppercase">
+              {company.name.slice(0, 1)}
+            </span>
+          )
+        )}
+      />
+      </div>
 
-            <button
-              onClick={() => setActiveTab('dashboard')}
-              className={`px-3 py-2 rounded-md text-sm font-medium transition-colors whitespace-nowrap flex-shrink-0 ${
-                activeTab === 'dashboard'
-                  ? 'text-white bg-zinc-800'
-                  : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-              }`}
-            >
-              Dashboard
-            </button>
-
-            <SafeDropdown
-              active={['heatmap','import','products','import-history','label-generator','full-manager','nfe-conference'].includes(activeTab)}
-              trigger={
-                <button className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  ['heatmap','import','products','import-history','label-generator','full-manager','nfe-conference'].includes(activeTab)
-                    ? 'text-white bg-zinc-800'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-                }`}>
-                  Operações <ChevronDown size={12} className="text-zinc-600" />
-                </button>
-              }
-              items={[
-                { id: 'heatmap',         label: 'Ver Heatmap',              icon: <Map size={14}/>,             onClick: () => setActiveTab('heatmap'),         active: activeTab === 'heatmap' },
-                { id: 'products',        label: 'Produtos Importados',      icon: <Package size={14}/>,         onClick: () => setActiveTab('products'),         active: activeTab === 'products' },
-                { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet size={14}/>, onClick: () => setActiveTab('import'),           active: activeTab === 'import' },
-                { id: 'import-history',  label: 'Histórico de Importações', icon: <History size={14}/>,         onClick: () => setActiveTab('import-history'),   active: activeTab === 'import-history', divider: true },
-                { id: 'label-generator', label: 'Gerador de Etiquetas',     icon: <Tag size={14}/>,             onClick: () => setActiveTab('label-generator'), active: activeTab === 'label-generator', divider: true },
-                { id: 'full-manager',    label: 'Full Manager',             icon: <Zap size={14}/>,             onClick: () => setActiveTab('full-manager'),     active: activeTab === 'full-manager', divider: true },
-                { id: 'nfe-conference',  label: 'Conferência por NF-e',     icon: <ScanLine size={14}/>,        onClick: () => setActiveTab('nfe-conference'),   active: activeTab === 'nfe-conference' },
-              ]}
-            />
-
-            <SafeDropdown
-              active={['kpis','rankings'].includes(activeTab)}
-              trigger={
-                <button className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  ['kpis','rankings'].includes(activeTab)
-                    ? 'text-white bg-zinc-800'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-                }`}>
-                  Análises <ChevronDown size={12} className="text-zinc-600" />
-                </button>
-              }
-              items={[
-                { id: 'kpis',     label: 'KPIs e Indicadores', icon: <Target size={14}/>, onClick: () => setActiveTab('kpis'),     active: activeTab === 'kpis' },
-                { id: 'rankings', label: 'Rankings',            icon: <Award size={14}/>,  onClick: () => setActiveTab('rankings'), active: activeTab === 'rankings' },
-              ]}
-            />
-
-            <SafeDropdown
-              active={['admin','users','security'].includes(activeTab)}
-              trigger={
-                <button className={`px-3 py-2 rounded-md text-sm font-medium transition-colors flex items-center gap-1.5 whitespace-nowrap ${
-                  ['admin','users','security'].includes(activeTab)
-                    ? 'text-white bg-zinc-800'
-                    : 'text-zinc-400 hover:text-white hover:bg-zinc-800/60'
-                }`}>
-                  Administração <ChevronDown size={12} className="text-zinc-600" />
-                </button>
-              }
-              items={[
-                { id: 'admin', label: 'Acesso Administrativo', icon: <Lock size={14}/>, onClick: () => setActiveTab('admin'), active: activeTab === 'admin' },
-                ...(canManageUsers(profile?.role) ? [{ id: 'users', label: 'Usuários', icon: <UserCog size={14}/>, onClick: () => setActiveTab('users'), active: activeTab === 'users' }] : []),
-                ...(hasPermission(profile?.role, 'security.view') ? [{ id: 'security', label: 'Segurança', icon: <ShieldCheck size={14}/>, onClick: () => setActiveTab('security'), active: activeTab === 'security' }] : []),
-              ]}
-            />
-          </nav>
-
-          {/* Right side */}
-          <div className="ml-auto flex items-center gap-1.5 pl-3">
-
-            {/* + Nova Contagem CTA */}
-            <button
-              onClick={() => { setActiveTab('input'); setMobileOpen(false); }}
-              className="hidden sm:flex items-center gap-1.5 px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 active:bg-emerald-700 text-white text-sm font-semibold rounded-lg transition-colors flex-shrink-0"
-            >
-              <Plus size={14} />
-              <span className="hidden lg:inline">Nova Contagem</span>
-              <span className="lg:hidden">Contar</span>
-            </button>
-
-            {/* User menu */}
-            <SafeDropdown
-              trigger={
-                <button className="flex items-center gap-2 pl-1 pr-2 py-1 rounded-lg hover:bg-zinc-800 transition-colors">
-                  <div className="w-7 h-7 rounded-full bg-emerald-700 flex items-center justify-center text-xs font-bold text-white flex-shrink-0 uppercase">
-                    {(profile?.email ?? '?').slice(0, 1)}
+      {/* ── SIDEBAR (mobile drawer) ──────────────────────────────────────── */}
+      {mobileOpen && (
+        <div className="md:hidden fixed inset-0 z-[1000] flex">
+          <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
+          <div className="relative z-10 flex h-full">
+            <Sidebar
+              groups={navGroups}
+              header={sidebarHeader}
+              hideRail
+              // O drawer é `fixed inset-0`: cobre a barra de status em cima e a barra de
+              // gesto embaixo. Sem os insets, o topo do menu ficava sob o relógio e o
+              // "Sair" do rodapé sob o home indicator. `box-border` já é global, então o
+              // padding cabe dentro do `h-full` e a `nav` interna encolhe sozinha.
+              className="pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
+              footer={
+                <div className="space-y-2">
+                  <div className="flex items-center justify-between px-1 pb-1">
+                    <span className="text-xs text-fg-muted">Tema</span>
+                    <ThemeToggle />
                   </div>
-                  <div className="hidden xl:block text-left leading-tight">
-                    <p className="text-xs font-medium text-zinc-200">{profile?.email?.split('@')[0]}</p>
-                    <p className="text-[10px] text-zinc-500">{getRoleLabel(profile?.role ?? '')}</p>
-                  </div>
-                  <ChevronDown size={12} className="text-zinc-600 hidden xl:block" />
-                </button>
+                  {canInstall && (
+                    <button
+                      onClick={() => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } setMobileOpen(false); }}
+                      className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors text-sm"
+                    >
+                      <Download size={15} /> Instalar InventoryBlind
+                    </button>
+                  )}
+                  <button onClick={signOut} className="flex items-center gap-2 w-full px-3 py-2 rounded-lg text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors text-sm">
+                    <LogOut size={15} /> Sair
+                  </button>
+                </div>
               }
-              items={[
-                { id: 'company', label: `Empresa: ${company?.name ?? '—'}`, icon: <Building2 size={14} />, onClick: () => {} },
-                ...(canInstall ? [{ id: 'install', label: 'Instalar InventoryBlind', icon: <Download size={14} />, onClick: () => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } } }] : []),
-                { id: 'signout', label: 'Sair',                             icon: <LogOut size={14} />,    onClick: signOut, divider: true },
-              ]}
             />
-
-            {/* Hamburger */}
             <button
-              onClick={() => setMobileOpen(o => !o)}
-              className="md:hidden p-2 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors"
+              onClick={() => setMobileOpen(false)}
+              className="absolute top-[calc(0.75rem+env(safe-area-inset-top))] left-full ml-2 p-2 rounded-lg bg-surface-2 border border-edge text-fg-muted"
             >
-              {mobileOpen ? <X size={18} /> : <Menu size={18} />}
+              <X size={18} />
             </button>
           </div>
         </div>
+      )}
 
-        {/* Mobile drawer */}
-        {mobileOpen && (
-          <div className="md:hidden border-t border-zinc-800 bg-zinc-950 px-3 py-3 space-y-0.5">
-            <MobileNavItem label="Dashboard" onClick={() => { setActiveTab('dashboard'); setMobileOpen(false); }} active={activeTab === 'dashboard'} />
-            <MobileNavItem label="+ Nova Contagem" onClick={() => { setActiveTab('input'); setMobileOpen(false); }} active={activeTab === 'input'} highlight />
-            <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest px-3 pt-3 pb-1">Operações</p>
-            <MobileNavItem label="Ver Heatmap"              onClick={() => { setActiveTab('heatmap');         setMobileOpen(false); }} active={activeTab === 'heatmap'} />
-            <MobileNavItem label="Produtos Importados"      onClick={() => { setActiveTab('products');        setMobileOpen(false); }} active={activeTab === 'products'} />
-            <MobileNavItem label="Importar Produtos"        onClick={() => { setActiveTab('import');          setMobileOpen(false); }} active={activeTab === 'import'} />
-            <MobileNavItem label="Histórico de Importações" onClick={() => { setActiveTab('import-history');  setMobileOpen(false); }} active={activeTab === 'import-history'} />
-            <MobileNavItem label="Gerador de Etiquetas"     onClick={() => { setActiveTab('label-generator'); setMobileOpen(false); }} active={activeTab === 'label-generator'} />
-            <MobileNavItem label="Full Manager"             onClick={() => { setActiveTab('full-manager');    setMobileOpen(false); }} active={activeTab === 'full-manager'} />
-            <MobileNavItem label="Conferência por NF-e"     onClick={() => { setActiveTab('nfe-conference');   setMobileOpen(false); }} active={activeTab === 'nfe-conference'} />
-            <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest px-3 pt-3 pb-1">Análises</p>
-            <MobileNavItem label="KPIs e Indicadores" onClick={() => { setActiveTab('kpis');     setMobileOpen(false); }} active={activeTab === 'kpis'} />
-            <MobileNavItem label="Rankings"           onClick={() => { setActiveTab('rankings'); setMobileOpen(false); }} active={activeTab === 'rankings'} />
-            <p className="text-zinc-600 text-[10px] font-bold uppercase tracking-widest px-3 pt-3 pb-1">Administração</p>
-            <MobileNavItem label="Acesso Administrativo" onClick={() => { setActiveTab('admin');    setMobileOpen(false); }} active={activeTab === 'admin'} />
-            {canManageUsers(profile?.role) && (
-              <MobileNavItem label="Usuários" onClick={() => { setActiveTab('users'); setMobileOpen(false); }} active={activeTab === 'users'} />
-            )}
-            {hasPermission(profile?.role, 'security.view') && (
-              <MobileNavItem label="Segurança" onClick={() => { setActiveTab('security'); setMobileOpen(false); }} active={activeTab === 'security'} />
-            )}
-            <div className="border-t border-zinc-800 mt-3 pt-3">
-              {canInstall && (
-                <button
-                  onClick={() => { if (hasPrompt) { promptInstall(); } else { setShowInstallModal(true); } setMobileOpen(false); }}
-                  className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm mb-2"
-                >
-                  <Download size={15} /> Instalar InventoryBlind
-                </button>
-              )}
-              <button onClick={signOut} className="flex items-center gap-2 w-full px-3 py-2.5 rounded-lg text-zinc-400 hover:text-white hover:bg-zinc-800 transition-colors text-sm">
-                <LogOut size={15} /> Sair
-              </button>
-            </div>
-          </div>
-        )}
-      </header>
+      {/* ── CONTENT COLUMN ────────────────────────────────────────────────── */}
+      <div className="flex-1 min-w-0 min-h-0 flex flex-col">
+        <AppHeader
+          onOpenMobileNav={() => setMobileOpen(true)}
+          right={
+            <>
+              <WhatsNewButton />
+              <TaskNotificationBell
+                notifications={taskNotifications.notifications}
+                unreadCount={taskNotifications.unreadCount}
+                onMarkRead={taskNotifications.markRead}
+                onMarkAllRead={taskNotifications.markAllRead}
+                onOpenTask={(taskId) => { setTasksPendingOpenId(taskId); setActiveTab('tasks'); }}
+              />
+              <ThemeToggle className="hidden md:flex" />
+              {userMenu}
+            </>
+          }
+        />
 
       {/* MAIN CONTENT */}
-      <main className="flex-1 mt-14 overflow-y-auto overflow-x-hidden">
+      {/* pb com o inset inferior: o `main` termina na borda da viewport, então o último
+          elemento da página ficava embaixo da barra de gesto e fora de alcance do toque.
+          O padding entra no conteúdo rolável, garantindo que dê para rolar o fim da
+          página acima do home indicator. */}
+      <main className="flex-1 min-h-0 overflow-y-auto overflow-x-hidden [overflow-anchor:none] pb-[env(safe-area-inset-bottom)]">
 
-        {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' && activeTab !== 'users' && (
+        {activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'barcode-lab' && activeTab !== 'full-manager' && activeTab !== 'users' && activeTab !== 'pdf-center' && activeTab !== 'pallet-calc' && (
           <>
 
         {/* ABA HEATMAP */}
@@ -1111,6 +1026,7 @@ function AppContent() {
           <React.Suspense fallback={<PageLoader />}>
           <HeatmapEstoque
             brandsData={brandsData}
+            companyId={companyId}
             onRequestAdminAccess={() => {
               if (!isLoggedIn) {
                 setActiveTab('admin');
@@ -1128,7 +1044,22 @@ function AppContent() {
           <ImportedProductsPage
             onBack={() => setActiveTab('dashboard')}
             isAdmin={isLoggedIn}
+            onGoToImport={() => setActiveTab('import')}
           />
+          </React.Suspense>
+        )}
+
+        {/* ABA LINHAS E MARCAS */}
+        {activeTab === 'product-brands' && companyId && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ProductBrandsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
+        {/* ABA CURVA ABC */}
+        {activeTab === 'abc-curve' && companyId && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AbcCurvePage companyId={companyId} />
           </React.Suspense>
         )}
 
@@ -1139,6 +1070,24 @@ function AppContent() {
             onBack={() => setActiveTab('dashboard')}
             isAdmin={isLoggedIn}
             onRequestAdmin={() => setActiveTab('admin')}
+          />
+          </React.Suspense>
+        )}
+
+        {/* FERRAMENTAS: COMPARADOR DE PLANILHAS */}
+        {activeTab === 'spreadsheet-comparator' && (
+          <React.Suspense fallback={<PageLoader />}>
+          <SpreadsheetComparatorPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        )}
+
+        {/* FERRAMENTAS: MEU TRABALHO (TAREFAS) */}
+        {activeTab === 'tasks' && (
+          <React.Suspense fallback={<PageLoader />}>
+          <TasksPage
+            onBack={() => setActiveTab('dashboard')}
+            initialTaskId={tasksPendingOpenId ?? undefined}
+            onConsumedInitialTask={() => setTasksPendingOpenId(null)}
           />
           </React.Suspense>
         )}
@@ -1201,249 +1150,160 @@ function AppContent() {
 
         {/* ABA DASHBOARD */}
         {activeTab === 'dashboard' && (
-          <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
+          <div className="max-w-7xl mx-auto p-4 md:p-6 lg:p-8 space-y-6">
 
-            {/* TOPO: INDICADORES PRINCIPAIS */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-              <StatCard
-                title="Progresso Geral"
-                value={`${globais.progresso.toFixed(1)}%`}
-                subtitle={`${globais.totalDone} de ${globais.totalSku} SKUs`}
-                icon={TrendingUp}
-                colorClass="bg-zinc-200 text-zinc-800"
-              />
-              <StatCard
-                title="Acuracidade Geral (IRA)"
-                value={`${globais.acuracidade.toFixed(1)}%`}
-                subtitle="Calculado via divergências"
-                icon={Activity}
-                colorClass={globais.acuracidade >= 80 ? "bg-emerald-100 text-emerald-700" : globais.acuracidade >= 50 ? "bg-amber-100 text-amber-700" : "bg-red-100 text-red-700"}
-              />
-              <StatCard
-                title="Tempo de Inventário"
-                value="44 Dias"
-                subtitle="Projeção: 27 dias"
-                icon={Clock}
-                colorClass="bg-zinc-200 text-zinc-800"
-              />
-              <StatCard
-                title="Total Divergências"
-                value={globais.totalDiv}
-                subtitle="Unidades p/ recontagem"
-                icon={CheckCircle2}
-                colorClass="bg-zinc-200 text-zinc-800"
-              />
-            </div>
-
-            {/* ASSISTENTE IA - INSIGHTS AUTOMÁTICOS */}
-            <div className="bg-gradient-to-r from-zinc-900 to-zinc-800 rounded-xl shadow-lg p-5 text-white">
-              <div className="flex items-start justify-between">
-                <div className="flex items-center gap-3">
-                  <div className="bg-blue-600 p-2 rounded-lg">
-                    <Bot size={24} />
-                  </div>
-                  <div>
-                    <h3 className="font-bold text-lg flex items-center gap-2">
-                      AZBot I.A
-                      <Sparkles size={16} className="text-amber-400" />
-                    </h3>
-                    <p className="text-zinc-400 text-sm">Assistente inteligente AZ ByGocase</p>
-                  </div>
-                </div>
-                <div className="flex gap-2">
-                  <button
-                    onClick={generateInsights}
-                    className="p-2 rounded-lg bg-zinc-700 hover:bg-zinc-600 transition text-zinc-300 hover:text-white"
-                    title="Atualizar insights"
-                  >
-                    <RefreshCw size={18} />
-                  </button>
-                  <button
-                    onClick={() => setShowAIChat(!showAIChat)}
-                    className="flex items-center gap-2 px-4 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 transition font-medium text-sm"
-                  >
-                    <MessageCircle size={18} />
-                    Conversar
-                    {showAIChat ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                  </button>
-                </div>
+            {/* CABEÇALHO — título + saudação + seletor de inventário + atualizar + nova contagem */}
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between border-b border-edge/70 pb-6">
+              <div className="min-w-0">
+                <h1 className="text-display">Visão operacional</h1>
+                <p className="mt-2 text-sm text-fg-muted truncate">
+                  {greetingText(profile?.name ?? null)}
+                  {company?.name ? ` · Inventário ${company.name}` : ''}
+                </p>
+                {formatLastLoaded(lastLoadedAt) && (
+                  <p className="mt-1 flex items-center gap-1 text-caption">
+                    <Clock size={11} />
+                    {formatLastLoaded(lastLoadedAt)}
+                  </p>
+                )}
               </div>
 
-              {/* Insights Automáticos */}
-              <div className="mt-4 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                {aiInsights.slice(0, 3).map((insight, idx) => (
-                  <div
-                    key={idx}
-                    className="bg-zinc-800/50 backdrop-blur rounded-lg p-3 text-sm text-zinc-300 border border-zinc-700"
-                  >
-                    {insight}
-                  </div>
-                ))}
-              </div>
-
-              {/* Chat Interface */}
-              {showAIChat && (
-                <div className="mt-4 bg-zinc-800 rounded-lg border border-zinc-700 overflow-hidden">
-                  {/* Chat Messages */}
-                  <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: '300px' }}>
-                    {aiMessages.length === 0 && (
-                      <div className="text-center py-4">
-                        <Bot size={32} className="mx-auto text-zinc-600 mb-2" />
-                        <p className="text-zinc-500 text-sm">
-                          Olá! Sou o AZBot I.A, assistente da AZ ByGocase. Pergunte sobre o inventário, produtos, ou a empresa!
-                        </p>
-                        <div className="flex flex-wrap gap-2 justify-center mt-3">
-                          {[
-                            'Qual o progresso?',
-                            'Me fale sobre a GoCase',
-                            'Quais linhas precisam de atenção?',
-                            'O que é a AZ ByGocase?'
-                          ].map((q) => (
-                            <button
-                              key={q}
-                              onClick={() => {
-                                setAiInput(q);
-                              }}
-                              className="px-3 py-1.5 bg-zinc-700 hover:bg-zinc-600 rounded-full text-xs text-zinc-300 transition"
-                            >
-                              {q}
-                            </button>
-                          ))}
-                        </div>
-                      </div>
-                    )}
-                    {aiMessages.map((msg, idx) => (
-                      <div
-                        key={idx}
-                        className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-lg px-4 py-2 text-sm whitespace-pre-wrap ${
-                            msg.role === 'user'
-                              ? 'bg-blue-600 text-white'
-                              : 'bg-zinc-700 text-zinc-200'
-                          }`}
-                        >
-                          {msg.content}
-                        </div>
-                      </div>
-                    ))}
-                    {aiLoading && (
-                      <div className="flex justify-start">
-                        <div className="bg-zinc-700 rounded-lg px-4 py-2 flex items-center gap-2">
-                          <Loader2 size={16} className="animate-spin text-zinc-400" />
-                          <span className="text-zinc-400 text-sm">Analisando...</span>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-
-                  {/* Chat Input */}
-                  <form onSubmit={handleSendAIMessage} className="border-t border-zinc-700 p-3 flex gap-2">
-                    <input
-                      type="text"
-                      value={aiInput}
-                      onChange={(e) => setAiInput(e.target.value)}
-                      placeholder="Pergunte sobre o inventário..."
-                      className="flex-1 bg-zinc-700 text-white placeholder-zinc-500 rounded-lg px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-                      disabled={aiLoading}
-                    />
-                    <button
-                      type="submit"
-                      disabled={aiLoading || !aiInput.trim()}
-                      className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-lg transition disabled:opacity-50 disabled:cursor-not-allowed"
-                    >
-                      <Send size={18} />
+              <div className="flex flex-shrink-0 items-center gap-2">
+                <SafeDropdown
+                  trigger={
+                    <button className="flex items-center gap-2 rounded-control border border-edge px-3 py-2 text-sm text-fg hover:bg-surface-3/60 transition-colors">
+                      Inventário atual
+                      <ChevronDown size={13} className="text-fg-subtle" />
                     </button>
-                  </form>
-                </div>
-              )}
+                  }
+                  items={[
+                    { id: 'current', label: 'Inventário atual', active: true, onClick: () => {} },
+                    ...(snapshots.length > 0
+                      ? snapshots.map(s => ({
+                          id: s.id,
+                          label: s.name,
+                          divider: s === snapshots[0],
+                          onClick: () => { handleViewSnapshot(s); setShowHistoryModal(true); },
+                        }))
+                      : [{ id: 'none', label: 'Nenhum histórico salvo ainda', disabled: true, divider: true, onClick: () => {} }]),
+                  ]}
+                />
+                <button
+                  onClick={() => loadData()}
+                  disabled={loading}
+                  title="Atualizar"
+                  className="p-2.5 rounded-control border border-edge text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
+                >
+                  <RefreshCw size={15} className={loading ? 'animate-spin' : ''} />
+                </button>
+                <Button onClick={() => setActiveTab('input')}>
+                  <Plus size={14} /> Nova contagem
+                </Button>
+              </div>
             </div>
 
-            {/* SEÇÃO DO MEIO: SAÚDE E RANKINGS */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+            {/* Acesso rápido — espaço fixo do topo do dashboard, sempre, para todo
+                usuário e plano. Nunca é substituído pelo diagnóstico. */}
+            {profile?.id && (
+              <MyShortcutsCard companyId={companyId} userId={profile.id} navGroups={navGroups} />
+            )}
 
-              {/* COLUNA ESQUERDA: Saúde e Rankings */}
-              <div className="lg:col-span-1 space-y-6">
-
-                {/* Saúde do Estoque Limpo */}
-                <div className={`bg-white rounded-xl shadow-sm border border-zinc-200 p-5 border-l-4 ${healthStatus.border}`}>
-                  <h3 className="text-sm font-bold text-zinc-500 uppercase tracking-wider mb-2">
-                    Índice de Saúde do Estoque
-                  </h3>
-                  <div className="flex items-center gap-3 mt-4">
-                    <healthStatus.icon size={28} className={healthStatus.iconColor} />
-                    <span className={`text-2xl font-extrabold uppercase ${healthStatus.color}`}>
-                      {healthStatus.label}
-                    </span>
-                  </div>
-                </div>
-
-                <button
-                  onClick={() => setActiveTab('rankings')}
-                  className="w-full bg-zinc-900 hover:bg-zinc-800 text-white font-medium py-3 px-4 rounded-xl flex items-center justify-center gap-2 transition-colors shadow-sm"
-                >
-                  <Trophy size={18} className="text-amber-400" />
-                  Ver Rankings Completos
-                </button>
-
-                {/* Mini Rankings - Top 5 Preview */}
-                <DashboardRankingPreview
-                  melhores={globais.melhores}
-                  piores={globais.piores}
-                  inProgress={globais.tabela.filter(b => b.status === 'ANDAMENTO')}
-                  onViewAll={() => setActiveTab('rankings')}
+            {/* Aviso de diagnóstico — separado de Acesso rápido, só quando elegível
+                (workspace novo, poucos SKUs ou interesse em função bloqueada — ver
+                evaluateDiagnosticEligibility). "Agora não" vale só para esta sessão. */}
+            {showDiagnosticInvite && (
+              <React.Suspense fallback={null}>
+                <DiagnosticInvite
+                  onStart={() => setActiveTab('diagnostico')}
+                  onDismiss={() => setDiagnosticDismissed(true)}
                 />
-              </div>
+              </React.Suspense>
+            )}
 
-              {/* COLUNA DIREITA: Tabela de Controle */}
-              <div className="lg:col-span-2">
-                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col">
-                  <div className="bg-zinc-50 p-4 border-b border-zinc-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 sticky top-0 z-10">
-                    <h3 className="text-sm font-bold text-zinc-800 flex items-center gap-2">
-                      <BarChart3 size={18} className="text-zinc-600" />
-                      Controle e Desempenho por Linha
-                    </h3>
-                    <div className="flex items-center gap-3">
-                      <span className="text-xs font-bold text-zinc-700 bg-white px-2 py-1.5 rounded border border-zinc-300">
-                        Total Geral: {globais.totalSku.toLocaleString('pt-BR')}
-                      </span>
-                    </div>
-                  </div>
+            {/* RESUMO EXECUTIVO */}
+            <Panel>
+              <PanelSection padding="lg">
+                <StatRow>
+                  {(() => {
+                    const inProgressRows = globais.tabela.filter(b => b.status === 'ANDAMENTO');
+                    const topInProgress = [...inProgressRows].sort((a, b) => b.progress - a.progress)[0] ?? null;
+                    const ACCURACY_TARGET = 95;
+                    return ([
+                      {
+                        label: 'Progresso Geral',
+                        value: `${globais.progresso.toFixed(1)}%`,
+                        context: `${globais.totalDone} de ${globais.totalSku} SKUs`,
+                      },
+                      {
+                        label: 'Acuracidade (IRA)',
+                        value: `${globais.acuracidade.toFixed(1)}%`,
+                        context: `Meta ${ACCURACY_TARGET}% · ${globais.acuracidade >= ACCURACY_TARGET ? 'dentro da meta' : 'abaixo da meta'}`,
+                        // The only figure here whose level is a condition, so the
+                        // only one allowed to carry colour.
+                        valueTone:
+                          globais.acuracidade >= 80 ? 'positive' : globais.acuracidade >= 50 ? 'warning' : 'critical',
+                      },
+                      { label: 'Divergências', value: globais.totalDiv, context: 'Aguardando recontagem' },
+                      {
+                        label: 'Linhas em andamento',
+                        value: `${inProgressRows.length} de ${globais.tabela.length}`,
+                        context: topInProgress
+                          ? `${topInProgress.brand} · ${topInProgress.progress.toFixed(1)}%`
+                          : 'Nenhuma linha em andamento',
+                      },
+                    ] satisfies StatProps[]);
+                  })().map(kpi => (
+                    <StatCell key={kpi.label}>
+                      <Stat {...kpi} />
+                    </StatCell>
+                  ))}
+                </StatRow>
+              </PanelSection>
+            </Panel>
+
+            {/* GRID PRINCIPAL — esquerda: prioridades + controle por linha; direita: progresso + BlindAI + integrações */}
+            <div className="grid grid-cols-1 lg:grid-cols-[62%_1fr] gap-6 items-start">
+
+              {/* COLUNA ESQUERDA */}
+              <div className="space-y-6 min-w-0">
+                <DashboardPriorities
+                  globais={globais}
+                  erpDisconnected={erpConnections == null ? null : erpConnections.length === 0}
+                  onRecount={() => setActiveTab('input')}
+                  onContinueCounting={() => setActiveTab('input')}
+                  onConnectErp={() => setActiveTab('integracoes')}
+                  onViewAll={() => setActiveTab('tasks')}
+                />
+
+                <Panel className="flex flex-col">
+                  <PanelSection padding="sm" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
+                    <h3 className="text-title">Controle por linha</h3>
+                    <span className="text-caption">Total: {globais.totalSku.toLocaleString('pt-BR')} SKUs</span>
+                  </PanelSection>
 
                   <div className="overflow-x-auto flex-1">
                     <table className="w-full text-sm text-left whitespace-nowrap">
-                      <thead className="text-[10px] text-zinc-500 uppercase bg-zinc-50 border-b border-zinc-200 sticky top-0 z-10 shadow-sm">
-                        <tr>
-                          <th className="px-3 py-3 font-semibold">Linha / Marca</th>
-                          <th className="px-3 py-3 font-semibold text-center">Total SKU</th>
-                          <th className="px-3 py-3 font-semibold text-center">Concluídos</th>
-                          <th className="px-3 py-3 font-semibold text-center">Progresso</th>
-                          <th className="px-3 py-3 font-semibold text-center">Acuracidade</th>
-                          <th className="px-3 py-3 font-semibold text-center">Status</th>
+                      <thead>
+                        <tr className="border-b border-edge">
+                          <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide">Linha / Marca</th>
+                          <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Progresso</th>
+                          <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Concluídos</th>
+                          <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Acuracidade</th>
+                          <th className="px-6 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Situação</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {globais.tabela.map((row) => (
-                          <tr key={row.id} className="border-b border-zinc-100 hover:bg-zinc-50 transition-colors">
-                            <td className="px-3 py-2 font-medium text-zinc-800">{row.brand}</td>
-                            <td className="px-3 py-2 text-center text-zinc-600">{row.totalSku}</td>
-                            <td className="px-3 py-2 text-center font-semibold">{row.doneSku}</td>
-                            <td className="px-3 py-2 text-center">
-                              <div className="flex items-center justify-center gap-2">
-                                <span className="text-xs text-zinc-600 font-mono w-10 text-right">{row.progress.toFixed(1)}%</span>
-                              </div>
+                        {globais.tabela.slice(0, 5).map((row) => (
+                          <tr key={row.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                            <td className="px-6 py-3.5 font-medium text-fg">{row.brand}</td>
+                            <td className="px-3 py-3.5 text-center text-fg-muted text-numeric text-xs">{row.progress.toFixed(1)}%</td>
+                            <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">{row.doneSku}</td>
+                            <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">
+                              {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : '—'}
                             </td>
-                            <td className="px-3 py-2 text-center font-bold text-zinc-800">
-                              {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : ''}
-                            </td>
-                            <td className="px-3 py-2 text-center">
-                              <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-md ${
-                                row.status === 'CONCLUÍDO'
-                                  ? 'bg-emerald-100 text-emerald-800 border border-emerald-200'
-                                  : 'bg-amber-100 text-amber-800 border border-amber-200'
-                              }`}>
-                                {row.status}
+                            <td className="px-6 py-3.5 text-center">
+                              <span className="text-xs font-medium text-fg-subtle">
+                                {row.status === 'CONCLUÍDO' ? 'Concluído' : 'Em andamento'}
                               </span>
                             </td>
                           </tr>
@@ -1451,475 +1311,400 @@ function AppContent() {
                       </tbody>
                     </table>
                   </div>
-                </div>
+
+                  <PanelSection padding="sm">
+                    <button
+                      onClick={() => setActiveTab('rankings')}
+                      className="w-full flex items-center justify-center gap-1.5 text-sm font-medium text-accent hover:text-accent-strong transition-colors py-1"
+                    >
+                      Ver desempenho completo <ArrowRight size={14} />
+                    </button>
+                  </PanelSection>
+                </Panel>
               </div>
 
+              {/* COLUNA DIREITA */}
+              <div className="space-y-6 min-w-0">
+                <DashboardInventoryProgress
+                  companyId={companyId}
+                  globais={globais}
+                  onOpenKpis={() => setActiveTab('kpis')}
+                />
+
+                <Panel>
+                  <PanelSection padding="lg">
+                    <div className="flex items-start justify-between gap-4">
+                      <div>
+                        <h3 className="text-title flex items-center gap-2">
+                          <Bot size={18} className="text-accent" />
+                          BlindAI
+                        </h3>
+                        <p className="text-caption mt-0.5">Situações identificadas na operação</p>
+                      </div>
+                      <div className="flex gap-1.5 flex-shrink-0">
+                        <button
+                          onClick={loadSituations}
+                          disabled={situationsLoading}
+                          className="p-2 rounded-control text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors disabled:opacity-50"
+                          title="Atualizar análise"
+                        >
+                          <RefreshCw size={16} className={situationsLoading ? 'animate-spin' : ''} />
+                        </button>
+                        <button
+                          onClick={() => setShowAIChat(!showAIChat)}
+                          className="flex items-center gap-1.5 px-3 py-1.5 rounded-control text-accent hover:bg-accent/10 transition-colors font-medium text-sm"
+                        >
+                          <MessageCircle size={15} />
+                          Conversar
+                          {showAIChat ? <ChevronUp size={14} /> : <ChevronDown size={14} />}
+                        </button>
+                      </div>
+                    </div>
+
+                    {/* Situações detectadas */}
+                    <div className="mt-4">
+                      {situationsLoading && situations.length === 0 ? (
+                        <p className="text-sm text-fg-subtle">Analisando a operação...</p>
+                      ) : situations.length === 0 ? (
+                        <p className="text-sm text-fg-subtle">Nenhuma situação crítica identificada no momento.</p>
+                      ) : (
+                        <div className="divide-y divide-edge">
+                          {situations.map(s => {
+                            const SituationIcon = resolveInsightIcon(s.icon, s.severity);
+                            return (
+                              <button
+                                key={s.id}
+                                onClick={() => setActiveTab(s.module)}
+                                className="w-full flex items-start gap-3 py-3 first:pt-0 last:pb-0 text-left -mx-1 px-1 rounded-control hover:bg-surface-3/60 transition-colors"
+                              >
+                                <SituationIcon size={15} className={`flex-shrink-0 mt-0.5 ${INSIGHT_ICON_TONE[s.severity]}`} />
+                                <div className="min-w-0 flex-1 space-y-1">
+                                  <div className="flex items-center gap-2 flex-wrap">
+                                    <p className="text-sm font-semibold text-fg">{s.title}</p>
+                                    <Badge variant={SITUATION_SEVERITY_BADGE[s.severity]}>{s.actionLabel}</Badge>
+                                  </div>
+                                  <p className="text-sm text-fg-muted">{s.evidence}</p>
+                                  <ul className="text-xs text-fg-subtle space-y-0.5">
+                                    {s.reasons.map((reason, idx) => <li key={idx}>• {reason}</li>)}
+                                  </ul>
+                                  <p className="flex items-start gap-1 text-xs text-fg-subtle">
+                                    <ArrowRight size={12} className="mt-0.5 flex-shrink-0" />
+                                    {s.recommendation}
+                                  </p>
+                                </div>
+                              </button>
+                            );
+                          })}
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Chat: apoio secundário, não o produto principal */}
+                    {showAIChat && (
+                      <div className="mt-4 bg-surface rounded-container border border-edge overflow-hidden">
+                        {/* Chat Messages */}
+                        <div className="overflow-y-auto p-4 space-y-3" style={{ maxHeight: '300px' }}>
+                          {aiMessages.length === 0 && (
+                            <div className="text-center py-4">
+                              <Bot size={28} className="mx-auto text-fg-subtle mb-2" />
+                              <p className="text-fg-subtle text-sm">
+                                Pergunte sobre prioridades, risco, divergências ou estratégia de contagem.
+                              </p>
+                              <div className="flex flex-wrap gap-2 justify-center mt-3">
+                                {aiSuggestions.map((q) => (
+                                  <button
+                                    key={q}
+                                    onClick={() => {
+                                      setAiInput(q);
+                                    }}
+                                    className="px-3 py-1.5 bg-surface-2 hover:bg-edge rounded-full text-xs text-fg-muted transition"
+                                  >
+                                    {q}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          )}
+                          {aiMessages.map((msg, idx) => (
+                            <div
+                              key={idx}
+                              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
+                            >
+                              <div
+                                className={`max-w-[80%] rounded-control px-4 py-2 text-sm whitespace-pre-wrap ${
+                                  msg.role === 'user'
+                                    ? 'bg-accent text-white'
+                                    : 'bg-surface-2 text-fg'
+                                }`}
+                              >
+                                {msg.content}
+                              </div>
+                            </div>
+                          ))}
+                          {aiLoading && (
+                            <div className="flex justify-start">
+                              <div className="bg-surface-2 rounded-control px-4 py-2 flex items-center gap-2">
+                                <Loader2 size={16} className="animate-spin text-fg-subtle" />
+                                <span className="text-fg-subtle text-sm">Analisando...</span>
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Chat Input */}
+                        <form onSubmit={handleSendAIMessage} className="border-t border-edge p-3 flex gap-2">
+                          <input
+                            type="text"
+                            value={aiInput}
+                            onChange={(e) => setAiInput(e.target.value)}
+                            placeholder="Pergunte sobre o inventário..."
+                            className="flex-1 bg-surface-2 text-fg placeholder-fg-subtle rounded-control px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
+                            disabled={aiLoading}
+                          />
+                          <button
+                            type="submit"
+                            disabled={aiLoading || !aiInput.trim()}
+                            className="bg-accent hover:bg-accent-strong text-white px-4 py-2 rounded-control transition disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <Send size={18} />
+                          </button>
+                        </form>
+                      </div>
+                    )}
+                  </PanelSection>
+                </Panel>
+
+                {canSyncIntegrations(profile?.role) && (
+                  <DashboardIntegrationsHealth
+                    connections={erpConnections}
+                    onConnect={() => setActiveTab('integracoes')}
+                    onViewIntegrations={() => setActiveTab('integracoes')}
+                  />
+                )}
+              </div>
             </div>
+
+            {/* ESTOQUE NO ERP — detalhamento completo, só quando há ao menos uma
+                conexão. O card condensado de Saúde e integrações (coluna direita
+                acima) já cobre o estado desconectado; este continua existindo
+                para não perder o detalhamento que ele oferece quando conectado. */}
+            {canSyncIntegrations(profile?.role) && erpConnections != null && erpConnections.length > 0 && (
+              <React.Suspense fallback={null}>
+                <ErpIntelligenceSection onDrill={handleIntelligenceDrill} />
+              </React.Suspense>
+            )}
+
           </div>
         )}
 
         {/* ABA ADMIN */}
         {activeTab === 'admin' && (
-          <div className="max-w-4xl mx-auto">
+          <div>
             {!isLoggedIn ? (
-              <div className="bg-white rounded-xl shadow-md border border-zinc-200 overflow-hidden mt-6 max-w-md mx-auto">
-                <div className="bg-amber-600 p-6 text-center text-white">
-                  <Lock size={40} className="mx-auto mb-2 opacity-80" />
-                  <h2 className="text-xl font-bold tracking-wide">Acesso Restrito</h2>
-                  <p className="text-amber-100 text-sm mt-1">Esta área é restrita a administradores e proprietários.</p>
-                </div>
-                <div className="p-6 text-center">
-                  <p className="text-sm text-zinc-600">Você não tem permissão para acessar este painel.</p>
-                  <p className="text-xs text-zinc-400 mt-1">Perfil atual: {profile?.role ?? '—'}</p>
-                </div>
+              <div className="max-w-4xl mx-auto p-4 md:p-6 lg:p-8">
+                <Panel className="max-w-md mx-auto mt-6">
+                  <PanelSection padding="lg" className="text-center">
+                    <Lock size={32} className="mx-auto mb-3 text-fg-subtle" />
+                    <h2 className="text-title">Acesso Restrito</h2>
+                    <p className="text-fg-muted text-sm mt-2">Esta área é restrita a administradores e proprietários.</p>
+                    <p className="text-caption mt-3">Perfil atual: {profile?.role ?? '—'}</p>
+                  </PanelSection>
+                </Panel>
               </div>
             ) : (
-              // PAINEL ADMINISTRATIVO
-              <div className="space-y-6">
-                <div className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-zinc-200">
-                  <div>
-                    <h2 className="text-lg font-bold text-zinc-800 flex items-center gap-2">
-                      <Edit size={20} className="text-amber-600"/> Painel Administrativo
-                    </h2>
-                    <p className="text-sm text-zinc-500">Altere parâmetros do sistema e dados gerenciais.</p>
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Edição Top Vendas */}
-                  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                    <div className="bg-zinc-900 p-3 text-white font-bold text-sm">Editar Top 10 Vendas</div>
-                    <div className="p-4 overflow-x-auto">
-                       <table className="w-full text-xs text-left">
-                         <thead><tr className="border-b"><th className="pb-2">Produto</th><th className="pb-2">SKU</th><th className="pb-2 text-right">Vendas</th></tr></thead>
-                         <tbody>
-                           {topVendas.map((item, idx) => (
-                             <tr key={item.id} className="border-b border-zinc-100">
-                               <td className="py-2 pr-2"><input type="text" className="w-full border rounded px-2 py-1 text-xs" value={item.produto} onChange={(e) => handleUpdateTopVenda(idx, 'produto', e.target.value)} /></td>
-                               <td className="py-2 pr-2"><input type="text" className="w-full border rounded px-2 py-1 text-xs font-mono" value={item.sku} onChange={(e) => handleUpdateTopVenda(idx, 'sku', e.target.value)} /></td>
-                               <td className="py-2"><input type="text" className="w-full border rounded px-2 py-1 text-xs text-right font-bold" value={item.vendas} onChange={(e) => handleUpdateTopVenda(idx, 'vendas', e.target.value)} /></td>
-                             </tr>
-                           ))}
-                         </tbody>
-                       </table>
-                    </div>
-                  </div>
-
-                  {/* Edição Linhas */}
-                  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden flex flex-col">
-                     <div className="bg-zinc-900 p-3 text-white font-bold text-sm">Gerenciamento de Marcas / Linhas</div>
-                     <div className="p-6 flex-1 flex flex-col justify-center items-center text-center">
-                        <Package size={40} className="text-zinc-300 mb-3"/>
-                        <p className="text-sm text-zinc-600 mb-4">Para adicionar uma nova linha ao controle do inventário principal, clique no botão abaixo.</p>
-                        <button
-                          onClick={() => setShowAddBrandModal(true)}
-                          className="bg-amber-600 hover:bg-amber-700 text-white font-bold py-3 px-6 rounded-lg transition shadow-md w-full"
-                        >
-                          + Cadastrar Nova Linha no Estoque
-                        </button>
-                     </div>
-                  </div>
-                </div>
-
-                {/* Gerenciamento de KPIs */}
-                <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                  <div className="bg-blue-600 p-4 text-white font-bold text-sm flex items-center gap-2">
-                    <Target size={18} />
-                    Gerenciamento de KPIs e Indicadores
-                  </div>
-                  <div className="p-4">
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-3 mb-4">
-                      {customKPIs.map((kpi) => (
-                        <div key={kpi.id} className="bg-zinc-50 rounded-lg p-3 border border-zinc-200 relative group">
-                          <button
-                            onClick={() => handleDeleteKPI(kpi.id)}
-                            className="absolute top-2 right-2 text-zinc-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                          >
-                            <Trash2 size={16} />
-                          </button>
-                          <p className="text-xs text-zinc-500 uppercase font-semibold">{kpi.titulo}</p>
-                          <p className="text-xl font-bold text-zinc-900 mt-1">{kpi.valor} <span className="text-sm font-normal">{kpi.unidade}</span></p>
-                          <p className="text-xs text-zinc-400 mt-1 truncate">{kpi.variacao}</p>
-                        </div>
-                      ))}
-                    </div>
-                    <button
-                      onClick={() => setShowAddKPIModal(true)}
-                      className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2"
-                    >
-                      <Plus size={18} />
-                      Adicionar Novo KPI
-                    </button>
-                  </div>
-                </div>
-
-                {/* Reset e Histórico de Inventários */}
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                  {/* Reset de Inventário */}
-                  <div className="bg-white rounded-xl shadow-sm border border-red-200 overflow-hidden">
-                    <div className="bg-red-600 p-4 text-white font-bold text-sm flex items-center gap-2">
-                      <RotateCcw size={18} />
-                      Reset de Inventário
-                    </div>
-                    <div className="p-6">
-                      <p className="text-sm text-zinc-600 mb-4">
-                        Ao resetar, o inventário atual será arquivado com todos os dados de progresso, acuracidade e divergências.
-                        As contagens serão zeradas para iniciar um novo ciclo.
-                      </p>
-                      <div className="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-4">
-                        <p className="text-xs text-amber-800 font-medium">
-                          Os dados serão salvos permanentemente no histórico e poderão ser consultados a qualquer momento.
-                        </p>
-                      </div>
-                      <button
-                        onClick={() => setShowResetModal(true)}
-                        disabled={resetProgress}
-                        className="w-full bg-red-600 hover:bg-red-700 text-white font-bold py-3 px-4 rounded-lg transition flex items-center justify-center gap-2 disabled:opacity-50"
-                      >
-                        {resetProgress ? (
-                          <>
-                            <Loader2 size={18} className="animate-spin" />
-                            Arquivando...
-                          </>
-                        ) : (
-                          <>
-                            <Archive size={18} />
-                            Arquivar e Resetar Inventário
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </div>
-
-                  {/* Histórico de Inventários */}
-                  <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                    <div className="bg-emerald-600 p-4 text-white font-bold text-sm flex items-center gap-2">
-                      <History size={18} />
-                      Histórico de Inventários
-                    </div>
-                    <div className="p-4 overflow-y-auto" style={{ maxHeight: '400px' }}>
-                      {snapshots.length === 0 ? (
-                        <p className="text-sm text-zinc-500 text-center py-4">
-                          Nenhum inventário arquivado ainda.
-                        </p>
-                      ) : (
-                        <div className="space-y-2">
-                          {snapshots.map((snapshot) => (
-                            <div
-                              key={snapshot.id}
-                              className="bg-zinc-50 rounded-lg p-3 border border-zinc-200 hover:border-zinc-300 transition cursor-pointer"
-                              onClick={() => handleViewSnapshot(snapshot)}
-                            >
-                              <div className="flex justify-between items-start">
-                                <div>
-                                  <p className="font-bold text-zinc-800 text-sm">{snapshot.name}</p>
-                                  <p className="text-xs text-zinc-500 mt-1">
-                                    {new Date(snapshot.end_date).toLocaleDateString('pt-BR', {
-                                      day: '2-digit',
-                                      month: 'long',
-                                      year: 'numeric'
-                                    })}
-                                  </p>
-                                </div>
-                                <button
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleViewSnapshot(snapshot);
-                                    setShowHistoryModal(true);
-                                  }}
-                                  className="text-emerald-600 hover:text-emerald-700 text-xs font-medium flex items-center gap-1"
-                                >
-                                  <Eye size={14} />
-                                  Ver
-                                </button>
-                              </div>
-                              <div className="flex gap-4 mt-2 text-xs">
-                                <span className="text-zinc-600">
-                                  Progresso: <span className="font-bold">{snapshot.progress.toFixed(1)}%</span>
-                                </span>
-                                <span className="text-zinc-600">
-                                  Acuracidade: <span className="font-bold">{snapshot.accuracy.toFixed(1)}%</span>
-                                </span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
+              <React.Suspense fallback={<PageLoader />}>
+                <AdminDashboardPage
+                  role={profile?.role}
+                  companyId={companyId ?? ''}
+                  companyName={company?.name ?? null}
+                  companyCreatedAt={company?.createdAt ?? null}
+                  userId={profile?.id ?? ''}
+                  userEmail={profile?.email ?? ''}
+                  globais={globais}
+                  customKPIs={customKPIs}
+                  onAddKPI={handleAddKPI}
+                  onDeleteKPI={handleDeleteKPI}
+                  snapshots={snapshots}
+                  onViewSnapshot={(snapshot) => { handleViewSnapshot(snapshot); setShowHistoryModal(true); }}
+                  onResetComplete={() => { loadSnapshots(); setBrandsData(prev => prev.map(b => ({ ...b, done_sku: 0, divergences: 0 }))); }}
+                  onAddInventoryLine={() => setShowAddBrandModal(true)}
+                />
+              </React.Suspense>
             )}
           </div>
         )}
 
         {/* ABA KPIs E INDICADORES */}
-        {activeTab === 'kpis' && (
-          <div className="max-w-7xl mx-auto p-4 md:p-6 space-y-6">
-            {/* KPI Cards - Dinâmicos */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              {customKPIs.map((kpi) => (
-                <div key={kpi.id} className="bg-white rounded-xl shadow-sm border border-zinc-200 p-5">
-                  <div className="flex justify-between items-start mb-2">
-                    <h3 className="text-zinc-500 text-xs font-semibold uppercase tracking-wider">{kpi.titulo}</h3>
-                    <div className={`p-2 rounded-lg ${getIconColorClass(kpi.cor_icone)}`}>
-                      {kpi.cor_icone === 'blue' && <Zap size={20} />}
-                      {kpi.cor_icone === 'red' && <AlertTriangle size={20} />}
-                      {kpi.cor_icone === 'amber' && <Clock size={20} />}
-                      {kpi.cor_icone === 'emerald' && <Users size={20} />}
-                    </div>
-                  </div>
-                  <div className="mt-2">
-                    <span className="text-3xl font-bold text-zinc-900">{kpi.valor}</span>
-                    <span className="text-zinc-500 ml-1">{kpi.unidade}</span>
-                  </div>
-                  <div className={`flex items-center gap-1 mt-2 text-xs font-medium ${
-                    kpi.tipo_variacao === 'up' ? 'text-emerald-600' :
-                    kpi.tipo_variacao === 'down' ? 'text-emerald-600' :
-                    'text-zinc-500'
-                  }`}>
-                    {kpi.tipo_variacao === 'up' && <ArrowUpRight size={14} />}
-                    {kpi.tipo_variacao === 'down' && <ArrowDownRight size={14} />}
-                    {kpi.tipo_variacao === 'neutral' && <Calendar size={14} />}
-                    <span>{kpi.variacao}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
+        {activeTab === 'kpis' && companyId && (
+          <KpisIndicadoresPage companyId={companyId} globais={globais} operatorStats={operatorStats} />
+        )}
 
-            {/* Desempenho por Operador */}
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <div className="bg-zinc-900 p-4 border-b border-zinc-800">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <Users size={18} className="text-zinc-400" />
-                    Desempenho por Operador
-                  </h3>
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm">
-                    <thead className="bg-zinc-50 text-xs text-zinc-500 uppercase font-bold border-b border-zinc-200">
-                      <tr>
-                        <th className="p-3 text-left">Operador</th>
-                        <th className="p-3 text-center">SKUs Dia</th>
-                        <th className="p-3 text-center">Acuracidade</th>
-                        <th className="p-3 text-center">Tendência</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {[
-                        { nome: 'Davi', skus: 65, acuracidade: 94.1, tendencia: 'up' },
-                        { nome: 'Jackson', skus: 52, acuracidade: 79.2, tendencia: 'up' },
-                        { nome: 'Willian', skus: 48, acuracidade: 64.1, tendencia: 'down' },
-                        { nome: 'Geovanna', skus: 45, acuracidade: 51.8, tendencia: 'up' },
-                        { nome: 'Leo', skus: 42, acuracidade: 29.2, tendencia: 'down' },
-                        { nome: 'Giovani', skus: 38, acuracidade: null, tendencia: 'up' },
-                      ].map((op, idx) => (
-                        <tr key={idx} className="border-b border-zinc-100 hover:bg-zinc-50">
-                          <td className="p-3 font-medium text-zinc-800">{op.nome}</td>
-                          <td className="p-3 text-center font-semibold">{op.skus}</td>
-                          <td className="p-3 text-center">
-                            <span className={`font-bold ${op.acuracidade !== null ? (op.acuracidade >= 80 ? 'text-emerald-600' : op.acuracidade >= 50 ? 'text-amber-600' : 'text-red-600') : 'text-zinc-400'}`}>
-                              {op.acuracidade !== null ? `${op.acuracidade.toFixed(1)}%` : 'Em andamento'}
-                            </span>
-                          </td>
-                          <td className="p-3 text-center">
-                            {op.tendencia === 'up' ? (
-                              <ArrowUpRight size={18} className="mx-auto text-emerald-600" />
-                            ) : (
-                              <ArrowDownRight size={18} className="mx-auto text-red-600" />
-                            )}
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              </div>
-
-              {/* Indicadores de Processo */}
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <div className="bg-zinc-900 p-4 border-b border-zinc-800">
-                  <h3 className="text-sm font-bold text-white flex items-center gap-2">
-                    <BarChart2 size={18} className="text-zinc-400" />
-                    Indicadores de Processo
-                  </h3>
-                </div>
-                <div className="p-6 space-y-5">
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Taxa de Conclusão Diária</span>
-                      <span className="text-sm font-bold text-zinc-900">85.4%</span>
-                    </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-blue-600 rounded-full" style={{ width: '85.4%' }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Meta de Acuracidade</span>
-                      <span className="text-sm font-bold text-zinc-900">{globais.acuracidade.toFixed(1)}% / 95%</span>
-                    </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className={`h-full rounded-full ${globais.acuracidade >= 95 ? 'bg-emerald-600' : globais.acuracidade >= 80 ? 'bg-amber-500' : 'bg-red-500'}`} style={{ width: `${Math.min(100, (globais.acuracidade / 95) * 100)}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Cobertura de Estoque</span>
-                      <span className="text-sm font-bold text-zinc-900">{globais.progresso.toFixed(1)}%</span>
-                    </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-emerald-600 rounded-full" style={{ width: `${globais.progresso}%` }}></div>
-                    </div>
-                  </div>
-
-                  <div>
-                    <div className="flex justify-between items-center mb-2">
-                      <span className="text-sm font-medium text-zinc-700">Divergências Recontadas</span>
-                      <span className="text-sm font-bold text-zinc-900">72.3%</span>
-                    </div>
-                    <div className="h-3 bg-zinc-200 rounded-full overflow-hidden">
-                      <div className="h-full bg-amber-500 rounded-full" style={{ width: '72.3%' }}></div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-
-            {/* Resumo Executivo */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-              <div className="lg:col-span-2 bg-white rounded-xl shadow-sm border border-zinc-200 p-6">
-                <h3 className="text-sm font-bold text-zinc-800 mb-4 flex items-center gap-2">
-                  <Target size={18} className="text-blue-600" />
-                  Resumo Executivo
-                </h3>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="text-center p-4 bg-zinc-50 rounded-lg">
-                    <p className="text-2xl font-bold text-zinc-900">{globais.totalSku.toLocaleString('pt-BR')}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Total SKUs</p>
-                  </div>
-                  <div className="text-center p-4 bg-emerald-50 rounded-lg">
-                    <p className="text-2xl font-bold text-emerald-700">{globais.totalDone.toLocaleString('pt-BR')}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Contabilizados</p>
-                  </div>
-                  <div className="text-center p-4 bg-amber-50 rounded-lg">
-                    <p className="text-2xl font-bold text-amber-700">{(globais.totalSku - globais.totalDone).toLocaleString('pt-BR')}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Pendentes</p>
-                  </div>
-                  <div className="text-center p-4 bg-red-50 rounded-lg">
-                    <p className="text-2xl font-bold text-red-700">{globais.totalDiv}</p>
-                    <p className="text-xs text-zinc-500 mt-1">Divergências</p>
-                  </div>
-                </div>
-
-                <div className="mt-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
-                  <h4 className="font-bold text-blue-900 text-sm mb-2">Projeção de Conclusão</h4>
-                  <p className="text-sm text-blue-800">
-                    Com base na produtividade média de <strong>48 SKUs/dia</strong>, o inventário será concluído em aproximadamente <strong>{Math.ceil((globais.totalSku - globais.totalDone) / 48)} dias úteis</strong>.
-                  </p>
-                </div>
-              </div>
-
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-6">
-                <h3 className="text-sm font-bold text-zinc-800 mb-4 flex items-center gap-2">
-                  <Activity size={18} className="text-emerald-600" />
-                  Status Atual
-                </h3>
-                <div className="space-y-4">
-                  <div className="flex items-center justify-between p-3 bg-emerald-50 rounded-lg border border-emerald-200">
-                    <span className="text-sm font-medium text-emerald-800">Linhas Concluídas</span>
-                    <span className="text-lg font-bold text-emerald-700">{globais.tabela.filter(b => b.status === 'CONCLUÍDO').length}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-amber-50 rounded-lg border border-amber-200">
-                    <span className="text-sm font-medium text-amber-800">Em Andamento</span>
-                    <span className="text-lg font-bold text-amber-700">{globais.tabela.filter(b => b.status === 'ANDAMENTO').length}</span>
-                  </div>
-                  <div className="flex items-center justify-between p-3 bg-zinc-50 rounded-lg border border-zinc-200">
-                    <span className="text-sm font-medium text-zinc-600">Próx. Meta</span>
-                    <span className="text-sm font-bold text-zinc-800">95% Acuracidade</span>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </div>
+        {/* ABA RESULTADOS POR LINHA */}
+        {activeTab === 'closing-results' && companyId && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ClosingResultsPage companyId={companyId} brandsData={brandsData} userId={profile.id} userEmail={profile.email ?? null} />
+          </React.Suspense>
         )}
 
         {/* ABA NOVA CONTAGEM */}
         {activeTab === 'input' && (
-          <div className="max-w-xl mx-auto bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden mt-6">
-            <div className="bg-zinc-950 p-6 text-center text-white border-b-4 border-zinc-700">
-              <Package size={48} className="mx-auto text-zinc-400 mb-2" />
-              <h2 className="text-2xl font-bold tracking-wide">Contagem de SKUs</h2>
-              <p className="text-zinc-400 text-sm mt-1 font-medium">
-                Insira a quantidade de SKUs contabilizados e as divergências encontradas.
-              </p>
-            </div>
+          <CountManagementCenter
+            brandsData={brandsData}
+            companyId={companyId}
+            onBrandsUpdated={setBrandsData}
+          />
+        )}
 
-            <div className="p-6">
-              {countSuccess && (
-                <div className="mb-6 p-3 bg-emerald-50 border border-emerald-200 text-emerald-700 rounded-lg flex items-center gap-2 text-sm font-bold">
-                  <CheckCircle2 size={18} />
-                  Contagem e Divergências registradas com sucesso!
-                </div>
-              )}
+        {/* ABA PRODUTIVIDADE */}
+        {activeTab === 'conta' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ProductivityTab
+              userId={profile.id}
+              userEmail={profile.email ?? ''}
+              companyId={companyId}
+              role={profile.role}
+            />
+          </React.Suspense>
+        )}
 
-              <form onSubmit={handleSaveCount} className="space-y-5">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Linha / Marca</label>
-                  <select
-                    required
-                    value={countBrand}
-                    onChange={(e) => setCountBrand(e.target.value)}
-                    className="w-full p-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 focus:border-zinc-800 outline-none transition-all font-medium text-zinc-700 bg-zinc-50"
-                  >
-                    <option value="">Selecione a linha ou marca...</option>
-                    {brandsData.map((b) => (
-                      <option key={b.id} value={b.brand}>{b.brand} (Pendentes: {b.total_sku - b.done_sku})</option>
-                    ))}
-                  </select>
-                </div>
+        {/* ABA RECURSOS E CONHECIMENTO */}
+        {activeTab === 'knowledge' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <KnowledgeCenterPage onNavigateToAcademy={() => setActiveTab('academy')} />
+          </React.Suspense>
+        )}
 
-                <div className="grid grid-cols-2 gap-4">
-                  <div>
-                    <label className="block text-sm font-bold text-zinc-800 mb-1">Qtd. SKUs Contabilizados</label>
-                    <input
-                      type="number"
-                      required
-                      min="1"
-                      placeholder="Ex: 50"
-                      value={countSkusContabilizados}
-                      onChange={(e) => setCountSkusContabilizados(e.target.value)}
-                      className="w-full p-3 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 focus:border-zinc-800 outline-none transition-all font-mono bg-zinc-50"
-                    />
-                  </div>
+        {/* ABA CBC — CONFIDENCE BASED COUNTING */}
+        {activeTab === 'cbc' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <CBCDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} onNavigateToCount={() => setActiveTab('input')} />
+          </React.Suspense>
+        )}
 
-                  <div>
-                    <label className="block text-sm font-bold text-red-600 mb-1">Qtd. Divergências</label>
-                    <input
-                      type="number"
-                      required
-                      min="0"
-                      placeholder="Ex: 5"
-                      value={countDivergences}
-                      onChange={(e) => setCountDivergences(e.target.value)}
-                      className="w-full p-3 border border-red-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-red-500 outline-none transition-all font-mono bg-red-50"
-                    />
-                  </div>
-                </div>
+        {/* ABA INVENTÁRIO POR RISCO */}
+        {activeTab === 'risk' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <RiskDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} onNavigateToCount={() => setActiveTab('input')} />
+          </React.Suspense>
+        )}
 
-                <button
-                  type="submit"
-                  className="w-full bg-zinc-900 hover:bg-black text-white font-bold py-4 px-6 rounded-lg transition-colors flex items-center justify-center gap-2 mt-4 shadow-md"
-                >
-                  <Save size={20} />
-                  Salvar e Processar
-                </button>
-              </form>
-            </div>
-          </div>
+        {/* ABA CLASSIFICAÇÃO ABC/XYZ */}
+        {activeTab === 'abcxyz' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AbcXyzDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} onOpenProduct={() => setActiveTab('products')} />
+          </React.Suspense>
+        )}
+
+        {/* ABA WAREHOUSE DIGITAL TWIN */}
+        {activeTab === 'slotting' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <WarehouseDigitalTwinPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} onNavigateToCount={() => setActiveTab('input')} />
+          </React.Suspense>
+        )}
+
+        {/* ABA ROOT CAUSE ANALYSIS */}
+        {activeTab === 'rca' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <RcaDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} />
+          </React.Suspense>
+        )}
+
+        {/* ABA AUDITORIA DE ESTOQUE */}
+        {activeTab === 'audit' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AuditDashboardPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} />
+          </React.Suspense>
+        )}
+
+        {/* ABA ORDENS DE COMPRA */}
+        {activeTab === 'purchase-orders' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <PurchaseOrdersPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
+        {/* ABA LOGÍSTICA REVERSA */}
+        {activeTab === 'reverse-logistics' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ReverseLogisticsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+
+        {/* ANALYTICS: BLINDSCORE */}
+        {activeTab === 'analytics-blindscore' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <BlindScorePage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        )}
+
+        {/* ANALYTICS: INVENTORY HEALTH */}
+        {activeTab === 'analytics-health' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <InventoryHealthPage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        )}
+
+        {/* ANALYTICS: IA INSIGHTS */}
+        {activeTab === 'analytics-ia' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <IaInsightsPage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        )}
+
+        {/* ANALYTICS: AUDITORIAS */}
+        {activeTab === 'analytics-audit' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AuditsAnalyticsPage companyId={companyId} onNavigate={(tab) => setActiveTab(tab)} />
+          </React.Suspense>
+        )}
+
+        {/* CONFIGURAÇÕES AVANÇADAS: API / WEBHOOKS / LOGS — restrito a owner/admin (ver group.locked em navGroups) */}
+        {activeTab === 'config-api' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ApiKeysPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-webhooks' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <WebhooksPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-logs' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <LogsPage companyId={companyId} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-empresas-fiscais' && profile && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <FiscalEntitiesPage companyId={companyId} />
+          </React.Suspense>
+        )}
+        {activeTab === 'config-workspaces' && profile && company && canManageUsers(profile.role) && (
+          <React.Suspense fallback={<PageLoader />}>
+            <WorkspacesSettingsPage
+              company={company}
+              companies={companies}
+              userId={profile.id}
+              userEmail={profile.email}
+              switchingCompany={switchingCompany}
+              onSwitchCompany={switchCompany}
+              onCreateWorkspace={createWorkspace}
+              onRefresh={refreshProfile}
+            />
+          </React.Suspense>
+        )}
+
+        {/* ABA I.B ACADEMY */}
+        {activeTab === 'academy' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <AcademyRouter
+              userId={profile.id}
+              userEmail={profile.email ?? ''}
+              userName={profile.name ?? profile.email?.split('@')[0] ?? 'Colaborador'}
+              companyId={companyId}
+              role={profile.role}
+            />
+          </React.Suspense>
         )}
 
           </> /* end activeTab !== 'rankings' && activeTab !== 'label-generator' && activeTab !== 'full-manager' */
@@ -1928,17 +1713,15 @@ function AppContent() {
       </main>
 
       {/* ABA RANKINGS COMPLETOS - rendered as full page, outside overflow container */}
-      {activeTab === 'rankings' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+      {activeTab === 'rankings' && companyId && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <RankingsPage
             onBack={() => setActiveTab('dashboard')}
+            companyId={companyId}
             brandsData={globais.tabela}
             topVendas={topVendas}
-            opCapas={opCapas}
-            melhores={globais.melhores}
-            piores={globais.piores}
-            inProgress={globais.tabela.filter(b => b.status === 'ANDAMENTO')}
+            operatorStats={operatorStats}
           />
           </React.Suspense>
         </div>
@@ -1946,393 +1729,350 @@ function AppContent() {
 
       {/* FERRAMENTAS: GERADOR DE ETIQUETAS */}
       {activeTab === 'label-generator' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <LabelGeneratorPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         </div>
       )}
 
+      {/* FERRAMENTAS: LABORATÓRIO DE CÓDIGOS DE BARRAS */}
+      {activeTab === 'barcode-lab' && hasPermission(profile?.role, 'labels.use') && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <BarcodeLabPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* FERRAMENTAS: CENTRAL DE PDFS */}
+      {activeTab === 'pdf-center' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <PdfCenterPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* FERRAMENTAS: CALCULADORA DE PALETIZAÇÃO */}
+      {activeTab === 'pallet-calc' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <PalletCalcPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* FERRAMENTAS: FULL MANAGER */}
       {activeTab === 'full-manager' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <FullManagerPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         </div>
       )}
 
+      {/* FERRAMENTAS: INVENTORYFULL (app desktop — apresentação e download) */}
+      {activeTab === 'inventoryfull' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <InventoryFullPage onBack={() => setActiveTab('dashboard')} />
+          </React.Suspense>
+        </div>
+      )}
+
       {/* CONFERÊNCIA CEGA POR NF-E */}
       {activeTab === 'nfe-conference' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
-          <NFeConferencePage onBack={() => setActiveTab('dashboard')} />
+          <NFeConferencePage
+            onBack={() => setActiveTab('dashboard')}
+            initialInvoiceId={nfePendingInvoiceId ?? undefined}
+            onConsumedInitialInvoice={() => setNfePendingInvoiceId(null)}
+          />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* FERRAMENTAS: CONSULTA E DOWNLOAD DE XML/NFE */}
+      {activeTab === 'nfe-xml-lookup' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <NFeXmlLookupPage
+            onBack={() => setActiveTab('dashboard')}
+            onTransferToConference={(invoiceId) => {
+              setNfePendingInvoiceId(invoiceId);
+              setActiveTab('nfe-conference');
+            }}
+          />
           </React.Suspense>
         </div>
       )}
 
       {/* GERENCIAMENTO DE USUÁRIOS */}
       {activeTab === 'users' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-50 overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <UserManagementPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         </div>
       )}
 
+      {/* DIAGNÓSTICO DA OPERAÇÃO.
+          Mesma moldura em overlay das demais telas de tela cheia. Opcional por
+          definição: sair a qualquer momento devolve ao dashboard, e o rascunho local
+          guarda o que já foi respondido. */}
+      {activeTab === 'diagnostico' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <OperationDiagnostic
+            initial={diagnosticRecord}
+            onClose={() => setActiveTab('dashboard')}
+            onCompleted={() => setDiagnosticDone(true)}
+          />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* PRIVACIDADE E LEGAL. Mesma moldura em overlay das demais telas cheias. */}
+      {activeTab === 'legal' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+            <PrivacyLegalPage />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* AGENTES E AUTOMAÇÕES.
+          A tela é legível para qualquer papel; criar, editar e ativar é restrito, e o
+          gate espelha a policy da 051 para não oferecer controle que o banco recusa. */}
+      {activeTab === 'automacoes' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          <AutomationsPage
+            canManage={canManageAutomations(profile?.role)}
+            onBack={() => setActiveTab('dashboard')}
+          />
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* HUB DE INTEGRAÇÕES — catálogo (ERPs/marketplaces) + status real do Tiny.
+          Mesmo gate de papel da tela de gestão abaixo: navegar até o hub sem
+          poder gerenciar nada nele não ajudaria ninguém. */}
+      {activeTab === 'integracoes-hub' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          {canSyncIntegrations(profile?.role) ? (
+            <IntegrationsHubPage
+              onBack={() => setActiveTab('dashboard')}
+              onManageTiny={() => setActiveTab('integracoes')}
+            />
+          ) : (
+            <AccessDeniedPage onBack={() => setActiveTab('dashboard')} />
+          )}
+          </React.Suspense>
+        </div>
+      )}
+
+      {/* INTEGRAÇÕES — ERP e marketplaces.
+          Gated on the same roles the sync Edge Function accepts (owner/admin/
+          manager). The function refuses anyone else regardless, so this only keeps
+          the screen from offering buttons that would come back 403. */}
+      {activeTab === 'integracoes' && (
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
+          <React.Suspense fallback={<PageLoader />}>
+          {canSyncIntegrations(profile?.role) ? (
+            <IntegrationsPage onBack={() => setActiveTab('dashboard')} />
+          ) : (
+            <AccessDeniedPage onBack={() => setActiveTab('dashboard')} />
+          )}
+          </React.Suspense>
+        </div>
+      )}
+
       {/* CENTRAL DE SEGURANÇA */}
       {activeTab === 'security' && (
-        <div className="fixed inset-0 top-14 z-[900] bg-zinc-950 overflow-y-auto">
+        <div className="fixed inset-0 md:left-[calc(17.5rem+env(safe-area-inset-left))] z-[900] bg-surface overflow-y-auto pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] md:pl-0 pr-[env(safe-area-inset-right)]">
           <React.Suspense fallback={<PageLoader />}>
           <SecurityPage onBack={() => setActiveTab('dashboard')} />
           </React.Suspense>
         </div>
       )}
 
-      {/* MODAL ADICIONAR MARCA/LINHA */}
-      {showAddBrandModal && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-zinc-50">
-              <h3 className="font-bold text-zinc-900">Nova Linha/Marca</h3>
-              <button onClick={() => setShowAddBrandModal(false)} className="text-zinc-500 hover:text-zinc-800">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleAddBrand} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Nome da Linha / Marca</label>
-                <input
-                  type="text" required value={newBrandName} onChange={e => setNewBrandName(e.target.value)}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 outline-none bg-zinc-50"
-                  placeholder="Ex: Linha Premium AZ"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Total de SKUs Esperados</label>
-                <input
-                  type="number" required min="1" value={newBrandTotalSku} onChange={e => setNewBrandTotalSku(e.target.value)}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-zinc-800 outline-none bg-zinc-50"
-                  placeholder="Ex: 150"
-                />
-              </div>
-              <button type="submit" className="w-full bg-zinc-900 text-white font-bold py-3 rounded-lg hover:bg-black transition mt-2">
-                Cadastrar Linha
-              </button>
-            </form>
+      {/* MODAL NOVA LINHA DE CONTAGEM (controle de progresso do inventário — não é
+          marca/linha de catálogo; essa vive em Produtos → Linhas e Marcas) */}
+      <Modal open={showAddBrandModal} onClose={() => setShowAddBrandModal(false)} title="Nova Linha de Contagem" maxWidth="max-w-md">
+        <form onSubmit={handleAddBrand} className="space-y-4">
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Nome da Linha (controle de inventário)</label>
+            <input
+              type="text" required value={newBrandName} onChange={e => setNewBrandName(e.target.value)}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              placeholder="Ex: Linha Premium AZ"
+            />
           </div>
-        </div>
-      )}
-
-      {/* MODAL ADICIONAR KPI */}
-      {showAddKPIModal && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-blue-50">
-              <h3 className="font-bold text-zinc-900 flex items-center gap-2">
-                <Target size={18} className="text-blue-600" />
-                Novo KPI / Indicador
-              </h3>
-              <button onClick={() => setShowAddKPIModal(false)} className="text-zinc-500 hover:text-zinc-800">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={handleAddKPI} className="p-5 space-y-4">
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Título do KPI</label>
-                <input
-                  type="text" required value={newKPI.titulo} onChange={e => setNewKPI({...newKPI, titulo: e.target.value})}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  placeholder="Ex: Taxa de Aprovação"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Valor</label>
-                  <input
-                    type="text" required value={newKPI.valor} onChange={e => setNewKPI({...newKPI, valor: e.target.value})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                    placeholder="Ex: 95.5"
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Unidade</label>
-                  <input
-                    type="text" value={newKPI.unidade} onChange={e => setNewKPI({...newKPI, unidade: e.target.value})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                    placeholder="Ex: %"
-                  />
-                </div>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Variação / Descrição</label>
-                <input
-                  type="text" value={newKPI.variacao} onChange={e => setNewKPI({...newKPI, variacao: e.target.value})}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  placeholder="Ex: +5% vs mês anterior"
-                />
-              </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Tipo de Variação</label>
-                  <select
-                    value={newKPI.tipo_variacao}
-                    onChange={e => setNewKPI({...newKPI, tipo_variacao: e.target.value as 'up' | 'down' | 'neutral'})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  >
-                    <option value="up">Subiu (↑)</option>
-                    <option value="down">Caiu (↓)</option>
-                    <option value="neutral">Neutro</option>
-                  </select>
-                </div>
-                <div>
-                  <label className="block text-sm font-bold text-zinc-800 mb-1">Cor do Ícone</label>
-                  <select
-                    value={newKPI.cor_icone}
-                    onChange={e => setNewKPI({...newKPI, cor_icone: e.target.value as 'blue' | 'red' | 'amber' | 'emerald'})}
-                    className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none bg-zinc-50"
-                  >
-                    <option value="blue">Azul</option>
-                    <option value="red">Vermelho</option>
-                    <option value="amber">Âmbar</option>
-                    <option value="emerald">Verde</option>
-                  </select>
-                </div>
-              </div>
-              <button type="submit" className="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-700 transition mt-2 flex items-center justify-center gap-2">
-                <Plus size={18} />
-                Cadastrar KPI
-              </button>
-            </form>
+          <div>
+            <label className="block text-sm font-medium text-fg mb-1">Total de SKUs Esperados</label>
+            <input
+              type="number" required min="1" value={newBrandTotalSku} onChange={e => setNewBrandTotalSku(e.target.value)}
+              className="w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 bg-surface text-fg"
+              placeholder="Ex: 150"
+            />
           </div>
-        </div>
-      )}
-
-      {/* MODAL RESET DE INVENTÁRIO */}
-      {showResetModal && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-md overflow-hidden">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-red-50">
-              <h3 className="font-bold text-zinc-900 flex items-center gap-2">
-                <Archive size={18} className="text-red-600" />
-                Arquivar e Resetar Inventário
-              </h3>
-              <button onClick={() => setShowResetModal(false)} className="text-zinc-500 hover:text-zinc-800">
-                <X size={20} />
-              </button>
-            </div>
-            <form onSubmit={(e) => {
-              e.preventDefault();
-              const form = e.target as HTMLFormElement;
-              const formData = new FormData(form);
-              handleResetInventory(
-                formData.get('name') as string,
-                formData.get('notes') as string
-              );
-            }} className="p-5 space-y-4">
-              <div className="bg-red-50 border border-red-200 rounded-lg p-3">
-                <p className="text-sm text-red-800">
-                  Esta ação irá arquivar o inventário atual com todos os dados e iniciar um novo ciclo.
-                  <strong> Os dados das marcas serão mantidos, mas as contagens serão zeradas.</strong>
-                </p>
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Nome do Inventário Arquivado</label>
-                <input
-                  type="text"
-                  name="name"
-                  required
-                  defaultValue={`Inventário ${new Date().toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}`}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-zinc-50"
-                  placeholder="Ex: Inventário Junho 2026"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-bold text-zinc-800 mb-1">Observações (opcional)</label>
-                <textarea
-                  name="notes"
-                  rows={3}
-                  className="w-full p-2.5 border border-zinc-300 rounded-lg focus:ring-2 focus:ring-red-500 outline-none bg-zinc-50 resize-none"
-                  placeholder="Ex: Inventário finalizado com sucesso..."
-                />
-              </div>
-              <div className="bg-zinc-50 rounded-lg p-3 border border-zinc-200">
-                <p className="text-xs text-zinc-600 mb-2 font-semibold">Resumo do Inventário Atual:</p>
-                <div className="grid grid-cols-2 gap-2 text-xs">
-                  <span>Total SKUs: <strong>{globais.totalSku}</strong></span>
-                  <span>Contabilizados: <strong>{globais.totalDone}</strong></span>
-                  <span>Divergências: <strong>{globais.totalDiv}</strong></span>
-                  <span>Acuracidade: <strong>{globais.acuracidade.toFixed(1)}%</strong></span>
-                </div>
-              </div>
-              <button
-                type="submit"
-                disabled={resetProgress}
-                className="w-full bg-red-600 text-white font-bold py-3 rounded-lg hover:bg-red-700 transition flex items-center justify-center gap-2 disabled:opacity-50"
-              >
-                {resetProgress ? (
-                  <>
-                    <Loader2 size={18} className="animate-spin" />
-                    Processando...
-                  </>
-                ) : (
-                  <>
-                    <Archive size={18} />
-                    Confirmar Arquivamento e Reset
-                  </>
-                )}
-              </button>
-            </form>
-          </div>
-        </div>
-      )}
+          <button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent-strong transition mt-2">
+            Cadastrar Linha
+          </button>
+        </form>
+      </Modal>
 
       {/* MODAL HISTÓRICO DE INVENTÁRIO */}
-      {showHistoryModal && selectedSnapshot && (
-        <div className="fixed inset-0 bg-zinc-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-2 sm:p-4">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col">
-            <div className="flex justify-between items-center p-4 border-b border-zinc-200 bg-zinc-950 text-white">
-              <h3 className="font-bold text-lg flex items-center gap-2 tracking-wide">
-                <History className="text-emerald-400" /> {selectedSnapshot.name}
-              </h3>
-              <button onClick={() => {
-                setShowHistoryModal(false);
-                setSelectedSnapshot(null);
-                setSnapshotBrands([]);
-              }} className="text-zinc-400 hover:text-white p-1 rounded-md transition-colors">
-                <X size={24} />
-              </button>
-            </div>
-
-            <div className="p-4 sm:p-6 overflow-y-auto bg-zinc-100">
-              {/* Resumo do Inventório Arquivado */}
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-6 mb-6">
-                <h4 className="font-bold text-zinc-800 mb-4 flex items-center gap-2">
-                  <Calendar size={18} className="text-zinc-600" />
+      <Modal
+        open={showHistoryModal && !!selectedSnapshot}
+        onClose={() => {
+          setShowHistoryModal(false);
+          setSelectedSnapshot(null);
+          setSnapshotBrands([]);
+        }}
+        title={selectedSnapshot?.name}
+        maxWidth="max-w-5xl"
+      >
+        {selectedSnapshot && (
+          <div className="space-y-6">
+            {/* Resumo do Inventório Arquivado */}
+            <Panel>
+              <PanelSection padding="sm">
+                <h4 className="text-title flex items-center gap-2">
+                  <Calendar size={16} className="text-fg-subtle" />
                   Informações do Inventário
                 </h4>
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  <div className="bg-zinc-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-zinc-500 uppercase font-semibold">Início</p>
-                    <p className="text-sm font-bold text-zinc-800 mt-1">
+              </PanelSection>
+              <PanelSection>
+                <div className="grid grid-cols-2 md:grid-cols-4 divide-x divide-edge">
+                  <div className="text-center px-2">
+                    <p className="text-caption">Início</p>
+                    <p className="text-sm font-semibold text-fg mt-1">
                       {new Date(selectedSnapshot.start_date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <div className="bg-zinc-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-zinc-500 uppercase font-semibold">Término</p>
-                    <p className="text-sm font-bold text-zinc-800 mt-1">
+                  <div className="text-center px-2">
+                    <p className="text-caption">Término</p>
+                    <p className="text-sm font-semibold text-fg mt-1">
                       {new Date(selectedSnapshot.end_date).toLocaleDateString('pt-BR')}
                     </p>
                   </div>
-                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-emerald-600 uppercase font-semibold">Progresso</p>
-                    <p className="text-xl font-bold text-emerald-700 mt-1">{selectedSnapshot.progress.toFixed(1)}%</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Progresso</p>
+                    <p className="text-title text-emerald-600 dark:text-emerald-400 mt-1">{selectedSnapshot.progress.toFixed(1)}%</p>
                   </div>
-                  <div className="bg-blue-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-blue-600 uppercase font-semibold">Acuracidade</p>
-                    <p className="text-xl font-bold text-blue-700 mt-1">{selectedSnapshot.accuracy.toFixed(1)}%</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Acuracidade</p>
+                    <p className="text-title text-accent mt-1">{selectedSnapshot.accuracy.toFixed(1)}%</p>
                   </div>
                 </div>
-                <div className="grid grid-cols-3 gap-4 mt-4">
-                  <div className="bg-zinc-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-zinc-500 uppercase font-semibold">Total SKUs</p>
-                    <p className="text-lg font-bold text-zinc-800 mt-1">{selectedSnapshot.total_sku}</p>
+                <div className="grid grid-cols-3 divide-x divide-edge mt-4 pt-4 border-t border-edge">
+                  <div className="text-center px-2">
+                    <p className="text-caption">Total SKUs</p>
+                    <p className="text-sm font-semibold text-fg mt-1">{selectedSnapshot.total_sku}</p>
                   </div>
-                  <div className="bg-emerald-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-emerald-600 uppercase font-semibold">Contabilizados</p>
-                    <p className="text-lg font-bold text-emerald-700 mt-1">{selectedSnapshot.total_done}</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Contabilizados</p>
+                    <p className="text-sm font-semibold text-emerald-600 dark:text-emerald-400 mt-1">{selectedSnapshot.total_done}</p>
                   </div>
-                  <div className="bg-red-50 rounded-lg p-3 text-center">
-                    <p className="text-xs text-red-600 uppercase font-semibold">Divergências</p>
-                    <p className="text-lg font-bold text-red-700 mt-1">{selectedSnapshot.total_divergences}</p>
+                  <div className="text-center px-2">
+                    <p className="text-caption">Divergências</p>
+                    <p className="text-sm font-semibold text-red-600 dark:text-red-400 mt-1">{selectedSnapshot.total_divergences}</p>
                   </div>
                 </div>
                 {selectedSnapshot.notes && (
-                  <div className="mt-4 bg-amber-50 border border-amber-200 rounded-lg p-3">
-                    <p className="text-xs text-amber-800 font-semibold">Observações:</p>
-                    <p className="text-sm text-amber-700 mt-1">{selectedSnapshot.notes}</p>
+                  <div className="mt-4 bg-amber-500/10 rounded-lg p-3">
+                    <p className="text-xs text-amber-700 dark:text-amber-400 font-medium">Observações:</p>
+                    <p className="text-sm text-amber-700 dark:text-amber-400 mt-1">{selectedSnapshot.notes}</p>
                   </div>
                 )}
-              </div>
+              </PanelSection>
+            </Panel>
 
-              {/* Tabela de Marcas do Histórico */}
-              <div className="bg-white rounded-xl shadow-sm border border-zinc-200 overflow-hidden">
-                <div className="bg-zinc-900 p-4 border-b border-zinc-800 text-white font-bold text-sm">
-                  Desempenho por Linha/Marca
-                </div>
-                <div className="overflow-x-auto">
-                  <table className="w-full text-sm text-left whitespace-nowrap">
-                    <thead className="text-[10px] text-zinc-500 uppercase bg-zinc-50 border-b border-zinc-200 sticky top-0">
-                      <tr>
-                        <th className="px-3 py-3 font-semibold">Linha / Marca</th>
-                        <th className="px-3 py-3 font-semibold text-center">Total SKU</th>
-                        <th className="px-3 py-3 font-semibold text-center">Concluídos</th>
-                        <th className="px-3 py-3 font-semibold text-center">Divergências</th>
-                        <th className="px-3 py-3 font-semibold text-center">Progresso</th>
-                        <th className="px-3 py-3 font-semibold text-center">Acuracidade</th>
-                        <th className="px-3 py-3 font-semibold text-center">Status</th>
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {snapshotBrands.map((brand, idx) => (
-                        <tr key={idx} className="border-b border-zinc-100 hover:bg-zinc-50">
-                          <td className="px-3 py-2 font-medium text-zinc-800">{brand.brand}</td>
-                          <td className="px-3 py-2 text-center text-zinc-600">{brand.total_sku}</td>
-                          <td className="px-3 py-2 text-center font-semibold">{brand.done_sku}</td>
-                          <td className="px-3 py-2 text-center text-red-600 font-semibold">{brand.divergences}</td>
-                          <td className="px-3 py-2 text-center">
-                            <span className="text-xs font-mono">{brand.progress.toFixed(1)}%</span>
-                          </td>
-                          <td className="px-3 py-2 text-center font-bold">
-                            {brand.accuracy !== null ? (
-                              <span className={brand.accuracy >= 80 ? 'text-emerald-600' : brand.accuracy >= 50 ? 'text-amber-600' : 'text-red-600'}>
-                                {brand.accuracy.toFixed(1)}%
-                              </span>
-                            ) : '-'}
-                          </td>
-                          <td className="px-3 py-2 text-center">
-                            <span className={`px-2 py-1 text-[10px] uppercase font-bold rounded-md ${
-                              brand.status === 'CONCLUÍDO'
-                                ? 'bg-emerald-100 text-emerald-800'
-                                : 'bg-amber-100 text-amber-800'
-                            }`}>
-                              {brand.status}
+            {/* Tabela de Marcas do Histórico */}
+            <Panel>
+              <PanelSection padding="sm">
+                <h4 className="text-title">Desempenho por Linha/Marca</h4>
+              </PanelSection>
+              <div className="overflow-x-auto">
+                <table className="w-full text-sm text-left whitespace-nowrap">
+                  <thead>
+                    <tr className="border-b border-edge">
+                      <th className="px-4 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide">Linha / Marca</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Total SKU</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Concluídos</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Divergências</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Progresso</th>
+                      <th className="px-3 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Acuracidade</th>
+                      <th className="px-4 py-3 font-medium text-fg-subtle text-xs uppercase tracking-wide text-center">Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {snapshotBrands.map((brand, idx) => (
+                      <tr key={idx} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
+                        <td className="px-4 py-2.5 font-medium text-fg">{brand.brand}</td>
+                        <td className="px-3 py-2.5 text-center text-fg-muted">{brand.total_sku}</td>
+                        <td className="px-3 py-2.5 text-center font-semibold text-fg">{brand.done_sku}</td>
+                        <td className="px-3 py-2.5 text-center text-red-600 dark:text-red-400 font-semibold">{brand.divergences}</td>
+                        <td className="px-3 py-2.5 text-center">
+                          <span className="text-xs text-fg-muted font-mono">{brand.progress.toFixed(1)}%</span>
+                        </td>
+                        <td className="px-3 py-2.5 text-center font-semibold">
+                          {brand.accuracy !== null ? (
+                            <span className={brand.accuracy >= 80 ? 'text-emerald-600 dark:text-emerald-400' : brand.accuracy >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}>
+                              {brand.accuracy.toFixed(1)}%
                             </span>
-                          </td>
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
+                          ) : '-'}
+                        </td>
+                        <td className="px-4 py-2.5 text-center">
+                          <span className={`text-xs font-medium ${
+                            brand.status === 'CONCLUÍDO' ? 'text-emerald-600 dark:text-emerald-400' : 'text-fg-subtle'
+                          }`}>
+                            {brand.status === 'CONCLUÍDO' ? 'Concluído' : 'Em andamento'}
+                          </span>
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
               </div>
-            </div>
+            </Panel>
           </div>
-        </div>
-      )}
+        )}
+      </Modal>
 
       {/* PWA Install Instructions Modal (iOS) */}
       {showInstallModal && (
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center bg-black/60 backdrop-blur-sm" onClick={() => setShowInstallModal(false)}>
-          <div className="bg-zinc-900 border border-zinc-700 rounded-2xl p-6 max-w-sm mx-4 shadow-2xl" onClick={e => e.stopPropagation()}>
+        <div
+          className="fixed inset-0 flex items-center justify-center bg-black/60 backdrop-blur-sm"
+          style={{ zIndex: 'var(--z-modal)' }}
+          onClick={() => setShowInstallModal(false)}
+        >
+          <div className="bg-surface-2 border border-edge rounded-sheet p-6 max-w-sm mx-4 shadow-overlay" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-emerald-500/15 rounded-xl flex items-center justify-center">
-                <Smartphone size={20} className="text-emerald-400" />
+              <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
+                <Smartphone size={20} className="text-accent" />
               </div>
-              <h3 className="text-lg font-bold text-white">Instalar InventoryBlind</h3>
+              <h3 className="text-lg font-bold text-fg">Instalar InventoryBlind</h3>
             </div>
-            <p className="text-zinc-400 text-sm mb-4">Para instalar no iPhone ou iPad:</p>
-            <ol className="space-y-3 text-sm text-zinc-300">
-              <li className="flex gap-2"><span className="font-bold text-emerald-400">1.</span> Abra esta página no Safari</li>
-              <li className="flex gap-2"><span className="font-bold text-emerald-400">2.</span> Toque no botão <strong>Compartilhar</strong></li>
-              <li className="flex gap-2"><span className="font-bold text-emerald-400">3.</span> Selecione <strong>"Adicionar à Tela de Início"</strong></li>
+            <p className="text-fg-muted text-sm mb-4">Para instalar no iPhone ou iPad:</p>
+            <ol className="space-y-3 text-sm text-fg-muted">
+              <li className="flex gap-2"><span className="font-bold text-accent">1.</span> Abra esta página no Safari</li>
+              <li className="flex gap-2"><span className="font-bold text-accent">2.</span> Toque no botão <strong>Compartilhar</strong></li>
+              <li className="flex gap-2"><span className="font-bold text-accent">3.</span> Selecione <strong>"Adicionar à Tela de Início"</strong></li>
             </ol>
-            <button onClick={() => setShowInstallModal(false)} className="w-full mt-5 py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-semibold text-sm transition">
+            <button onClick={() => setShowInstallModal(false)} className="w-full mt-5 py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-semibold text-sm transition">
               Entendi
             </button>
           </div>
         </div>
       )}
 
+      </div>
     </div>
   );
 }
@@ -2340,48 +2080,149 @@ function AppContent() {
 // ── Link Company screen ───────────────────────────────────────────────────────
 
 function LinkCompanyScreen() {
-  const { linkToAZ, signOut, user } = useAuth();
-  const [linking, setLinking] = useState(false);
+  const { linkToAZ, createCompany, joinByInviteCode, inviteCodeError, clearInviteCodeError, signOut, user } = useAuth();
+  const [companyName, setCompanyName] = useState('');
+  const [creating, setCreating] = useState(false);
+  const [linkingAZ, setLinkingAZ] = useState(false);
+  const [inviteCode, setInviteCode] = useState('');
+  const [joiningByCode, setJoiningByCode] = useState(false);
   const [error, setError] = useState('');
 
-  const handleLink = async () => {
-    setLinking(true);
+  // Um código de convite informado no cadastro (SignupView, modo "Tenho um código de convite")
+  // já foi tentado automaticamente em runAuthSequence antes desta tela aparecer. Se falhou, o
+  // motivo chega aqui em vez de a pessoa cair silenciosamente em "criar empresa" sem explicação —
+  // consumido uma vez e limpo, para não reaparecer se ela tentar de novo manualmente abaixo.
+  useEffect(() => {
+    if (inviteCodeError) {
+      setError(inviteCodeError);
+      clearInviteCodeError();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // This screen is a recovery path — the golden signup flow creates the
+  // company via create_company_onboarding() right after signUp() and never
+  // lands here. A user only reaches this if that RPC call failed (network
+  // blip) or their profile predates onboarding. "Vincular à empresa AZ" is a
+  // legacy dev/demo shortcut, not a real option for a genuine new tenant —
+  // keep it visible only for the one account it was ever meant for.
+  const isDevOwner = user?.email === 'victor@azbuy.com.br';
+
+  const handleCreate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!companyName.trim()) { setError('Informe o nome da empresa.'); return; }
+    setCreating(true);
+    setError('');
+    try {
+      await createCompany(companyName.trim());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : String(err);
+      console.error('[LinkCompanyScreen] createCompany error:', msg);
+      setError('Não foi possível concluir a configuração da empresa. Tente novamente.');
+      setCreating(false);
+    }
+  };
+
+  const handleJoinByCode = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!inviteCode.trim()) { setError('Informe o código de convite.'); return; }
+    setJoiningByCode(true);
+    setError('');
+    try {
+      await joinByInviteCode(inviteCode.trim());
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Código de convite inválido.';
+      setError(msg);
+      setJoiningByCode(false);
+    }
+  };
+
+  const handleLinkAZ = async () => {
+    setLinkingAZ(true);
     setError('');
     try {
       await linkToAZ();
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : String(err);
-      console.error('[LinkCompanyScreen] Error:', msg);
+      console.error('[LinkCompanyScreen] linkToAZ error:', msg);
       setError(msg);
-      setLinking(false);
+      setLinkingAZ(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-zinc-800 rounded-2xl p-8 text-center shadow-2xl">
-        <div className="w-14 h-14 bg-emerald-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
-          <BarChart3 size={28} className="text-emerald-400" />
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-surface-2 border border-edge rounded-sheet p-8 text-center shadow-overlay">
+        <div className="w-14 h-14 bg-accent/10 rounded-container flex items-center justify-center mx-auto mb-5">
+          <LogoMark size={28} className="text-accent" />
         </div>
-        <h2 className="text-xl font-black text-white mb-2">Vincular Empresa</h2>
-        <p className="text-zinc-500 text-sm mb-1">Logado como</p>
-        <p className="text-white text-sm font-semibold mb-6">{user?.email}</p>
-        <p className="text-zinc-400 text-sm mb-6">
-          Sua conta está ativa mas ainda não está vinculada a uma empresa.
+        <h2 className="text-xl font-bold text-fg mb-2">Configurar Empresa</h2>
+        <p className="text-fg-subtle text-sm mb-1">Logado como</p>
+        <p className="text-fg text-sm font-semibold mb-6">{user?.email}</p>
+        <p className="text-fg-muted text-sm mb-6">
+          Sua conta está ativa mas ainda não está vinculada a uma empresa. Crie a sua para continuar.
         </p>
         {error && (
-          <div className="bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4 text-left">
-            <p className="text-red-400 text-xs font-mono break-all whitespace-pre-wrap">{error}</p>
+          <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4 text-left">
+            <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-red-400" />
+            <p className="text-red-400 text-xs">{error}</p>
           </div>
         )}
-        <button
-          onClick={handleLink}
-          disabled={linking}
-          className="w-full flex items-center justify-center gap-2 py-3.5 bg-emerald-500 hover:bg-emerald-400 disabled:opacity-60 text-white rounded-xl font-bold text-sm transition mb-3"
-        >
-          {linking ? <Loader2 size={16} className="animate-spin" /> : 'Vincular à empresa AZ'}
-        </button>
-        <button onClick={signOut} className="text-xs text-zinc-500 hover:text-zinc-300 transition">
+        <form onSubmit={handleCreate} className="text-left mb-3">
+          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1.5">
+            Nome da Empresa
+          </label>
+          <input
+            type="text"
+            value={companyName}
+            onChange={e => setCompanyName(e.target.value)}
+            placeholder="Minha Empresa Ltda"
+            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-xl text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
+          />
+          <button
+            type="submit"
+            disabled={creating}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-xl font-bold text-sm transition"
+          >
+            {creating ? <Loader2 size={16} className="animate-spin" /> : 'Criar minha empresa'}
+          </button>
+        </form>
+
+        <div className="flex items-center gap-3 my-4" aria-hidden="true">
+          <div className="h-px flex-1 bg-edge" />
+          <span className="text-[11px] uppercase tracking-wider text-fg-subtle/70">ou</span>
+          <div className="h-px flex-1 bg-edge" />
+        </div>
+
+        <form onSubmit={handleJoinByCode} className="text-left mb-3">
+          <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1.5">
+            Código de Convite da Empresa
+          </label>
+          <input
+            type="text"
+            value={inviteCode}
+            onChange={e => setInviteCode(e.target.value.toUpperCase())}
+            placeholder="Ex.: AB3DFGHJ"
+            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-xl text-fg text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
+          />
+          <button
+            type="submit"
+            disabled={joiningByCode}
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge disabled:opacity-60 text-fg rounded-xl font-bold text-sm transition"
+          >
+            {joiningByCode ? <Loader2 size={16} className="animate-spin" /> : 'Entrar com código de convite'}
+          </button>
+        </form>
+        {isDevOwner && (
+          <button
+            onClick={handleLinkAZ}
+            disabled={linkingAZ}
+            className="w-full flex items-center justify-center gap-2 py-2.5 text-fg-subtle hover:text-fg-muted disabled:opacity-60 text-xs transition mb-3"
+          >
+            {linkingAZ ? <Loader2 size={14} className="animate-spin" /> : 'Vincular à empresa AZ (conta de teste)'}
+          </button>
+        )}
+        <button onClick={signOut} className="text-xs text-fg-subtle hover:text-fg-muted transition">
           Sair
         </button>
       </div>
@@ -2395,28 +2236,28 @@ function AuthErrorScreen() {
   const { authError, retryAuth, signOut } = useAuth();
 
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center px-4">
-      <div className="w-full max-w-md bg-zinc-900 border border-red-500/20 rounded-2xl p-8 text-center shadow-2xl">
-        <div className="w-14 h-14 bg-red-500/15 rounded-2xl flex items-center justify-center mx-auto mb-5">
+    <div className="min-h-screen bg-surface flex items-center justify-center px-4">
+      <div className="w-full max-w-md bg-surface-2 border border-red-500/20 rounded-sheet p-8 text-center shadow-overlay">
+        <div className="w-14 h-14 bg-red-500/15 rounded-container flex items-center justify-center mx-auto mb-5">
           <AlertTriangle size={28} className="text-red-400" />
         </div>
-        <h2 className="text-xl font-black text-white mb-2">Erro ao carregar</h2>
-        <p className="text-zinc-400 text-sm mb-6">{authError ?? 'Ocorreu um erro inesperado.'}</p>
+        <h2 className="text-xl font-bold text-fg mb-2">Erro ao carregar</h2>
+        <p className="text-fg-muted text-sm mb-6">{authError ?? 'Ocorreu um erro inesperado.'}</p>
         <button
           onClick={retryAuth}
-          className="w-full py-3 bg-emerald-500 hover:bg-emerald-400 text-white rounded-xl font-bold text-sm transition mb-3"
+          className="w-full py-3 bg-accent hover:bg-accent-strong text-white rounded-xl font-bold text-sm transition mb-3"
         >
           Tentar novamente
         </button>
         <button
           onClick={signOut}
-          className="w-full py-3 bg-zinc-800 hover:bg-zinc-700 text-white rounded-xl font-bold text-sm transition mb-3"
+          className="w-full py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-bold text-sm transition mb-3"
         >
           Sair da conta
         </button>
         <button
           onClick={() => window.location.href = '/'}
-          className="text-xs text-zinc-500 hover:text-zinc-300 transition"
+          className="text-xs text-fg-subtle hover:text-fg-muted transition"
         >
           Voltar para homepage
         </button>
@@ -2429,18 +2270,18 @@ function AuthErrorScreen() {
 
 function ProfileLoadingOverlay() {
   return (
-    <div className="min-h-screen bg-zinc-950 flex items-center justify-center">
+    <div className="min-h-screen bg-surface flex items-center justify-center">
       <div className="text-center">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 bg-emerald-500 rounded-xl flex items-center justify-center">
-            <BarChart3 size={20} className="text-white" />
+          <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center">
+            <LogoMark size={20} className="text-white" />
           </div>
-          <span className="text-xl font-bold text-white tracking-wide">
-            Inventory<span className="text-emerald-400 font-light">Blind</span>
+          <span className="text-xl font-bold text-fg tracking-wide">
+            Inventory<span className="text-accent font-light">Blind</span>
           </span>
         </div>
-        <Loader2 className="mx-auto animate-spin text-emerald-500" size={32} />
-        <p className="text-zinc-500 text-sm mt-3">Carregando seu perfil...</p>
+        <Loader2 className="mx-auto animate-spin text-accent" size={32} />
+        <p className="text-fg-subtle text-sm mt-3">Carregando seu perfil...</p>
       </div>
     </div>
   );
@@ -2448,28 +2289,79 @@ function ProfileLoadingOverlay() {
 
 // ── App shell ─────────────────────────────────────────────────────────────────
 
+// Supabase persists the session under a `sb-<ref>-auth-token` localStorage key.
+// Checking for it synchronously (before the async onAuthStateChange/getSession
+// resolves) lets us hold off rendering the public Homepage for a returning
+// authenticated user — eliminating the Homepage→Dashboard flash on tab refocus —
+// while leaving genuinely anonymous visitors (no key present) on the instant,
+// non-blocked landing path described in auth.tsx's rule #2.
+function hasPersistedSession(): boolean {
+  try {
+    return Object.keys(localStorage).some(k => k.includes('-auth-token'));
+  } catch {
+    return false;
+  }
+}
+
 export default function App() {
-  const { view, authLoading, profileLoading } = useAuth();
+  const { view, authLoading, profileLoading, companyId } = useAuth();
+  const [hadStoredSession] = useState(hasPersistedSession);
 
   // Auth error
   if (view === 'auth-error') return <AuthErrorScreen />;
 
+  // A session was persisted — validate it before ever showing the public Homepage.
+  if (hadStoredSession && authLoading) return <ProfileLoadingOverlay />;
+
   // Public routes — never block on auth
-  if (view === 'landing') return <LandingPage />;
-  if (view === 'login' || view === 'signup' || view === 'forgot' || view === 'confirm-email') return <AuthPage />;
+  if (view === 'landing') {
+    return (
+      <React.Suspense fallback={<LandingFallback />}>
+        <LandingPage />
+      </React.Suspense>
+    );
+  }
+  if (view === 'login' || view === 'signup' || view === 'forgot' || view === 'update-password' || view === 'confirm-email') return <AuthPage />;
 
   // Auth still initializing (session check in progress)
   if (authLoading) return <ProfileLoadingOverlay />;
 
   // Authenticated-only screens
   if (view === 'link-company' || view === 'complete-profile') return <LinkCompanyScreen />;
+  if (view === 'select-workspace') return <WorkspaceSelectorScreen />;
 
   // Profile loading after login
   if (profileLoading && view !== 'app') return <ProfileLoadingOverlay />;
 
-  // Main app
-  if (view === 'app') return <AppContent />;
+  // Main app.
+  //
+  // `key={companyId}`: trocar de workspace muda profiles.company_id, e o RLS passa a
+  // responder pela empresa nova na hora — mas a árvore React continuava montada, então
+  // toda tela que busca dados no mount (sem companyId nas deps) seguia exibindo o que
+  // já tinha carregado da empresa anterior. Não é vazamento de banco (uma leitura nova
+  // seria barrada), mas na tela é indistinguível de um. Remontar é a única correção que
+  // vale para as telas de hoje e para as que ainda vão existir; corrigir dependência a
+  // dependência deixaria a próxima tela nova com o mesmo bug.
+  //
+  // Só dispara na troca: quando `view` vira 'app' o companyId já está resolvido, então
+  // não há remontagem extra na entrada. O activeTab volta para o dashboard, que é o
+  // correto — a aba aberta descrevia o contexto da empresa anterior.
+  // O aceite é exigido depois de a sessão existir e antes do sistema aparecer.
+  // Fica AQUI, e não dentro de AppContent, para valer para qualquer empresa
+  // selecionada — e porque o `key={companyId}` remontaria o gate a cada troca de
+  // workspace, repetindo a verificação sem necessidade.
+  if (view === 'app') {
+    return (
+      <LegalAcceptanceGate>
+        <AppContent key={companyId} />
+      </LegalAcceptanceGate>
+    );
+  }
 
   // Absolute fallback
-  return <LandingPage />;
+  return (
+    <React.Suspense fallback={<LandingFallback />}>
+      <LandingPage />
+    </React.Suspense>
+  );
 }

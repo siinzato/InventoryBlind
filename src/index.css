@@ -2,6 +2,30 @@
 @tailwind components;
 @tailwind utilities;
 
+/* ── Typeface ──────────────────────────────────────────────────────────────
+   No licensed SF Pro files ship with this project, so we don't fake the name
+   — 'SF Pro Display'/'SF Pro Text' stay first in the stacks below and take
+   over automatically the day real files are installed. Until then, Geist
+   (self-hosted, OFL-licensed, variable) is the deliberate fallback: it reads
+   in the same precise/technical register SF Pro does, on every OS — unlike
+   the previous -apple-system stack, which fell through to plain Segoe UI on
+   Windows and lost that character entirely. */
+@font-face {
+  font-family: 'Geist Sans';
+  src: url('/fonts/Geist-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: 'Geist Mono';
+  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
+  font-weight: 100 900;
+  font-style: normal;
+  font-display: swap;
+}
+
 /* Global Layout Fixes */
 
 /* Prevent horizontal scroll on body */
@@ -17,6 +41,24 @@ html, body {
   flex-direction: column;
 }
 
+/* iOS Safari's address bar show/hide makes `100vh` (h-screen/min-h-screen)
+   taller than the actually-visible viewport, so back-to-back full-height
+   landing sections (Hero, CinematicDashboard, OperationalJourney) can render
+   overlapping — the next section's content bleeds into the current one.
+   `100dvh` tracks the real visible viewport; @supports keeps `vh` as the
+   fallback for browsers that don't understand `dvh`. */
+@supports (height: 100dvh) {
+  .h-screen {
+    height: 100dvh;
+  }
+  .min-h-screen {
+    min-height: 100dvh;
+  }
+  #root {
+    min-height: 100dvh;
+  }
+}
+
 /* Z-index scale for layered components */
 :root {
   --z-base: 1;
@@ -28,6 +70,79 @@ html, body {
   --z-popover: 2000;
   --z-tooltip: 4000;
   --z-toast: 5000;
+
+  /* Authenticated-app theme tokens (light default). Landing/AuthPage don't
+     reference these — untouched by the .dark class below.
+
+     Surface order is depth order: `surface` is the recessed page, `surface-2`
+     is content raised out of it, `surface-3` is inset again (fields, hover,
+     wells). Light mode used to invert this — a white page with grey panels,
+     which read as a grid of boxes stamped onto the page instead of content
+     lifted off it. Dark mode always had it right (panel lighter than page);
+     light mode now matches that logic, so both themes describe the same
+     hierarchy and panels can lean on contrast instead of a stroke. */
+  --surface: 243 244 247;
+  --surface-2: 255 255 255;
+  --surface-3: 238 240 244;
+  --edge: 224 227 233;
+  --fg: 15 23 42;
+  --fg-muted: 82 92 110;
+  --fg-subtle: 139 147 162;
+  --accent: 30 95 191;
+  --accent-strong: 18 60 130;
+
+  /* Sidebar "rail" — the deep-navy icon strip, fixed brand identity like the
+     Landing's ink/mist/enterprise scale (not a new arbitrary color: derived
+     from the same enterprise-900/700 already declared in tailwind.config.js).
+     Rail stays dark in both themes; only its depth shifts per theme, same as
+     the reference. */
+  --rail: 10 38 71;          /* enterprise-900 #0A2647 */
+  --rail-active: 18 59 110;  /* enterprise-700 #123B6E */
+  --rail-fg: 255 255 255;
+  --rail-fg-muted: 154 176 209;
+}
+
+.dark {
+  /* Matches the Homepage's ink/mist/enterprise values exactly — dark mode
+     here IS the Homepage identity. */
+  --surface: 11 13 18;
+  --surface-2: 18 21 28;
+  --surface-3: 27 31 41;
+  --edge: 42 47 59;
+  --fg: 231 234 240;
+  --fg-muted: 138 147 166;
+  --fg-subtle: 100 108 122;
+  --accent: 62 123 224;
+  --accent-strong: 127 179 245;
+
+  /* Deeper than the light theme's rail, per spec — still the same navy family. */
+  --rail: 6 20 38;           /* ~#061426 */
+  --rail-active: 14 42 78;   /* ~#0E2A4E */
+  --rail-fg: 255 255 255;
+  --rail-fg-muted: 130 150 181;
+}
+
+/* Authenticated-app typography scale — one shared set of sizes/weights
+   instead of ad-hoc text-2xl/font-black per screen. Landing/AuthPage keep
+   their own typography and never reference these classes. */
+@layer components {
+  .text-display  { @apply font-display text-3xl font-semibold tracking-tight text-fg; }
+  .text-title    { @apply font-display text-xl font-semibold tracking-tight text-fg; }
+  .text-headline { @apply font-display text-base font-semibold text-fg; }
+  /* Panel/section heading. This was a 12px uppercase grey micro-label, which
+     made every panel title weigh the same as the data inside it — the single
+     biggest reason the app read as a generic admin template. It is a real
+     heading now: display face, 15px, primary colour, no shouting caps. The
+     old treatment survives as .text-overline for the few places that genuinely
+     want a kicker above a title. */
+  .text-section  { @apply font-display text-[0.9375rem] font-semibold tracking-tight text-fg; }
+  .text-overline { @apply text-xs font-semibold uppercase tracking-wide text-fg-subtle; }
+  .text-body     { @apply text-sm text-fg; }
+  .text-label    { @apply text-xs font-medium text-fg-muted; }
+  .text-caption  { @apply text-xs text-fg-subtle; }
+  /* Precise, aligned figures for KPIs, table numbers, IDs — never the
+     proportional/lining digits a display face uses for prose. */
+  .text-numeric  { @apply font-mono tabular-nums; }
 }
 
 /* Proper scroll containers */
@@ -94,30 +209,91 @@ html, body {
   contain: layout;
 }
 
-/* Scrollbar styling */
+/* Scrollbar styling — resolves through the theme tokens so the bar follows
+   light/dark instead of painting a fixed light-gray track over dark
+   surfaces. The previous hardcoded #f1f1f1/#c1c1c1 pair ignored `.dark`
+   entirely (and `scrollbar-color` carried a stray lavender #c1c1f1). */
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;
 }
 
 ::-webkit-scrollbar-track {
-  background: #f1f1f1;
+  background: rgb(var(--surface-3));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb {
-  background: #c1c1c1;
+  background: rgb(var(--edge));
   border-radius: 4px;
 }
 
 ::-webkit-scrollbar-thumb:hover {
-  background: #a1a1a1;
+  background: rgb(var(--fg-subtle));
+}
+
+/* React Flow (editor de automações) x reset do Tailwind — a base do Tailwind
+   aplica `max-width: 100%` a todo `<svg>` (parte do reset de elementos
+   substituídos, junto com img/video/canvas). O React Flow desenha as
+   conexões dentro de um `<svg>` cujo contêiner imediato (`.react-flow__edges`)
+   é propositalmente 0×0 por design da própria lib — o SVG é quem recebe
+   `width: 100%`/`height: 100%` e se estica visualmente por cima. `max-width`
+   só afeta largura, não altura, e por isso o bug é exatamente esse: altura
+   calcula certo, largura vira 100% de 0 = 0, e a linha existe no DOM nas
+   coordenadas certas mas com largura zero — invisível. Escopado a
+   `.react-flow` para não afetar nenhum outro SVG do app. */
+.react-flow svg {
+  max-width: none;
 }
 
 /* Firefox scrollbar */
 * {
   scrollbar-width: thin;
-  scrollbar-color: #c1c1f1 #f1f1f1;
+  scrollbar-color: rgb(var(--edge)) rgb(var(--surface-3));
+}
+
+/* Body/label type lift — authenticated app only.
+   Formal extension of the type scale (design doc §4.2/§23).
+
+   The app resolved to 1.080 of ~1.230 text-size usages being `text-xs` (12px)
+   or `text-sm` (14px): a flat wall of small type, which is the real reason the
+   interface read as a dense admin panel no matter how clean the tokens were.
+   Body steps to 15px and small labels to 13px — still compact for a WMS working
+   screen, but with air and a legible floor.
+
+   Scoped to [data-app-shell] rather than set in tailwind.config.js, because the
+   Tailwind override is global and would have resized the frozen Landing/AuthPage
+   too (70 usages there). Specificity (0,2,0) beats the utility (0,1,0), and the
+   rules sit after `@tailwind utilities`, so they win without !important. Only
+   one responsive variant of these utilities exists in the whole codebase and it
+   is outside this scope, so no `md:text-sm` gets shadowed. */
+[data-app-shell] .text-sm { font-size: 0.9375rem; line-height: 1.55; }
+[data-app-shell] .text-xs { font-size: 0.8125rem; line-height: 1.45; }
+
+/* Motion accessibility — authenticated app only.
+   The Landing/Auth zone already resolves this itself through
+   useAnimationTier()/landingMotion and must not be touched here, so this is
+   scoped to [data-app-shell] (set on the app shell root in App.tsx) instead
+   of being a global reset. Inside the app, motion is functional-only: a
+   reduced-motion user keeps state changes and spinners' meaning but loses
+   pulses, hover scaling and long transitions. */
+@media (prefers-reduced-motion: reduce) {
+  /* :not(.animate-spin) — a spinner is progress feedback, not decoration:
+     freezing it would remove information, so it keeps turning. Pulses,
+     bounces and pings carry nothing and stop. */
+  [data-app-shell] *:not(.animate-spin),
+  [data-app-shell] *::before,
+  [data-app-shell] *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
+  /* Hover scaling communicates nothing the color change doesn't. */
+  [data-app-shell] .hover\:scale-\[1\.02\]:hover,
+  [data-app-shell] .hover\:scale-\[1\.01\]:hover {
+    transform: none !important;
+  }
 }
 
 /* ── PWA & Global Responsive ──────────────────────────────────────────── */

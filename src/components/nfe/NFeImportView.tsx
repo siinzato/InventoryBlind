@@ -3,6 +3,7 @@ import { Upload, ClipboardPaste, Loader2, AlertCircle, FileText, ArrowRight, Eye
 import { importNfeXml, NfeImportError } from '../../lib/nfe/nfeService';
 import type { NfeInvoice } from '../../lib/nfe/nfeTypes';
 import { InvoiceStatusBadge, formatDate } from './nfeUi';
+import { Card, Button } from '../ui';
 
 interface Props {
   onImported: (invoice: NfeInvoice) => void;
@@ -44,72 +45,69 @@ export function NFeImportView({ onImported, onOpenExisting }: Props) {
   const canResume = duplicate && (duplicate.status === 'not_started' || duplicate.status === 'in_progress');
 
   return (
-    <div className="max-w-3xl mx-auto p-4 sm:p-6 space-y-6">
+    <div className="max-w-3xl mx-auto p-4 md:p-6 lg:p-8 space-y-8">
       <div>
-        <h2 className="text-xl font-bold text-zinc-900">Importar NF-e</h2>
-        <p className="text-sm text-zinc-500 mt-1">
+        <h2 className="text-title">Importar NF-e</h2>
+        <p className="text-sm text-fg-subtle mt-1">
           Envie o arquivo XML da nota fiscal ou cole o conteúdo. A conferência será cega: as quantidades da nota ficam ocultas até a finalização.
         </p>
       </div>
 
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-50 border border-red-200 text-red-700">
+        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
           <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
           <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
       {duplicate && (
-        <div className="p-4 rounded-xl bg-amber-50 border border-amber-200 space-y-3">
-          <div className="flex items-start gap-3 text-amber-800">
+        <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-4">
+          <div className="flex items-start gap-3 text-amber-700 dark:text-amber-400">
             <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
             <div>
               <p className="text-sm font-semibold">Esta NF-e já foi importada.</p>
-              <p className="text-xs mt-1 text-amber-700">
+              <p className="text-xs mt-1 text-amber-700/80 dark:text-amber-400/80">
                 Nota {duplicate.invoice_number ?? '—'} · {duplicate.supplier_name ?? 'Fornecedor não informado'} · {formatDate(duplicate.issue_date)}
               </p>
             </div>
             <div className="ml-auto"><InvoiceStatusBadge status={duplicate.status} /></div>
           </div>
-          <button
-            onClick={() => onOpenExisting(duplicate)}
-            className="inline-flex items-center gap-2 px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-500 text-white text-sm font-semibold transition-colors"
-          >
+          <Button onClick={() => onOpenExisting(duplicate)}>
             {canResume ? <><ArrowRight size={15} /> Continuar conferência</> : <><Eye size={15} /> Visualizar relatório</>}
-          </button>
+          </Button>
         </div>
       )}
 
-      <div className="grid sm:grid-cols-2 gap-4">
+      <div className="grid sm:grid-cols-2 gap-6">
         <button
           disabled={busy}
           onClick={() => fileRef.current?.click()}
-          className="flex flex-col items-center justify-center gap-3 p-8 rounded-2xl border-2 border-dashed border-zinc-300 hover:border-emerald-400 hover:bg-emerald-50/40 transition-colors disabled:opacity-50"
+          className="flex flex-col items-center justify-center gap-3 p-8 rounded-container border-2 border-dashed border-edge hover:border-accent/40 hover:bg-accent/5 transition-colors disabled:opacity-50"
         >
-          <div className="p-3 rounded-xl bg-emerald-100 text-emerald-700"><Upload size={24} /></div>
-          <span className="text-sm font-semibold text-zinc-800">Selecionar arquivo XML</span>
-          <span className="text-xs text-zinc-400">Formato aceito: .xml</span>
+          <div className="p-3 rounded-xl bg-accent/10 text-accent"><Upload size={24} /></div>
+          <span className="text-sm font-semibold text-fg">Selecionar arquivo XML</span>
+          <span className="text-xs text-fg-subtle">Formato aceito: .xml</span>
         </button>
 
-        <div className="flex flex-col p-5 rounded-2xl border border-zinc-200 bg-white">
-          <label className="flex items-center gap-2 text-sm font-semibold text-zinc-800 mb-2">
-            <ClipboardPaste size={16} className="text-zinc-500" /> Colar XML
+        <Card className="flex flex-col">
+          <label className="flex items-center gap-2 text-sm font-semibold text-fg mb-2">
+            <ClipboardPaste size={16} className="text-fg-subtle" /> Colar XML
           </label>
           <textarea
             value={pasted}
             onChange={(e) => setPasted(e.target.value)}
             placeholder="Cole aqui o conteúdo do XML da NF-e..."
-            className="flex-1 min-h-[120px] resize-none rounded-lg border border-zinc-200 p-3 text-xs font-mono text-zinc-700 focus:outline-none focus:ring-2 focus:ring-emerald-500"
+            className="flex-1 min-h-[120px] resize-none rounded-lg border border-edge bg-surface p-3 text-xs font-mono text-fg-muted placeholder-fg-subtle focus:outline-none focus:ring-2 focus:ring-accent/40"
           />
-          <button
+          <Button
             disabled={busy || pasted.trim() === ''}
             onClick={() => runImport(pasted)}
-            className="mt-3 inline-flex items-center justify-center gap-2 px-4 py-2 rounded-lg bg-zinc-900 hover:bg-zinc-800 text-white text-sm font-semibold transition-colors disabled:opacity-40"
+            className="mt-3 w-full"
           >
             {busy ? <Loader2 size={15} className="animate-spin" /> : <FileText size={15} />}
             Importar da área de transferência
-          </button>
-        </div>
+          </Button>
+        </Card>
       </div>
 
       <input
@@ -125,7 +123,7 @@ export function NFeImportView({ onImported, onOpenExisting }: Props) {
       />
 
       {busy && (
-        <div className="flex items-center justify-center gap-2 text-zinc-500 text-sm">
+        <div className="flex items-center justify-center gap-2 text-fg-subtle text-sm">
           <Loader2 size={16} className="animate-spin" /> Processando NF-e...
         </div>
       )}

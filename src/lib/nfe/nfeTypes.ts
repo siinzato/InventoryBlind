@@ -18,6 +18,15 @@ export interface ParsedNfeItem {
   totalValue: number | null;// vProd
   ean: string | null;         // original valid EAN (cEAN preferred, else cEANTrib)
   eanNormalized: string | null; // normalized comparison form
+  /** det/prod/rastro/nLote — primeiro lote informado, quando o item tem rastreabilidade.
+   *  Null quando a NF-e não declara lote (a maioria dos itens não declara). */
+  lotNumber: string | null;
+  /** det/prod/xPed — número do pedido de compra/venda externo, quando a NF-e o
+   *  declara. Só referência/auditoria: nunca cria um pedido interno nem é usado
+   *  para decidir o canal de origem da devolução. */
+  externalOrderRef: string | null;
+  /** det/prod/nItemPed — número do item dentro do pedido externo acima. */
+  externalOrderItemRef: string | null;
 }
 
 export interface ParsedNfe {
@@ -27,7 +36,31 @@ export interface ParsedNfe {
   issueDate: string | null; // ISO
   supplierName: string | null;
   supplierCnpj: string | null;
+  /** dest/xNome, dest/CNPJ, dest/CPF — o destinatário da nota. Uma pessoa física
+   *  tem CPF em vez de CNPJ, então os dois campos convivem, nunca inventados. */
+  destName: string | null;
+  destCnpj: string | null;
+  destCpf: string | null;
+  /** infAdic/infCpl — texto livre, informação complementar genérica da NF-e.
+   *  Nunca usada para preencher automaticamente motivo, canal de origem ou
+   *  qualquer outro campo — é texto livre, exatamente o tipo de fonte que não
+   *  é uma evidência estruturada. */
+  additionalInfo: string | null;
   items: ParsedNfeItem[];
+  purposeCode: string | null;          // finNFe (1=normal, 2=complementar, 3=ajuste, 4=devolução)
+  referencedInvoiceKey: string | null; // ide/NFref/refNFe — chave da NF-e original, quando referenciada
+  /** ide/indIntermed — indicador de operação em site/plataforma de terceiros
+   *  (intermediador). "1" = com intermediador. Evidência bruta, exibida para
+   *  contexto; a resolução do canal de origem depende de intermediaryIdCadIntTran. */
+  indIntermed: string | null;
+  /** infIntermed/CNPJ — CNPJ do intermediador (ex.: o CNPJ do próprio Mercado
+   *  Livre). Sozinho não distingue contas/lojas diferentes do mesmo intermediador. */
+  intermediaryCnpj: string | null;
+  /** infIntermed/idCadIntTran — identificador do cadastro do vendedor no
+   *  intermediador. É o identificador que de fato diferencia contas/lojas
+   *  distintas por trás do mesmo CNPJ de intermediador (ex.: várias contas
+   *  Mercado Livre de um mesmo CNPJ). */
+  intermediaryIdCadIntTran: string | null;
 }
 
 // ── Product catalog (shared, global) ─────────────────────────────────────────
@@ -53,6 +86,7 @@ export interface NfeInvoice {
   supplier_cnpj: string | null;
   status: InvoiceStatus;
   total_items: number;
+  raw_xml: string | null;
   created_by: string | null;
   started_at: string | null;
   started_by: string | null;
@@ -60,6 +94,16 @@ export interface NfeInvoice {
   finished_by: string | null;
   created_at: string;
   updated_at: string;
+  /** Arquivamento (migration 062). Preenchido, a nota sai do histórico visível e
+   *  não aceita mais escrita nenhuma — o trigger nfe_invoices_guard_archived
+   *  recusa. Nada é apagado: itens, eventos e XML continuam gravados.
+   *
+   *  Opcional no tipo de propósito: `select('*')` não devolve estas colunas
+   *  enquanto a migration não for aplicada, e o resto da tela precisa continuar
+   *  funcionando. Ver isArchived()/filterActive() em lib/admin/recordAdmin.ts. */
+  deleted_at?: string | null;
+  deleted_by?: string | null;
+  deletion_reason?: string | null;
 }
 
 export interface NfeInvoiceItem {

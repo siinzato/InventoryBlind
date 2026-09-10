@@ -1,4 +1,5 @@
 import type { InvoiceStatus, ItemResultStatus } from '../../lib/nfe/nfeTypes';
+import { Badge } from '../ui';
 
 export function formatDate(value: string | null): string {
   if (!value) return '—';
@@ -19,11 +20,11 @@ export function formatQty(value: number | null): string {
   return Number.isInteger(value) ? String(value) : value.toLocaleString('pt-BR', { maximumFractionDigits: 3 });
 }
 
-const INVOICE_BADGE: Record<InvoiceStatus, string> = {
-  not_started: 'bg-zinc-100 text-zinc-600 border-zinc-200',
-  in_progress: 'bg-blue-50 text-blue-700 border-blue-200',
-  completed: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  with_divergences: 'bg-amber-50 text-amber-700 border-amber-200',
+const INVOICE_VARIANT: Record<InvoiceStatus, 'neutral' | 'accent' | 'success' | 'warning'> = {
+  not_started: 'neutral',
+  in_progress: 'accent',
+  completed: 'success',
+  with_divergences: 'warning',
 };
 
 const INVOICE_LABEL: Record<InvoiceStatus, string> = {
@@ -34,19 +35,15 @@ const INVOICE_LABEL: Record<InvoiceStatus, string> = {
 };
 
 export function InvoiceStatusBadge({ status }: { status: InvoiceStatus }) {
-  return (
-    <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold border ${INVOICE_BADGE[status]}`}>
-      {INVOICE_LABEL[status]}
-    </span>
-  );
+  return <Badge variant={INVOICE_VARIANT[status]}>{INVOICE_LABEL[status]}</Badge>;
 }
 
-const ITEM_BADGE: Record<ItemResultStatus, string> = {
-  unlinked: 'bg-zinc-100 text-zinc-500 border-zinc-200',
-  pending: 'bg-zinc-100 text-zinc-600 border-zinc-200',
-  ok: 'bg-emerald-50 text-emerald-700 border-emerald-200',
-  missing: 'bg-red-50 text-red-700 border-red-200',
-  surplus: 'bg-amber-50 text-amber-700 border-amber-200',
+const ITEM_VARIANT: Record<ItemResultStatus, 'neutral' | 'success' | 'danger' | 'warning'> = {
+  unlinked: 'neutral',
+  pending: 'neutral',
+  ok: 'success',
+  missing: 'danger',
+  surplus: 'warning',
 };
 
 const ITEM_LABEL: Record<ItemResultStatus, string> = {
@@ -58,9 +55,5 @@ const ITEM_LABEL: Record<ItemResultStatus, string> = {
 };
 
 export function ItemStatusBadge({ status }: { status: ItemResultStatus }) {
-  return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-semibold border ${ITEM_BADGE[status]}`}>
-      {ITEM_LABEL[status]}
-    </span>
-  );
+  return <Badge variant={ITEM_VARIANT[status]}>{ITEM_LABEL[status]}</Badge>;
 }

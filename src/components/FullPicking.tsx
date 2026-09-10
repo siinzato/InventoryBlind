@@ -1,25 +1,27 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
 import {
   ArrowRight, Check, X, SkipForward, AlertTriangle,
   ChevronLeft, RefreshCw, Package, MapPin,
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR } from '../lib/fullManagerTypes';
+import { Card } from './ui';
 
 // ── Operation selector ────────────────────────────────────────────────────────
 
 const OpSelector: React.FC<{ operations: FullOperation[]; onSelect: (op: FullOperation) => void; loading: boolean }> = ({ operations, onSelect, loading }) => (
   <div className="space-y-3">
-    <p className="text-sm text-zinc-500 font-medium">
+    <p className="text-sm text-fg-subtle font-medium">
       Selecione uma operação para iniciar ou continuar a separação:
     </p>
     {loading ? (
-      <div className="flex items-center justify-center py-16 gap-2 text-zinc-400">
+      <div className="flex items-center justify-center py-16 gap-2 text-fg-subtle">
         <RefreshCw size={18} className="animate-spin" /> Carregando...
       </div>
     ) : operations.length === 0 ? (
-      <div className="flex flex-col items-center justify-center py-16 bg-white rounded-xl border border-zinc-200 text-zinc-300">
+      <div className="flex flex-col items-center justify-center py-16 bg-surface-2 rounded-xl border border-edge text-fg-subtle">
         <Package size={40} className="mb-3 opacity-30" />
         <p className="text-sm font-medium">Nenhuma operação em separação.</p>
         <p className="text-xs mt-1">Crie uma nova operação ou mude o status para "Preparando".</p>
@@ -29,11 +31,11 @@ const OpSelector: React.FC<{ operations: FullOperation[]; onSelect: (op: FullOpe
         const tagCls = STATUS_COLOR[op.status];
         return (
           <button key={op.id} onClick={() => onSelect(op)}
-            className="w-full flex items-center gap-4 p-4 bg-white border border-zinc-200 rounded-xl hover:border-zinc-300 hover:bg-zinc-50 transition text-left shadow-sm">
+            className="w-full flex items-center gap-4 p-4 bg-surface-2 border border-edge rounded-xl hover:border-fg-subtle hover:bg-surface-3 transition text-left">
             <div className="flex-1 min-w-0">
-              <p className="font-black text-zinc-900">FULL #{op.full_number}</p>
-              <p className="text-sm text-zinc-500">{op.marketplace} · {op.responsible || '—'}</p>
-              <div className="flex gap-3 mt-1 text-xs text-zinc-500">
+              <p className="font-bold text-fg">FULL #{op.full_number}</p>
+              <p className="text-sm text-fg-subtle">{op.marketplace} · {op.responsible || '—'}</p>
+              <div className="flex gap-3 mt-1 text-xs text-fg-subtle">
                 <span className="font-mono font-bold">{op.total_sku} SKU</span>
                 <span className="font-mono font-bold">{op.total_pieces} peças</span>
               </div>
@@ -42,7 +44,7 @@ const OpSelector: React.FC<{ operations: FullOperation[]; onSelect: (op: FullOpe
               <span className={`text-xs font-bold px-2.5 py-1 rounded-full border ${tagCls}`}>
                 {STATUS_LABEL[op.status]}
               </span>
-              <ArrowRight size={16} className="text-zinc-400" />
+              <ArrowRight size={16} className="text-fg-subtle" />
             </div>
           </button>
         );
@@ -72,56 +74,56 @@ const PickingCard: React.FC<{
     <div className="max-w-sm mx-auto w-full space-y-4">
       {/* Progress bar */}
       <div>
-        <div className="flex items-center justify-between text-xs text-zinc-500 mb-1.5">
+        <div className="flex items-center justify-between text-xs text-fg-subtle mb-1.5">
           <span>Item {index + 1} de {total}</span>
-          <span className="font-bold text-zinc-700">{progress}% concluído</span>
+          <span className="font-bold text-fg-muted">{progress}% concluído</span>
         </div>
-        <div className="w-full bg-zinc-100 rounded-full h-2">
+        <div className="w-full bg-edge rounded-full h-2">
           <div className="bg-emerald-500 h-2 rounded-full transition-all" style={{ width: `${progress}%` }} />
         </div>
       </div>
 
       {/* Main card */}
-      <div className="bg-white rounded-2xl border border-zinc-200 shadow-lg overflow-hidden">
+      <Card padding="none" className="overflow-hidden">
         {/* Location banner */}
-        <div className="bg-zinc-900 text-white px-5 py-4 flex items-center gap-3">
-          <MapPin size={20} className="text-emerald-400 flex-shrink-0" />
+        <div className="bg-accent text-white px-5 py-4 flex items-center gap-3">
+          <MapPin size={20} className="flex-shrink-0" />
           <div>
-            <p className="text-xs text-zinc-400 uppercase font-bold tracking-wider">Localização</p>
-            <p className="font-black text-2xl leading-tight">{item.location || '—'}</p>
+            <p className="text-xs text-white/70 uppercase font-bold tracking-wider">Localização</p>
+            <p className="font-bold text-2xl leading-tight">{item.location || '—'}</p>
           </div>
         </div>
 
         <div className="px-5 py-5 space-y-4">
           {/* Product name */}
-          <p className="font-bold text-zinc-800 text-base leading-snug">{item.product_name || '—'}</p>
+          <p className="font-bold text-fg text-base leading-snug">{item.product_name || '—'}</p>
 
           <div className="grid grid-cols-2 gap-2">
-            <div className="bg-zinc-50 rounded-lg p-3">
-              <p className="text-xs text-zinc-400 font-semibold uppercase">SKU</p>
-              <p className="font-mono font-bold text-zinc-800 text-sm mt-0.5">{item.sku || '—'}</p>
+            <div className="bg-surface-3 rounded-lg p-3">
+              <p className="text-xs text-fg-subtle font-semibold uppercase">SKU</p>
+              <p className="font-mono font-bold text-fg text-sm mt-0.5">{item.sku || '—'}</p>
             </div>
-            <div className="bg-zinc-50 rounded-lg p-3">
-              <p className="text-xs text-zinc-400 font-semibold uppercase">EAN</p>
-              <p className="font-mono font-bold text-zinc-800 text-sm mt-0.5">{item.ean || '—'}</p>
+            <div className="bg-surface-3 rounded-lg p-3">
+              <p className="text-xs text-fg-subtle font-semibold uppercase">EAN</p>
+              <p className="font-mono font-bold text-fg text-sm mt-0.5">{item.ean || '—'}</p>
             </div>
           </div>
 
           {/* Quantity */}
-          <div className="bg-emerald-50 border border-emerald-200 rounded-xl p-3 flex items-center justify-between">
+          <div className="bg-emerald-500/10 rounded-xl p-3 flex items-center justify-between">
             <div>
-              <p className="text-xs text-emerald-600 font-bold uppercase">Quantidade Solicitada</p>
-              <p className="font-black text-emerald-800 text-3xl leading-none mt-0.5">{item.quantity_requested}</p>
+              <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold uppercase">Quantidade Solicitada</p>
+              <p className="font-bold text-emerald-700 dark:text-emerald-400 text-3xl leading-none mt-0.5">{item.quantity_requested}</p>
             </div>
             <div className="flex flex-col items-end gap-1">
-              <p className="text-xs text-zinc-500">Qtd coletada:</p>
+              <p className="text-xs text-fg-subtle">Qtd coletada:</p>
               <input type="number" min="0" max={item.quantity_requested * 2} value={qty}
                 onChange={e => setQty(Number(e.target.value))}
-                className="w-20 text-right px-2 py-1 border border-emerald-200 rounded-lg text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-400 bg-white" />
+                className="w-20 text-right px-2 py-1 border border-emerald-500/30 rounded-lg text-sm font-mono font-bold focus:outline-none focus:ring-2 focus:ring-emerald-500/40 bg-surface text-fg" />
             </div>
           </div>
         </div>
-      </div>
+      </Card>
 
       {/* Action buttons */}
       <div className="grid grid-cols-2 gap-2">
@@ -139,7 +141,7 @@ const PickingCard: React.FC<{
           <AlertTriangle size={16} /> Qtd insuficiente
         </button>
         <button disabled={actioning} onClick={() => act('skipped')}
-          className="flex items-center justify-center gap-2 py-3.5 bg-zinc-200 hover:bg-zinc-300 text-zinc-700 rounded-xl font-semibold text-sm transition disabled:opacity-60">
+          className="flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge text-fg-muted rounded-xl font-semibold text-sm transition disabled:opacity-60">
           <SkipForward size={16} /> Pular
         </button>
       </div>
@@ -163,30 +165,30 @@ const PickingSummary: React.FC<{
 
   return (
     <div className="max-w-sm mx-auto space-y-4">
-      <div className="bg-white rounded-2xl border border-zinc-200 shadow-lg p-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-4">
-          <Check size={28} className="text-emerald-600" />
+      <Card padding="none" className="p-6 text-center">
+        <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
+          <Check size={28} className="text-emerald-600 dark:text-emerald-400" />
         </div>
-        <h3 className="font-black text-zinc-900 text-xl mb-1">Separação Concluída!</h3>
-        <p className="text-zinc-500 text-sm">FULL #{operation.full_number}</p>
+        <h3 className="font-bold text-fg text-xl mb-1">Separação Concluída!</h3>
+        <p className="text-fg-subtle text-sm">FULL #{operation.full_number}</p>
         <div className="grid grid-cols-2 gap-3 mt-5">
-          <div className="bg-emerald-50 rounded-xl p-3">
-            <p className="text-2xl font-black text-emerald-700">{picked}</p>
-            <p className="text-xs text-emerald-600 font-semibold">Separados</p>
+          <div className="bg-emerald-500/10 rounded-xl p-3">
+            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{picked}</p>
+            <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">Separados</p>
           </div>
-          <div className="bg-red-50 rounded-xl p-3">
-            <p className="text-2xl font-black text-red-600">{errors}</p>
-            <p className="text-xs text-red-500 font-semibold">Com erro</p>
+          <div className="bg-red-500/10 rounded-xl p-3">
+            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{errors}</p>
+            <p className="text-xs text-red-600 dark:text-red-400 font-semibold">Com erro</p>
           </div>
         </div>
-      </div>
+      </Card>
       <button onClick={send} disabled={sending}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-zinc-900 hover:bg-zinc-800 text-white rounded-xl font-bold text-sm transition disabled:opacity-60">
+        className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-xl font-bold text-sm transition disabled:opacity-60">
         {sending ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
         Enviar para Conferência
       </button>
       <button onClick={onFinish}
-        className="w-full py-2.5 border border-zinc-200 text-zinc-600 rounded-xl font-semibold text-sm hover:bg-zinc-50 transition">
+        className="w-full py-2.5 border border-edge text-fg-muted rounded-xl font-semibold text-sm hover:bg-surface-3 transition">
         Voltar ao início
       </button>
     </div>
@@ -201,6 +203,7 @@ interface FullPickingProps {
 }
 
 const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone }) => {
+  const { user, companyId } = useAuth();
   const [operations, setOperations] = useState<FullOperation[]>([]);
   const [loadingOps, setLoadingOps] = useState(true);
   const [selectedOp, setSelectedOp] = useState<FullOperation | null>(null);
@@ -210,10 +213,12 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
   const [done, setDone] = useState(false);
 
   const loadOperations = useCallback(async () => {
+    if (!companyId) return;
     setLoadingOps(true);
     const { data } = await supabase
       .from('full_operations')
       .select('id, company_id, full_number, marketplace, responsible, scheduled_date, scheduled_time, status, total_sku, total_pieces, notes, checker, checker_notes, checked_at, completed_at, created_at, updated_at')
+      .eq('company_id', companyId)
       .in('status', ['preparing', 'picking'])
       .order('created_at', { ascending: false })
       .limit(50);
@@ -225,7 +230,7 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
       const found = ops.find(o => o.id === initialOperationId);
       if (found) loadOperation(found);
     }
-  }, [initialOperationId]);
+  }, [companyId, initialOperationId]);
 
   useEffect(() => { loadOperations(); }, [loadOperations]);
 
@@ -241,7 +246,7 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
     // Load items sorted by location
     const { data } = await supabase
       .from('full_operation_items')
-      .select('id, operation_id, company_id, listing_id, product_id, sku, ean, product_name, location, quantity_requested, quantity_picked, status, picker_notes, picked_at, created_at')
+      .select('id, operation_id, company_id, listing_id, product_id, sku, ean, product_name, location, quantity_requested, quantity_picked, status, picker_notes, picked_by_user_id, picked_at, created_at')
       .eq('operation_id', op.id)
       .order('location', { ascending: true, nullsFirst: false });
 
@@ -265,6 +270,7 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
     const update: Partial<FullOperationItem> = {
       status,
       quantity_picked: status === 'picked' ? (qty ?? item.quantity_requested) : 0,
+      picked_by_user_id: status === 'picked' ? (user?.id ?? null) : item.picked_by_user_id,
       picked_at: new Date().toISOString(),
     };
 
@@ -299,7 +305,7 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
 
   if (loadingItems) {
     return (
-      <div className="flex items-center justify-center py-16 gap-2 text-zinc-400">
+      <div className="flex items-center justify-center py-16 gap-2 text-fg-subtle">
         <RefreshCw size={20} className="animate-spin" /> Carregando itens e ordenando por localização...
       </div>
     );
@@ -309,7 +315,7 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
     return (
       <div className="space-y-4">
         <button onClick={() => { setSelectedOp(null); setDone(false); }}
-          className="flex items-center gap-2 text-sm text-zinc-500 hover:text-zinc-800 transition">
+          className="flex items-center gap-2 text-sm text-fg-subtle hover:text-fg transition">
           <ChevronLeft size={16} /> Voltar
         </button>
         <PickingSummary
@@ -325,9 +331,9 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
   const currentItem = pendingItems[0]; // always show first pending
   if (!currentItem) {
     return (
-      <div className="text-center py-16 text-zinc-400">
+      <div className="text-center py-16 text-fg-subtle">
         <p>Nenhum item pendente encontrado.</p>
-        <button onClick={() => setSelectedOp(null)} className="mt-4 text-sm text-zinc-600 underline">Voltar</button>
+        <button onClick={() => setSelectedOp(null)} className="mt-4 text-sm text-fg-muted underline">Voltar</button>
       </div>
     );
   }
@@ -338,14 +344,14 @@ const FullPicking: React.FC<FullPickingProps> = ({ initialOperationId, onDone })
     <div className="space-y-4">
       {/* Op header */}
       <div className="flex items-center gap-3">
-        <button onClick={() => setSelectedOp(null)} className="text-zinc-400 hover:text-zinc-700">
+        <button onClick={() => setSelectedOp(null)} className="text-fg-subtle hover:text-fg-muted">
           <ChevronLeft size={20} />
         </button>
         <div>
-          <p className="font-black text-zinc-900">FULL #{selectedOp.full_number}</p>
-          <p className="text-xs text-zinc-500">{selectedOp.marketplace} · {selectedOp.responsible || '—'}</p>
+          <p className="font-bold text-fg">FULL #{selectedOp.full_number}</p>
+          <p className="text-xs text-fg-subtle">{selectedOp.marketplace} · {selectedOp.responsible || '—'}</p>
         </div>
-        <span className="ml-auto text-xs font-bold px-2.5 py-1 rounded-full border bg-orange-100 text-orange-700 border-orange-200">
+        <span className="ml-auto text-xs font-medium px-2.5 py-1 rounded-full border bg-orange-500/10 text-orange-700 dark:text-orange-400 border-orange-500/20">
           Separando
         </span>
       </div>

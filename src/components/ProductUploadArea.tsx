@@ -1,7 +1,8 @@
 // Product Upload Area Component
 
 import React, { useCallback, useRef, useState } from 'react';
-import { Upload, FileSpreadsheet, File, AlertCircle, CheckCircle2 } from 'lucide-react';
+import { Upload, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
+import { Panel, PanelSection, Table, Thead, Tr, Th, Td } from './ui';
 
 interface ProductUploadAreaProps {
   onFileSelect: (file: File) => void;
@@ -15,13 +16,6 @@ export const ProductUploadArea: React.FC<ProductUploadAreaProps> = ({
   const [isDragging, setIsDragging] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const acceptedTypes = [
-    'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', // .xlsx
-    'application/vnd.ms-excel', // .xls
-    'text/csv',
-    '.csv',
-  ];
 
   const acceptedExtensions = ['.xlsx', '.xls', '.csv'];
 
@@ -74,110 +68,110 @@ export const ProductUploadArea: React.FC<ProductUploadAreaProps> = ({
   };
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-6">
-      <div className="flex items-center gap-2 mb-4">
-        <FileSpreadsheet size={20} className="text-zinc-500" />
-        <h3 className="font-semibold text-zinc-800">Selecione a Planilha</h3>
-      </div>
+    <Panel>
+      <PanelSection>
+        <h3 className="text-title flex items-center gap-2">
+          <FileSpreadsheet size={20} className="text-fg-subtle" />
+          Selecione a Planilha
+        </h3>
 
-      {/* Accepted formats info */}
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-4">
-        <p className="text-sm text-blue-800">
-          <strong>Formatos aceitos:</strong> Excel (.xlsx, .xls) ou CSV (.csv)
+        {/* Accepted formats info */}
+        <p className="text-sm text-fg-muted mt-2">
+          <strong className="text-fg">Formatos aceitos:</strong> Excel (.xlsx, .xls) ou CSV (.csv)
         </p>
-        <p className="text-xs text-blue-600 mt-1">
+        <p className="text-xs text-fg-subtle mt-1 mb-5">
           Colunas esperadas: Nome, SKU, EAN, Local, Preço
         </p>
-      </div>
 
-      {/* Drop zone */}
-      <div
-        onClick={handleClick}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-        className={`
-          border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-all
-          ${isDragging
-            ? 'border-blue-500 bg-blue-50'
-            : selectedFile
-              ? 'border-emerald-500 bg-emerald-50'
-              : 'border-zinc-300 hover:border-zinc-400 hover:bg-zinc-50'
-          }
-          ${isLoading ? 'pointer-events-none opacity-60' : ''}
-        `}
-      >
-        <input
-          ref={fileInputRef}
-          type="file"
-          accept={acceptedExtensions.join(',')}
-          onChange={handleFileChange}
-          className="hidden"
-        />
+        {/* Drop zone */}
+        <div
+          onClick={handleClick}
+          onDragOver={handleDragOver}
+          onDragLeave={handleDragLeave}
+          onDrop={handleDrop}
+          className={`
+            border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors
+            ${isDragging
+              ? 'border-accent bg-accent/10'
+              : selectedFile
+                ? 'border-emerald-500/20 bg-emerald-500/10'
+                : 'border-edge hover:border-fg-subtle hover:bg-surface-3'
+            }
+            ${isLoading ? 'pointer-events-none opacity-60' : ''}
+          `}
+        >
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept={acceptedExtensions.join(',')}
+            onChange={handleFileChange}
+            className="hidden"
+          />
 
-        {isLoading ? (
-          <div className="flex flex-col items-center gap-2">
-            <div className="animate-spin w-12 h-12 border-4 border-blue-500 border-t-transparent rounded-full" />
-            <p className="text-zinc-600 font-medium">Processando planilha...</p>
-          </div>
-        ) : selectedFile ? (
-          <div className="flex flex-col items-center gap-2">
-            <CheckCircle2 size={48} className="text-emerald-500" />
-            <p className="font-medium text-zinc-800">{selectedFile.name}</p>
-            <p className="text-sm text-zinc-500">
-              {(selectedFile.size / 1024).toFixed(1)} KB
-            </p>
-            <p className="text-xs text-blue-600 mt-2">
-              Clique para selecionar outro arquivo
-            </p>
-          </div>
-        ) : (
-          <div className="flex flex-col items-center gap-2">
-            <Upload size={48} className={`${isDragging ? 'text-blue-500' : 'text-zinc-400'}`} />
-            <p className="font-medium text-zinc-800">
-              {isDragging ? 'Solte o arquivo aqui' : 'Arraste e solte sua planilha'}
-            </p>
-            <p className="text-sm text-zinc-500">ou clique para selecionar</p>
-          </div>
-        )}
-      </div>
+          {isLoading ? (
+            <div className="flex flex-col items-center gap-2">
+              <div className="animate-spin w-12 h-12 border-4 border-accent border-t-transparent rounded-full" />
+              <p className="text-fg-muted font-medium">Processando planilha...</p>
+            </div>
+          ) : selectedFile ? (
+            <div className="flex flex-col items-center gap-2">
+              <CheckCircle2 size={48} className="text-emerald-600 dark:text-emerald-400" />
+              <p className="font-medium text-fg">{selectedFile.name}</p>
+              <p className="text-sm text-fg-subtle">
+                {(selectedFile.size / 1024).toFixed(1)} KB
+              </p>
+              <p className="text-xs text-accent mt-2">
+                Clique para selecionar outro arquivo
+              </p>
+            </div>
+          ) : (
+            <div className="flex flex-col items-center gap-2">
+              <Upload size={48} className={`${isDragging ? 'text-accent' : 'text-fg-subtle'}`} />
+              <p className="font-medium text-fg">
+                {isDragging ? 'Solte o arquivo aqui' : 'Arraste e solte sua planilha'}
+              </p>
+              <p className="text-sm text-fg-subtle">ou clique para selecionar</p>
+            </div>
+          )}
+        </div>
+      </PanelSection>
 
       {/* Column information */}
-      <div className="mt-4 p-4 bg-zinc-50 rounded-lg">
-        <p className="text-sm font-medium text-zinc-700 mb-2">Estrutura esperada da planilha:</p>
+      <PanelSection>
+        <p className="text-section mb-3">Estrutura esperada da planilha:</p>
         <div className="overflow-x-auto">
-          <table className="w-full text-xs">
-            <thead>
-              <tr className="bg-zinc-200">
-                <th className="px-2 py-1 text-left rounded-tl">Nome *</th>
-                <th className="px-2 py-1 text-left">SKU *</th>
-                <th className="px-2 py-1 text-left">EAN</th>
-                <th className="px-2 py-1 text-left">Local</th>
-                <th className="px-2 py-1 text-left rounded-tr">Preço</th>
+          <Table>
+            <Thead>
+              <tr>
+                <Th>Nome *</Th>
+                <Th>SKU *</Th>
+                <Th>EAN</Th>
+                <Th>Local</Th>
+                <Th>Preço</Th>
               </tr>
-            </thead>
+            </Thead>
             <tbody>
-              <tr className="bg-white">
-                <td className="px-2 py-1 border-b">Case ESR Premium</td>
-                <td className="px-2 py-1 border-b font-mono">ESR001</td>
-                <td className="px-2 py-1 border-b font-mono">7891234567890</td>
-                <td className="px-2 py-1 border-b">Rua A, Vão 1</td>
-                <td className="px-2 py-1 border-b">49,90</td>
-              </tr>
-              <tr className="bg-zinc-50">
-                <td className="px-2 py-1">Pelicula Nillkin</td>
-                <td className="px-2 py-1 font-mono">NIL002</td>
-                <td className="px-2 py-1 font-mono">7891234567891</td>
-                <td className="px-2 py-1">Rua B, Vão 3</td>
-                <td className="px-2 py-1">29,90</td>
-              </tr>
+              <Tr>
+                <Td>Case ESR Premium</Td>
+                <Td className="font-mono">ESR001</Td>
+                <Td className="font-mono">7891234567890</Td>
+                <Td>Rua A, Vão 1</Td>
+                <Td>49,90</Td>
+              </Tr>
+              <Tr>
+                <Td>Pelicula Nillkin</Td>
+                <Td className="font-mono">NIL002</Td>
+                <Td className="font-mono">7891234567891</Td>
+                <Td>Rua B, Vão 3</Td>
+                <Td>29,90</Td>
+              </Tr>
             </tbody>
-          </table>
+          </Table>
         </div>
-        <p className="text-xs text-zinc-500 mt-2">
+        <p className="text-xs text-fg-subtle mt-3">
           * Campos obrigatórios. A ordem das colunas não afeta a importação.
         </p>
-      </div>
-    </div>
+      </PanelSection>
+    </Panel>
   );
 };

@@ -7,6 +7,8 @@ import { ColumnMappingWizard } from './ColumnMappingWizard';
 import { ProductImportPreview } from './ProductImportPreview';
 import { ProductImportProgress } from './ProductImportProgress';
 import { ProductImportSummary } from './ProductImportSummary';
+import { Page, PageHeader, Panel, PanelSection, Button, PhaseRail } from './ui';
+import type { PhaseRailStep } from './ui';
 import type { ProductValidated, ImportSummary, ImportProgress, ImportError, ImportStatus, ColumnMapping, ProductFromDB } from '../lib/productImportTypes';
 import {
   parseCSV,
@@ -14,6 +16,9 @@ import {
   calculateImportSummary,
 } from '../lib/productImportUtils';
 import { supabase } from '../lib/supabase';
+import { useAuth } from '../lib/auth';
+import { classifyCompanyProducts } from '../lib/productBrands/productBrandService';
+import { syncActiveCycleItems } from '../lib/inventoryCycle/inventoryCycleService';
 
 interface ProductImportPageProps {
   onBack: () => void;
@@ -21,11 +26,24 @@ interface ProductImportPageProps {
   onRequestAdmin: () => void;
 }
 
+const IMPORT_PHASES: PhaseRailStep[] = [
+  { key: 'upload', label: 'Enviar' },
+  { key: 'mapping', label: 'Mapear' },
+  { key: 'preview', label: 'Revisar' },
+  { key: 'importing', label: 'Importar' },
+  { key: 'complete', label: 'Concluido' },
+];
+
 export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   onBack,
   isAdmin,
   onRequestAdmin,
 }) => {
+  // Mesmo identificador de empresa nas duas pontas: inventory_brands.company_id é text e
+  // product_brands/product_lines.company_id é uuid, mas o valor é o mesmo — o contexto de auth
+  // já entrega o companyId ativo (que respeita a troca de workspace).
+  const { profile, companyId } = useAuth();
+
   const [status, setStatus] = useState<ImportStatus>('upload');
   const [isReading, setIsReading] = useState(false);
   const [products, setProducts] = useState<ProductValidated[]>([]);
@@ -48,24 +66,38 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   const [rawRows, setRawRows] = useState<Array<{ [key: string]: string | number | undefined }>>([]);
   const [columnMapping, setColumnMapping] = useState<ColumnMapping | null>(null);
 
-  // Load existing products from database
+  // Load existing products from database.
+  // Paginated with .range() — a single unbounded .select() is silently capped
+  // (PostgREST/Supabase default row limit, ~1000) and any product past that
+  // cutoff would be wrongly treated as "new" below, causing duplicate-key
+  // failures on insert for SKUs that already exist in the database.
   const loadExistingProducts = async (): Promise<Map<string, ProductFromDB>> => {
+    const PAGE_SIZE = 1000;
+    const productsMap = new Map<string, ProductFromDB>();
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('id, name, sku, ean, location, price, created_at, updated_at, company_id');
+      let from = 0;
+      for (;;) {
+        const { data, error } = await supabase
+          .from('products')
+          .select('id, name, sku, ean, location, price, created_at, updated_at, company_id')
+          .order('id', { ascending: true })
+          .range(from, from + PAGE_SIZE - 1);
 
-      if (error) throw error;
+        if (error) throw error;
 
-      const productsMap = new Map<string, ProductFromDB>();
-      data?.forEach((item: ProductFromDB) => {
-        productsMap.set(item.sku.toUpperCase(), item);
-      });
+        data?.forEach((item: ProductFromDB) => {
+          productsMap.set(item.sku.toUpperCase(), item);
+        });
+
+        const pageLength = data?.length ?? 0;
+        if (pageLength < PAGE_SIZE) break;
+        from += PAGE_SIZE;
+      }
 
       return productsMap;
     } catch (err) {
       console.error('Error loading existing products:', err);
-      return new Map();
+      return productsMap;
     }
   };
 
@@ -341,6 +373,31 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
       }
     }
 
+    // Classificação Marca > Linha e reconciliação do inventário ativo. Vem DEPOIS de os
+    // produtos estarem gravados (o classificador precisa dos ids) e antes de a tela declarar
+    // a importação concluída — era exatamente esta etapa que faltava: SKU novo entrava no
+    // catálogo e nunca aparecia como pendente, deixando a linha em 100% sem ter sido contada.
+    //
+    // `onlyUnclassified` preenche o que falta sem reprocessar o que já está resolvido, e
+    // curadoria manual nunca é sobrescrita. Falha aqui não invalida a importação: os produtos
+    // já estão salvos, então isto vira aviso, não erro.
+    if (companyId) {
+      try {
+        setProgress({
+          current: total, total, percentage: 100, status: 'importing',
+          message: 'Classificando marcas e linhas...',
+        });
+        await classifyCompanyProducts(companyId, profile?.id ?? '', profile?.email ?? '', { onlyUnclassified: true });
+        await syncActiveCycleItems(companyId, profile?.id ?? null);
+      } catch (syncErr) {
+        console.warn('[handleConfirmImport] Classificação/reconciliação não concluída:', syncErr);
+        executionErrors.push({
+          row: 0,
+          error: 'Produtos importados, mas a classificação por marca/linha e a atualização das pendências do inventário não foram concluídas. Reprocesse em Produtos → Linhas e Marcas.',
+        });
+      }
+    }
+
     setSummary(prev => prev ? {
       ...prev,
       newProducts: newCount,
@@ -369,7 +426,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
       });
       setStatus('complete');
     }
-  }, [products, summary, columnMapping, isAdmin, existingProducts, errors.length]);
+  }, [products, summary, columnMapping, isAdmin, existingProducts, errors.length, companyId, profile?.id, profile?.email]);
 
   // Create import history record
   const createImportHistory = async (): Promise<string | null> => {
@@ -474,156 +531,94 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
 
   // Admin check overlay
   const AdminCheckOverlay = () => (
-    <div className="bg-amber-50 border-2 border-amber-200 rounded-xl p-6 text-center">
-      <div className="flex justify-center mb-4">
-        <div className="p-4 bg-amber-100 rounded-full">
-          <Lock size={40} className="text-amber-600" />
-        </div>
-      </div>
-      <h3 className="text-xl font-bold text-amber-800 mb-2">Acesso Restrito</h3>
-      <p className="text-amber-700 mb-4">
+    <div className="rounded-container border border-amber-500/20 bg-amber-500/10 p-8 text-center">
+      <Lock size={32} className="mx-auto mb-3 text-amber-600 dark:text-amber-400" />
+      <h3 className="text-title mb-2">Acesso Restrito</h3>
+      <p className="text-sm text-fg-muted mb-6">
         Somente administradores podem importar produtos.
       </p>
-      <button
-        onClick={onRequestAdmin}
-        className="px-6 py-3 bg-amber-600 text-white rounded-lg font-bold hover:bg-amber-700 transition"
-      >
+      <Button onClick={onRequestAdmin}>
         Fazer Login como Admin
-      </button>
+      </Button>
     </div>
   );
 
   // Import completed with database execution errors
   const ImportErrorResult = () => (
-    <div className="bg-white rounded-xl shadow-sm border border-zinc-200 p-8">
+    <div>
       <div className="text-center mb-8">
-        <div className="flex justify-center mb-4">
-          <div className="p-4 bg-red-100 rounded-full">
-            <XCircle size={64} className="text-red-600" />
-          </div>
-        </div>
-        <h2 className="text-2xl font-bold text-zinc-800 mb-2">
+        <XCircle size={32} className="mx-auto mb-3 text-red-600 dark:text-red-400" />
+        <h2 className="text-title mb-2">
           Importação concluída com falhas
         </h2>
-        <p className="text-zinc-500">
+        <p className="text-sm text-fg-muted">
           Alguns produtos não foram salvos no banco de dados. Veja os detalhes abaixo.
         </p>
       </div>
 
-      <div className="grid grid-cols-2 gap-4 mb-8">
-        <div className="bg-emerald-50 border-2 border-emerald-200 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-emerald-700">{summary?.importedCount ?? 0}</p>
-          <p className="text-sm text-emerald-700 font-medium">Salvos com sucesso</p>
-        </div>
-        <div className="bg-red-50 border-2 border-red-200 rounded-xl p-4 text-center">
-          <p className="text-3xl font-bold text-red-600">{dbErrors.length}</p>
-          <p className="text-sm text-red-600 font-medium">Falharam ao salvar</p>
-        </div>
-      </div>
+      <Panel className="mb-8">
+        <PanelSection>
+          <div className="grid grid-cols-2 divide-x divide-edge">
+            <div className="text-center px-4">
+              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{summary?.importedCount ?? 0}</p>
+              <p className="text-sm text-fg-muted mt-1">Salvos com sucesso</p>
+            </div>
+            <div className="text-center px-4">
+              <p className="text-3xl font-bold text-red-600 dark:text-red-400">{dbErrors.length}</p>
+              <p className="text-sm text-fg-muted mt-1">Falharam ao salvar</p>
+            </div>
+          </div>
+        </PanelSection>
 
-      <div className="bg-zinc-50 rounded-xl p-4 mb-8 max-h-64 overflow-y-auto">
-        <h4 className="font-semibold text-zinc-700 mb-3">Produtos não salvos</h4>
-        <ul className="space-y-2 text-sm">
-          {dbErrors.map((err, idx) => (
-            <li key={idx} className="border-b border-zinc-200 pb-2 last:border-0">
-              <span className="font-medium text-zinc-800">{err.sku || 'SKU não informado'}</span>
-              {err.name ? <span className="text-zinc-500"> — {err.name}</span> : null}
-              <p className="text-red-600">{err.error}</p>
-            </li>
-          ))}
-        </ul>
-      </div>
+        <PanelSection>
+          <p className="text-section mb-3">Produtos não salvos</p>
+          <ul className="divide-y divide-edge/60 max-h-64 overflow-y-auto">
+            {dbErrors.map((err, idx) => (
+              <li key={idx} className="py-2 text-sm">
+                <span className="font-medium text-fg">{err.sku || 'SKU não informado'}</span>
+                {err.name ? <span className="text-fg-subtle"> — {err.name}</span> : null}
+                <p className="text-red-600 dark:text-red-400">{err.error}</p>
+              </li>
+            ))}
+          </ul>
+        </PanelSection>
+      </Panel>
 
       <div className="flex flex-col sm:flex-row items-center justify-center gap-4">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 px-6 py-3 bg-zinc-900 text-white rounded-lg font-medium hover:bg-zinc-800 transition"
-        >
+        <Button onClick={onBack} variant="secondary">
           <Package size={20} />
           Ver Produtos
-        </button>
-        <button
-          onClick={handleReset}
-          className="flex items-center gap-2 px-6 py-3 bg-emerald-600 text-white rounded-lg font-medium hover:bg-emerald-700 transition"
-        >
+        </Button>
+        <Button onClick={handleReset} variant="primary">
           <FileSpreadsheet size={20} />
           Nova Importação
-        </button>
+        </Button>
       </div>
     </div>
   );
 
   return (
-    <div className="min-h-screen bg-zinc-50 p-6">
-      {/* Header */}
-      <div className="mb-6">
-        <button
-          onClick={onBack}
-          className="flex items-center gap-2 text-zinc-600 hover:text-zinc-800 transition mb-4"
-        >
-          <ArrowLeft size={20} />
-          Voltar
-        </button>
+    <Page>
+      <PageHeader
+        title="Importar Produtos"
+        description="Importe sua planilha de produtos para o sistema"
+        actions={
+          <Button variant="ghost" onClick={onBack}>
+            <ArrowLeft size={16} />
+            Voltar
+          </Button>
+        }
+      />
 
-        <div className="flex items-center gap-3">
-          <div className="p-3 bg-emerald-600 rounded-xl">
-            <FileSpreadsheet size={28} className="text-white" />
-          </div>
-          <div>
-            <h1 className="text-2xl font-bold text-zinc-800">Importar Produtos</h1>
-            <p className="text-zinc-500">Importe sua planilha de produtos para o sistema</p>
-          </div>
-        </div>
-      </div>
+      {/* Fases da importação */}
+        <PhaseRail
+          label="Progresso da importação"
+          steps={IMPORT_PHASES}
+          currentKey={status === 'error' ? 'complete' : status}
+          className="mb-8"
+        />
 
-      {/* Stepper */}
-      <div className="flex items-center justify-center mb-8">
-        {['upload', 'mapping', 'preview', 'importing', 'complete'].map((step, idx) => {
-          const stepLabels: Record<string, string> = {
-            upload: 'Enviar',
-            mapping: 'Mapear',
-            preview: 'Revisar',
-            importing: 'Importar',
-            complete: 'Concluido',
-          };
-
-          const statusOrder = ['upload', 'mapping', 'preview', 'importing', 'complete'];
-          const effectiveStatus = status === 'error' ? 'complete' : status;
-          const currentIdx = statusOrder.indexOf(effectiveStatus);
-
-          const isComplete = currentIdx > idx;
-          const isCurrent = effectiveStatus === step;
-
-          return (
-            <React.Fragment key={step}>
-              {idx > 0 && (
-                <div className={`w-16 h-1 mx-2 rounded ${
-                  isComplete || isCurrent ? 'bg-emerald-500' : 'bg-zinc-200'
-                }`} />
-              )}
-              <div className="flex flex-col items-center">
-                <div className={`w-10 h-10 rounded-full flex items-center justify-center font-bold text-sm ${
-                  isComplete
-                    ? 'bg-emerald-500 text-white'
-                    : isCurrent
-                      ? 'bg-zinc-900 text-white'
-                      : 'bg-zinc-200 text-zinc-500'
-                }`}>
-                  {isComplete ? '✓' : idx + 1}
-                </div>
-                <p className={`text-xs mt-1 font-medium ${
-                  isComplete || isCurrent ? 'text-zinc-800' : 'text-zinc-400'
-                }`}>
-                  {stepLabels[step]}
-                </p>
-              </div>
-            </React.Fragment>
-          );
-        })}
-      </div>
-
-      {/* Content */}
-      <div className="max-w-5xl mx-auto">
+        {/* Content */}
         {!isAdmin ? (
           <AdminCheckOverlay />
         ) : (
@@ -672,7 +667,6 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
             )}
           </>
         )}
-      </div>
-    </div>
+    </Page>
   );
 };

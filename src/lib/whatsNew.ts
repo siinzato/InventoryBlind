@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-11-nova-abertura-pagina-inicial',
+    date: '2026-09-11',
+    category: 'melhoria',
+    title: 'Página inicial com nova abertura, mais direta e com o produto em destaque',
+    description: 'A primeira tela do site do InventoryBlind foi reorganizada: o título, o texto de apresentação, os botões e os indicadores agora ficam próximos uns dos outros, sem o espaço vazio que empurrava a imagem do sistema para o fim da tela. A tela do produto aparece logo abaixo, maior e já visível assim que a página abre. Os efeitos visuais de fundo foram reduzidos para deixar a leitura mais calma. Nada mudou no acesso, no login nem em qualquer funcionalidade de dentro do sistema.',
+  },
+  {
     id: '2026-09-10-emitir-relatorio-usa-fonte-de-saldo',
     date: '2026-09-10',
     category: 'melhoria',

@@ -5,24 +5,30 @@
 /* ── Typeface ──────────────────────────────────────────────────────────────
    No licensed SF Pro files ship with this project, so we don't fake the name
    — 'SF Pro Display'/'SF Pro Text' stay first in the stacks below and take
-   over automatically the day real files are installed. Until then, Geist
-   (self-hosted, OFL-licensed, variable) is the deliberate fallback: it reads
-   in the same precise/technical register SF Pro does, on every OS — unlike
-   the previous -apple-system stack, which fell through to plain Segoe UI on
-   Windows and lost that character entirely. */
+   over automatically the day real files are installed. On every other OS the
+   fallback is Satoshi (Indian Type Foundry, ITF Free Font License v2.0, which
+   permits commercial use and self-hosting — see LICENSE-SATOSHI-ITF-FFL.txt).
+   It was picked for sitting in the same neutral, high-contrast register as
+   SF Pro instead of the Inter/Geist look every AI SaaS ships with.
+
+   One variable file per style covers the whole weight range (300–900); the
+   italic only downloads on the handful of screens that render italics. No
+   custom mono ships with the project: the mono stack falls through to the
+   OS monospace, and it is reserved for genuinely technical data (SKU, EAN,
+   IDs, code) — KPI figures use the UI face with tabular-nums. */
 @font-face {
-  font-family: 'Geist Sans';
-  src: url('/fonts/Geist-Variable.woff2') format('woff2');
-  font-weight: 100 900;
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-Variable.woff2') format('woff2');
+  font-weight: 300 900;
   font-style: normal;
   font-display: swap;
 }
 
 @font-face {
-  font-family: 'Geist Mono';
-  src: url('/fonts/GeistMono-Variable.woff2') format('woff2');
-  font-weight: 100 900;
-  font-style: normal;
+  font-family: 'Satoshi';
+  src: url('/fonts/Satoshi-VariableItalic.woff2') format('woff2');
+  font-weight: 300 900;
+  font-style: italic;
   font-display: swap;
 }
 
@@ -140,9 +146,11 @@ html, body {
   .text-body     { @apply text-sm text-fg; }
   .text-label    { @apply text-xs font-medium text-fg-muted; }
   .text-caption  { @apply text-xs text-fg-subtle; }
-  /* Precise, aligned figures for KPIs, table numbers, IDs — never the
-     proportional/lining digits a display face uses for prose. */
-  .text-numeric  { @apply font-mono tabular-nums; }
+  /* Aligned figures for KPIs and table numbers. Deliberately NOT font-mono:
+     the UI face with tabular-nums keeps the Apple-like register, and mono
+     stays reserved for SKU/EAN/IDs/code (a <code> element still gets it from
+     Tailwind preflight). */
+  .text-numeric  { @apply tabular-nums; }
 }
 
 /* Proper scroll containers */

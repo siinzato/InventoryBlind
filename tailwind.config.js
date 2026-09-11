@@ -7,11 +7,12 @@ export default {
       fontFamily: {
         // Body/UI text. 'SF Pro Text' stays first so licensed files take over
         // the moment they're installed — see the comment in src/index.css.
-        sans: ['SF Pro Text', 'Geist Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
+        sans: ['SF Pro Text', 'Satoshi', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
         // Headings, KPIs, page titles — anywhere size carries the hierarchy.
-        display: ['SF Pro Display', 'Geist Sans', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'sans-serif'],
-        // Precision data: KPI values, table/ledger numbers, IDs, timestamps.
-        mono: ['SF Mono', 'Geist Mono', 'ui-monospace', 'SFMono-Regular', 'monospace'],
+        display: ['SF Pro Display', 'Satoshi', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'system-ui', 'sans-serif'],
+        // Genuinely technical data only — SKU, EAN, IDs, hashes, code. KPI figures
+        // use the UI face with tabular-nums, not this stack.
+        mono: ['SF Mono', 'ui-monospace', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'monospace'],
       },
       colors: {
         ink: {

@@ -20,6 +20,34 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-11-nova-tipografia-inventoryblind',
+    date: '2026-09-11',
+    category: 'melhoria',
+    title: 'Nova tipografia do InventoryBlind',
+    description: 'O sistema e o site passaram a usar uma nova fonte, a Satoshi. O desenho das letras ficou mais limpo e mais próximo do que se vê em produtos da Apple, mantendo o ar profissional. Os números de indicadores continuam alinhados em coluna, e a fonte de largura fixa ficou reservada para o que realmente precisa dela: SKU, EAN, códigos e identificadores. Em Mac e iPhone o sistema continua usando a fonte nativa do aparelho. Nenhum tamanho, espaçamento ou tela foi alterado.',
+  },
+  {
+    id: '2026-09-11-modulos-pagina-inicial-hierarquia',
+    date: '2026-09-11',
+    category: 'melhoria',
+    title: 'Página inicial: a lista de módulos virou uma vitrine com hierarquia',
+    description: 'A seção "Cada módulo, pensado para não deixar nada passar." deixou de ser uma parede de cards iguais. Agora seis módulos aparecem em destaque — BlindAI, HeatMap Inteligente, Confidence Score, Inventário por Risco, Root Cause Analysis e Warehouse Digital Twin — cada um com uma pequena amostra visual do que faz. Todos os demais módulos continuam na página, logo abaixo, em uma grade mais compacta e fácil de percorrer. Nenhum módulo foi retirado e nada mudou dentro do sistema.',
+  },
+  {
+    id: '2026-09-11-jornada-operacional-pagina-inicial',
+    date: '2026-09-11',
+    category: 'melhoria',
+    title: 'Página inicial: as etapas da operação agora aparecem como uma jornada única',
+    description: 'A seção "A jornada de uma operação sem pontos cegos." mudou de formato. Antes as etapas passavam de lado, uma por vez, enquanto você rolava a página. Agora todas as seis etapas — Recebimento, Conferência, Contagem, Correções, BlindScore e Relatórios — ficam visíveis de cima para baixo, ligadas por uma linha do tempo que marca o início da operação e o resultado final. Cada etapa ganhou uma pequena ilustração do que acontece nela. A rolagem voltou a ser normal, sem prender a página na horizontal.',
+  },
+  {
+    id: '2026-09-11-visao-operacional-pagina-inicial',
+    date: '2026-09-11',
+    category: 'melhoria',
+    title: 'Página inicial: demonstração da operação mais clara e completa',
+    description: 'A seção "Sua operação, sob controle total." da página inicial foi refeita. O painel de demonstração ficou maior e mais legível: os quatro indicadores agora mostram a variação em relação ao período anterior, o gráfico de divergências ganhou escala, meses e área sombreada, e o mapa de risco ficou maior, com legenda de baixo, médio e alto risco. O aviso da BlindAI deixou de ser uma faixa larga e passou a apontar diretamente para a posição de risco. Abaixo do painel, três frases resumem o que aquilo significa na prática. Os números continuam sendo apenas ilustrativos.',
+  },
+  {
     id: '2026-09-11-nova-abertura-pagina-inicial',
     date: '2026-09-11',
     category: 'melhoria',

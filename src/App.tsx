@@ -79,8 +79,10 @@ import { getTeamProductivity } from './lib/productivityService';
 import { getBlindAISituations } from './lib/blindAIInsightsEngine';
 import { tryFastPath, askBlindAIAgent, getContextualSuggestions, type ChatMessage } from './lib/blindAIAgent';
 import { computeGlobalStats } from './lib/blindAIAgentAlgorithm';
-import { cycleLinesAsBrandData, mergeCurrentCycleCounts, type CycleLineSummary } from './lib/inventoryCycle/inventoryCycleModel';
+import { cycleLinesAsBrandData, mergeCurrentCycleCounts, withRegisteredTaxonomy, type CycleLineSummary, type RegisteredBrand, type RegisteredLine } from './lib/inventoryCycle/inventoryCycleModel';
 import { listLineUniverse } from './lib/inventoryCycle/inventoryCycleService';
+import { listBrands, listLines } from './lib/productBrands/productBrandService';
+import { subscribeTaxonomyChanged } from './lib/productBrands/taxonomySync';
 import { KpisIndicadoresPage } from './components/KpisIndicadoresPage';
 import { SafeDropdown } from './components/SafeDropdown';
 import { CountManagementCenter } from './components/counting/CountManagementCenter';
@@ -383,6 +385,10 @@ function AppContent() {
   // gravou. Não há segunda taxonomia de reserva — `brandsData` abaixo serve apenas as
   // telas de contagem agregada e o fechamento, nunca os indicadores do Dashboard.
   const [lineUniverse, setLineUniverse] = useState<CycleLineSummary[]>([]);
+  // Cadastro canônico de marcas e linhas — a mesma fonte da tela Linhas e Marcas, lida
+  // aqui só para que uma entidade recém-criada exista no universo de exibição antes de
+  // ter qualquer produto associado.
+  const [taxonomy, setTaxonomy] = useState<{ brands: RegisteredBrand[]; lines: RegisteredLine[] }>({ brands: [], lines: [] });
   const loadData = useCallback(async () => {
     if (!companyId) {
       setLoading(false);
@@ -409,6 +415,15 @@ function AppContent() {
 
       // O Dashboard lê a view de agrupamento, nunca os itens um a um.
       setLineUniverse(await listLineUniverse(companyId));
+
+      // Cadastro canônico de Linhas e Marcas (product_brands / product_lines). Serve às
+      // telas que listam o que EXISTE — o Dashboard continua medindo só o que o
+      // inventário tem. Uma consulta cada, já escopadas por company_id.
+      const [registeredBrands, registeredLines] = await Promise.all([listBrands(companyId), listLines(companyId)]);
+      setTaxonomy({
+        brands: registeredBrands.map(b => ({ id: b.id, name: b.name, active: b.active })),
+        lines: registeredLines.map(l => ({ id: l.id, brandId: l.brandId, name: l.name, active: l.active })),
+      });
 
       setError(null);
       setLastLoadedAt(Date.now());
@@ -479,6 +494,23 @@ function AppContent() {
     () => computeGlobalStats(cycleLinesAsBrandData(mergeCurrentCycleCounts(lineUniverse, brandsData).lines)),
     [lineUniverse, brandsData]
   );
+
+  // Mesmo universo do Dashboard MAIS as marcas e linhas cadastradas que ainda não têm
+  // produto. É o que o Ranking lista: lá a pergunta é "quais linhas existem e como cada
+  // uma vai", então uma linha recém-criada precisa aparecer, com estado vazio. Entidade
+  // sem SKU soma zero em tudo, tem acuracidade nula e fica fora de destaques e
+  // prioridades — por isso nenhum indicador do Dashboard usa este universo.
+  const globaisCadastro = useMemo(
+    () => computeGlobalStats(cycleLinesAsBrandData(
+      withRegisteredTaxonomy(mergeCurrentCycleCounts(lineUniverse, brandsData).lines, taxonomy.brands, taxonomy.lines)
+    )),
+    [lineUniverse, brandsData, taxonomy]
+  );
+
+  // Marca/linha criada, renomeada, ativada ou associada em qualquer tela do sistema: o
+  // serviço avisa e os dados daqui são relidos. Sem F5, sem polling — um aviso pontual
+  // depois de cada mutação bem-sucedida.
+  useEffect(() => subscribeTaxonomyChanged(() => { loadData(); }), [loadData]);
 
   /** Where an ERP-intelligence drill-down lands.
    *
@@ -1799,7 +1831,7 @@ function AppContent() {
           <RankingsPage
             onBack={() => setActiveTab('dashboard')}
             companyId={companyId}
-            brandsData={globais.tabela}
+            brandsData={globaisCadastro.tabela}
             topVendas={topVendas}
             operatorStats={operatorStats}
           />

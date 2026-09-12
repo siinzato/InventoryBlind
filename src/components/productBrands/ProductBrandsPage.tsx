@@ -16,6 +16,7 @@ import { signBrandLogoPaths } from '../../lib/brandLogos/brandLogoService';
 import { BrandMark } from '../brandLogos/BrandMark';
 import { BrandLineFormModal } from './BrandLineFormModal';
 import { ImportedProductsPage, type ProductBrandLineFilter } from '../ImportedProductsPage';
+import { notifyTaxonomyChanged, requestActiveCycleSync } from '../../lib/productBrands/taxonomySync';
 
 interface ProductBrandsPageProps {
   companyId: string;
@@ -104,6 +105,10 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
     try {
       const result = await classifyCompanyProducts(companyId, profile?.id ?? '', profile?.email ?? '');
       setClassifyResult(`${result.classified} classificados automaticamente, ${result.needsReview} para revisão, ${result.unmatched} não identificados.`);
+      // Um lote inteiro reclassificado: uma reconciliação do inventário no fim, nunca uma
+      // por produto. O aviso reabastece Dashboard e Ranking sem recarregar a página.
+      await requestActiveCycleSync(companyId, profile?.id ?? null);
+      notifyTaxonomyChanged();
       load();
     } catch (err) {
       console.error('Error classifying products:', err);

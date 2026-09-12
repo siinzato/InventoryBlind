@@ -5,6 +5,7 @@
 import { supabase } from '../supabase';
 import { logAuditEvent } from '../auditLogService';
 import { classifyProductTitle, type ClassifierBrand } from './brandClassifier';
+import { notifyTaxonomyChanged, requestActiveCycleSync } from './taxonomySync';
 
 export interface ProductBrand {
   id: string; companyId: string; name: string; code: string | null; keywords: string[];
@@ -104,6 +105,7 @@ export async function createBrand(companyId: string, input: BrandInput, userId: 
     .single();
   if (error || !data) throw error ?? new Error('Falha ao criar a marca.');
   await logAuditEvent({ companyId, userId, userEmail, action: 'product_brand.created', resourceType: 'product_brands', resourceId: data.id, metadata: { name: input.name } });
+  notifyTaxonomyChanged();
   return brandFromRow(data);
 }
 
@@ -118,6 +120,8 @@ export async function updateBrand(companyId: string, id: string, input: Partial<
   const { error } = await supabase.from('product_brands').update(payload).eq('id', id).eq('company_id', companyId);
   if (error) throw error;
   await logAuditEvent({ companyId, userId, userEmail, action: 'product_brand.updated', resourceType: 'product_brands', resourceId: id });
+  await requestActiveCycleSync(companyId, userId);
+  notifyTaxonomyChanged();
 }
 
 /** Nunca apaga fisicamente — desativar é a única forma suportada de "remover" uma marca já usada. */
@@ -125,6 +129,7 @@ export async function setBrandActive(companyId: string, id: string, active: bool
   const { error } = await supabase.from('product_brands').update({ active, updated_at: new Date().toISOString() }).eq('id', id).eq('company_id', companyId);
   if (error) throw error;
   await logAuditEvent({ companyId, userId, userEmail, action: active ? 'product_brand.updated' : 'product_brand.deactivated', resourceType: 'product_brands', resourceId: id });
+  notifyTaxonomyChanged();
 }
 
 export interface LineInput {
@@ -142,6 +147,7 @@ export async function createLine(companyId: string, input: LineInput, userId: st
     .single();
   if (error || !data) throw error ?? new Error('Falha ao criar a linha.');
   await logAuditEvent({ companyId, userId, userEmail, action: 'product_line.created', resourceType: 'product_lines', resourceId: data.id, metadata: { name: input.name, brandId: input.brandId } });
+  notifyTaxonomyChanged();
   return lineFromRow(data);
 }
 
@@ -155,12 +161,15 @@ export async function updateLine(companyId: string, id: string, input: Partial<O
   const { error } = await supabase.from('product_lines').update(payload).eq('id', id).eq('company_id', companyId);
   if (error) throw error;
   await logAuditEvent({ companyId, userId, userEmail, action: 'product_line.updated', resourceType: 'product_lines', resourceId: id });
+  await requestActiveCycleSync(companyId, userId);
+  notifyTaxonomyChanged();
 }
 
 export async function setLineActive(companyId: string, id: string, active: boolean, userId: string, userEmail: string): Promise<void> {
   const { error } = await supabase.from('product_lines').update({ active, updated_at: new Date().toISOString() }).eq('id', id).eq('company_id', companyId);
   if (error) throw error;
   await logAuditEvent({ companyId, userId, userEmail, action: active ? 'product_line.updated' : 'product_line.deactivated', resourceType: 'product_lines', resourceId: id });
+  notifyTaxonomyChanged();
 }
 
 /** Responsáveis efetivos de uma linha: os próprios, ou os da marca quando a linha não tiver nenhum. */
@@ -233,6 +242,10 @@ export async function bulkAssignProductAssociation(
     companyId, userId, userEmail, action: 'product_brand_association.confirmed', resourceType: 'product_brand_associations',
     metadata: { bulk: true, count: productIds.length, brandId, lineId },
   });
+
+  // Mesma reconciliação da associação individual, aqui para o lote inteiro de uma vez.
+  await requestActiveCycleSync(companyId, userId);
+  notifyTaxonomyChanged();
 }
 
 export async function listReviewQueue(companyId: string, limit = 100): Promise<ProductBrandAssociation[]> {
@@ -302,6 +315,11 @@ export async function confirmProductAssociation(
     companyId, userId, userEmail, action: 'product_brand_association.confirmed', resourceType: 'product_brand_associations',
     resourceId: input.productId, metadata: { brandId: input.brandId, lineId: input.lineId },
   });
+
+  // A associação é a verdade; o inventário ativo passa a refletir a classificação nova.
+  // Revisar vários itens em sequência gera UMA reconciliação, não uma por produto.
+  await requestActiveCycleSync(companyId, userId);
+  notifyTaxonomyChanged();
 }
 
 export interface ClassifyBatchResult { classified: number; needsReview: number; unmatched: number; skippedManual: number }

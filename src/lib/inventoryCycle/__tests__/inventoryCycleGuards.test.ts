@@ -125,8 +125,28 @@ describe('Dashboard principal: um único inventário', () => {
     }
   });
 
-  it('só existe uma chamada de computeGlobalStats — um universo, um total', () => {
-    expect((app.match(/computeGlobalStats\(/g) ?? []).length).toBe(1);
+  // O Ranking lista o que está CADASTRADO, então precisa enxergar marca/linha que ainda
+  // não tem produto; o Dashboard mede o que o inventário tem. São duas leituras da mesma
+  // base, não duas fontes: por isso a guarda deixou de contar chamadas e passou a exigir
+  // que toda chamada nasça do universo do ciclo.
+  it('um universo, um total: todo computeGlobalStats parte da mesma base do ciclo', () => {
+    const calls = app.match(/computeGlobalStats\(/g) ?? [];
+    expect(calls.length).toBeGreaterThan(0);
+
+    const flat = app.replace(/\s+/g, ' ');
+    const bases = flat.match(/computeGlobalStats\(cycleLinesAsBrandData\( ?([a-zA-Z]+)\(/g) ?? [];
+    expect(bases.length).toBe(calls.length);
+    for (const base of bases) {
+      expect(['mergeCurrentCycleCounts', 'withRegisteredTaxonomy'].some(fn => base.includes(fn))).toBe(true);
+    }
+  });
+
+  // As entidades acrescentadas ao universo do Ranking entram todas com zero — é o que
+  // garante que criar uma linha não mexa em progresso, acuracidade nem denominador.
+  it('o Dashboard continua medindo só o universo do inventário', () => {
+    const dashboard = app.slice(app.indexOf('const globais = useMemo('), app.indexOf('const globaisCadastro'));
+    expect(dashboard).not.toContain('withRegisteredTaxonomy');
+    expect(dashboard).toContain('mergeCurrentCycleCounts(lineUniverse, brandsData).lines');
   });
 });
 

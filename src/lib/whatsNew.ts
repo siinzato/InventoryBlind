@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-11-marcas-linhas-aparecem-em-todo-sistema',
+    date: '2026-09-11',
+    category: 'correcao',
+    title: 'Marcas e linhas novas aparecem na hora no resto do sistema',
+    description: 'Ao cadastrar uma marca ou uma linha em Produtos → Linhas e Marcas, ela agora passa a existir imediatamente no Ranking, mesmo antes de ter qualquer produto associado — aparece com estado vazio, sem inventar número. Ao associar produtos, renomear ou classificar o catálogo, o inventário em andamento é atualizado sozinho e o Dashboard e o Ranking se atualizam sem precisar recarregar a página. Antes era preciso dar F5, e uma linha recém-criada só aparecia depois de ganhar produtos. Nenhuma contagem já feita é perdida, e os indicadores não mudam por causa de uma marca ou linha ainda sem produtos.',
+  },
+  {
     id: '2026-09-11-nova-tipografia-inventoryblind',
     date: '2026-09-11',
     category: 'melhoria',

@@ -290,3 +290,83 @@ export function mergeCurrentCycleCounts(
 
   return { lines, carried, unresolved };
 }
+
+// ── Universo de EXIBIÇÃO: cadastro + inventário ────────────────────────────────────────
+//
+// A view agrega os ITENS do inventário, então uma marca ou linha recém-criada — que ainda
+// não tem nenhum produto associado — simplesmente não existe nela. Isso é correto para
+// medir o inventário e errado para listar o que está cadastrado: a linha existe, só está
+// vazia. As funções abaixo juntam as duas coisas SEM criar taxonomia paralela: as
+// entidades vêm de `product_brands`/`product_lines`, a mesma fonte canônica da tela
+// Linhas e Marcas, e a chave de agrupamento é a mesma da view.
+
+export interface RegisteredBrand {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export interface RegisteredLine {
+  id: string;
+  brandId: string;
+  name: string;
+  active: boolean;
+}
+
+/**
+ * Acrescenta ao universo as entidades cadastradas que ainda não aparecem nele, sempre com
+ * zero: 0 SKU, 0 contado, 0 divergência.
+ *
+ * Por que isso não mexe em métrica nenhuma: linha com `totalSku = 0` soma 0 em todos os
+ * totais, tem progresso 0, acuracidade `null` (`computeAccuracy` exige `doneSku > 0`) e
+ * fica de fora de destaques, prioridades e atenção, que exigem amostra. Ela existe para
+ * ser listada e navegada, não para produzir dado operacional.
+ *
+ * Entidade INATIVA não entra: desativar tira a marca/linha das opções de vínculo futuro,
+ * mas não apaga histórico — se ainda houver produto dela no inventário, o grupo continua
+ * vindo da view normalmente, com seus números reais.
+ */
+export function withRegisteredTaxonomy(
+  universe: CycleLineSummary[],
+  brands: RegisteredBrand[],
+  lines: RegisteredLine[],
+): CycleLineSummary[] {
+  const rows = [...universe];
+  const presentLineIds = new Set(universe.map(group => group.lineId).filter((id): id is string => !!id));
+  const presentKeys = new Set(universe.map(group => group.groupKey));
+
+  const activeLines = lines.filter(line => line.active);
+
+  for (const line of activeLines) {
+    if (presentLineIds.has(line.id)) continue;
+    rows.push({
+      groupKey: line.id,
+      lineId: line.id,
+      brandId: line.brandId,
+      label: line.name,
+      totalSku: 0,
+      doneSku: 0,
+      divergences: 0,
+    });
+  }
+
+  // Marca entra por si mesma só quando não tem nenhuma linha ativa — é exatamente o
+  // critério da view, que agrupa pela marca quando o item não tem linha.
+  const brandsWithActiveLine = new Set(activeLines.map(line => line.brandId));
+  for (const brand of brands) {
+    if (!brand.active || brandsWithActiveLine.has(brand.id)) continue;
+    const key = `brand:${brand.id}`;
+    if (presentKeys.has(key)) continue;
+    rows.push({
+      groupKey: key,
+      lineId: null,
+      brandId: brand.id,
+      label: brand.name,
+      totalSku: 0,
+      doneSku: 0,
+      divergences: 0,
+    });
+  }
+
+  return rows;
+}

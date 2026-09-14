@@ -313,6 +313,14 @@ export interface RegisteredLine {
   active: boolean;
 }
 
+export interface RegisteredTaxonomyOptions {
+  /** Inclui TODA marca ativa como entidade própria, inclusive as que já têm linha ativa.
+   *  É o que a seleção de contagem precisa — lá a pergunta é "quais marcas existem para
+   *  contar?". O Ranking segue com o padrão (`false`), que espelha o critério da view:
+   *  marca só é grupo quando o item não tem linha. */
+  includeParentBrands?: boolean;
+}
+
 /**
  * Acrescenta ao universo as entidades cadastradas que ainda não aparecem nele, sempre com
  * zero: 0 SKU, 0 contado, 0 divergência.
@@ -330,6 +338,7 @@ export function withRegisteredTaxonomy(
   universe: CycleLineSummary[],
   brands: RegisteredBrand[],
   lines: RegisteredLine[],
+  options: RegisteredTaxonomyOptions = {},
 ): CycleLineSummary[] {
   const rows = [...universe];
   const presentLineIds = new Set(universe.map(group => group.lineId).filter((id): id is string => !!id));
@@ -351,10 +360,14 @@ export function withRegisteredTaxonomy(
   }
 
   // Marca entra por si mesma só quando não tem nenhuma linha ativa — é exatamente o
-  // critério da view, que agrupa pela marca quando o item não tem linha.
+  // critério da view, que agrupa pela marca quando o item não tem linha. Com
+  // `includeParentBrands`, toda marca ativa entra. Isso nunca duplica SKU: a marca só é
+  // acrescentada quando a chave `brand:<id>` ainda NÃO existe no universo, e entra
+  // zerada — os SKUs das linhas continuam contados uma única vez, nas próprias linhas.
   const brandsWithActiveLine = new Set(activeLines.map(line => line.brandId));
   for (const brand of brands) {
-    if (!brand.active || brandsWithActiveLine.has(brand.id)) continue;
+    if (!brand.active) continue;
+    if (!options.includeParentBrands && brandsWithActiveLine.has(brand.id)) continue;
     const key = `brand:${brand.id}`;
     if (presentKeys.has(key)) continue;
     rows.push({

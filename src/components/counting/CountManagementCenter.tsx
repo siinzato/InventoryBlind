@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { ClipboardList, Upload, Tablet, Repeat2, Printer } from 'lucide-react';
 import { Button, Page, PageHeader, SegmentedControl, type SegmentedOption } from '../ui';
 import { BrandData } from '../../lib/supabase';
+import type { CycleLineSummary } from '../../lib/inventoryCycle/inventoryCycleModel';
 import { ManualCountTab } from './ManualCountTab';
 import { ImportCountTab } from './ImportCountTab';
 import { PhysicalCountSessionsTab } from './PhysicalCountSessionsTab';
@@ -13,6 +14,14 @@ import { hasPermission } from '../../lib/permissionService';
 
 interface CountManagementCenterProps {
   brandsData: BrandData[];
+  /** Universo de seleção preparado pelo App: inventário do ciclo + taxonomia ativa
+   *  cadastrada. É a única fonte de "quais linhas/marcas existem" nas abas de contagem —
+   *  a mesma do Dashboard e do Ranking, para que nenhuma tela fique com lista própria. */
+  countingUniverse: CycleLineSummary[];
+  /** O ciclo ativo já foi conferido contra a classificação atual? `null` enquanto a
+   *  reconciliação roda, `false` se ela falhou. Enquanto não for `true`, o universo pode
+   *  estar incompleto e a seleção de contagem não o apresenta como verdade. */
+  universeReconciled: boolean | null;
   companyId: string;
   onBrandsUpdated: (brands: BrandData[]) => void;
   /** Abre a ferramenta Emitir Relatório — a folha de contagem que o operador
@@ -34,7 +43,7 @@ const MODES: SegmentedOption<Mode>[] = [
 
 const EMPTY_STATS: LiveCountStats = { linha: '', totalSku: 0, contados: 0, divergencias: 0, acuracidade: null, active: false };
 
-export function CountManagementCenter({ brandsData, companyId, onBrandsUpdated, onEmitReport }: CountManagementCenterProps) {
+export function CountManagementCenter({ brandsData, countingUniverse, universeReconciled, companyId, onBrandsUpdated, onEmitReport }: CountManagementCenterProps) {
   const { profile } = useAuth();
   const [mode, setMode] = useState<Mode>('manual');
   const [liveStats, setLiveStats] = useState<LiveCountStats>(EMPTY_STATS);
@@ -88,6 +97,8 @@ export function CountManagementCenter({ brandsData, companyId, onBrandsUpdated, 
               {mode === 'manual' ? (
                 <ManualCountTab
                   brandsData={brandsData}
+                  countingUniverse={countingUniverse}
+                  universeReconciled={universeReconciled}
                   companyId={companyId}
                   onBrandsUpdated={onBrandsUpdated}
                   onSaved={handleSaved}

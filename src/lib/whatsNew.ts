@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-09-14-pendentes-reais-na-contagem',
+    date: '2026-09-14',
+    category: 'correcao',
+    title: 'Pendentes da contagem voltam a refletir os produtos reais',
+    description: 'Algumas linhas e marcas apareciam como "Pendentes: 0" na Contagem Manual mesmo tendo produtos ainda não contados — acontecia quando os produtos tinham sido associados depois da última importação e o inventário em andamento ainda não havia sido conferido. Agora o inventário é conferido com a classificação atual dos produtos antes de a lista ser montada, então a quantidade pendente é sempre a real. Enquanto essa conferência acontece, a lista fica indisponível por alguns instantes em vez de mostrar números provisórios. Nenhuma contagem já registrada foi alterada.',
+  },
+  {
+    id: '2026-09-14-marcas-linhas-na-nova-contagem',
+    date: '2026-09-14',
+    category: 'correcao',
+    title: 'Marcas e linhas novas já aparecem para contar',
+    description: 'A marca ou linha criada em Produtos → Linhas e Marcas agora aparece na hora na lista "Linha / Marca" de Nova Contagem → Contagem Manual e também na tabela de linhas do Dashboard, sem recarregar a página e sem precisar ter produtos ainda. Ela aparece com "Pendentes: 0" e não altera progresso, acuracidade, divergências nem o total de SKUs. Se ainda não houver produto associado, o sistema avisa e não deixa registrar contagem — nenhum número é inventado. Assim que produtos forem associados, os pendentes passam a refletir a quantidade real.',
+  },
+  {
     id: '2026-09-11-marcas-linhas-aparecem-em-todo-sistema',
     date: '2026-09-11',
     category: 'correcao',

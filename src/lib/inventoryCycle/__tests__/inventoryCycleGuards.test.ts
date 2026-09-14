@@ -13,7 +13,10 @@ const executableSql = (sql: string): string => sql
 const read = (glob: Record<string, string>, needle: string): string => {
   const entry = Object.entries(glob).find(([path]) => path.includes(needle));
   if (!entry) throw new Error(`arquivo não encontrado no glob: ${needle}`);
-  return entry[1];
+  // O repositório usa CRLF. Normalizar para LF é o que faz os recortes por fim de função
+  // abaixo funcionarem: com CRLF o `indexOf('\n}\n')` não casa e a fatia devolve o
+  // arquivo inteiro — a asserção passa a ler código de outra função.
+  return entry[1].replace(/\r\n/g, '\n');
 };
 
 const SERVICES = import.meta.glob('../*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -148,6 +151,16 @@ describe('Dashboard principal: um único inventário', () => {
     expect(dashboard).not.toContain('withRegisteredTaxonomy');
     expect(dashboard).toContain('mergeCurrentCycleCounts(lineUniverse, brandsData).lines');
   });
+
+  // …mas a tabela "Controle por linha" responde a outra pergunta — quais linhas existem —
+  // e por isso lista o universo de exibição. Os KPIs e o total de SKU do cabeçalho
+  // continuam em `globais`: criar uma linha não move indicador nenhum.
+  it('a listagem do Dashboard enxerga o cadastro; os indicadores não', () => {
+    expect(app).toContain('globaisCadastro.tabela.slice(0, 5)');
+    expect(app.includes('globais.tabela.slice(0, 5)')).toBe(false);
+    expect(app).toContain('{globais.totalSku.toLocaleString(\'pt-BR\')}');
+    expect(app).toContain('value: `${globais.progresso.toFixed(1)}%`');
+  });
 });
 
 describe('nenhum segundo ambiente de contagem', () => {
@@ -159,10 +172,47 @@ describe('nenhum segundo ambiente de contagem', () => {
     }
   });
 
-  it('Nova Contagem escolhe do inventário atual, não de uma lista de grupos própria', () => {
+  // A tela deixou de carregar o universo por conta própria: quem prepara é o App, que é
+  // também quem reage ao cadastro de marca/linha. Enquanto ela tinha a sua própria
+  // leitura, o dropdown ficava com um retrato mais velho que o do Dashboard — foi
+  // exatamente o bug da entidade recém-criada que não aparecia na Contagem Manual.
+  it('Nova Contagem escolhe do universo preparado pelo App, não de uma lista própria', () => {
     const manual = read(COUNTING, 'ManualCountTab');
-    expect(manual).toContain('listLineUniverse(companyId)');
-    expect(manual).toContain('buildCycleLineRows(mergeCurrentCycleCounts(universe, brandsData).lines)');
+    expect(manual).toContain('buildCycleLineRows(countingUniverse)');
+    expect(manual.includes('listLineUniverse')).toBe(false);
+    expect(manual.includes('mergeCurrentCycleCounts')).toBe(false);
+    // …e o App é quem monta esse universo, do ciclo + taxonomia ativa cadastrada.
+    const app = read(APP, 'App.tsx').replace(/\s+/g, ' ');
+    expect(app).toContain('const countingUniverse = useMemo( () => withRegisteredTaxonomy( mergeCurrentCycleCounts(lineUniverse, brandsData).lines, taxonomy.brands, taxonomy.lines, { includeParentBrands: true },');
+    expect(app).toContain('countingUniverse={countingUniverse}');
+  });
+
+  // O universo operacional só é verdade se o ciclo estiver conferido com a classificação
+  // atual: produto associado depois da última importação fica no ciclo com `line_id`
+  // nulo, some do universo e volta como entidade vazia. Reconciliar ANTES de ler é o que
+  // impede "Pendentes: 0" numa linha que tem produtos.
+  it('o ciclo é reconciliado antes de o universo ser lido — uma vez, no App', () => {
+    const app = read(APP, 'App.tsx');
+    const sync = app.indexOf('await requestActiveCycleSync(companyId, profile?.id ?? null)');
+    const leitura = app.indexOf('setLineUniverse(await listLineUniverse(companyId))');
+    expect(sync).toBeGreaterThan(-1);
+    expect(leitura).toBeGreaterThan(sync);
+    // Reutiliza a sincronização coalescida existente — nada de mecanismo próprio.
+    expect(app).toContain("import { requestActiveCycleSync, subscribeTaxonomyChanged } from './lib/productBrands/taxonomySync'");
+    // Sem polling: a releitura é por aviso pontual, não por intervalo.
+    expect(app.includes('setInterval(')).toBe(false);
+  });
+
+  it('falha ou espera na reconciliação nunca vira universo zerado apresentado como verdade', () => {
+    const app = read(APP, 'App.tsx');
+    expect(app).toContain('const [universeReconciled, setUniverseReconciled] = useState<boolean | null>(null)');
+    expect(app).toContain('universeReconciled={universeReconciled}');
+
+    const manual = read(COUNTING, 'ManualCountTab');
+    expect(manual).toContain('disabled={universeReconciled !== true}');
+    expect(manual).toContain('universeReconciled === true && groups.map(');
+    // E nada é gravado sobre um universo que ainda não foi conferido.
+    expect(manual).toContain('if (universeReconciled !== true) return;');
     // Pendentes do dropdown = pendentes do inventário, não total digitado menos contado.
     expect(manual).toContain('(Pendentes: {g.pendingSku})');
     expect(manual.includes('b.total_sku - b.done_sku')).toBe(false);
@@ -186,6 +236,14 @@ describe('nenhum segundo ambiente de contagem', () => {
     expect(/update\(\{\s*brand:/.test(manual)).toBe(false);
     // Linha que ainda não existia nasce zerada: contagem nenhuma é sobrescrita.
     expect(manual).toContain('done_sku: 0');
+  });
+
+  // Entidade recém-cadastrada existe no seletor, mas contar exige SKU: sem esta trava o
+  // inventário passaria a ter contado mais do que possui.
+  it('não se registra contagem positiva em entidade sem nenhum SKU', () => {
+    const manual = read(COUNTING, 'ManualCountTab');
+    expect(manual).toContain('selectedGroup.totalSku === 0 && (parseInt(skusContados) || 0) > 0');
+    expect(manual).toContain('Esta linha ainda não possui SKUs associados.');
   });
 
   it('as abas de contagem existentes seguem intactas', () => {

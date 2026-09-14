@@ -7,7 +7,10 @@ import { describe, expect, it } from 'vitest';
 const read = (glob: Record<string, string>, needle: string): string => {
   const entry = Object.entries(glob).find(([path]) => path.includes(needle));
   if (!entry) throw new Error(`arquivo não encontrado no glob: ${needle}`);
-  return entry[1];
+  // O repositório usa CRLF. Normalizar para LF é o que faz os recortes por fim de função
+  // abaixo funcionarem: com CRLF o `indexOf('\n}\n')` não casa e a fatia devolve o
+  // arquivo inteiro — a asserção passa a ler código de outra função.
+  return entry[1].replace(/\r\n/g, '\n');
 };
 
 const SERVICES = import.meta.glob('../*.ts', { query: '?raw', import: 'default', eager: true }) as Record<string, string>;
@@ -101,6 +104,29 @@ describe('ciclo', () => {
     expect(body).toContain('totalSku: 0');
     expect(body).toContain('doneSku: 0');
     expect(body).toContain('divergences: 0');
-    expect(body).toContain('if (!brand.active || brandsWithActiveLine.has(brand.id)) continue;');
+    expect(body).toContain('if (!brand.active) continue;');
+    // A marca-pai só é opção extra no universo de contagem; no padrão (Ranking) o
+    // critério da view continua valendo: marca com linha ativa não vira grupo próprio.
+    expect(body).toContain('if (!options.includeParentBrands && brandsWithActiveLine.has(brand.id)) continue;');
+  });
+});
+
+// Cenário G: rodar a reconciliação duas vezes não pode duplicar item nem regravar
+// contagem. As duas garantias vivem no serviço e na migration; aqui trava-se a fonte.
+describe('reconciliação idempotente', () => {
+  it('G: SKU novo só entra quando ainda não existe item para o produto no ciclo', () => {
+    const service = read(CYCLE, 'inventoryCycleService');
+    expect(service).toContain('const existingByProduct = new Map(existing.map(item => [item.product_id, item]))');
+    expect(service).toContain('.filter(product => !existingByProduct.has(product.id))');
+  });
+
+  it('G: reclassificar só toca no que realmente mudou, e nunca na contagem', () => {
+    const service = read(CYCLE, 'inventoryCycleService');
+    expect(service).toContain('if (unchanged) continue;');
+    const sync = service.slice(service.indexOf('export async function syncActiveCycleItems'));
+    const body = sync.slice(0, sync.indexOf('\n}\n'));
+    for (const proibido of ['counted_quantity:', 'counted_at:', 'counted_by:', "status: 'counted'"]) {
+      expect(body.includes(proibido)).toBe(false);
+    }
   });
 });

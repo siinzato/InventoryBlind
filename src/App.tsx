@@ -82,7 +82,7 @@ import { computeGlobalStats } from './lib/blindAIAgentAlgorithm';
 import { cycleLinesAsBrandData, mergeCurrentCycleCounts, withRegisteredTaxonomy, type CycleLineSummary, type RegisteredBrand, type RegisteredLine } from './lib/inventoryCycle/inventoryCycleModel';
 import { listLineUniverse } from './lib/inventoryCycle/inventoryCycleService';
 import { listBrands, listLines } from './lib/productBrands/productBrandService';
-import { subscribeTaxonomyChanged } from './lib/productBrands/taxonomySync';
+import { requestActiveCycleSync, subscribeTaxonomyChanged } from './lib/productBrands/taxonomySync';
 import { KpisIndicadoresPage } from './components/KpisIndicadoresPage';
 import { SafeDropdown } from './components/SafeDropdown';
 import { CountManagementCenter } from './components/counting/CountManagementCenter';
@@ -389,6 +389,11 @@ function AppContent() {
   // aqui só para que uma entidade recém-criada exista no universo de exibição antes de
   // ter qualquer produto associado.
   const [taxonomy, setTaxonomy] = useState<{ brands: RegisteredBrand[]; lines: RegisteredLine[] }>({ brands: [], lines: [] });
+  // O ciclo ativo já foi conferido contra a classificação atual nesta carga?
+  // `null` = ainda em andamento; `false` = a reconciliação falhou. Nos dois casos o
+  // universo de contagem pode estar incompleto, e as telas de contagem não podem
+  // apresentá-lo como verdade — nem piscar Pendentes: 0 enquanto isso.
+  const [universeReconciled, setUniverseReconciled] = useState<boolean | null>(null);
   const loadData = useCallback(async () => {
     if (!companyId) {
       setLoading(false);
@@ -413,6 +418,24 @@ function AppContent() {
       setCustomKPIs(kpisRes.data || []);
       setOperatorStats(operatorStatsRes);
 
+      // Antes de ler o universo, o ciclo ativo é reconciliado com a classificação atual
+      // dos produtos. Sem isto, um produto associado a uma linha depois da última
+      // importação continua no ciclo com `line_id` nulo: a linha some do universo
+      // operacional e passa a ser acrescentada como entidade vazia — Pendentes: 0 em uma
+      // linha que tem produtos. Zero precisa significar zero de verdade, não "o ciclo
+      // ainda não sincronizou". É a MESMA `requestActiveCycleSync` das associações:
+      // coalescida, idempotente e sem criar inventário quando não há ciclo ativo.
+      let reconciled = true;
+      try {
+        await requestActiveCycleSync(companyId, profile?.id ?? null);
+      } catch (err) {
+        // Falha aqui não pode virar universo zerado silencioso: o estado fica explícito e
+        // as telas de contagem recusam trabalhar sobre um universo sabidamente incompleto.
+        console.error('[inventário] reconciliação do ciclo ativo falhou:', err);
+        reconciled = false;
+      }
+      setUniverseReconciled(reconciled);
+
       // O Dashboard lê a view de agrupamento, nunca os itens um a um.
       setLineUniverse(await listLineUniverse(companyId));
 
@@ -433,7 +456,7 @@ function AppContent() {
     } finally {
       setLoading(false);
     }
-  }, [companyId]);
+  }, [companyId, profile?.id]);
 
   useEffect(() => {
     loadData();
@@ -504,6 +527,22 @@ function AppContent() {
     () => computeGlobalStats(cycleLinesAsBrandData(
       withRegisteredTaxonomy(mergeCurrentCycleCounts(lineUniverse, brandsData).lines, taxonomy.brands, taxonomy.lines)
     )),
+    [lineUniverse, brandsData, taxonomy]
+  );
+
+  // Universo de SELEÇÃO da contagem. Mesma base operacional das linhas acima, mais toda a
+  // taxonomia ativa — aqui inclusive as marcas que já possuem linha, porque na hora de
+  // escolher o que contar toda marca ativa precisa ser uma opção. É a resposta à pergunta
+  // "o que existe para contar?", nunca a "quanto já foi contado?": as entidades
+  // acrescentadas entram zeradas e não alimentam indicador nenhum. Nova Contagem recebe
+  // isto por prop — não existe segunda leitura de taxonomia lá dentro.
+  const countingUniverse = useMemo(
+    () => withRegisteredTaxonomy(
+      mergeCurrentCycleCounts(lineUniverse, brandsData).lines,
+      taxonomy.brands,
+      taxonomy.lines,
+      { includeParentBrands: true },
+    ),
     [lineUniverse, brandsData, taxonomy]
   );
 
@@ -1404,7 +1443,12 @@ function AppContent() {
                         </tr>
                       </thead>
                       <tbody>
-                        {globais.tabela.slice(0, 5).map((row) => (
+                        {/* Listagem — a pergunta aqui é "quais linhas/marcas existem",
+                            então a fonte é o universo de exibição. Os números de cada
+                            linha continuam sendo os reais do inventário; entidade recém
+                            cadastrada aparece zerada. Os totais e KPIs acima seguem em
+                            `globais`, o universo operacional. */}
+                        {globaisCadastro.tabela.slice(0, 5).map((row) => (
                           <tr key={row.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
                             <td className="px-6 py-3.5 font-medium text-fg">{row.brand}</td>
                             <td className="px-3 py-3.5 text-center text-fg-muted text-numeric text-xs">{row.progress.toFixed(1)}%</td>
@@ -1661,6 +1705,8 @@ function AppContent() {
         {activeTab === 'input' && (
           <CountManagementCenter
             brandsData={brandsData}
+            countingUniverse={countingUniverse}
+            universeReconciled={universeReconciled}
             companyId={companyId}
             onBrandsUpdated={setBrandsData}
             onEmitReport={() => setActiveTab('inventory-report')}

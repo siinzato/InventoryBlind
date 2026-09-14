@@ -8,9 +8,8 @@ import {
   type ManualCountTimingErrors,
 } from '../../lib/countManagementUtils';
 import type { LiveCountStats } from './CountSidePanel';
-import { listLineUniverse } from '../../lib/inventoryCycle/inventoryCycleService';
 import {
-  buildCycleLineRows, mergeCurrentCycleCounts,
+  buildCycleLineRows,
   type CycleLineRow, type CycleLineSummary,
 } from '../../lib/inventoryCycle/inventoryCycleModel';
 import { useAuth } from '../../lib/auth';
@@ -21,6 +20,13 @@ import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
 
 interface ManualCountTabProps {
   brandsData: BrandData[];
+  /** Universo de seleção vindo do App (inventário do ciclo + taxonomia ativa). Única
+   *  fonte das opções do dropdown Linha / Marca. */
+  countingUniverse: CycleLineSummary[];
+  /** `true` só depois de o ciclo ativo ter sido conferido contra a classificação atual.
+   *  Enquanto não for, o dropdown não exibe números — pendência zerada por ciclo
+   *  defasado é mentira para o operador. */
+  universeReconciled: boolean | null;
   companyId: string;
   onBrandsUpdated: (brands: BrandData[]) => void;
   onSaved: () => void;
@@ -65,10 +71,9 @@ async function resolveCountingLine(
 const inputClass = 'w-full p-2.5 border border-edge rounded-lg focus:outline-none focus:ring-2 focus:ring-accent/40 text-fg bg-surface text-sm';
 const labelClass = 'block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1';
 
-export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved, onStatsChange }: ManualCountTabProps) {
+export function ManualCountTab({ brandsData, countingUniverse, universeReconciled, companyId, onBrandsUpdated, onSaved, onStatsChange }: ManualCountTabProps) {
   const { profile } = useAuth();
   const [groupKey, setGroupKey] = useState('');
-  const [universe, setUniverse] = useState<CycleLineSummary[]>([]);
   const [operator1, setOperator1] = useState('');
   const [operator2, setOperator2] = useState('');
   const [totalSku, setTotalSku] = useState('');
@@ -88,27 +93,18 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const [closingBrandName, setClosingBrandName] = useState('');
   const [reprocessing, setReprocessing] = useState(false);
   const [manageCategoriesOpen, setManageCategoriesOpen] = useState(false);
+  const [emptyGroupError, setEmptyGroupError] = useState<string | null>(null);
 
-  // Mesma fonte do Dashboard: o universo do inventário atual, agrupado pela linha que a
-  // classificação Marca > Linha já gravou no produto, com o trabalho já concluído do
-  // ciclo por cima. Não existe lista de grupos própria desta tela.
-  useEffect(() => {
-    if (!companyId) return;
-    let cancelled = false;
-    listLineUniverse(companyId)
-      .then(lines => { if (!cancelled) setUniverse(lines); })
-      .catch(err => console.error('Error loading inventory universe:', err));
-    return () => { cancelled = true; };
-  }, [companyId]);
-
-  const groups = useMemo(
-    () => buildCycleLineRows(mergeCurrentCycleCounts(universe, brandsData).lines),
-    [universe, brandsData]
-  );
+  // Mesma fonte do Dashboard e do Ranking: o universo já preparado pelo App — inventário
+  // do ciclo com o trabalho concluído por cima, mais a taxonomia ativa cadastrada. Esta
+  // tela não lê taxonomia por conta própria, então não tem como ficar com um retrato
+  // velho: quando uma marca/linha é criada, o App relê e o dropdown vem junto, sem F5.
+  const groups = useMemo(() => buildCycleLineRows(countingUniverse), [countingUniverse]);
   const selectedGroup = groups.find(g => g.groupKey === groupKey);
 
   useEffect(() => {
     if (selectedGroup) setTotalSku(String(selectedGroup.totalSku));
+    setEmptyGroupError(null);
     // Selecionar a linha só carrega os totais/pendências — nunca inicia um
     // cronômetro nem preenche início/término, que ficam por conta do operador.
   }, [selectedGroup?.groupKey]);
@@ -158,7 +154,18 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (saving) return;
+    // Nenhuma contagem é gravada sobre um universo que ainda não foi conferido.
+    if (universeReconciled !== true) return;
     if (!selectedGroup || !skusContados) return;
+
+    // A entidade existe no seletor mesmo sem produto associado — mas contar exige SKU.
+    // Sem esta trava, uma linha com 0 SKU aceitaria um registro de contagem positivo e o
+    // inventário passaria a ter contado mais do que possui.
+    setEmptyGroupError(null);
+    if (selectedGroup.totalSku === 0 && (parseInt(skusContados) || 0) > 0) {
+      setEmptyGroupError('Esta linha ainda não possui SKUs associados. Associe produtos a ela em Produtos → Linhas e Marcas antes de registrar a contagem.');
+      return;
+    }
 
     const errors = validateManualCountTiming(startedDate, finishedDate, new Date());
     setTimingErrors(errors);
@@ -300,12 +307,30 @@ export function ManualCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
         <form onSubmit={handleSubmit} className="space-y-5">
           <div>
             <label className={labelClass}>Linha / Marca</label>
-            <select required value={groupKey} onChange={e => setGroupKey(e.target.value)} className={inputClass}>
-              <option value="">Selecione a linha ou marca...</option>
-              {groups.map(g => (
+            {/* Só depois de o ciclo estar conferido é que as pendências do dropdown são a
+                verdade. Antes disso não há lista: melhor esperar do que piscar zero. */}
+            <select
+              required
+              disabled={universeReconciled !== true}
+              value={groupKey}
+              onChange={e => setGroupKey(e.target.value)}
+              className={inputClass}
+            >
+              <option value="">
+                {universeReconciled === null ? 'Sincronizando o inventário...'
+                  : universeReconciled === false ? 'Inventário não sincronizado — recarregue os dados'
+                  : 'Selecione a linha ou marca...'}
+              </option>
+              {universeReconciled === true && groups.map(g => (
                 <option key={g.groupKey} value={g.groupKey}>{g.label} (Pendentes: {g.pendingSku})</option>
               ))}
             </select>
+            {universeReconciled === false && (
+              <p className="text-xs text-red-600 dark:text-red-400 mt-1">
+                Não foi possível conferir o inventário com a classificação atual dos produtos. Para não registrar contagem sobre um universo incompleto, a seleção fica bloqueada até os dados serem recarregados.
+              </p>
+            )}
+            {emptyGroupError && <p className="text-xs text-red-600 dark:text-red-400 mt-1">{emptyGroupError}</p>}
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">

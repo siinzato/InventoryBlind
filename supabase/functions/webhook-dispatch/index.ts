@@ -329,10 +329,16 @@ async function deliverOne(admin: SupabaseClient, delivery: Delivery): Promise<At
       // Loopback de desenvolvimento: sem DNS de terceiro para forjar, e sem
       // TLS (é HTTP simples) — um fetch() direto é seguro e mais simples que
       // o cliente com IP fixado, que assume TLS.
+      //
+      // `redirect: 'manual'` é o que impede este ramo de virar um contorno do bloqueio de
+      // rede interna: sem ele, um receptor em localhost poderia responder 302 para
+      // 169.254.169.254 (metadata) ou para qualquer endereço privado, e o fetch seguiria
+      // — o caminho com IP fixado não segue redirect nenhum, e este passa a não seguir
+      // também. O redirect vira o status registrado da entrega, não uma segunda request.
       const controller = new AbortController();
       const timer = setTimeout(() => controller.abort(), DELIVERY_TIMEOUT_MS);
       try {
-        const response = await fetch(url, { method: 'POST', headers, body, signal: controller.signal });
+        const response = await fetch(url, { method: 'POST', headers, body, redirect: 'manual', signal: controller.signal });
         status = response.status;
       } finally {
         clearTimeout(timer);

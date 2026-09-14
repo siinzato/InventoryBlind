@@ -36,6 +36,39 @@ const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
  *  inteiro para calcular o HMAC, então não há como validar antes de ler. */
 const MAX_BODY_BYTES = 128 * 1024;
 
+/** Leitura do corpo com teto REAL: para de ler ao ultrapassar o limite em vez de
+ *  materializar tudo e medir depois. `req.text()` seguido de `length > MAX` já aloca o
+ *  payload inteiro — e mede em code units UTF-16, não em bytes. Devolve `null` quando o
+ *  corpo excede o teto. */
+async function readBoundedBody(req: Request): Promise<string | null> {
+  const declared = Number(req.headers.get('content-length') ?? '');
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+
+  const reader = req.body?.getReader();
+  if (reader == null) return '';
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(joined);
+}
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'content-type, x-signature, x-timestamp',
@@ -161,7 +194,12 @@ Deno.serve(async (req: Request) => {
   // segredo.
   const waitToken = url.searchParams.get('wait');
   if (waitToken != null) {
-    return await resumeWait(waitToken, await req.text());
+    // O teto vale AQUI TAMBÉM: este ramo é alcançável sem credencial nenhuma (o token só
+    // é conferido dentro de `resumeWait`), então ler o corpo sem limite antes da
+    // conferência era memória arbitrária a pedido de qualquer chamador.
+    const waitBody = await readBoundedBody(req);
+    if (waitBody == null) return json({ error: 'Corpo da requisição muito grande.' }, 413);
+    return await resumeWait(waitToken, waitBody);
   }
 
   const automationId = parseAutomationId(url.pathname);
@@ -169,8 +207,8 @@ Deno.serve(async (req: Request) => {
     return json({ error: 'URL de webhook inválida.' }, 404);
   }
 
-  const rawBody = await req.text();
-  if (rawBody.length > MAX_BODY_BYTES) {
+  const rawBody = await readBoundedBody(req);
+  if (rawBody == null) {
     return json({ error: 'Corpo da requisição muito grande.' }, 413);
   }
 

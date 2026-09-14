@@ -38,8 +38,21 @@
 
   ## 4. DEFAULT DENY de EXECUTE (P1/P2)
 
-  35 funções SECURITY DEFINER estavam executáveis por `anon`. Depois desta migration,
-  `anon` não executa NENHUMA função de negócio. Três grupos:
+  O catálogo vivo reportava 46 funções de `public` executáveis por `anon`: 35 SECURITY
+  DEFINER mais 11 SECURITY INVOKER. Depois desta migration, `anon` não executa NENHUMA
+  delas — zero, não "nenhuma de negócio".
+
+  Dois pontos que a primeira versão desta migration errava, e que a revisão corrigiu:
+
+   - `REVOKE ... FROM anon` NÃO protege função que também tem EXECUTE para PUBLIC:
+     `anon` continua herdando o privilégio. `rca_next_case_number` e `nfe_claim_key_fetch`
+     estavam nessa situação (`=X/postgres` no proacl) e as correções delas teriam sido
+     inúteis. As duas passam a sair de PUBLIC, com GRANT explícito para `authenticated`.
+   - as 11 SECURITY INVOKER tinham ficado de fora por serem "puras". Ser pura não é
+     motivo para `anon` poder chamar: o critério aplicado é quem REALMENTE precisa de
+     EXECUTE, provado pelo chamador (ver 5c-bis e 5c-ter).
+
+  Grupos:
 
    - funções de manutenção sem nenhum chamador no produto (`automation_prune_history`,
      `automation_reap_stuck_events`): só `service_role`. A primeira fazia DELETE em
@@ -56,6 +69,14 @@
 
   O restante das RPCs continua executável por `authenticated` — a autorização real delas
   é por papel e por empresa DENTRO do corpo, como já era.
+
+  ## 5. Rate limit da public-api (P2)
+
+  A Edge Function `public-api` autentica por chave e isola por empresa, mas não tinha teto
+  de requisições. Entra aqui a tabela `api_key_rate_limits` (sem policy nenhuma) e a
+  função `api_key_consume_rate_limit`, na mesma arquitetura de `nfe_claim_key_fetch`:
+  reserva atômica por INSERT ... ON CONFLICT, contador no banco, executável só por
+  `service_role`. Detalhes na seção 6.
 
   ## Fora do escopo desta migration
 
@@ -251,6 +272,41 @@ REVOKE EXECUTE ON FUNCTION public.task_assignees_recompute_status()     FROM PUB
 REVOKE EXECUTE ON FUNCTION public.task_log_attachment()                 FROM PUBLIC, anon;
 REVOKE EXECUTE ON FUNCTION public.task_log_comment()                    FROM PUBLIC, anon;
 
+-- 5c-bis. Mesmas condições, funções que retornam `trigger` e por isso NÃO podem ser
+--         chamadas de outro jeito. Não são SECURITY DEFINER (rodam com o privilégio de
+--         quem dispara), então nunca foram um caminho de escalonamento — saem daqui só
+--         para que `anon` não tenha EXECUTE em nada que não precise.
+REVOKE EXECUTE ON FUNCTION public.automation_refresh_schedule()                FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.automation_touch_version()                   FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.integration_connections_check_fiscal_entity() FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.inventory_cycles_block_reopen()              FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.inventory_items_block_closed_cycle()         FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.returns_check_origin_channel_connection()    FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.update_full_operations_updated_at()          FROM PUBLIC, anon;
+REVOKE EXECUTE ON FUNCTION public.update_updated_at_column()                   FROM PUBLIC, anon;
+
+-- 5c-ter. As três últimas funções alcançáveis por anon. Não são triggers nem RPC de
+--         negócio — são auxiliares. Ficaram de fora da primeira versão desta migration
+--         por serem "puras"; ser pura não é motivo para anon poder chamá-las. O critério
+--         aplicado é quem REALMENTE precisa de EXECUTE, provado pelo chamador:
+--
+--   is_valid_cnpj / company_webhook_allowed_events — chamadas SOMENTE de dentro de
+--     fiscal_entities_create, fiscal_entities_update, company_webhook_create e
+--     company_webhook_update, TODAS SECURITY DEFINER. Dentro delas o usuário efetivo é o
+--     dono, que não precisa de grant. Nenhuma participa de CHECK constraint (conferido em
+--     pg_constraint: zero ocorrências) e nenhuma é chamada pelo front — `cnpjUtils.ts` e
+--     `webhookEvents.ts` são espelhos client-side, não chamadas RPC. Saem de todos os
+--     papéis de API.
+--
+--   automation_next_schedule_run — além de automation_emit_due_schedules (SECURITY
+--     DEFINER), é chamada por automation_refresh_schedule, que é SECURITY INVOKER. Nesse
+--     caminho o usuário efetivo é quem disparou o trigger, então `authenticated` PRECISA
+--     de EXECUTE para gravar automação. Mantida para authenticated, revogada de anon.
+REVOKE EXECUTE ON FUNCTION public.is_valid_cnpj(text)                   FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.company_webhook_allowed_events()      FROM PUBLIC, anon, authenticated;
+REVOKE EXECUTE ON FUNCTION public.automation_next_schedule_run(text, integer, integer, integer, integer, text, timestamptz) FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.automation_next_schedule_run(text, integer, integer, integer, integer, text, timestamptz) TO authenticated;
+
 -- 5d. RPCs de negócio: continuam para `authenticated` (a autorização é por papel e
 --     empresa dentro do corpo), mas `anon` não chama mais nenhuma delas.
 REVOKE EXECUTE ON FUNCTION public.create_additional_company(text)                         FROM anon;
@@ -258,10 +314,17 @@ REVOKE EXECUTE ON FUNCTION public.create_company_onboarding(text, text)         
 REVOKE EXECUTE ON FUNCTION public.link_user_to_company(uuid)                              FROM anon;
 REVOKE EXECUTE ON FUNCTION public.switch_active_company(uuid)                             FROM anon;
 REVOKE EXECUTE ON FUNCTION public.update_member_role(uuid, text)                          FROM anon;
-REVOKE EXECUTE ON FUNCTION public.rca_next_case_number(text, integer)                     FROM anon;
+-- rca_next_case_number e nfe_claim_key_fetch são as DUAS únicas RPCs de negócio que
+-- também tinham EXECUTE para PUBLIC (`=X/postgres` no proacl). Revogar só de `anon`
+-- não as protegeria: `anon` continuaria herdando o privilégio por PUBLIC. Por isso as
+-- duas saem de PUBLIC e recebem GRANT explícito para `authenticated`, deixando o estado
+-- final independente do ACL de origem.
+REVOKE EXECUTE ON FUNCTION public.rca_next_case_number(text, integer)                     FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.rca_next_case_number(text, integer)                     TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.integration_intelligence_snapshot(uuid)                 FROM anon;
 REVOKE EXECUTE ON FUNCTION public.integration_negative_stock_detail(uuid, integer)        FROM anon;
-REVOKE EXECUTE ON FUNCTION public.nfe_claim_key_fetch(text)                               FROM anon;
+REVOKE EXECUTE ON FUNCTION public.nfe_claim_key_fetch(text)                               FROM PUBLIC, anon;
+GRANT  EXECUTE ON FUNCTION public.nfe_claim_key_fetch(text)                               TO authenticated;
 REVOKE EXECUTE ON FUNCTION public.nfe_finalize_conference(uuid)                           FROM anon;
 REVOKE EXECUTE ON FUNCTION public.nfe_register_count(uuid, text, numeric, text, uuid, text, text) FROM anon;
 REVOKE EXECUTE ON FUNCTION public.nfe_reopen_conference(uuid)                             FROM anon;
@@ -279,3 +342,77 @@ COMMENT ON FUNCTION public.update_member_role(uuid, text) IS
   'Troca de papel. Falha fechada: exige sessão, empresa e papel não nulos antes de qualquer comparação (migration 115).';
 COMMENT ON FUNCTION public.link_user_to_company(uuid) IS
   'Vincula o usuário a uma empresa SOMENTE com convite pendente ou membership existente (migration 115).';
+
+-- ─────────────────────────────────────────────────────────────────────────────────────
+-- 6. Rate limit da public-api (P2)
+-- ─────────────────────────────────────────────────────────────────────────────────────
+--
+-- A Edge Function public-api autentica por chave (SHA-256 contra api_keys.key_hash) e
+-- nunca aceitou company_id do chamador, mas não tinha teto de requisições: uma chave
+-- válida podia varrer o catálogo inteiro da própria empresa sem nenhum limite.
+--
+-- Mesma arquitetura de nfe_claim_key_fetch (migration 060), que já é o padrão de
+-- rate limit do projeto: tabela sem policy nenhuma, tocada só por SECURITY DEFINER, e
+-- reserva atômica por INSERT ... ON CONFLICT DO UPDATE — sem race entre chamadas
+-- concorrentes e sem contador no cliente.
+--
+-- Janela fixa por CHAVE: o isolamento por workspace é consequência, já que cada chave
+-- pertence a uma empresa. O contador nunca revela a existência de outra chave — a função
+-- só responde true/false para a chave apresentada.
+
+CREATE TABLE IF NOT EXISTS api_key_rate_limits (
+  api_key_id    uuid PRIMARY KEY REFERENCES api_keys(id) ON DELETE CASCADE,
+  window_start  timestamptz NOT NULL DEFAULT now(),
+  request_count integer     NOT NULL DEFAULT 0
+);
+
+ALTER TABLE api_key_rate_limits ENABLE ROW LEVEL SECURITY;
+-- Sem policies, de propósito: nem anon nem authenticated leem ou escrevem. Só a função
+-- abaixo (SECURITY DEFINER) toca nesta tabela — igual a nfe_provider_fetch_locks.
+
+CREATE OR REPLACE FUNCTION public.api_key_consume_rate_limit(
+  p_api_key_id     uuid,
+  p_limit          integer DEFAULT 60,
+  p_window_seconds integer DEFAULT 60
+)
+RETURNS boolean
+LANGUAGE plpgsql
+SECURITY DEFINER
+SET search_path TO 'public'
+AS $function$
+DECLARE
+  v_count integer;
+BEGIN
+  -- Falha FECHADA: argumento inválido nega a requisição, nunca libera.
+  IF p_api_key_id IS NULL
+     OR p_limit IS NULL OR p_limit < 1
+     OR p_window_seconds IS NULL OR p_window_seconds < 1 THEN
+    RETURN false;
+  END IF;
+
+  -- Uma linha por chave. O CASE decide, dentro do mesmo comando atômico, se a janela
+  -- corrente expirou (reinicia em 1) ou continua (incrementa). O lock de linha do
+  -- ON CONFLICT serializa chamadas concorrentes: duas requisições simultâneas contam 2.
+  INSERT INTO api_key_rate_limits AS rl (api_key_id, window_start, request_count)
+  VALUES (p_api_key_id, now(), 1)
+  ON CONFLICT (api_key_id) DO UPDATE
+    SET window_start = CASE
+          WHEN rl.window_start < now() - make_interval(secs => p_window_seconds) THEN now()
+          ELSE rl.window_start
+        END,
+        request_count = CASE
+          WHEN rl.window_start < now() - make_interval(secs => p_window_seconds) THEN 1
+          ELSE rl.request_count + 1
+        END
+  RETURNING rl.request_count INTO v_count;
+
+  RETURN v_count <= p_limit;
+END;
+$function$;
+
+-- Só o backend consome: a public-api roda com service_role. Nenhum papel de API executa.
+REVOKE EXECUTE ON FUNCTION public.api_key_consume_rate_limit(uuid, integer, integer) FROM PUBLIC, anon, authenticated;
+GRANT  EXECUTE ON FUNCTION public.api_key_consume_rate_limit(uuid, integer, integer) TO service_role;
+
+COMMENT ON FUNCTION public.api_key_consume_rate_limit(uuid, integer, integer) IS
+  'Janela fixa por chave de API. Devolve false quando o teto foi atingido (migration 115).';

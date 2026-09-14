@@ -26,6 +26,12 @@ import { createClient, type SupabaseClient } from 'npm:@supabase/supabase-js@2';
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+/** Teto por chave de API, em janela fixa. 60 req/min é folgado para consulta de saldo
+ *  (o caso de uso é um ERP perguntando por SKU) e ainda assim impede varredura de
+ *  catálogo em rajada. O contador vive no banco — nunca no cliente. */
+const RATE_LIMIT_MAX_REQUESTS = 60;
+const RATE_LIMIT_WINDOW_SECONDS = 60;
+
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, content-type',
@@ -99,6 +105,34 @@ Deno.serve(async (req: Request) => {
     }
     if (keyRow.expires_at != null && new Date(keyRow.expires_at).getTime() <= Date.now()) {
       return fail(401, 'key_expired', 'Esta chave de API expirou.');
+    }
+
+    // Teto de requisições por CHAVE, contado no banco (nunca no cliente): reserva atômica
+    // via api_key_consume_rate_limit, o mesmo padrão de nfe_claim_key_fetch. Só entra
+    // DEPOIS de a chave ser reconhecida, válida e não revogada — uma chave inválida não
+    // consome a cota de ninguém, e a resposta 429 não revela nada sobre outras chaves ou
+    // workspaces. Falha do RPC nega a requisição: teto que falha aberto não é teto.
+    const { data: withinLimit, error: limitError } = await admin.rpc('api_key_consume_rate_limit', {
+      p_api_key_id: keyRow.id,
+      p_limit: RATE_LIMIT_MAX_REQUESTS,
+      p_window_seconds: RATE_LIMIT_WINDOW_SECONDS,
+    });
+    if (limitError) {
+      console.error('[public-api] Rate limit check failed:', limitError.message);
+      return fail(503, 'rate_limit_unavailable', 'Serviço indisponível no momento. Tente novamente.');
+    }
+    if (withinLimit !== true) {
+      return new Response(
+        JSON.stringify({ error: 'Limite de requisições excedido. Tente novamente em instantes.', code: 'rate_limited' }),
+        {
+          status: 429,
+          headers: {
+            ...CORS_HEADERS,
+            'Content-Type': 'application/json',
+            'Retry-After': String(RATE_LIMIT_WINDOW_SECONDS),
+          },
+        },
+      );
     }
 
     const { error: touchError } = await admin

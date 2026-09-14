@@ -167,6 +167,38 @@ describe.skipIf(!CONFIGURED)('isolamento entre workspaces (integração real)', 
     expect(String(after?.company_id)).toBe(a.companyId);
   });
 
+  // ── TESTE F2 — A não altera NEM apaga registro de B ────────────────────────────────
+  // O par UPDATE/DELETE contra linhas alheias é o que a RLS precisa negar de forma
+  // SILENCIOSA: o PostgREST não devolve erro quando a policy simplesmente não casa
+  // nenhuma linha — devolve sucesso com zero linhas afetadas. Por isso a asserção é
+  // sobre o ESTADO de B depois, lido pelo próprio B, e não sobre a presença de erro.
+  it('F2) A não consegue UPDATE em linha de B', async () => {
+    const { data: theirs } = await b.client.from('product_brands').select('id, name').limit(1);
+    const target = theirs?.[0];
+    if (!target) return; // B precisa ter ao menos uma marca para este teste valer
+
+    const { data: affected } = await a.client
+      .from('product_brands').update({ name: 'invadido-por-a' }).eq('id', target.id).select('id');
+    expect(affected ?? []).toHaveLength(0);
+
+    const { data: after } = await b.client.from('product_brands').select('name').eq('id', target.id).single();
+    expect(after?.name).toBe(target.name);
+  });
+
+  it('F2) A não consegue DELETE em linha de B', async () => {
+    const { data: theirs } = await b.client.from('product_brands').select('id').limit(1);
+    const target = theirs?.[0]?.id;
+    if (!target) return;
+
+    const { data: affected } = await a.client.from('product_brands').delete().eq('id', target).select('id');
+    expect(affected ?? []).toHaveLength(0);
+
+    // A linha de B continua exatamente onde estava — conferido pelo dono dela.
+    const { data: after, error } = await b.client.from('product_brands').select('id').eq('id', target).single();
+    expect(error).toBeNull();
+    expect(after?.id).toBe(target);
+  });
+
   // ── TESTE G — RPC com company_id do outro tenant ───────────────────────────────────
   it('G) A não consegue usar RPC passando o company_id de B', async () => {
     const { error } = await a.client.rpc('rca_next_case_number', { p_company_id: b.companyId, p_year: 2026 });

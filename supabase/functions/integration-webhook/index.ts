@@ -36,6 +36,42 @@ import {
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 
+/** Body ceiling. This route is reachable with no credential at all — the signature can
+ *  only be checked AFTER the body is read, because the signature covers the body — so an
+ *  unbounded read is memory allocated on request by anyone who knows the URL. */
+const MAX_BODY_BYTES = 128 * 1024;
+
+/** Bounded read: stops at the ceiling instead of materialising everything and measuring
+ *  afterwards. Returns `null` when the body is over the limit. */
+async function readBoundedBody(req: Request): Promise<string | null> {
+  const declared = Number(req.headers.get('content-length') ?? '');
+  if (Number.isFinite(declared) && declared > MAX_BODY_BYTES) return null;
+
+  const reader = req.body?.getReader();
+  if (reader == null) return '';
+
+  const chunks: Uint8Array[] = [];
+  let total = 0;
+  for (;;) {
+    const { done, value } = await reader.read();
+    if (done) break;
+    total += value.byteLength;
+    if (total > MAX_BODY_BYTES) {
+      await reader.cancel();
+      return null;
+    }
+    chunks.push(value);
+  }
+
+  const joined = new Uint8Array(total);
+  let offset = 0;
+  for (const chunk of chunks) {
+    joined.set(chunk, offset);
+    offset += chunk.byteLength;
+  }
+  return new TextDecoder().decode(joined);
+}
+
 /** Header names differ per provider. Kept as a list rather than a per-provider map
  *  because the set is small and a provider using a new name is a one-line change —
  *  and because a missing entry fails closed (no signature -> 401), never open. */
@@ -125,7 +161,10 @@ Deno.serve(async (req: Request) => {
     auth: { persistSession: false },
   });
 
-  const rawBody = await req.text();
+  const rawBody = await readBoundedBody(req);
+  if (rawBody == null) {
+    return json({ error: 'Payload too large.' }, 413);
+  }
 
   try {
     // ── 1. Resolve the connection from the PATH, before trusting the body ────

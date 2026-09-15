@@ -1,0 +1,40 @@
+name: Sync releases to Notion
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inventoryblind-notion-sync
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    env:
+      NOTION_TOKEN: ${{ secrets.NOTION_TOKEN }}
+      NOTION_UPDATES_DATA_SOURCE_ID: 9372a697-ddbc-48ab-8a0c-7a2b137d00d7
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: '22'
+          package-manager-cache: false
+
+      - name: Test Notion synchronizer
+        run: node --test scripts/notion-sync.node-test.mjs
+
+      - name: Synchronize pushed commits
+        run: node scripts/notion-sync.mjs

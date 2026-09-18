@@ -686,6 +686,44 @@ export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   },
 ];
 
+// ── Retenção de exibição ──────────────────────────────────────────────────────────────
+//
+// O painel é um histórico RECENTE, não um changelog infinito: com 95 entradas acumuladas
+// desde as primeiras versões, abrir o painel montava 95 blocos de uma vez no DOM e
+// travava. O corte é feito AQUI, na origem, e não com slice na renderização — quem
+// consome recebe só o que vai aparecer.
+//
+// Não existe banco por trás disto: as entradas são um array estático deste módulo, então
+// "limitar a consulta" significa limitar o que a origem exporta. Nada é apagado — o
+// histórico completo continua em `WHATS_NEW_ENTRIES`, versionado no git.
+
+/** Teto de entradas montadas no painel. */
+export const WHATS_NEW_MAX_ENTRIES = 20;
+/** Idade máxima de uma entrada para ainda aparecer. */
+export const WHATS_NEW_MAX_AGE_DAYS = 90;
+
+const DAY_MS = 24 * 60 * 60 * 1000;
+
+/** Data da entrada como instante local, no mesmo formato que o painel já usa para exibir. */
+const entryTime = (entry: WhatsNewEntry): number => new Date(`${entry.date}T00:00:00`).getTime();
+
+/**
+ * As novidades que o painel deve mostrar: as mais recentes primeiro, sem nada acima de
+ * 90 dias e no máximo 20.
+ *
+ * A ordenação é defensiva. A convenção do arquivo é inserir no topo, mas basta uma
+ * entrada fora de lugar para o "mais recente primeiro" deixar de valer — e hoje já existe
+ * uma. `sort` é estável, então entradas do MESMO dia mantêm exatamente a ordem em que
+ * foram escritas: a aparência do painel não muda.
+ */
+export function listRecentWhatsNew(now: Date = new Date()): WhatsNewEntry[] {
+  const cutoff = now.getTime() - WHATS_NEW_MAX_AGE_DAYS * DAY_MS;
+  return [...WHATS_NEW_ENTRIES]
+    .sort((a, b) => entryTime(b) - entryTime(a))
+    .filter(entry => entryTime(entry) >= cutoff)
+    .slice(0, WHATS_NEW_MAX_ENTRIES);
+}
+
 const LAST_SEEN_KEY = 'ib_whats_new_last_seen_id';
 
 // Per-device: qual foi a última novidade já visualizada. Não existe hoje uma tabela de
@@ -708,7 +746,9 @@ export function markWhatsNewSeen(latestId: string): void {
 }
 
 export function hasUnseenWhatsNew(): boolean {
-  const latest = WHATS_NEW_ENTRIES[0]?.id;
+  // A partir da MESMA lista que o painel mostra: se a novidade mais nova já não aparece
+  // mais (saiu pela retenção), o indicador não pode continuar aceso apontando para ela.
+  const latest = listRecentWhatsNew()[0]?.id;
   if (!latest) return false;
   return getLastSeenWhatsNewId() !== latest;
 }

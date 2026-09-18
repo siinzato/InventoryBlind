@@ -1,9 +1,9 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { Megaphone, X } from 'lucide-react';
 import { Badge } from './ui';
 import {
-  WHATS_NEW_ENTRIES, WHATS_NEW_CATEGORY_LABEL,
+  WHATS_NEW_ENTRIES, WHATS_NEW_CATEGORY_LABEL, listRecentWhatsNew,
   getLastSeenWhatsNewId, markWhatsNewSeen, hasUnseenWhatsNew,
 } from '../lib/whatsNew';
 import { notifyPanelOpened, registerExclusivePanel } from '../lib/exclusivePanel';
@@ -24,6 +24,11 @@ export function WhatsNewButton() {
   const [open, setOpen] = useState(false);
   const [unseen, setUnseen] = useState(false);
 
+  // Já recortado na origem (20 mais recentes, nada acima de 90 dias): o painel monta
+  // essas entradas e nenhuma outra. Calculado só com o painel aberto, e a cada abertura,
+  // para o corte por data não ficar preso ao instante em que a aba foi carregada.
+  const entries = useMemo(() => (open ? listRecentWhatsNew() : []), [open]);
+
   useEffect(() => {
     setUnseen(hasUnseenWhatsNew());
   }, []);
@@ -32,7 +37,8 @@ export function WhatsNewButton() {
 
   useEffect(() => {
     if (!open) return;
-    const latest = WHATS_NEW_ENTRIES[0]?.id;
+    // Mesma origem da lista renderizada; lido aqui direto para o efeito não depender dela.
+    const latest = listRecentWhatsNew()[0]?.id;
     if (latest && getLastSeenWhatsNewId() !== latest) {
       markWhatsNewSeen(latest);
       setUnseen(false);
@@ -85,16 +91,20 @@ export function WhatsNewButton() {
               </div>
 
               <div className="flex-1 overflow-y-auto p-6 space-y-5">
-                {WHATS_NEW_ENTRIES.length === 0 ? (
+                {entries.length === 0 ? (
                   <div className="h-full flex flex-col items-center justify-center text-center gap-2 py-12">
                     <Megaphone size={28} className="text-fg-subtle" />
-                    <p className="text-sm font-medium text-fg">Nenhuma novidade publicada ainda</p>
+                    {/* Mesmo bloco de sempre. Só o texto distingue "nunca houve novidade"
+                        de "as que existem já são antigas demais para este painel". */}
+                    <p className="text-sm font-medium text-fg">
+                      {WHATS_NEW_ENTRIES.length === 0 ? 'Nenhuma novidade publicada ainda' : 'Nenhuma atualização recente'}
+                    </p>
                     <p className="text-xs text-fg-subtle max-w-[26ch]">
                       Assim que lançarmos algo novo, você verá aqui primeiro.
                     </p>
                   </div>
                 ) : (
-                  WHATS_NEW_ENTRIES.map(entry => (
+                  entries.map(entry => (
                     <div key={entry.id} className="space-y-1.5 pb-5 border-b border-edge last:border-b-0 last:pb-0">
                       <div className="flex items-center gap-2 flex-wrap">
                         <Badge variant={CATEGORY_BADGE_VARIANT[entry.category]}>

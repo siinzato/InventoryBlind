@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-10-29-pulmao-porta-pallet',
+    date: '2026-10-29',
+    category: 'novidade',
+    title: 'Pulmão: endereçamento do porta-pallet',
+    description: 'Chegou em Operação Inteligente a tela "Pulmão (Porta-Pallet)", para controlar a mercadoria em excesso que fica guardada no porta-pallet. Cada vaga ganha um endereço próprio e uma etiqueta com QR Code, que você gera e imprime pela própria tela. A partir daí dá para consultar onde está o excesso de um produto — endereço, quantas caixas e há quanto tempo está guardado — em vez de procurar no olho. Todo saldo vem de uma movimentação registrada, com autor e horário, então nada muda sem deixar rastro. Os endereços de separação das capas não foram alterados.',
+  },
+  {
     id: '2026-09-14-pendentes-reais-na-contagem',
     date: '2026-09-14',
     category: 'correcao',

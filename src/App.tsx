@@ -155,6 +155,7 @@ const CBCDashboardPage = React.lazy(() => import('./components/cbc/CBCDashboardP
 const RiskDashboardPage = React.lazy(() => import('./components/risk/RiskDashboardPage').then(m => ({ default: m.RiskDashboardPage })));
 const AbcXyzDashboardPage = React.lazy(() => import('./components/abcxyz/AbcXyzDashboardPage').then(m => ({ default: m.AbcXyzDashboardPage })));
 const WarehouseDigitalTwinPage = React.lazy(() => import('./components/slotting/WarehouseDigitalTwinPage').then(m => ({ default: m.WarehouseDigitalTwinPage })));
+const WmsPulmaoPage = React.lazy(() => import('./components/wms/WmsPulmaoPage').then(m => ({ default: m.WmsPulmaoPage })));
 const RcaDashboardPage = React.lazy(() => import('./components/rca/RcaDashboardPage').then(m => ({ default: m.RcaDashboardPage })));
 const AuditDashboardPage = React.lazy(() => import('./components/audit/AuditDashboardPage').then(m => ({ default: m.AuditDashboardPage })));
 const PurchaseOrdersPage = React.lazy(() => import('./components/purchaseOrders/PurchaseOrdersPage').then(m => ({ default: m.PurchaseOrdersPage })));
@@ -779,6 +780,7 @@ function AppContent() {
         { id: 'risk',           label: 'Inventário por Risco', icon: <AlertTriangle />, onClick: () => { setActiveTab('risk'); setMobileOpen(false); },         active: activeTab === 'risk' },
         { id: 'abcxyz',         label: 'Classificação ABC/XYZ', icon: <LayoutGrid />, onClick: () => { setActiveTab('abcxyz'); setMobileOpen(false); },   active: activeTab === 'abcxyz' },
         { id: 'slotting',       label: 'Warehouse Digital Twin', icon: <Warehouse />, onClick: () => { setActiveTab('slotting'); setMobileOpen(false); },     active: activeTab === 'slotting' },
+        { id: 'wms-pulmao',     label: 'Pulmão (Porta-Pallet)', icon: <Boxes />,     onClick: () => { setActiveTab('wms-pulmao'); setMobileOpen(false); },   active: activeTab === 'wms-pulmao' },
         { id: 'rca',            label: 'Root Cause Analysis',  icon: <GitBranch />, onClick: () => { setActiveTab('rca'); setMobileOpen(false); },        active: activeTab === 'rca' },
         { id: 'audit',          label: 'Auditoria de Estoque', icon: <SearchCheck />, onClick: () => { setActiveTab('audit'); setMobileOpen(false); },   active: activeTab === 'audit' },
       ],
@@ -1757,6 +1759,16 @@ function AppContent() {
         {activeTab === 'slotting' && profile && (
           <React.Suspense fallback={<PageLoader />}>
             <WarehouseDigitalTwinPage companyId={companyId} userId={profile.id} userEmail={profile.email ?? ''} role={profile.role} onNavigateToCount={() => setActiveTab('input')} />
+          </React.Suspense>
+        )}
+
+        {/* ABA PULMÃO — PORTA-PALLET (endereçamento do excesso) */}
+        {activeTab === 'wms-pulmao' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            {/* 'counting.approve' é detida por exatamente owner/admin/manager — a mesma
+                lista que as policies de INSERT/UPDATE de warehouse_storage_bins exigem.
+                A UI não oferece um botão que o banco recusaria. */}
+            <WmsPulmaoPage canManage={hasPermission(profile.role, 'counting.approve')} />
           </React.Suspense>
         )}
 

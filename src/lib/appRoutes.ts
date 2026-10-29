@@ -37,6 +37,7 @@ export const APP_ROUTE_BY_TAB: Record<string, string> = {
   risk: '/app/operacoes/inventario-por-risco',
   abcxyz: '/app/operacoes/classificacao-abc-xyz',
   slotting: '/app/operacoes/warehouse-digital-twin',
+  'wms-pulmao': '/app/operacoes/pulmao',
   rca: '/app/operacoes/root-cause-analysis',
   audit: '/app/operacoes/auditoria-de-estoque',
 

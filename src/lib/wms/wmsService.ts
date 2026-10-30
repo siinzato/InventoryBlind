@@ -103,6 +103,26 @@ export async function createBins(codes: string[], capacityBoxes: number | null):
   return (data ?? []).length;
 }
 
+/**
+ * Remove endereços criados por engano.
+ *
+ * Não há verificação de saldo aqui de propósito: as FKs de `warehouse_bin_stock` e
+ * `warehouse_bin_movements` são ON DELETE RESTRICT, então o próprio banco recusa apagar
+ * endereço que já recebeu mercadoria. Checar no cliente seria uma segunda verdade que
+ * pode divergir — a garantia fica onde não dá para contornar.
+ */
+export async function deleteBins(ids: string[]): Promise<void> {
+  if (ids.length === 0) return;
+  const { error } = await supabase.from('warehouse_storage_bins').delete().in('id', ids);
+  if (error) {
+    // 23503 = violação de chave estrangeira: o endereço tem histórico.
+    if (error.code === '23503') {
+      throw new Error('Este endereço já tem movimentação registrada e não pode ser apagado. Bloqueie-o em vez disso.');
+    }
+    throw new Error(error.message);
+  }
+}
+
 export async function setBinBlocked(id: string, blocked: boolean, reason: string | null): Promise<void> {
   const { error } = await supabase
     .from('warehouse_storage_bins')

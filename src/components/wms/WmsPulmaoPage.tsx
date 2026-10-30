@@ -10,8 +10,8 @@
 // O que ela NÃO faz: não encosta no vão de PICKING das capas. `products.location` e o
 // campo de local do Tiny continuam sendo daquele fluxo e não são lidos nem escritos aqui.
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Lock, PackagePlus, Printer, Search, Unlock, Warehouse } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Lock, PackagePlus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
 import {
   Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection,
   SegmentedControl, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
@@ -20,7 +20,7 @@ import {
 import { renderBarcodeSVG } from '../../lib/barcode/barcodeExport';
 import { WmsBinOperations } from './WmsBinOperations';
 import {
-  boxesByBin, buildBinCodes, createBins, listBins, listMovements, searchStock, setBinBlocked,
+  boxesByBin, buildBinCodes, createBins, deleteBins, listBins, listMovements, searchStock, setBinBlocked,
   type BinMovement, type BinStockRow, type StorageBin,
 } from '../../lib/wms/wmsService';
 
@@ -101,7 +101,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   // Impressão
   const [qrBase, setQrBase] = useState(readQrBase);
   const [printing, setPrinting] = useState(false);
-  const printAreaRef = useRef<HTMLDivElement>(null);
+  const [confirmBulk, setConfirmBulk] = useState(false);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -130,6 +130,9 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
     }),
     [prefix, streets, modules, levels],
   );
+
+  // Endereco sem caixa nenhuma: candidato a limpeza. Se tiver historico, o banco recusa.
+  const emptyBins = useMemo(() => bins.filter(b => (occupancy.get(b.code) ?? 0) === 0), [bins, occupancy]);
 
   const stats = useMemo(() => {
     const ocupados = bins.filter(b => (occupancy.get(b.code) ?? 0) > 0).length;
@@ -170,6 +173,20 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
     }
   };
 
+  /** Endereço com histórico é barrado pelo próprio banco (FK ON DELETE RESTRICT), e a
+   *  mensagem que sobe para a tela vem de lá — não de uma checagem daqui que poderia
+   *  divergir da verdade. */
+  const handleDelete = async (ids: string[]) => {
+    setError(null);
+    try {
+      await deleteBins(ids);
+      setConfirmBulk(false);
+      await load();
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Não foi possível excluir.');
+    }
+  };
+
   const handleToggleBlock = async (bin: StorageBin) => {
     try {
       await setBinBlocked(bin.id, !bin.blocked, bin.blocked ? null : 'Bloqueado pela gestão');
@@ -186,12 +203,42 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
     const base = qrBase.trim().replace(/\/+$/, '');
     if (!base) return;
     setPrinting(true);
+
+    // O container é pendurado DIRETO no <body>, e não dentro da árvore do React. Esse é
+    // o detalhe que faz a impressão funcionar: a regra de @media print esconde os irmãos
+    // do container, e um elemento aninhado lá no meio do app teria ancestrais escondidos
+    // junto — saía folha em branco por mais que o próprio elemento estivesse visível.
+    const root = document.createElement('div');
+    root.id = 'ib-wms-print-root';
+    const style = document.createElement('style');
+    style.textContent = `
+      #ib-wms-print-root { display: none; }
+      @media print {
+        body > *:not(#ib-wms-print-root) { display: none !important; }
+        #ib-wms-print-root {
+          display: grid !important;
+          grid-template-columns: repeat(4, 1fr);
+          background: #fff; color: #000;
+        }
+        #ib-wms-print-root .ib-wms-label {
+          display: flex; flex-direction: column; align-items: center; justify-content: center;
+          break-inside: avoid; padding: 5mm 2mm;
+        }
+        #ib-wms-print-root .ib-wms-label svg { width: 28mm; height: 28mm; }
+        #ib-wms-print-root .ib-wms-label span {
+          margin-top: 2mm; font-size: 10pt; font-weight: 700; letter-spacing: .02em;
+        }
+        @page { margin: 8mm; }
+      }
+    `;
+
+    const cleanup = () => {
+      root.remove();
+      style.remove();
+    };
+
     try {
       try { localStorage.setItem(QR_BASE_KEY, base); } catch { /* modo privado */ }
-
-      const area = printAreaRef.current;
-      if (!area) return;
-      area.innerHTML = '';
 
       for (const bin of bins) {
         const svg = await renderBarcodeSVG('qrcode', `${base}${SCAN_PATH}?${SCAN_PARAM}=${bin.code}`, {
@@ -202,13 +249,18 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
         const cell = document.createElement('div');
         cell.className = 'ib-wms-label';
         cell.innerHTML = `${svg}<span>${bin.code}</span>`;
-        area.appendChild(cell);
+        root.appendChild(cell);
       }
 
+      document.head.appendChild(style);
+      document.body.appendChild(root);
+      // Limpa quando a caixa de impressão fecha, tenha a pessoa impresso ou cancelado.
+      window.addEventListener('afterprint', cleanup, { once: true });
       window.print();
     } catch (err) {
       console.error('[wms] falha ao gerar as etiquetas:', err);
       setError('Não foi possível gerar as etiquetas.');
+      cleanup();
     } finally {
       setPrinting(false);
     }
@@ -339,6 +391,30 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
           </Panel>
 
           <Panel>
+            {canManage && emptyBins.length > 0 && (
+              <PanelSection padding="sm" className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-title">Limpeza</h3>
+                  <p className="text-caption mt-1">
+                    {emptyBins.length} endereço(s) sem nenhuma movimentação. Útil quando o padrão
+                    saiu errado e o lote gerou mais códigos do que você queria.
+                  </p>
+                </div>
+                {confirmBulk ? (
+                  <div className="flex items-center gap-2">
+                    <span className="text-sm text-fg">Excluir {emptyBins.length}?</span>
+                    <Button onClick={() => handleDelete(emptyBins.map(b => b.id))}>Confirmar</Button>
+                    <Button variant="secondary" onClick={() => setConfirmBulk(false)}>Cancelar</Button>
+                  </div>
+                ) : (
+                  <Button variant="secondary" onClick={() => setConfirmBulk(true)}>
+                    <Trash2 size={16} />
+                    Excluir os {emptyBins.length} vazios
+                  </Button>
+                )}
+              </PanelSection>
+            )}
+
             <div className="overflow-x-auto">
               <Table>
                 <Thead>
@@ -376,10 +452,20 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                           </Td>
                           {canManage && (
                             <Td className="text-center">
-                              <Button variant="secondary" onClick={() => handleToggleBlock(bin)}>
-                                {bin.blocked ? <Unlock size={14} /> : <Lock size={14} />}
-                                {bin.blocked ? 'Liberar' : 'Bloquear'}
-                              </Button>
+                              <div className="flex items-center justify-center gap-2">
+                                <Button variant="secondary" onClick={() => handleToggleBlock(bin)}>
+                                  {bin.blocked ? <Unlock size={14} /> : <Lock size={14} />}
+                                  {bin.blocked ? 'Liberar' : 'Bloquear'}
+                                </Button>
+                                {/* Só aparece em endereço vazio. Com saldo, o banco recusaria
+                                    de qualquer jeito — mas oferecer o botão seria mentira. */}
+                                {boxes === 0 && (
+                                  <Button variant="secondary" onClick={() => handleDelete([bin.id])}>
+                                    <Trash2 size={14} />
+                                    Excluir
+                                  </Button>
+                                )}
+                              </div>
                             </Td>
                           )}
                         </Tr>
@@ -490,20 +576,6 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
         </Panel>
       )}
 
-      {/* Área de impressão: fora da tela no uso normal, única coisa visível ao imprimir. */}
-      <div ref={printAreaRef} className="ib-wms-print-area" aria-hidden="true" />
-      <style>{`
-        .ib-wms-print-area { display: none; }
-        .ib-wms-label { display: flex; flex-direction: column; align-items: center; justify-content: center;
-          break-inside: avoid; padding: 4mm 2mm; }
-        .ib-wms-label svg { width: 26mm; height: 26mm; }
-        .ib-wms-label span { margin-top: 2mm; font-size: 10pt; font-weight: 600; letter-spacing: .02em; }
-        @media print {
-          body > * { display: none !important; }
-          .ib-wms-print-area { display: grid !important; grid-template-columns: repeat(4, 1fr);
-            position: absolute; inset: 0; background: #fff; color: #000; }
-        }
-      `}</style>
     </Page>
   );
 }

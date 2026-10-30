@@ -11,20 +11,24 @@
 // campo de local do Tiny continuam sendo daquele fluxo e não são lidos nem escritos aqui.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
+import { ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Plus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
 import {
   Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection,
-  SegmentedControl, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
+  SegmentedControl, Select, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
   type SegmentedOption,
 } from '../ui';
 import { BIN_SCAN_PARAM } from '../../lib/appRoutes';
 import { renderBarcodeSVG } from '../../lib/barcode/barcodeExport';
 import { parseBinCode } from '../../lib/wms/binCode';
+import {
+  A4_PER_PAGE, LABEL_FORMATS, fallbackValuePt, planLabels, sheetsFor,
+  type A4PerPage, type LabelFormatId,
+} from '../../lib/wms/labelLayout';
 import { WmsBinOperations } from './WmsBinOperations';
 import { WmsStorageMap } from './WmsStorageMap';
 import {
   boxesByBin, buildBinCodes, createBins, deleteBins, listBins, listMovements, searchStock, setBinBlocked,
-  type BinMovement, type BinStockRow, type StorageBin,
+  type BinMovement, type BinStockRow, type BinStreetSpec, type StorageBin,
 } from '../../lib/wms/wmsService';
 
 type Mode = 'mapa' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos';
@@ -48,6 +52,37 @@ const SCAN_PATH = '/';
  *  hífen, a coluna é texto livre — então escapa. */
 const esc = (value: string): string =>
   value.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
+
+/** Milímetro com uma casa: `3.0000000000000004mm` é CSS válido mas ilegível no DevTools
+ *  de quem for depurar uma etiqueta torta depois. */
+const round1 = (value: number): number => Math.round(value * 10) / 10;
+
+/** Formato de etiqueta escolhido. Fica no navegador de quem imprime porque é
+ *  propriedade do rolo que a pessoa tem na mesa, não da empresa. */
+const LABEL_FORMAT_KEY = 'ib_wms_label_format';
+
+interface LabelPrefs {
+  format: LabelFormatId;
+  perPage: A4PerPage;
+  customWidthMm: number;
+  customHeightMm: number;
+}
+
+const DEFAULT_LABEL_PREFS: LabelPrefs = {
+  format: 'a4',
+  perPage: 8,
+  customWidthMm: 70,
+  customHeightMm: 50,
+};
+
+const readLabelPrefs = (): LabelPrefs => {
+  try {
+    const raw = localStorage.getItem(LABEL_FORMAT_KEY);
+    return raw ? { ...DEFAULT_LABEL_PREFS, ...(JSON.parse(raw) as Partial<LabelPrefs>) } : DEFAULT_LABEL_PREFS;
+  } catch {
+    return DEFAULT_LABEL_PREFS;
+  }
+};
 
 /** Base da URL que vai dentro do QR. O padrão é o endereço do próprio app — é quase
  *  sempre o certo, e ninguém deveria ter que descobrir o que digitar aqui. Só é editável
@@ -102,9 +137,24 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
 
   // Gerador de endereços
   const [prefix, setPrefix] = useState('PP');
-  const [streets, setStreets] = useState('A, B, C');
-  const [modules, setModules] = useState('5');
-  const [levels, setLevels] = useState('4');
+  // Uma linha por rua/paredão. Estrutura real não é uniforme — um paredão de 13 módulos
+  // com 3 níveis convive com um meio de 7 módulos e 1 nível —, e um número único para
+  // todas obrigava a criar em várias rodadas.
+  const [streetRows, setStreetRows] = useState<BinStreetSpec[]>([
+    { street: 'A', modules: 5, levels: 4 },
+  ]);
+
+  const patchStreet = (index: number, patch: Partial<BinStreetSpec>) =>
+    setStreetRows(rows => rows.map((row, i) => (i === index ? { ...row, ...patch } : row)));
+
+  /** Próxima letra livre: A, B, C... Poupa quem está cadastrando de conferir qual já usou. */
+  const addStreet = () =>
+    setStreetRows(rows => {
+      const usadas = new Set(rows.map(r => r.street.trim().toUpperCase()));
+      const livre = 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'.split('').find(l => !usadas.has(l)) ?? '';
+      const ultima = rows[rows.length - 1];
+      return [...rows, { street: livre, modules: ultima?.modules ?? 5, levels: ultima?.levels ?? 1 }];
+    });
   const [capacity, setCapacity] = useState('');
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<number | null>(null);
@@ -117,6 +167,16 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   // Impressão
   const [qrBase, setQrBase] = useState(readQrBase);
   const [printing, setPrinting] = useState(false);
+  const [labelPrefs, setLabelPrefs] = useState(readLabelPrefs);
+
+  const plan = planLabels(labelPrefs);
+  const sheets = sheetsFor(bins.length, plan);
+
+  const changeLabelPrefs = (patch: Partial<LabelPrefs>) => {
+    const next = { ...labelPrefs, ...patch };
+    setLabelPrefs(next);
+    try { localStorage.setItem(LABEL_FORMAT_KEY, JSON.stringify(next)); } catch { /* modo privado */ }
+  };
   const [confirmBulk, setConfirmBulk] = useState(false);
 
   const load = useCallback(async () => {
@@ -138,13 +198,8 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   useEffect(() => { load(); }, [load]);
 
   const preview = useMemo(
-    () => buildBinCodes({
-      prefix,
-      streets: streets.split(',').map(s => s.trim()).filter(Boolean),
-      modulesPerStreet: Math.max(0, parseInt(modules) || 0),
-      levelsPerModule: Math.max(0, parseInt(levels) || 0),
-    }),
-    [prefix, streets, modules, levels],
+    () => buildBinCodes({ prefix, streets: streetRows }),
+    [prefix, streetRows],
   );
 
   // Endereco sem caixa nenhuma: candidato a limpeza. Se tiver historico, o banco recusa.
@@ -245,44 +300,65 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
           background: #fff !important;
         }
         body > *:not(#ib-wms-print-root) { display: none !important; }
-        @page { size: A4 portrait; margin: 8mm; }
+        @page { ${plan.pageCss} }
 
         #ib-wms-print-root {
           display: grid !important;
-          grid-template-columns: repeat(2, 1fr);
-          gap: 4mm;
+          grid-template-columns: repeat(${plan.columns}, ${plan.labelWidthMm}mm);
+          ${plan.gapMm ? `gap: ${plan.gapMm}mm;` : ''}
+          justify-content: start;
           background: #fff; color: #000;
           font-family: Arial, Helvetica, sans-serif;
         }
         #ib-wms-print-root .ib-wms-label {
-          display: flex; flex-direction: column; align-items: center;
+          display: flex;
+          flex-direction: ${plan.orientation === 'horizontal' ? 'row' : 'column'};
+          align-items: center; justify-content: center;
+          ${plan.orientation === 'horizontal' ? `gap: ${plan.padMm}mm;` : ''}
+          width: ${plan.labelWidthMm}mm; height: ${plan.labelHeightMm}mm;
+          padding: ${plan.padMm}mm;
+          box-sizing: border-box;
+          overflow: hidden;
           break-inside: avoid;
-          border: 0.3mm solid #999; border-radius: 1.5mm;
-          padding: 4mm 3mm 3mm;
+          ${plan.showCutBorder ? 'border: 0.3mm solid #999; border-radius: 1.5mm;' : ''}
         }
-        #ib-wms-print-root .ib-wms-label svg { width: 30mm; height: 30mm; }
+        /* Uma etiqueta por página nos formatos de rolo: a etiqueta É a página. */
+        ${plan.perPage === 1 ? '#ib-wms-print-root .ib-wms-label { break-after: page; }' : ''}
+        #ib-wms-print-root .ib-wms-label svg {
+          width: ${plan.qrMm}mm; height: ${plan.qrMm}mm; flex: none;
+        }
+        #ib-wms-print-root .ib-wms-info {
+          display: flex; flex-direction: column; align-items: center;
+          min-width: 0;
+        }
         #ib-wms-print-root .ib-wms-parts {
           display: flex; align-items: flex-end; justify-content: center;
-          gap: 4mm; margin-top: 2mm;
+          gap: ${round1(plan.padMm * 1.2)}mm;
+          ${plan.orientation === 'horizontal' ? '' : `margin-top: ${round1(plan.padMm * 0.7)}mm;`}
         }
         #ib-wms-print-root .ib-wms-part {
           display: flex; flex-direction: column; align-items: center;
         }
         #ib-wms-print-root .ib-wms-part b {
-          font-size: 7pt; font-weight: 700; letter-spacing: .12em; color: #444;
+          font-size: ${plan.headerPt}pt; font-weight: 700; letter-spacing: .12em; color: #444;
+          white-space: nowrap;
         }
         #ib-wms-print-root .ib-wms-part i {
-          font-style: normal; font-size: 26pt; font-weight: 800; line-height: 1.05;
+          font-style: normal; font-size: ${plan.valuePt}pt; font-weight: 800; line-height: 1.05;
+          white-space: nowrap;
         }
         /* Caixa em volta do nível, e não fundo colorido como no modelo de referência: o
            Chrome só imprime fundo com "Gráficos de plano de fundo" marcado, e uma
            etiqueta que depende dessa caixinha de diálogo é uma etiqueta que um dia sai
            ilegível. Borda sai em qualquer impressora, inclusive preto e branco. */
         #ib-wms-print-root .ib-wms-level i {
-          border: 0.6mm solid #000; border-radius: 1mm; padding: 0 2.5mm;
+          border: 0.6mm solid #000; border-radius: 1mm;
+          padding: 0 ${round1(plan.padMm * 0.7)}mm;
         }
         #ib-wms-print-root .ib-wms-code {
-          margin-top: 2.5mm; font-size: 8pt; letter-spacing: .08em; color: #555;
+          margin-top: ${round1(plan.padMm * 0.6)}mm;
+          font-size: ${plan.codePt}pt; letter-spacing: .08em; color: #555;
+          white-space: nowrap;
         }
       }
     `;
@@ -309,13 +385,21 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
           ? `<div class="ib-wms-part"><b>RUA</b><i>${esc(parsed.street)}</i></div>` +
             `<div class="ib-wms-part"><b>MÓDULO</b><i>${esc(parsed.module)}</i></div>` +
             `<div class="ib-wms-part ib-wms-level"><b>NÍVEL</b><i>${parsed.level}</i></div>`
-          : `<div class="ib-wms-part"><b>ENDEREÇO</b><i>${esc(bin.code)}</i></div>`;
+          // Endereço fora do padrão ocupa a linha inteira sozinho: o corpo cede ao
+          // comprimento, senão some pela borda da célula.
+          : `<div class="ib-wms-part"><b>ENDEREÇO</b>` +
+            `<i style="font-size:${fallbackValuePt(plan, bin.code.length)}pt">${esc(bin.code)}</i></div>`;
 
+        // O bloco de texto é um filho só: assim a etiqueta deitada (rolo 100×40) vira
+        // QR à esquerda e endereço à direita trocando apenas o flex-direction.
         const cell = document.createElement('div');
         cell.className = 'ib-wms-label';
         cell.innerHTML =
-          `${svg}<div class="ib-wms-parts">${parts}</div>` +
-          `<div class="ib-wms-code">${esc(bin.code)}</div>`;
+          svg +
+          `<div class="ib-wms-info">` +
+          `<div class="ib-wms-parts">${parts}</div>` +
+          `<div class="ib-wms-code">${esc(bin.code)}</div>` +
+          `</div>`;
         root.appendChild(cell);
       }
 
@@ -395,27 +479,82 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
               </PanelSection>
               {generatorOpen && (
               <PanelSection padding="sm">
-                <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
+                <div className="grid grid-cols-2 gap-3">
                   <label className="block">
                     <span className="text-caption">Prefixo</span>
                     <Input value={prefix} onChange={e => setPrefix(e.target.value)} placeholder="PP" />
                   </label>
                   <label className="block">
-                    <span className="text-caption">Ruas (separadas por vírgula)</span>
-                    <Input value={streets} onChange={e => setStreets(e.target.value)} placeholder="A, B, C" />
-                  </label>
-                  <label className="block">
-                    <span className="text-caption">Módulos por rua</span>
-                    <Input type="number" min={1} value={modules} onChange={e => setModules(e.target.value)} />
-                  </label>
-                  <label className="block">
-                    <span className="text-caption">Níveis por módulo</span>
-                    <Input type="number" min={1} value={levels} onChange={e => setLevels(e.target.value)} />
-                  </label>
-                  <label className="block">
                     <span className="text-caption">Capacidade (caixas, opcional)</span>
                     <Input type="number" min={1} value={capacity} onChange={e => setCapacity(e.target.value)} />
                   </label>
+                </div>
+
+                {/* Uma linha por rua, com a própria contagem: é assim que o galpão é, e
+                    um número único para todas obrigava a criar em várias rodadas. */}
+                <div className="mt-4">
+                  <span className="text-caption">Estrutura — uma linha por rua (paredão, meio, bloco)</span>
+                  <div className="mt-2 space-y-2">
+                    {streetRows.map((row, i) => {
+                      const valida = /^[A-Za-z]+$/.test(row.street.trim());
+                      const quantas = valida ? Math.max(0, row.modules) * Math.max(0, row.levels) : 0;
+                      return (
+                        <div key={i} className="flex flex-wrap items-end gap-2">
+                          <label className="block w-20">
+                            {i === 0 && <span className="text-caption">Rua</span>}
+                            <Input
+                              value={row.street}
+                              onChange={e => patchStreet(i, { street: e.target.value })}
+                              placeholder="A"
+                            />
+                          </label>
+                          <label className="block w-24">
+                            {i === 0 && <span className="text-caption">Módulos</span>}
+                            <Input
+                              type="number" min={1}
+                              value={row.modules}
+                              onChange={e => patchStreet(i, { modules: Math.max(0, parseInt(e.target.value) || 0) })}
+                            />
+                          </label>
+                          <label className="block w-24">
+                            {i === 0 && <span className="text-caption">Níveis</span>}
+                            <Input
+                              type="number" min={1}
+                              value={row.levels}
+                              onChange={e => patchStreet(i, { levels: Math.max(0, parseInt(e.target.value) || 0) })}
+                            />
+                          </label>
+                          <span className="text-caption pb-2.5 min-w-[9rem]">
+                            {valida
+                              ? `= ${quantas} endereço(s)`
+                              : 'Rua precisa ser letra'}
+                          </span>
+                          {streetRows.length > 1 && (
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => setStreetRows(rows => rows.filter((_, k) => k !== i))}
+                              aria-label={`Remover rua ${row.street || i + 1}`}
+                            >
+                              <Trash2 size={16} />
+                            </Button>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  <Button variant="secondary" size="sm" onClick={addStreet} className="mt-2">
+                    <Plus size={16} />
+                    Adicionar rua
+                  </Button>
+
+                  {/* A rua é letra porque o código vira número no módulo (`PP-A01-N1`):
+                      um dígito na rua tornaria `PP-113-N1` ambíguo. */}
+                  <p className="text-caption mt-2">
+                    A rua é uma letra — o nome que vocês usam (Paredão 1, Meio 3) vira A, B, C
+                    na mesma ordem em que estiverem aqui.
+                  </p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-3 mt-4">
@@ -466,7 +605,80 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
 
             {labelsOpen && (
             <PanelSection padding="sm">
-              <label className="block">
+              {/* Formato antes do endereço do QR: é o que muda de uma impressão para a
+                  outra. O endereço se configura uma vez na vida. */}
+              <div className="space-y-3">
+                <div>
+                  <span className="text-caption">Formato da etiqueta</span>
+                  <div className="mt-1 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {LABEL_FORMATS.map(fmt => (
+                      <button
+                        key={fmt.id}
+                        type="button"
+                        onClick={() => changeLabelPrefs({ format: fmt.id })}
+                        aria-pressed={labelPrefs.format === fmt.id}
+                        className={`min-h-[44px] rounded-control border px-3 py-2 text-left transition-colors ${
+                          labelPrefs.format === fmt.id
+                            ? 'border-accent bg-accent/10 text-accent'
+                            : 'border-edge bg-surface-3 text-fg hover:bg-edge'
+                        }`}
+                      >
+                        <span className="block text-sm font-semibold">{fmt.label}</span>
+                        <span className="block text-xs text-fg-subtle mt-0.5">{fmt.hint}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {labelPrefs.format === 'a4' && (
+                  <label className="block">
+                    <span className="text-caption">Etiquetas por folha</span>
+                    <Select
+                      value={String(labelPrefs.perPage)}
+                      onChange={e => changeLabelPrefs({ perPage: Number(e.target.value) as A4PerPage })}
+                      className="mt-1 w-full sm:w-auto"
+                    >
+                      {A4_PER_PAGE.map(n => <option key={n} value={n}>{n} por folha</option>)}
+                    </Select>
+                  </label>
+                )}
+
+                {labelPrefs.format === 'custom' && (
+                  <div className="grid grid-cols-2 gap-3">
+                    <label className="block">
+                      <span className="text-caption">Largura (mm)</span>
+                      <Input
+                        type="number" min={25} max={210}
+                        value={labelPrefs.customWidthMm}
+                        onChange={e => changeLabelPrefs({ customWidthMm: Number(e.target.value) || 0 })}
+                      />
+                    </label>
+                    <label className="block">
+                      <span className="text-caption">Altura (mm)</span>
+                      <Input
+                        type="number" min={15} max={297}
+                        value={labelPrefs.customHeightMm}
+                        onChange={e => changeLabelPrefs({ customHeightMm: Number(e.target.value) || 0 })}
+                      />
+                    </label>
+                  </div>
+                )}
+
+                {/* O que vai sair da impressora, antes de sair. Evita descobrir no papel
+                    que 85 endereços viraram 85 páginas. */}
+                <p className="text-caption">
+                  Etiqueta de <strong>{plan.labelWidthMm} × {plan.labelHeightMm} mm</strong>, QR de {plan.qrMm} mm
+                  {' · '}
+                  {bins.length} endereço(s) em <strong>{sheets}</strong>{' '}
+                  {plan.perPage === 1 ? 'etiqueta(s)' : `folha(s) de ${plan.perPage}`}
+                </p>
+                <p className="text-caption">
+                  A impressora é escolhida na janela de impressão do navegador, que abre em seguida.
+                  Confira ali se o tamanho do papel bate com o formato acima.
+                </p>
+              </div>
+
+              <label className="block mt-4 pt-4 border-t border-edge">
                 <span className="text-caption">Endereço do sistema que vai dentro do QR</span>
                 <Input value={qrBase} onChange={e => setQrBase(e.target.value)} />
               </label>

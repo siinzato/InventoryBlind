@@ -386,11 +386,18 @@ export async function transfer(params: {
 
 // ── Geração de códigos ────────────────────────────────────────────────────────────────
 
+/** Uma rua do pulmão — na prática um paredão, um meio de galpão, um bloco de
+ *  porta-pallet. Cada uma tem a própria contagem porque estrutura real não é uniforme:
+ *  um paredão de 13 módulos com 3 níveis convive com um meio de 7 módulos e 1 nível. */
+export interface BinStreetSpec {
+  street: string;
+  modules: number;
+  levels: number;
+}
+
 export interface BinCodePattern {
   prefix: string;
-  streets: string[];
-  modulesPerStreet: number;
-  levelsPerModule: number;
+  streets: BinStreetSpec[];
 }
 
 /**
@@ -401,11 +408,13 @@ export interface BinCodePattern {
 export function buildBinCodes(pattern: BinCodePattern): string[] {
   const prefix = pattern.prefix.trim().toUpperCase().replace(/-+$/, '');
   const codes: string[] = [];
-  for (const street of pattern.streets) {
-    const rua = street.trim().toUpperCase();
-    if (!rua) continue;
-    for (let m = 1; m <= pattern.modulesPerStreet; m += 1) {
-      for (let n = 1; n <= pattern.levelsPerModule; n += 1) {
+  for (const spec of pattern.streets) {
+    const rua = spec.street.trim().toUpperCase();
+    // Rua é só letra: o código separa rua de módulo pela virada de letra para número
+    // (`PP-A01-N1`). Um dígito na rua tornaria `PP-113-N1` ambíguo.
+    if (!rua || !/^[A-Z]+$/.test(rua)) continue;
+    for (let m = 1; m <= spec.modules; m += 1) {
+      for (let n = 1; n <= spec.levels; n += 1) {
         codes.push(`${prefix}-${rua}${String(m).padStart(2, '0')}-N${n}`);
       }
     }

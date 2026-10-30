@@ -12,7 +12,7 @@
 // ocupação vem do saldo real. Código que não segue o padrão de nomenclatura não é
 // descartado nem "corrigido" — cai num grupo próprio, listado como está.
 
-import { useEffect, useMemo, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { Lock, PackageOpen } from 'lucide-react';
 import { Badge, Button, Input, Notice, Panel, PanelSection, Select } from '../ui';
 import { parseBinCode } from '../../lib/wms/binCode';
@@ -244,22 +244,38 @@ export function WmsStorageMap({
           <PanelSection key={s.name} padding="sm">
             <div className="flex items-baseline gap-2 mb-3">
               <h3 className="text-title">Rua {s.name}</h3>
-              <span className="text-caption">{s.modules.length} módulos · {s.levels.length} níveis</span>
+              <span className="text-caption">
+                {s.modules.length} {s.modules.length === 1 ? 'módulo' : 'módulos'}
+                {' · '}
+                {s.levels.length} {s.levels.length === 1 ? 'nível' : 'níveis'}
+              </span>
             </div>
 
-            {/* Rolagem horizontal própria: rua comprida não empurra a página de lado. */}
+            {/* Grade elástica: a coluna encolhe até caber a rua inteira na largura
+                disponível — um paredão de 16 módulos tem que ser visto de uma vez, não
+                em duas rolagens. O mínimo garante que a célula continue legível; abaixo
+                disso (celular) a rolagem horizontal própria assume, sem empurrar a
+                página de lado. */}
             <div className="overflow-x-auto -mx-1 px-1">
-              <div className="inline-block min-w-full">
+              <div
+                className="grid gap-1.5"
+                style={{
+                  gridTemplateColumns: `2rem repeat(${s.modules.length}, minmax(2.5rem, 1fr))`,
+                  // Teto: sem ele, uma rua de 3 módulos estica cada célula por toda a
+                  // largura e fica desproporcional ao lado de uma de 16.
+                  maxWidth: `${2 + s.modules.length * (4.5 + 0.375)}rem`,
+                }}
+              >
                 {s.levels.map(level => (
-                  <div key={level} className="flex items-stretch gap-1.5 mb-1.5">
-                    <span className="w-8 shrink-0 flex items-center justify-end pr-1 text-caption text-numeric">
+                  <Fragment key={level}>
+                    <span className="flex items-center justify-end pr-1 text-caption text-numeric">
                       N{level}
                     </span>
                     {s.modules.map(module => {
                       const bin = s.bins.get(`${module}|${level}`);
                       if (!bin) {
                         // Buraco real na estrutura (nível que não existe naquele módulo).
-                        return <span key={module} className="w-[4.5rem] shrink-0" aria-hidden="true" />;
+                        return <span key={module} aria-hidden="true" />;
                       }
                       const boxes = occupancy.get(bin.code) ?? 0;
                       const st = statusOf(bin, boxes);
@@ -271,7 +287,7 @@ export function WmsStorageMap({
                           onClick={() => setSelected(bin)}
                           aria-label={`${bin.code} — ${STATUS_LABEL[st]}`}
                           aria-pressed={selected?.id === bin.id}
-                          className={`w-[4.5rem] shrink-0 rounded-container border px-1.5 py-2 text-center transition-colors
+                          className={`rounded-container border px-1 py-2 text-center transition-colors
                             ${CELL_STYLE[st]}
                             ${dim ? 'opacity-25' : ''}
                             ${selected?.id === bin.id ? 'ring-2 ring-accent ring-offset-1 ring-offset-surface-2' : ''}`}
@@ -299,7 +315,7 @@ export function WmsStorageMap({
                         </button>
                       );
                     })}
-                  </div>
+                  </Fragment>
                 ))}
               </div>
             </div>

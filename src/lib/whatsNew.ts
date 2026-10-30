@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-10-30-pulmao-mapa-rua-inteira',
+    date: '2026-10-30',
+    category: 'melhoria',
+    title: 'Pulmão: a rua inteira aparece no mapa, sem rolar de lado',
+    description: 'No mapa do Pulmão, as posições de uma rua agora se ajustam à largura da tela: um paredão de 16 módulos aparece inteiro de uma vez, em vez de exigir rolagem lateral para ver o fim. Ruas curtas continuam com as posições no tamanho normal, sem esticar. Em telas estreitas, como celular, a rolagem lateral continua existindo para manter as posições legíveis. Também corrigimos o texto que dizia "1 níveis" quando a rua tinha um nível só.',
+  },
+  {
+    id: '2026-10-30-pulmao-estrutura-por-rua',
+    date: '2026-10-30',
+    category: 'melhoria',
+    title: 'Pulmão: cada rua com a própria quantidade de módulos e níveis',
+    description: 'A criação de endereços em lote passou a aceitar uma linha por rua, cada uma com a sua quantidade de módulos e de níveis. Antes era um número único para todas, o que obrigava a criar em várias rodadas quando o galpão tinha paredões de 3 níveis convivendo com corredores de 1 nível. Agora dá para montar a estrutura inteira de uma vez, e a tela mostra quantos endereços cada rua vai gerar e o total antes de criar. Endereços que já existem continuam sendo preservados.',
+  },
+  {
+    id: '2026-10-30-pulmao-formato-etiqueta',
+    date: '2026-10-30',
+    category: 'melhoria',
+    title: 'Pulmão: escolha o tamanho da etiqueta antes de imprimir',
+    description: 'Ao imprimir as etiquetas do Pulmão agora dá para escolher o formato: folha A4 com 4, 8, 12 ou 24 etiquetas por folha, ou etiqueta avulsa nos mesmos tamanhos do Gerador de Etiquetas — Vão (100 × 40 mm) e Excesso (100 × 150 mm) — além de uma medida personalizada em milímetros. Antes de mandar imprimir, a tela informa o tamanho final da etiqueta, o tamanho do QR Code e quantas folhas ou etiquetas vão sair. O conteúdo se ajusta sozinho ao formato: na etiqueta deitada o QR fica ao lado do endereço, e o texto cresce ou diminui para caber sem cortar. A escolha fica guardada para a próxima impressão. A impressora continua sendo escolhida na janela de impressão do próprio navegador.',
+  },
+  {
     id: '2026-10-30-pulmao-etiquetas-impressao',
     date: '2026-10-30',
     category: 'correcao',

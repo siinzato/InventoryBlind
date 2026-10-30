@@ -17,6 +17,7 @@ import {
   SegmentedControl, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
   type SegmentedOption,
 } from '../ui';
+import { BIN_SCAN_PARAM } from '../../lib/appRoutes';
 import { renderBarcodeSVG } from '../../lib/barcode/barcodeExport';
 import { WmsBinOperations } from './WmsBinOperations';
 import {
@@ -33,11 +34,11 @@ const MODES: SegmentedOption<Mode>[] = [
   { value: 'movimentos', label: 'Movimentos', icon: Printer },
 ];
 
-/** Caminho que o QR abre: a própria tela, com o endereço na query. Não precisou de rota
- *  nova — o roteamento do app resolve pelo pathname e ignora a query, então o adesivo
- *  cai direto em "Movimentar" com a vaga já preenchida. */
-const SCAN_PATH = '/app/operacoes/pulmao';
-export const SCAN_PARAM = 'v';
+/** O QR aponta para a RAIZ, nao para o caminho da secao. Motivo: a hospedagem estatica
+ *  so responde em "/" — caminho de secao digitado direto devolve 404 do servidor, e o
+ *  adesivo nasceria morto. O App le este parametro na entrada e redireciona para ca com
+ *  a vaga preenchida, entao o resultado para quem escaneia e o mesmo. */
+const SCAN_PATH = '/';
 
 /** Base da URL que vai dentro do QR. O padrão é o endereço do próprio app — é quase
  *  sempre o certo, e ninguém deveria ter que descobrir o que digitar aqui. Só é editável
@@ -75,7 +76,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   // query e lida uma vez so, no primeiro render, para nao reabrir ao trocar de secao.
   const [scannedBin] = useState(() => {
     if (typeof window === 'undefined') return '';
-    return new URLSearchParams(window.location.search).get(SCAN_PARAM)?.trim().toUpperCase() ?? '';
+    return new URLSearchParams(window.location.search).get(BIN_SCAN_PARAM)?.trim().toUpperCase() ?? '';
   });
   const [mode, setMode] = useState<Mode>(scannedBin ? 'movimentar' : 'enderecos');
   const [bins, setBins] = useState<StorageBin[]>([]);
@@ -241,7 +242,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
       try { localStorage.setItem(QR_BASE_KEY, base); } catch { /* modo privado */ }
 
       for (const bin of bins) {
-        const svg = await renderBarcodeSVG('qrcode', `${base}${SCAN_PATH}?${SCAN_PARAM}=${bin.code}`, {
+        const svg = await renderBarcodeSVG('qrcode', `${base}${SCAN_PATH}?${BIN_SCAN_PARAM}=${bin.code}`, {
           showHumanReadable: false,
           scale: 1,
           eccLevel: 'M',
@@ -367,7 +368,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                 <Input value={qrBase} onChange={e => setQrBase(e.target.value)} />
               </label>
               <p className="text-caption mt-2">
-                Cada adesivo vai conter <code>{(qrBase || '…').replace(/\/+$/, '')}{SCAN_PATH}?{SCAN_PARAM}=PP-A01-N1</code>
+                Cada adesivo vai conter <code>{(qrBase || '…').replace(/\/+$/, '')}{SCAN_PATH}?{BIN_SCAN_PARAM}=PP-A01-N1</code>
               </p>
 
               {isLocalOrigin(qrBase) ? (

@@ -8,6 +8,7 @@ import {
   normalizePath,
   pathForTab,
   tabForPath,
+  BIN_SCAN_PARAM,
 } from './lib/appRoutes';
 import {
   Package,
@@ -261,9 +262,20 @@ function AppContent() {
   // Entrou no app por uma URL que não é de módulo ("/", "/login" logo após entrar, ou
   // "/app" sem seção): canonicaliza para o dashboard sem criar entrada no histórico.
   useEffect(() => {
-    if (!tabForPath(location.pathname)) navigate(APP_ROUTE_BY_TAB[DEFAULT_TAB], { replace: true });
-    else if (isTabOutOfReach(activeTab, profile?.role)) navigate(APP_ROUTE_BY_TAB[DEFAULT_TAB], { replace: true });
-  }, [location.pathname, activeTab, profile?.role, navigate]);
+    if (!tabForPath(location.pathname)) {
+      // Exceção: QR de vaga do pulmão. A hospedagem estática só responde na raiz —
+      // caminho de seção digitado direto devolve 404 —, então o adesivo aponta para "/"
+      // e traz o endereço da vaga na query. Canonicalizar para o dashboard jogaria o
+      // parâmetro fora e o scan abriria na tela errada.
+      if (new URLSearchParams(location.search).get(BIN_SCAN_PARAM)) {
+        navigate({ pathname: APP_ROUTE_BY_TAB['wms-pulmao'], search: location.search }, { replace: true });
+        return;
+      }
+      navigate(APP_ROUTE_BY_TAB[DEFAULT_TAB], { replace: true });
+      return;
+    }
+    if (isTabOutOfReach(activeTab, profile?.role)) navigate(APP_ROUTE_BY_TAB[DEFAULT_TAB], { replace: true });
+  }, [location.pathname, location.search, activeTab, profile?.role, navigate]);
   // Logo do workspace (Configurações Avançadas → Workspaces) — bucket privado, então a URL
   // de exibição é assinada e resolvida aqui para os 2 lugares que mostram o ícone do
   // workspace fora daquela página: o avatar do seletor no topo do Sidebar e o dropdown

@@ -11,6 +11,11 @@
 // cai no dashboard.
 
 export const APP_BASE = '/app';
+
+/** Parametro que o QR de uma vaga do pulmao carrega. Vive aqui porque quem o consome
+ *  sao dois lugares distantes: o App, que redireciona a raiz para a tela certa, e a
+ *  propria tela, que le o endereco escaneado. */
+export const BIN_SCAN_PARAM = 'v';
 export const DEFAULT_TAB = 'dashboard';
 
 /** Módulo -> caminho. Os ids são exatamente os usados em App.tsx/navGroups. */

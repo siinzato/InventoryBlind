@@ -1,0 +1,35 @@
+# Cabeçalhos de cache do Wasmer Edge.
+#
+# O padrão do static-web-server marca TODO .js com max-age de 1 ano e o .html com 1 dia.
+# Para os bundles com hash no nome isso é certo — o nome muda a cada build. Para estes
+# três arquivos é errado, e foi o que prendeu as pessoas em versões antigas:
+#
+#   index.html / 404.html  entram sem hash e são a porta de entrada: um dia de cache é
+#                          um dia de deploy que não chega em ninguém.
+#   sw.js                  o service worker do PWA. Com um ano de cache ele se
+#                          auto-prende e serve do próprio precache para sempre.
+#
+# `no-cache` não significa "não guarde": significa "revalide antes de usar". O navegador
+# segue guardando e o servidor responde 304 quando nada mudou.
+
+[advanced]
+
+[[advanced.headers]]
+source = "/index.html"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/404.html"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/sw.js"
+[advanced.headers.headers]
+Cache-Control = "no-cache"
+
+[[advanced.headers]]
+source = "/"
+[advanced.headers.headers]
+Cache-Control = "no-cache"

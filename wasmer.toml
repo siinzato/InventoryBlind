@@ -1,0 +1,40 @@
+# Empacota o `dist` buildado LOCALMENTE para o Wasmer Edge.
+#
+# Por que não o build remoto (`wasmer deploy --build-remote`): o uploader do Wasmer não
+# envia arquivos `.env*`, então o Vite compila sem VITE_SUPABASE_URL/ANON_KEY e o app
+# sobe morto ("Missing Supabase environment variables", tela branca). As variáveis são
+# inlinadas em tempo de BUILD — precisam existir na máquina que builda.
+#
+# A forma abaixo espelha exatamente o pacote que já rodava em produção (dependência,
+# ponto de montagem, argumentos do servidor), lido do próprio pacote publicado. A única
+# diferença é de onde vem o `dist`.
+
+[package]
+name = "siinzato/inventoryblind"
+version = "0.1.0"
+description = "InventoryBlind — controle de estoque"
+# O pacote já existe como privado no registry; publicar público seria expor o build.
+private = true
+
+[dependencies]
+"wasmer/static-web-server" = "=1.1.0"
+
+[fs]
+"/opt/static_app" = "dist"
+# Fora da raiz web de propósito: dentro de `dist` o próprio sws.toml seria servido.
+"/opt/sws" = "sws"
+
+[[command]]
+name = "start"
+module = "wasmer/static-web-server:webserver"
+runner = "https://webc.org/runner/wasi"
+
+[command.annotations.wasi]
+main-args = [
+  "--root=/opt/static_app",
+  "--log-level=info",
+  "--port=8080",
+  # Só os cabeçalhos de cache. Veja sws/sws.toml: sem isto o index.html fica um dia em
+  # cache e o sw.js um ano, e nenhum deploy chega em quem já abriu o sistema.
+  "--config-file=/opt/sws/sws.toml",
+]

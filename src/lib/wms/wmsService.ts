@@ -12,6 +12,7 @@
 // sendo o vão de picking das capas, e nada aqui lê ou escreve neles.
 
 import { supabase } from '../supabase';
+import type { PlacementMovement, StockPlacement } from './stockInsights';
 
 export interface StorageBin {
   id: string;
@@ -420,4 +421,131 @@ export function buildBinCodes(pattern: BinCodePattern): string[] {
     }
   }
   return codes;
+}
+
+// ── Fase 3: consulta por SKU, distribuição e permanência ─────────────────────────────
+
+/** Saldo lido da tabela, e não da view `wms_product_stock_v`: a view não expõe `ean`
+ *  nem `bin_id`, e os dois são necessários aqui — EAN para a busca, `bin_id` para
+ *  cruzar com o histórico. Mesma tabela, mesma RLS; nenhuma fonte nova de saldo. */
+const PLACEMENT_COLUMNS =
+  'bin_id, product_id, boxes, units_per_box, units, first_stored_at,' +
+  ' bin:bin_id(code, blocked, capacity_boxes),' +
+  ' product:product_id(sku, name, ean)';
+
+interface PlacementRow {
+  bin_id: string;
+  product_id: string;
+  boxes: number;
+  units_per_box: number;
+  units: number;
+  first_stored_at: string;
+  bin: { code: string; blocked: boolean; capacity_boxes: number | null } | null;
+  product: { sku: string; name: string; ean: string | null } | null;
+}
+
+const placementFromRow = (row: PlacementRow): StockPlacement => ({
+  productId: row.product_id,
+  sku: row.product?.sku ?? '—',
+  productName: row.product?.name ?? '—',
+  ean: row.product?.ean ?? null,
+  binId: row.bin_id,
+  binCode: row.bin?.code ?? '—',
+  binBlocked: row.bin?.blocked ?? false,
+  binCapacityBoxes: row.bin?.capacity_boxes ?? null,
+  boxes: row.boxes,
+  unitsPerBox: row.units_per_box,
+  units: row.units,
+  firstStoredAt: row.first_stored_at,
+});
+
+/** Teto de linhas de saldo lidas de uma vez. O pulmão tem dezenas de vagas, não
+ *  milhares — se um dia encostar aqui, a tela avisa em vez de mostrar meia verdade. */
+const PLACEMENT_LIMIT = 2000;
+
+/** Teto de movimentos. Atingi-lo significa histórico incompleto para o cálculo de
+ *  antiguidade, e aí NENHUMA data pode ser anunciada como exata (ver `truncated`). */
+const MOVEMENT_SCAN_LIMIT = 5000;
+
+export interface PulmaoStock {
+  placements: StockPlacement[];
+  movements: PlacementMovement[];
+  /** Histórico veio cortado: as datas viram todas limite superior. */
+  truncated: boolean;
+}
+
+const EMPTY_STOCK: PulmaoStock = { placements: [], movements: [], truncated: false };
+
+/** Movimentos que importam para a antiguidade: só os do período em que as ocupações
+ *  ATUAIS começaram. Movimento anterior pertence a uma ocupação já encerrada (a linha
+ *  de saldo é apagada ao zerar), então não diz nada sobre o que está guardado hoje. */
+async function movementsSince(productIds: string[], since: string): Promise<{ rows: PlacementMovement[]; truncated: boolean }> {
+  if (productIds.length === 0) return { rows: [], truncated: false };
+
+  const { data, error } = await supabase
+    .from('warehouse_bin_movements')
+    .select('product_id, from_bin_id, to_bin_id, created_at')
+    .in('product_id', productIds)
+    .gte('created_at', since)
+    .order('created_at', { ascending: true })
+    .limit(MOVEMENT_SCAN_LIMIT);
+  if (error) throw error;
+
+  const rows = (data ?? []) as Array<{ product_id: string; from_bin_id: string | null; to_bin_id: string | null; created_at: string }>;
+  return {
+    rows: rows.map(r => ({
+      productId: r.product_id,
+      fromBinId: r.from_bin_id,
+      toBinId: r.to_bin_id,
+      createdAt: r.created_at,
+    })),
+    truncated: rows.length >= MOVEMENT_SCAN_LIMIT,
+  };
+}
+
+const withMovements = async (placements: StockPlacement[]): Promise<PulmaoStock> => {
+  if (placements.length === 0) return EMPTY_STOCK;
+  const since = placements.reduce((min, p) => (p.firstStoredAt < min ? p.firstStoredAt : min), placements[0].firstStoredAt);
+  const ids = [...new Set(placements.map(p => p.productId))];
+  const { rows, truncated } = await movementsSince(ids, since);
+  return { placements, movements: rows, truncated };
+};
+
+/** "Onde está este SKU" — por SKU, nome ou EAN. Duas consultas leves: acha os produtos,
+ *  depois o saldo deles. Buscar pelo produto primeiro é o que permite usar o EAN sem
+ *  duplicar cadastro nenhum. */
+export async function searchPulmaoStock(term: string): Promise<PulmaoStock> {
+  const needle = term.trim();
+  if (needle.length < 2) return EMPTY_STOCK;
+
+  const { data: produtos, error: erroProdutos } = await supabase
+    .from('products')
+    .select('id')
+    .or(`sku.ilike.%${needle}%,name.ilike.%${needle}%,ean.ilike.%${needle}%`)
+    .limit(100);
+  if (erroProdutos) throw erroProdutos;
+
+  const ids = (produtos ?? []).map(p => (p as { id: string }).id);
+  if (ids.length === 0) return EMPTY_STOCK;
+
+  const { data, error } = await supabase
+    .from('warehouse_bin_stock')
+    .select(PLACEMENT_COLUMNS)
+    .in('product_id', ids)
+    .limit(PLACEMENT_LIMIT);
+  if (error) throw error;
+
+  return withMovements(((data ?? []) as unknown as PlacementRow[]).map(placementFromRow));
+}
+
+/** Todo o saldo do pulmão — a base da visão de permanência. */
+export async function listPulmaoStock(): Promise<PulmaoStock> {
+  const { data, error } = await supabase
+    .from('warehouse_bin_stock')
+    .select(PLACEMENT_COLUMNS)
+    .order('first_stored_at', { ascending: true })
+    .limit(PLACEMENT_LIMIT);
+  if (error) throw error;
+
+  return withMovements(((data ?? []) as unknown as PlacementRow[]).map(placementFromRow));
 }

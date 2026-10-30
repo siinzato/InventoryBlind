@@ -103,7 +103,7 @@ import { useTaskNotifications } from './lib/tasks/hooks';
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
-  SidebarFolderIcon,
+  SidebarFolderIcon, BrandLoader,
 } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
 import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnosticStorage';
@@ -718,10 +718,7 @@ function AppContent() {
   if (loading) {
     return (
       <div className="min-h-screen bg-surface flex items-center justify-center">
-        <div className="text-center">
-          <Loader2 className="mx-auto animate-spin text-fg-subtle" size={40} />
-          <p className="mt-4 text-fg-muted font-medium">Carregando dados...</p>
-        </div>
+        <BrandLoader />
       </div>
     );
   }

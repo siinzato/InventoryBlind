@@ -25,10 +25,11 @@ import {
   type A4PerPage, type LabelFormatId,
 } from '../../lib/wms/labelLayout';
 import { WmsBinOperations } from './WmsBinOperations';
+import { WmsStockInsights } from './WmsStockInsights';
 import { WmsStorageMap } from './WmsStorageMap';
 import {
-  boxesByBin, buildBinCodes, createBins, deleteBins, listBins, listMovements, searchStock, setBinBlocked,
-  type BinMovement, type BinStockRow, type BinStreetSpec, type StorageBin,
+  boxesByBin, buildBinCodes, createBins, deleteBins, listBins, listMovements, setBinBlocked,
+  type BinMovement, type BinStreetSpec, type StorageBin,
 } from '../../lib/wms/wmsService';
 
 type Mode = 'mapa' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos';
@@ -111,9 +112,6 @@ const MOVEMENT_LABEL: Record<BinMovement['movementType'], string> = {
 
 const formatDate = (iso: string): string => new Date(iso).toLocaleDateString('pt-BR');
 
-/** Dias desde a entrada — o número que denuncia estoque encalhado. */
-const ageInDays = (iso: string): number =>
-  Math.max(0, Math.floor((Date.now() - new Date(iso).getTime()) / 86_400_000));
 
 export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   // Veio de um QR de vaga? Abre direto em Movimentar com o endereco preenchido — e a
@@ -159,10 +157,6 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   const [creating, setCreating] = useState(false);
   const [created, setCreated] = useState<number | null>(null);
 
-  // Consulta
-  const [term, setTerm] = useState('');
-  const [results, setResults] = useState<BinStockRow[] | null>(null);
-  const [searching, setSearching] = useState(false);
 
   // Impressão
   const [qrBase, setQrBase] = useState(readQrBase);
@@ -228,19 +222,6 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
       setError(err instanceof Error ? err.message : 'Não foi possível criar os endereços.');
     } finally {
       setCreating(false);
-    }
-  };
-
-  const handleSearch = async (e: React.FormEvent) => {
-    e.preventDefault();
-    setSearching(true);
-    try {
-      setResults(await searchStock(term));
-    } catch (err) {
-      console.error('[wms] falha na consulta:', err);
-      setError('Não foi possível consultar o saldo.');
-    } finally {
-      setSearching(false);
     }
   };
 
@@ -797,57 +778,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
       )}
 
       {mode === 'consulta' && (
-        <Panel>
-          <PanelSection padding="sm">
-            <form onSubmit={handleSearch} className="flex flex-col sm:flex-row gap-2">
-              <Input
-                value={term}
-                onChange={e => setTerm(e.target.value)}
-                placeholder="SKU ou nome do produto"
-                className="flex-1"
-              />
-              <Button type="submit" disabled={searching || !term.trim()}>
-                <Search size={16} />
-                {searching ? 'Buscando...' : 'Buscar'}
-              </Button>
-            </form>
-          </PanelSection>
-
-          {results !== null && (
-            <div className="overflow-x-auto">
-              <Table>
-                <Thead>
-                  <Tr>
-                    <Th>SKU</Th>
-                    <Th>Produto</Th>
-                    <Th>Endereço</Th>
-                    <Th className="text-center">Caixas</Th>
-                    <Th className="text-center">Unidades</Th>
-                    <Th className="text-center">Guardado em</Th>
-                  </Tr>
-                </Thead>
-                <tbody>
-                  {results.length === 0 ? (
-                    <Tr><Td colSpan={6}>Nada encontrado no pulmão para esse termo.</Td></Tr>
-                  ) : (
-                    results.map(row => (
-                      <Tr key={`${row.productId}-${row.binCode}`}>
-                        <Td className="text-numeric">{row.sku}</Td>
-                        <Td>{row.productName}</Td>
-                        <Td className="font-medium text-fg">{row.binCode}</Td>
-                        <Td className="text-center text-numeric">{row.boxes}</Td>
-                        <Td className="text-center text-numeric">{row.units}</Td>
-                        <Td className="text-center text-caption">
-                          {formatDate(row.firstStoredAt)} · {ageInDays(row.firstStoredAt)}d
-                        </Td>
-                      </Tr>
-                    ))
-                  )}
-                </tbody>
-              </Table>
-            </div>
-          )}
-        </Panel>
+        <WmsStockInsights onOpenBin={code => { setOperateBin(code); setMode('movimentar'); }} />
       )}
 
       {mode === 'movimentos' && (

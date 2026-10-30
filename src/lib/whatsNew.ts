@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-10-30-tela-carregamento-marca',
+    date: '2026-10-30',
+    category: 'melhoria',
+    title: 'Tela de carregamento com a marca do InventoryBlind',
+    description: 'A tela de espera que aparece ao abrir o sistema deixou de usar o círculo girando genérico e passou a mostrar o símbolo do InventoryBlind, com as lâminas se movendo suavemente, e uma frase de espera com vocabulário de armazém. Em aparelhos configurados para reduzir animações, o movimento é substituído por uma variação discreta, sem piscar.',
+  },
+  {
+    id: '2026-10-30-pulmao-consulta-permanencia',
+    date: '2026-10-30',
+    category: 'novidade',
+    title: 'Pulmão: encontre um SKU e veja há quanto tempo ele está parado',
+    description: 'A aba "Consultar SKU" do Pulmão agora busca por SKU, nome do produto ou código de barras, e mostra de uma vez o total de caixas, o total de unidades, em quantos endereços o produto está e há quanto tempo está guardado. Abrindo o produto, aparece a distribuição endereço por endereço, com a data de entrada de cada um, em qual deles está a maior concentração e um atalho para movimentar aquela posição. Sem digitar nada, a lista mostra tudo que está no Pulmão, do mais parado para o mais novo, com filtros por faixa de permanência: até 7 dias, de 8 a 15, de 16 a 30 e mais de 30 dias. Quando o mesmo produto está guardado com quantidades diferentes por caixa em endereços diferentes, a tela avisa, para que o total de caixas não seja lido como uma medida única. E quando a mercadoria entrou em mais de uma data e já houve retirada parcial, o tempo aparece com o sinal "≤": nesse caso o sistema não tem como saber quais caixas saíram, então o número indicado é o máximo possível, nunca menos que a realidade.',
+  },
+  {
     id: '2026-10-30-pulmao-mapa-rua-inteira',
     date: '2026-10-30',
     category: 'melhoria',

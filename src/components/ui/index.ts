@@ -25,4 +25,5 @@ export { ToastStack } from './Toast';
 export { useToasts } from './useToasts';
 export type { ToastItem, ToastType } from './useToasts';
 export { Notice } from './Notice';
+export { BrandLoader } from './BrandLoader';
 export type { NoticeTone } from './Notice';

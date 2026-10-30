@@ -9,14 +9,24 @@
 // documento com autor e horário.
 
 import { useCallback, useEffect, useState } from 'react';
-import { ArrowRightLeft, PackageMinus, PackagePlus } from 'lucide-react';
+import { ArrowRightLeft, PackageMinus, PackagePlus, QrCode } from 'lucide-react';
 import { Badge, Button, Input, Notice, Panel, PanelSection, Table, Td, Th, Thead, Tr } from '../ui';
+import { WmsBinScanner } from './WmsBinScanner';
 import {
   lastKnownPackSize, listBinContents, pick, putaway, searchProducts, transfer,
   type BinStockRow, type ProductOption, type StorageBin,
 } from '../../lib/wms/wmsService';
 
 type Action = 'guardar' | 'retirar' | 'transferir';
+
+/** Qual campo a câmera está preenchendo. O leitor é o mesmo nos dois casos — ele
+ *  devolve um código e não sabe o que vai ser feito com ele. */
+type ScanTarget = 'origem' | 'destino';
+
+const SCAN_TITLE: Record<ScanTarget, string> = {
+  origem: 'Escanear endereço',
+  destino: 'Escanear endereço de destino',
+};
 
 const ACTION_LABEL: Record<Action, string> = {
   guardar: 'Guardar',
@@ -54,7 +64,25 @@ export function WmsBinOperations({
   const [targetProductId, setTargetProductId] = useState('');
   const [destCode, setDestCode] = useState('');
 
+  const [scanFor, setScanFor] = useState<ScanTarget | null>(null);
+
   const bin = bins.find(b => b.code === binCode.trim().toUpperCase()) ?? null;
+  const destBin = bins.find(b => b.code === destCode.trim().toUpperCase()) ?? null;
+
+  const applyScan = (code: string) => {
+    if (scanFor === 'destino') setDestCode(code);
+    else { setBinCode(code); setTargetProductId(''); }
+    setScanFor(null);
+    setError(null);
+    setDone(null);
+  };
+
+  /** Recusa que a RPC já faria, antecipada: poupa a ida ao servidor quando o motivo está
+   *  escrito na tela, logo acima do botão. Campo de destino VAZIO não entra aqui — para
+   *  esse caso a mensagem de `run` explica melhor que um botão apagado sem motivo. */
+  const knownBad =
+    (action === 'guardar' && bin?.blocked === true) ||
+    (action === 'transferir' && destCode.trim() !== '' && (!destBin || destBin.blocked));
 
   const loadContents = useCallback(async (code: string) => {
     if (!code.trim()) { setContents(null); return; }
@@ -149,9 +177,22 @@ export function WmsBinOperations({
         <PanelSection padding="sm">
           <h3 className="text-title">Endereço</h3>
           <p className="text-caption mt-1">
-            Escaneie o QR da vaga pelo celular — o endereço chega preenchido. No computador, digite o código.
+            Escaneie o QR colado na vaga. No computador, digite o código.
           </p>
-          <div className="mt-3 flex flex-col sm:flex-row gap-2">
+
+          {/* Enquanto não há endereço, escanear é a única coisa a fazer nesta tela — e o
+              painel da movimentação nem existe ainda, então o destaque não disputa com
+              nada. Resolvido o endereço, o peso passa para o botão que confirma. */}
+          <Button
+            variant={bin ? 'secondary' : 'primary'}
+            onClick={() => setScanFor('origem')}
+            className="mt-3 w-full sm:w-auto"
+          >
+            <QrCode size={18} />
+            Escanear QR Code
+          </Button>
+
+          <div className="mt-2 flex flex-col sm:flex-row gap-2">
             <Input
               value={binCode}
               onChange={e => setBinCode(e.target.value)}
@@ -168,6 +209,15 @@ export function WmsBinOperations({
             <p className="text-caption mt-2 text-red-600 dark:text-red-400">
               Endereço não cadastrado.
             </p>
+          )}
+          {bin && (
+            <div className="mt-2 flex flex-wrap items-center gap-2">
+              <Badge variant={bin.blocked ? 'warning' : 'accent'}>{bin.code}</Badge>
+              <span className="text-caption">
+                {bin.blocked ? 'Endereço bloqueado' : 'Endereço reconhecido'}
+                {bin.capacityBoxes !== null && ` · capacidade ${bin.capacityBoxes} cx`}
+              </span>
+            </div>
           )}
           {bin?.blocked && (
             <div className="mt-3">
@@ -287,13 +337,49 @@ export function WmsBinOperations({
                     <span className="text-caption">Caixas</span>
                     <Input type="number" min={1} value={boxes} onChange={e => setBoxes(e.target.value)} />
                   </label>
-                  {action === 'transferir' && (
-                    <label className="block">
-                      <span className="text-caption">Endereço de destino</span>
-                      <Input value={destCode} onChange={e => setDestCode(e.target.value)} placeholder="PP-B02-N1" list="wms-bin-codes" />
-                    </label>
-                  )}
                 </div>
+
+                {action === 'transferir' && (
+                  <div>
+                    <span className="text-caption">Endereço de destino</span>
+                    {/* Fora da grade de duas colunas: no celular o operador está parado na
+                        origem e precisa escanear o destino, e meia largura não comporta
+                        campo e botão lado a lado. */}
+                    <div className="mt-1 flex flex-col sm:flex-row gap-2">
+                      <Input
+                        value={destCode}
+                        onChange={e => setDestCode(e.target.value)}
+                        placeholder="PP-B02-N1"
+                        list="wms-bin-codes"
+                        className="flex-1"
+                      />
+                      <Button variant="secondary" onClick={() => setScanFor('destino')} className="w-full sm:w-auto">
+                        <QrCode size={18} />
+                        Escanear
+                      </Button>
+                    </div>
+
+                    {destCode.trim() && !destBin && (
+                      <p className="text-caption mt-2 text-red-600 dark:text-red-400">
+                        Endereço de destino não cadastrado.
+                      </p>
+                    )}
+                    {destBin?.blocked && (
+                      <p className="text-caption mt-2 text-amber-700 dark:text-amber-400">
+                        Destino bloqueado: não recebe mercadoria.
+                      </p>
+                    )}
+                    {destBin && !destBin.blocked && (
+                      <div className="mt-2 flex flex-wrap items-center gap-2">
+                        <Badge variant="accent">{destBin.code}</Badge>
+                        <span className="text-caption">
+                          Destino reconhecido
+                          {destBin.capacityBoxes !== null && ` · capacidade ${destBin.capacityBoxes} cx`}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
             )}
 
@@ -306,13 +392,20 @@ export function WmsBinOperations({
             )}
 
             <div className="mt-4">
-              <Button onClick={run} disabled={busy}>
+              <Button onClick={run} disabled={busy || knownBad} className="w-full sm:w-auto">
                 {busy ? 'Registrando...' : ACTION_LABEL[action]}
               </Button>
             </div>
           </PanelSection>
         </Panel>
       )}
+
+      <WmsBinScanner
+        open={scanFor !== null}
+        title={scanFor ? SCAN_TITLE[scanFor] : ''}
+        onClose={() => setScanFor(null)}
+        onDetected={applyScan}
+      />
     </>
   );
 }

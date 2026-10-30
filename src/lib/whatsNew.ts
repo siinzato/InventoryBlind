@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-10-30-pulmao-etiquetas-impressao',
+    date: '2026-10-30',
+    category: 'correcao',
+    title: 'Etiquetas do Pulmão voltam a imprimir — e ficaram legíveis de longe',
+    description: 'A folha de etiquetas do Pulmão saía em branco na impressão. Corrigido. Além disso a etiqueta foi redesenhada para o uso no corredor: além do QR Code, ela agora mostra rua, módulo e nível em separado e em letra grande, com o nível destacado, de modo que dá para conferir a posição olhando de baixo, sem escanear. O código completo do endereço continua impresso embaixo, menor, para quando for preciso digitá-lo na tela. Agora são 8 etiquetas por folha A4, com marca de corte, e o conteúdo do QR Code não mudou: adesivos já colados continuam valendo.',
+  },
+  {
+    id: '2026-10-30-pulmao-leitor-qr',
+    date: '2026-10-30',
+    category: 'novidade',
+    title: 'Pulmão: leitor de QR Code pelo celular',
+    description: 'A tela Movimentar do Pulmão ganhou o botão "Escanear QR Code": o operador aponta o celular ou tablet para a etiqueta colada na vaga e o endereço é preenchido sozinho, sem digitar. A câmera traseira é usada por padrão e só abre quando o botão é tocado. Na transferência dá para escanear também o endereço de destino, sem sair do app. Assim que a leitura acontece, a tela confirma qual endereço foi reconhecido, avisa se ele está bloqueado ou não está cadastrado e mostra o que já está guardado nele. Digitar o código continua funcionando igual, principalmente no computador. Se a câmera não estiver disponível ou a permissão for negada, o sistema explica o motivo e segue aceitando a digitação.',
+  },
+  {
+    id: '2026-10-30-pulmao-capacidade-vaga',
+    date: '2026-10-30',
+    category: 'novidade',
+    title: 'Pulmão: capacidade e ocupação de cada vaga',
+    description: 'Agora dá para definir quantas caixas cabem em cada endereço do porta-pallet, uma vaga por vez. Com a capacidade informada, o mapa passa a mostrar a ocupação de cada posição, destaca as que estão quase cheias e a que ainda está livre, e o detalhe da vaga informa quanto espaço resta. Também não é mais possível reduzir a capacidade de um endereço para menos do que já está guardado nele — o sistema avisa e pede que a mercadoria saia antes. Endereços sem capacidade informada continuam funcionando normalmente, apenas sem o indicador de ocupação.',
+  },
+  {
     id: '2026-10-29-pulmao-porta-pallet',
     date: '2026-10-29',
     category: 'novidade',

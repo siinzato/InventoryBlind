@@ -123,6 +123,24 @@ export async function deleteBins(ids: string[]): Promise<void> {
   }
 }
 
+/**
+ * Capacidade do endereço, em caixas. `null` = sem limite declarado.
+ *
+ * Reduzir abaixo do que já está guardado é recusado pelo banco (trigger da 118), não por
+ * uma checagem daqui — a regra precisa valer para qualquer caminho até a tabela, não só
+ * para este formulário. A mensagem exibida é a que o banco devolve.
+ */
+export async function setBinCapacity(id: string, capacityBoxes: number | null): Promise<void> {
+  if (capacityBoxes !== null && (!Number.isInteger(capacityBoxes) || capacityBoxes < 1)) {
+    throw new Error('A capacidade precisa ser um número inteiro maior que zero, ou vazia para “sem limite”.');
+  }
+  const { error } = await supabase
+    .from('warehouse_storage_bins')
+    .update({ capacity_boxes: capacityBoxes })
+    .eq('id', id);
+  if (error) throw new Error(error.message);
+}
+
 export async function setBinBlocked(id: string, blocked: boolean, reason: string | null): Promise<void> {
   const { error } = await supabase
     .from('warehouse_storage_bins')
@@ -254,31 +272,62 @@ type MovementRow = {
   to_bin: { code: string } | null;
 };
 
+const MOVEMENT_COLUMNS =
+  'id, movement_type, boxes, units_per_box, reason, created_at,' +
+  ' products(sku, name),' +
+  ' from_bin:from_bin_id(code),' +
+  ' to_bin:to_bin_id(code)';
+
+const movementFromRow = (row: MovementRow): BinMovement => ({
+  id: row.id,
+  movementType: row.movement_type,
+  sku: row.products?.sku ?? null,
+  productName: row.products?.name ?? null,
+  fromCode: row.from_bin?.code ?? null,
+  toCode: row.to_bin?.code ?? null,
+  boxes: row.boxes,
+  unitsPerBox: row.units_per_box,
+  reason: row.reason,
+  createdAt: row.created_at,
+});
+
+/** Última movimentação que tocou esta vaga, entrando ou saindo. Consultada sob demanda,
+ *  ao abrir o detalhe de uma posição no mapa — nunca em lote para todas, que seria um
+ *  N+1 só para preencher um rodapé. */
+export async function lastMovementForBin(binId: string): Promise<BinMovement | null> {
+  const { data, error } = await supabase
+    .from('warehouse_bin_movements')
+    .select(MOVEMENT_COLUMNS)
+    .or(`from_bin_id.eq.${binId},to_bin_id.eq.${binId}`)
+    .order('created_at', { ascending: false })
+    .limit(1);
+  if (error) throw error;
+  const rows = (data ?? []) as unknown as MovementRow[];
+  return rows.length > 0 ? movementFromRow(rows[0]) : null;
+}
+
+/** Histórico de uma vaga: entradas, saídas e transferências que a tocaram, do mais
+ *  recente para o mais antigo. Consultado só ao abrir o detalhe de uma posição. */
+export async function listMovementsForBin(binId: string, limit = 20): Promise<BinMovement[]> {
+  const { data, error } = await supabase
+    .from('warehouse_bin_movements')
+    .select(MOVEMENT_COLUMNS)
+    .or(`from_bin_id.eq.${binId},to_bin_id.eq.${binId}`)
+    .order('created_at', { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return ((data ?? []) as unknown as MovementRow[]).map(movementFromRow);
+}
+
 export async function listMovements(limit = 50): Promise<BinMovement[]> {
   const { data, error } = await supabase
     .from('warehouse_bin_movements')
-    .select(
-      'id, movement_type, boxes, units_per_box, reason, created_at,' +
-        ' products(sku, name),' +
-        ' from_bin:from_bin_id(code),' +
-        ' to_bin:to_bin_id(code)',
-    )
+    .select(MOVEMENT_COLUMNS)
     .order('created_at', { ascending: false })
     .limit(limit);
   if (error) throw error;
 
-  return ((data ?? []) as unknown as MovementRow[]).map(row => ({
-    id: row.id,
-    movementType: row.movement_type,
-    sku: row.products?.sku ?? null,
-    productName: row.products?.name ?? null,
-    fromCode: row.from_bin?.code ?? null,
-    toCode: row.to_bin?.code ?? null,
-    boxes: row.boxes,
-    unitsPerBox: row.units_per_box,
-    reason: row.reason,
-    createdAt: row.created_at,
-  }));
+  return ((data ?? []) as unknown as MovementRow[]).map(movementFromRow);
 }
 
 // ── Operações (sempre por RPC) ────────────────────────────────────────────────────────

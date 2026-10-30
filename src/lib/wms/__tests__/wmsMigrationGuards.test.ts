@@ -154,3 +154,59 @@ describe('116 — invariantes de estoque', () => {
     expect(M116).toContain('WITH (security_invoker = true)');
   });
 });
+
+// ── Fase 2 ────────────────────────────────────────────────────────────────────────────
+
+const M118 = (
+  MIGRATIONS[Object.keys(MIGRATIONS).find(p => p.includes('118_wms_capacity_guard')) ?? ''] ?? ''
+).replace(/\r\n/g, '\n');
+
+describe('118 — capacidade não cai abaixo do que já está guardado', () => {
+  it('existe e é aditiva', () => {
+    expect(M118.length).toBeGreaterThan(0);
+    expect(M118).not.toMatch(/\bDROP\s+TABLE\b/i);
+    expect(M118).not.toMatch(/\bDELETE\s+FROM\b/i);
+    expect(M118).not.toMatch(/DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
+  });
+
+  // A capacidade muda por UPDATE direto na tabela, nao por RPC. Validar so na tela
+  // deixaria a regra fora do banco e qualquer outro caminho a contornaria.
+  it('a garantia é trigger no banco, não checagem de formulário', () => {
+    expect(M118).toContain('BEFORE UPDATE OF capacity_boxes ON warehouse_storage_bins');
+    expect(M118).toContain('EXECUTE FUNCTION wms_guard_bin_capacity()');
+  });
+
+  it('compara contra o saldo real e recusa quando não cabe', () => {
+    const body = M118.slice(M118.indexOf('CREATE OR REPLACE FUNCTION public.wms_guard_bin_capacity'));
+    expect(body).toContain('FROM warehouse_bin_stock');
+    expect(body).toContain('WHERE bin_id = NEW.id');
+    expect(body).toContain('IF NEW.capacity_boxes < v_ocupado THEN');
+    expect(body).toContain('RAISE EXCEPTION');
+  });
+
+  it('capacidade nula segue significando sem limite', () => {
+    expect(M118).toContain('IF NEW.capacity_boxes IS NULL THEN');
+  });
+
+  // Salvar o formulario sem mexer na capacidade de um endereco ja lotado nao pode ser
+  // recusado: `UPDATE OF` dispara mesmo quando o valor nao mudou.
+  it('valor inalterado passa direto', () => {
+    expect(M118).toContain('IF NEW.capacity_boxes IS NOT DISTINCT FROM OLD.capacity_boxes THEN');
+  });
+
+  it('não é RPC: anon e PUBLIC não executam', () => {
+    expect(M118).toContain('REVOKE EXECUTE ON FUNCTION public.wms_guard_bin_capacity() FROM PUBLIC, anon;');
+    expect(M118).not.toMatch(/GRANT[^;]*\bTO\b[^;]*\banon\b/i);
+  });
+
+  // A 116 ja barrava ENTRAR acima da capacidade; a 118 fecha o caminho inverso. As duas
+  // guardas precisam coexistir.
+  it('não desfaz a validação de entrada que a 116 já tinha', () => {
+    expect(M116).toContain('Capacidade do endereço % excedida');
+    // Só o SQL executável: o cabeçalho da 118 CITA as duas RPCs para explicar que elas já
+    // cobrem o caminho de entrada. Sem tirar comentário, a asserção casaria com a prosa.
+    const executavel = M118.replace(/\/\*[\s\S]*?\*\//g, ' ').replace(/--.*/g, ' ');
+    expect(executavel).not.toContain('wms_bin_putaway');
+    expect(executavel).not.toContain('wms_bin_transfer');
+  });
+});

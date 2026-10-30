@@ -11,7 +11,7 @@
 // campo de local do Tiny continuam sendo daquele fluxo e não são lidos nem escritos aqui.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Lock, PackagePlus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
+import { ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
 import {
   Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection,
   SegmentedControl, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
@@ -19,15 +19,18 @@ import {
 } from '../ui';
 import { BIN_SCAN_PARAM } from '../../lib/appRoutes';
 import { renderBarcodeSVG } from '../../lib/barcode/barcodeExport';
+import { parseBinCode } from '../../lib/wms/binCode';
 import { WmsBinOperations } from './WmsBinOperations';
+import { WmsStorageMap } from './WmsStorageMap';
 import {
   boxesByBin, buildBinCodes, createBins, deleteBins, listBins, listMovements, searchStock, setBinBlocked,
   type BinMovement, type BinStockRow, type StorageBin,
 } from '../../lib/wms/wmsService';
 
-type Mode = 'movimentar' | 'enderecos' | 'consulta' | 'movimentos';
+type Mode = 'mapa' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos';
 
 const MODES: SegmentedOption<Mode>[] = [
+  { value: 'mapa', label: 'Mapa', icon: LayoutGrid },
   { value: 'movimentar', label: 'Movimentar', icon: PackagePlus },
   { value: 'enderecos', label: 'Endereços', icon: Warehouse },
   { value: 'consulta', label: 'Consultar SKU', icon: Search },
@@ -39,6 +42,12 @@ const MODES: SegmentedOption<Mode>[] = [
  *  adesivo nasceria morto. O App le este parametro na entrada e redireciona para ca com
  *  a vaga preenchida, entao o resultado para quem escaneia e o mesmo. */
 const SCAN_PATH = '/';
+
+/** A etiqueta é montada por `innerHTML` (é SVG cru vindo do gerador, não JSX). O código
+ *  do endereço vem do banco e, embora o gerador em lote só produza letra, número e
+ *  hífen, a coluna é texto livre — então escapa. */
+const esc = (value: string): string =>
+  value.replace(/[&<>"]/g, ch => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;' }[ch] as string));
 
 /** Base da URL que vai dentro do QR. O padrão é o endereço do próprio app — é quase
  *  sempre o certo, e ninguém deveria ter que descobrir o que digitar aqui. Só é editável
@@ -78,7 +87,13 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
     if (typeof window === 'undefined') return '';
     return new URLSearchParams(window.location.search).get(BIN_SCAN_PARAM)?.trim().toUpperCase() ?? '';
   });
-  const [mode, setMode] = useState<Mode>(scannedBin ? 'movimentar' : 'enderecos');
+  // Escaneou um QR? Vai direto operar. Senão, o mapa e a visao que responde a pergunta
+  // do dia a dia — onde tem vaga, o que esta cheio.
+  const [mode, setMode] = useState<Mode>(scannedBin ? 'movimentar' : 'mapa');
+  // Vaga escolhida no mapa e levada para a aba Movimentar.
+  const [operateBin, setOperateBin] = useState('');
+  const [generatorOpen, setGeneratorOpen] = useState(false);
+  const [labelsOpen, setLabelsOpen] = useState(false);
   const [bins, setBins] = useState<StorageBin[]>([]);
   const [occupancy, setOccupancy] = useState<Map<string, number>>(new Map());
   const [movements, setMovements] = useState<BinMovement[]>([]);
@@ -215,21 +230,60 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
     style.textContent = `
       #ib-wms-print-root { display: none; }
       @media print {
+        /* ISTO é o que fazia a folha sair em branco. O app declara
+           \`html, body { overflow-x: hidden; max-width: 100vw }\` (src/index.css), e na
+           paginação da impressão esse recorte vale para o documento inteiro: o Chrome
+           corta tudo em uma página e não sobra nada. As outras impressões do sistema
+           escapam porque usam \`position: fixed\` e são de uma etiqueta só. Desfeito
+           apenas dentro do @media print — a tela continua exatamente como está. */
+        html, body {
+          overflow: visible !important;
+          max-width: none !important;
+          width: auto !important;
+          height: auto !important;
+          margin: 0 !important;
+          background: #fff !important;
+        }
         body > *:not(#ib-wms-print-root) { display: none !important; }
+        @page { size: A4 portrait; margin: 8mm; }
+
         #ib-wms-print-root {
           display: grid !important;
-          grid-template-columns: repeat(4, 1fr);
+          grid-template-columns: repeat(2, 1fr);
+          gap: 4mm;
           background: #fff; color: #000;
+          font-family: Arial, Helvetica, sans-serif;
         }
         #ib-wms-print-root .ib-wms-label {
-          display: flex; flex-direction: column; align-items: center; justify-content: center;
-          break-inside: avoid; padding: 5mm 2mm;
+          display: flex; flex-direction: column; align-items: center;
+          break-inside: avoid;
+          border: 0.3mm solid #999; border-radius: 1.5mm;
+          padding: 4mm 3mm 3mm;
         }
-        #ib-wms-print-root .ib-wms-label svg { width: 28mm; height: 28mm; }
-        #ib-wms-print-root .ib-wms-label span {
-          margin-top: 2mm; font-size: 10pt; font-weight: 700; letter-spacing: .02em;
+        #ib-wms-print-root .ib-wms-label svg { width: 30mm; height: 30mm; }
+        #ib-wms-print-root .ib-wms-parts {
+          display: flex; align-items: flex-end; justify-content: center;
+          gap: 4mm; margin-top: 2mm;
         }
-        @page { margin: 8mm; }
+        #ib-wms-print-root .ib-wms-part {
+          display: flex; flex-direction: column; align-items: center;
+        }
+        #ib-wms-print-root .ib-wms-part b {
+          font-size: 7pt; font-weight: 700; letter-spacing: .12em; color: #444;
+        }
+        #ib-wms-print-root .ib-wms-part i {
+          font-style: normal; font-size: 26pt; font-weight: 800; line-height: 1.05;
+        }
+        /* Caixa em volta do nível, e não fundo colorido como no modelo de referência: o
+           Chrome só imprime fundo com "Gráficos de plano de fundo" marcado, e uma
+           etiqueta que depende dessa caixinha de diálogo é uma etiqueta que um dia sai
+           ilegível. Borda sai em qualquer impressora, inclusive preto e branco. */
+        #ib-wms-print-root .ib-wms-level i {
+          border: 0.6mm solid #000; border-radius: 1mm; padding: 0 2.5mm;
+        }
+        #ib-wms-print-root .ib-wms-code {
+          margin-top: 2.5mm; font-size: 8pt; letter-spacing: .08em; color: #555;
+        }
       }
     `;
 
@@ -247,9 +301,21 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
           scale: 1,
           eccLevel: 'M',
         });
+        // Rua, módulo e nível em separado e grandes: de pé no corredor, olhando para
+        // cima, ninguém lê "PP-A01-N1" — lê "A 01 1". O código inteiro fica embaixo,
+        // pequeno, porque é ele que se digita na tela quando a câmera falha.
+        const parsed = parseBinCode(bin.code);
+        const parts = parsed
+          ? `<div class="ib-wms-part"><b>RUA</b><i>${esc(parsed.street)}</i></div>` +
+            `<div class="ib-wms-part"><b>MÓDULO</b><i>${esc(parsed.module)}</i></div>` +
+            `<div class="ib-wms-part ib-wms-level"><b>NÍVEL</b><i>${parsed.level}</i></div>`
+          : `<div class="ib-wms-part"><b>ENDEREÇO</b><i>${esc(bin.code)}</i></div>`;
+
         const cell = document.createElement('div');
         cell.className = 'ib-wms-label';
-        cell.innerHTML = `${svg}<span>${bin.code}</span>`;
+        cell.innerHTML =
+          `${svg}<div class="ib-wms-parts">${parts}</div>` +
+          `<div class="ib-wms-code">${esc(bin.code)}</div>`;
         root.appendChild(cell);
       }
 
@@ -257,7 +323,9 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
       document.body.appendChild(root);
       // Limpa quando a caixa de impressão fecha, tenha a pessoa impresso ou cancelado.
       window.addEventListener('afterprint', cleanup, { once: true });
-      window.print();
+      // Um respiro antes do snapshot de impressão, como já faz o `printBarcodeArea` do
+      // Gerador de Etiquetas: são dezenas de SVGs recém-inseridos para o layout assentar.
+      setTimeout(() => window.print(), 200);
     } catch (err) {
       console.error('[wms] falha ao gerar as etiquetas:', err);
       setError('Não foi possível gerar as etiquetas.');
@@ -276,31 +344,56 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
 
       {error && <Notice tone="danger">{error}</Notice>}
 
+      {/* Três números, não quatro: "livres" já vive como contexto de "ocupados", e um KPI
+          a menos é uma linha mais legível. O quarto só aparece quando existe bloqueio —
+          zero bloqueado não é informação, é ruído. */}
       <StatRow>
-        <StatCell><Stat label="Endereços" value={stats.total} /></StatCell>
-        <StatCell><Stat label="Ocupados" value={stats.ocupados} context={`${stats.livres} livres`} /></StatCell>
+        <StatCell><Stat label="Endereços" value={stats.total} context={`${stats.livres} livres`} /></StatCell>
+        <StatCell><Stat label="Ocupados" value={stats.ocupados} context={stats.total > 0 ? `${Math.round((stats.ocupados / stats.total) * 100)}% do pulmão` : undefined} /></StatCell>
         <StatCell><Stat label="Caixas armazenadas" value={stats.caixas} /></StatCell>
-        <StatCell><Stat label="Bloqueados" value={stats.bloqueados} context="não recebem mercadoria" /></StatCell>
+        {stats.bloqueados > 0 && (
+          <StatCell><Stat label="Bloqueados" value={stats.bloqueados} context="não recebem mercadoria" /></StatCell>
+        )}
       </StatRow>
 
       <SegmentedControl label="Seção" options={MODES} value={mode} onChange={setMode} />
 
+      {mode === 'mapa' && (
+        <WmsStorageMap
+          bins={bins}
+          occupancy={occupancy}
+          canManage={canManage}
+          onOperate={code => { setOperateBin(code); setMode('movimentar'); }}
+          onCapacityChanged={load}
+        />
+      )}
+
       {mode === 'movimentar' && (
-        <WmsBinOperations bins={bins} initialBinCode={scannedBin} onMoved={load} />
+        <WmsBinOperations bins={bins} initialBinCode={operateBin || scannedBin} onMoved={load} />
       )}
 
       {mode === 'enderecos' && (
         <>
           {canManage && (
             <Panel>
-              <PanelSection padding="sm">
-                <h3 className="text-title">Criar endereços em lote</h3>
-                <p className="text-caption mt-1">
-                  O código é hierárquico de propósito: ordenado alfabeticamente ele já dá a sequência de
-                  caminhada pelo corredor. Use um prefixo diferente de <code>P1-</code> e <code>P2-</code>,
-                  que são os vãos de picking das capas.
-                </p>
+              {/* Recolhido por padrão: criar endereço é ato de configuração, feito uma vez.
+                  Deixá-lo aberto empurrava a lista — o conteúdo que se consulta todo dia —
+                  para baixo da dobra. */}
+              <PanelSection padding="sm" className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-title">Criar endereços em lote</h3>
+                  <p className="text-caption mt-1">
+                    O código é hierárquico de propósito: ordenado alfabeticamente ele já dá a sequência de
+                    caminhada pelo corredor. Use um prefixo diferente de <code>P1-</code> e <code>P2-</code>,
+                    que são os vãos de picking das capas.
+                  </p>
+                </div>
+                <Button variant="secondary" onClick={() => setGeneratorOpen(v => !v)} aria-expanded={generatorOpen}>
+                  {generatorOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {generatorOpen ? 'Fechar' : 'Abrir'}
+                </Button>
               </PanelSection>
+              {generatorOpen && (
               <PanelSection padding="sm">
                 <div className="grid grid-cols-2 lg:grid-cols-5 gap-3">
                   <label className="block">
@@ -344,10 +437,13 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                   </p>
                 )}
               </PanelSection>
+              )}
             </Panel>
           )}
 
           <Panel>
+            {/* Impressão também é configuração de uma vez: fica recolhida, abaixo do
+                gerador, e não disputa espaço com a lista de endereços. */}
             <PanelSection padding="sm" className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
               <div>
                 <h3 className="text-title">Etiquetas</h3>
@@ -356,12 +452,19 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                   mesma tela em <strong>Movimentar</strong>, já com a vaga preenchida.
                 </p>
               </div>
-              <Button variant="secondary" onClick={handlePrint} disabled={printing || bins.length === 0 || isLocalOrigin(qrBase)}>
-                <Printer size={16} />
-                {printing ? 'Gerando...' : `Imprimir ${bins.length} etiquetas`}
-              </Button>
+              <div className="flex items-center gap-2">
+                <Button variant="secondary" onClick={() => setLabelsOpen(v => !v)} aria-expanded={labelsOpen}>
+                  {labelsOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
+                  {labelsOpen ? 'Fechar' : 'Abrir'}
+                </Button>
+                <Button variant="secondary" onClick={handlePrint} disabled={printing || bins.length === 0 || isLocalOrigin(qrBase)}>
+                  <Printer size={16} />
+                  {printing ? 'Gerando...' : `Imprimir ${bins.length}`}
+                </Button>
+              </div>
             </PanelSection>
 
+            {labelsOpen && (
             <PanelSection padding="sm">
               <label className="block">
                 <span className="text-caption">Endereço do sistema que vai dentro do QR</span>
@@ -382,13 +485,14 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
               ) : (
                 <div className="mt-3">
                   <Notice tone="warning">
-                    Este endereço fica colado em 85 adesivos por anos. Se um dia o sistema mudar de
+                    Este endereço fica colado em cada adesivo por anos. Se um dia o sistema mudar de
                     endereço, todos param de funcionar de uma vez — por isso o ideal é um domínio seu
                     (ex.: <code>estoque.azbuy.com.br</code>) apontando para o sistema, e não o do provedor.
                   </Notice>
                 </div>
               )}
             </PanelSection>
+            )}
           </Panel>
 
           <Panel>

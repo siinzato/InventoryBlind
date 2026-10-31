@@ -11,7 +11,7 @@
 
 [package]
 name = "siinzato/inventoryblind"
-version = "0.1.3"
+version = "0.1.4"
 description = "InventoryBlind — controle de estoque"
 # O pacote já existe como privado no registry; publicar público seria expor o build.
 private = true

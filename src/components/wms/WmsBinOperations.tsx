@@ -8,24 +8,29 @@
 // o movimento e o saldo na mesma transação. É o que garante que todo número tenha um
 // documento com autor e horário.
 
-import { useCallback, useEffect, useState } from 'react';
-import { ArrowRightLeft, PackageMinus, PackagePlus, QrCode } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { ArrowRightLeft, Lightbulb, PackageMinus, PackagePlus, QrCode } from 'lucide-react';
 import { Badge, Button, Input, Notice, Panel, PanelSection, Table, Td, Th, Thead, Tr } from '../ui';
 import { WmsBinScanner } from './WmsBinScanner';
 import {
-  lastKnownPackSize, listBinContents, pick, putaway, searchProducts, transfer,
+  lastKnownPackSize, listBinContents, listPulmaoStock, pick, putaway, searchProducts, transfer,
   type BinStockRow, type ProductOption, type StorageBin,
 } from '../../lib/wms/wmsService';
+import {
+  EMPTY_OCCUPANCY, occupancyByProduct, previewTransfer, rejectionFor, suggestBins,
+} from '../../lib/wms/binSuggestion';
+import type { StockPlacement } from '../../lib/wms/stockInsights';
 
 type Action = 'guardar' | 'retirar' | 'transferir';
 
 /** Qual campo a câmera está preenchendo. O leitor é o mesmo nos dois casos — ele
  *  devolve um código e não sabe o que vai ser feito com ele. */
-type ScanTarget = 'origem' | 'destino';
+type ScanTarget = 'origem' | 'destino' | 'conferir';
 
 const SCAN_TITLE: Record<ScanTarget, string> = {
   origem: 'Escanear endereço',
   destino: 'Escanear endereço de destino',
+  conferir: 'Conferir a vaga',
 };
 
 const ACTION_LABEL: Record<Action, string> = {
@@ -65,12 +70,73 @@ export function WmsBinOperations({
   const [destCode, setDestCode] = useState('');
 
   const [scanFor, setScanFor] = useState<ScanTarget | null>(null);
+  /** Vaga cuja etiqueta o operador conferiu com a camera nesta sessao de tela. */
+  const [confirmedCode, setConfirmedCode] = useState<string | null>(null);
+
+  /** Saldo de TODO o pulmão — base do ranking de endereços. Mesma consulta da Fase 3;
+   *  nenhuma fonte nova e nenhuma chamada por sugestão. */
+  const [placements, setPlacements] = useState<StockPlacement[]>([]);
 
   const bin = bins.find(b => b.code === binCode.trim().toUpperCase()) ?? null;
   const destBin = bins.find(b => b.code === destCode.trim().toUpperCase()) ?? null;
 
+  const loadPlacements = useCallback(() => {
+    listPulmaoStock()
+      .then(r => setPlacements(r.placements))
+      // Sugestão é auxílio, não requisito: falhando, a tela segue funcionando na mão.
+      .catch(() => setPlacements([]));
+  }, []);
+
+  useEffect(() => { loadPlacements(); }, [loadPlacements]);
+
+  // ── Sugestão de endereço ────────────────────────────────────────────────────────────
+  // O produto e o pack em questão dependem da ação: guardar trabalha com o que foi
+  // escolhido na busca, transferir com o que já está na origem.
+  const rowAtOrigin = (contents ?? []).find(r => r.productId === targetProductId) ?? null;
+
+  const activeProductId = action === 'guardar' ? chosen?.id ?? null : targetProductId || null;
+  const activePack = action === 'guardar'
+    ? parseInt(unitsPerBox) || null
+    : rowAtOrigin?.unitsPerBox ?? null;
+
+  const qty = parseInt(boxes) || 0;
+
+  const occupancyByCode = useMemo(
+    () => occupancyByProduct(placements, activeProductId),
+    [placements, activeProductId],
+  );
+
+  const suggestions = useMemo(() => {
+    if (!activeProductId || qty <= 0) return [];
+    return suggestBins({
+      bins,
+      occupancyByCode,
+      boxes: qty,
+      unitsPerBox: activePack,
+      excludeCode: action === 'transferir' ? bin?.code : undefined,
+    }).slice(0, 4);
+  }, [bins, occupancyByCode, qty, activePack, activeProductId, action, bin?.code]);
+
+  /** Por que o destino escolhido não serve — a mesma regra que a RPC aplicaria. */
+  const destRejection = destBin
+    ? rejectionFor(destBin, occupancyByCode.get(destBin.code) ?? EMPTY_OCCUPANCY, {
+        boxes: qty,
+        unitsPerBox: activePack,
+        excludeCode: bin?.code,
+      })
+    : null;
+
+  const balance = destBin && rowAtOrigin && qty > 0
+    ? previewTransfer(
+        occupancyByCode.get(bin?.code ?? '') ?? EMPTY_OCCUPANCY,
+        occupancyByCode.get(destBin.code) ?? EMPTY_OCCUPANCY,
+        Math.min(qty, rowAtOrigin.boxes),
+      )
+    : null;
+
   const applyScan = (code: string) => {
-    if (scanFor === 'destino') setDestCode(code);
+    if (scanFor === 'conferir') setConfirmedCode(code);
+    else if (scanFor === 'destino') setDestCode(code);
     else { setBinCode(code); setTargetProductId(''); }
     setScanFor(null);
     setError(null);
@@ -82,7 +148,9 @@ export function WmsBinOperations({
    *  esse caso a mensagem de `run` explica melhor que um botão apagado sem motivo. */
   const knownBad =
     (action === 'guardar' && bin?.blocked === true) ||
-    (action === 'transferir' && destCode.trim() !== '' && (!destBin || destBin.blocked));
+    (action === 'transferir' && destCode.trim() !== '' && (!destBin || destRejection !== null)) ||
+    // Retirar mais do que existe: o saldo da origem está na tela, logo acima.
+    (action !== 'guardar' && rowAtOrigin !== null && qty > rowAtOrigin.boxes);
 
   const loadContents = useCallback(async (code: string) => {
     if (!code.trim()) { setContents(null); return; }
@@ -161,6 +229,8 @@ export function WmsBinOperations({
       }
       reset();
       await loadContents(code);
+      // O ranking tem que enxergar o movimento que acabou de acontecer.
+      loadPlacements();
       onMoved();
     } catch (err) {
       // A mensagem vem da própria RPC (saldo insuficiente, endereço bloqueado, pack
@@ -217,6 +287,16 @@ export function WmsBinOperations({
                 {bin.blocked ? 'Endereço bloqueado' : 'Endereço reconhecido'}
                 {bin.capacityBoxes !== null && ` · capacidade ${bin.capacityBoxes} cx`}
               </span>
+              {/* Conferência: aponta a câmera para a etiqueta e prova que está na vaga
+                  certa. Digitar o código não prova nada sobre onde a pessoa está. */}
+              {confirmedCode === bin.code ? (
+                <Badge variant="success">Vaga conferida</Badge>
+              ) : (
+                <Button variant="ghost" size="sm" onClick={() => setScanFor('conferir')}>
+                  <QrCode size={14} />
+                  Conferir no local
+                </Button>
+              )}
             </div>
           )}
           {bin?.blocked && (
@@ -364,12 +444,17 @@ export function WmsBinOperations({
                         Endereço de destino não cadastrado.
                       </p>
                     )}
-                    {destBin?.blocked && (
+                    {/* O motivo exato, igual ao que a RPC responderia — mas antes de ir
+                        até o servidor e voltar com erro. */}
+                    {destBin && destRejection && (
                       <p className="text-caption mt-2 text-amber-700 dark:text-amber-400">
-                        Destino bloqueado: não recebe mercadoria.
+                        {destRejection === 'bloqueado' && 'Destino bloqueado: não recebe mercadoria.'}
+                        {destRejection === 'mesma-origem' && 'Destino igual à origem.'}
+                        {destRejection === 'pack-diferente' && 'O destino já tem este produto com outra quantidade por caixa.'}
+                        {destRejection === 'sem-capacidade' && 'O destino não comporta essa quantidade.'}
                       </p>
                     )}
-                    {destBin && !destBin.blocked && (
+                    {destBin && !destRejection && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
                         <Badge variant="accent">{destBin.code}</Badge>
                         <span className="text-caption">
@@ -378,8 +463,86 @@ export function WmsBinOperations({
                         </span>
                       </div>
                     )}
+
+                    {/* A conta dos dois lados, antes de confirmar. */}
+                    {balance && !destRejection && (
+                      <p className="text-caption mt-2 text-numeric">
+                        {bin?.code}: {balance.fromBefore} → <strong>{balance.fromAfter}</strong> cx
+                        {' · '}
+                        {destBin?.code}: {balance.toBefore} → <strong>{balance.toAfter}</strong> cx
+                      </p>
+                    )}
                   </div>
                 )}
+              </div>
+            )}
+
+            {/* Sugestão de endereço: lista, motivo e um toque para aplicar. Nunca
+                aplica sozinha — o operador decide, como manda a regra de não movimentar
+                nada sem confirmação. Só aparece com produto e quantidade definidos,
+                porque antes disso não há o que ranquear. */}
+            {action !== 'retirar' && suggestions.length > 0 && (
+              <div className="mt-4 rounded-container border border-edge p-3">
+                <div className="flex items-center gap-2">
+                  <Lightbulb size={16} className="text-fg-subtle" />
+                  <span className="text-caption">
+                    {action === 'guardar' ? 'Onde guardar' : 'Destinos compatíveis'}
+                    {' · '}
+                    {qty} cx
+                  </span>
+                </div>
+
+                <div className="mt-2 space-y-1.5">
+                  {suggestions.map(s => {
+                    const atual = action === 'guardar'
+                      ? s.bin.code === bin?.code
+                      : s.bin.code === destBin?.code;
+                    return (
+                      <button
+                        key={s.bin.id}
+                        type="button"
+                        onClick={() => {
+                          if (action === 'guardar') setBinCode(s.bin.code);
+                          else setDestCode(s.bin.code);
+                          setError(null);
+                        }}
+                        className={`w-full min-h-[44px] rounded-control border px-3 py-2 text-left transition-colors ${
+                          atual
+                            ? 'border-accent bg-accent/10'
+                            : 'border-edge bg-surface-3 hover:bg-edge'
+                        }`}
+                      >
+                        <span className="flex flex-wrap items-center gap-2">
+                          <span className="font-semibold text-fg">{s.bin.code}</span>
+                          {s.consolidates && <Badge variant="success">Consolida</Badge>}
+                          {atual && <Badge variant="accent">Atual</Badge>}
+                        </span>
+                        <span className="block text-caption mt-0.5">{s.reasons.join(' · ')}</span>
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
+            )}
+
+            {/* Nenhuma vaga serve: dizer isso é mais útil que uma lista vazia. */}
+            {action !== 'retirar' && activeProductId && qty > 0 && suggestions.length === 0 && (
+              <div className="mt-4">
+                <Notice tone="warning">
+                  Nenhum endereço do pulmão comporta {qty} caixa(s) deste produto agora —
+                  todos estão bloqueados, sem espaço, ou já têm este SKU com outra quantidade
+                  por caixa.
+                </Notice>
+              </div>
+            )}
+
+            {/* Retirar mais do que existe: barrado na tela, com o número à vista. */}
+            {action !== 'guardar' && rowAtOrigin && qty > rowAtOrigin.boxes && (
+              <div className="mt-3">
+                <Notice tone="danger">
+                  {bin?.code} tem {rowAtOrigin.boxes} caixa(s) deste produto. Não dá para
+                  {action === 'retirar' ? ' retirar ' : ' transferir '}{qty}.
+                </Notice>
               </div>
             )}
 
@@ -404,6 +567,7 @@ export function WmsBinOperations({
         open={scanFor !== null}
         title={scanFor ? SCAN_TITLE[scanFor] : ''}
         onClose={() => setScanFor(null)}
+        expectCode={scanFor === 'conferir' ? bin?.code : undefined}
         onDetected={applyScan}
       />
     </>

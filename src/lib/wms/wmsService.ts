@@ -13,6 +13,7 @@
 
 import { supabase } from '../supabase';
 import type { PlacementMovement, StockPlacement } from './stockInsights';
+import type { AnalyticsMovement } from './pulmaoAnalytics';
 
 export interface StorageBin {
   id: string;
@@ -548,4 +549,97 @@ export async function listPulmaoStock(): Promise<PulmaoStock> {
   if (error) throw error;
 
   return withMovements(((data ?? []) as unknown as PlacementRow[]).map(placementFromRow));
+}
+
+// ── Fase 5: auditoria e indicadores ──────────────────────────────────────────────────
+
+/** Teto de movimentos lidos de uma vez. Atingi-lo significa que os indicadores veem
+ *  só um pedaço do periodo — e a tela avisa, em vez de somar meia verdade. */
+const ANALYTICS_LIMIT = 1000;
+
+export interface MovementFilter {
+  fromISO: string;
+  toISO: string;
+  /** Resolvido pela tela, que já tem a lista de endereços carregada. */
+  binId?: string;
+  productIds?: string[];
+  operatorId?: string;
+  movementType?: 'entrada' | 'saida' | 'transferencia';
+}
+
+export interface AnalyticsResult {
+  movements: AnalyticsMovement[];
+  truncated: boolean;
+}
+
+interface AnalyticsRow {
+  id: string;
+  movement_type: 'entrada' | 'saida' | 'transferencia';
+  product_id: string | null;
+  boxes: number;
+  created_at: string;
+  created_by: string | null;
+  products: { sku: string; name: string } | null;
+  from_bin: { code: string } | null;
+  to_bin: { code: string } | null;
+}
+
+const ANALYTICS_COLUMNS =
+  'id, movement_type, product_id, boxes, created_at, created_by,' +
+  ' products(sku, name),' +
+  ' from_bin:from_bin_id(code),' +
+  ' to_bin:to_bin_id(code)';
+
+/**
+ * Histórico para auditoria e indicadores.
+ *
+ * O nome do operador vem de `profiles` numa segunda consulta, porque `created_by`
+ * referencia `auth.users`, não `profiles` — não há FK para o PostgREST embutir. Quem
+ * a RLS de `profiles` não deixar ler fica sem nome, e a tela mostra "—" em vez do uuid.
+ */
+export async function listMovementsForAnalytics(filter: MovementFilter): Promise<AnalyticsResult> {
+  let query = supabase
+    .from('warehouse_bin_movements')
+    .select(ANALYTICS_COLUMNS)
+    .gte('created_at', filter.fromISO)
+    .lte('created_at', filter.toISO)
+    .order('created_at', { ascending: false })
+    .limit(ANALYTICS_LIMIT);
+
+  if (filter.movementType) query = query.eq('movement_type', filter.movementType);
+  if (filter.operatorId) query = query.eq('created_by', filter.operatorId);
+  if (filter.productIds) query = query.in('product_id', filter.productIds);
+  // Um endereço pode ser origem OU destino do mesmo movimento.
+  if (filter.binId) query = query.or(`from_bin_id.eq.${filter.binId},to_bin_id.eq.${filter.binId}`);
+
+  const { data, error } = await query;
+  if (error) throw error;
+
+  const rows = (data ?? []) as unknown as AnalyticsRow[];
+  const autores = [...new Set(rows.map(r => r.created_by).filter((v): v is string => !!v))];
+
+  const nomes = new Map<string, string>();
+  if (autores.length > 0) {
+    const { data: perfis } = await supabase.from('profiles').select('id, name').in('id', autores);
+    for (const p of (perfis ?? []) as Array<{ id: string; name: string | null }>) {
+      if (p.name) nomes.set(p.id, p.name);
+    }
+  }
+
+  return {
+    movements: rows.map(r => ({
+      id: r.id,
+      movementType: r.movement_type,
+      productId: r.product_id,
+      sku: r.products?.sku ?? null,
+      productName: r.products?.name ?? null,
+      fromCode: r.from_bin?.code ?? null,
+      toCode: r.to_bin?.code ?? null,
+      boxes: r.boxes,
+      createdAt: r.created_at,
+      createdBy: r.created_by,
+      operatorName: r.created_by ? nomes.get(r.created_by) ?? null : null,
+    })),
+    truncated: rows.length >= ANALYTICS_LIMIT,
+  };
 }

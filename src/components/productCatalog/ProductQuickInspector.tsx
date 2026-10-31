@@ -37,6 +37,7 @@ interface EditState {
   sku: string;
   ean: string;
   price: string;
+  location: string;
   brandId: string;
   lineId: string;
 }
@@ -44,6 +45,7 @@ interface EditState {
 function toEditState(p: ProductRow, assoc: AssociationRow | null): EditState {
   return {
     name: p.name, sku: p.sku, ean: p.ean ?? '', price: p.price != null ? String(p.price) : '',
+    location: p.location ?? '',
     brandId: assoc?.brand_id ?? '', lineId: assoc?.line_id ?? '',
   };
 }
@@ -112,10 +114,10 @@ export function ProductQuickInspector({ open, productId, isAdmin, brands, lines,
   const quality = useMemo(() => {
     if (!product) return null;
     return evaluateProductQuality({
-      ean: edit?.ean ?? product.ean, price: product.price, location: product.location,
+      ean: edit?.ean ?? product.ean, price: product.price, location: edit?.location ?? product.location,
       brandId: edit?.brandId || null, lineId: edit?.lineId || null, hasAbcXyz: !!classification,
     });
-  }, [product, edit?.ean, edit?.brandId, edit?.lineId, classification]);
+  }, [product, edit?.ean, edit?.location, edit?.brandId, edit?.lineId, classification]);
 
   const linesForBrand = lines.filter(l => l.brandId === edit?.brandId);
 
@@ -123,7 +125,7 @@ export function ProductQuickInspector({ open, productId, isAdmin, brands, lines,
     if (!product || !edit) return false;
     const base = toEditState(product, association);
     return base.name !== edit.name || base.sku !== edit.sku || base.ean !== edit.ean || base.price !== edit.price
-      || base.brandId !== edit.brandId || base.lineId !== edit.lineId;
+      || base.location !== edit.location || base.brandId !== edit.brandId || base.lineId !== edit.lineId;
   }, [product, association, edit]);
 
   const handleClose = () => {
@@ -146,6 +148,7 @@ export function ProductQuickInspector({ open, productId, isAdmin, brands, lines,
       if (edit.sku !== base.sku) patch.sku = edit.sku.trim();
       if (edit.ean !== base.ean) patch.ean = edit.ean.trim() || null;
       if (edit.price !== base.price) patch.price = priceValue;
+      if (edit.location !== base.location) patch.location = edit.location.trim() || null;
 
       let updated = product;
       if (Object.keys(patch).length > 0) {
@@ -304,7 +307,20 @@ export function ProductQuickInspector({ open, productId, isAdmin, brands, lines,
               {!loading && product && tab === 'estoque' && (
                 <div className="p-6 space-y-3">
                   <Row label="Estoque total" value={product.stock_quantity.toLocaleString('pt-BR')} />
-                  <Row label="Localização" value={product.location || '—'} />
+                  {isAdmin && edit ? (
+                    <div className="py-1.5">
+                      <Field label="Localização">
+                        <Input
+                          value={edit.location}
+                          onChange={e => setEdit({ ...edit, location: e.target.value })}
+                          placeholder="Ex.: PP-A01-N2, Prateleira 3, Mezanino"
+                        />
+                      </Field>
+                      <p className="text-xs text-fg-subtle mt-1">Texto livre. Use o endereço do seu galpão para encontrar o produto na conferência.</p>
+                    </div>
+                  ) : (
+                    <Row label="Localização" value={product.location || '—'} />
+                  )}
                   <Row label="Última atualização" value={formatDateTime(product.updated_at)} />
                   <p className="text-xs text-fg-subtle pt-2">Estoque por origem/canal e última contagem física aparecem aqui quando a integração ou a contagem correspondente estiver disponível para este produto.</p>
                 </div>

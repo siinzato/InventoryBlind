@@ -11,7 +11,7 @@
 // campo de local do Tiny continuam sendo daquele fluxo e não são lidos nem escritos aqui.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Plus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
+import { BarChart3, ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Plus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
 import {
   Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection,
   SegmentedControl, Select, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
@@ -25,6 +25,7 @@ import {
   type A4PerPage, type LabelFormatId,
 } from '../../lib/wms/labelLayout';
 import { WmsBinOperations } from './WmsBinOperations';
+import { WmsAnalytics } from './WmsAnalytics';
 import { WmsStockInsights } from './WmsStockInsights';
 import { WmsStorageMap } from './WmsStorageMap';
 import {
@@ -32,7 +33,7 @@ import {
   type BinMovement, type BinStreetSpec, type StorageBin,
 } from '../../lib/wms/wmsService';
 
-type Mode = 'mapa' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos';
+type Mode = 'mapa' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos' | 'gestao';
 
 const MODES: SegmentedOption<Mode>[] = [
   { value: 'mapa', label: 'Mapa', icon: LayoutGrid },
@@ -41,6 +42,8 @@ const MODES: SegmentedOption<Mode>[] = [
   { value: 'consulta', label: 'Consultar SKU', icon: Search },
   { value: 'movimentos', label: 'Movimentos', icon: Printer },
 ];
+
+const GESTAO_MODE: SegmentedOption<Mode> = { value: 'gestao', label: 'Gestão', icon: BarChart3 };
 
 /** O QR aponta para a RAIZ, nao para o caminho da secao. Motivo: a hospedagem estatica
  *  so responde em "/" — caminho de secao digitado direto devolve 404 do servidor, e o
@@ -162,6 +165,10 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   const [qrBase, setQrBase] = useState(readQrBase);
   const [printing, setPrinting] = useState(false);
   const [labelPrefs, setLabelPrefs] = useState(readLabelPrefs);
+
+  /** Gestao e area gerencial: indicadores por operador e auditoria so aparecem para
+   *  quem ja tem permissao de gerir o pulmao. */
+  const visibleModes = canManage ? [...MODES, GESTAO_MODE] : MODES;
 
   const plan = planLabels(labelPrefs);
   const sheets = sheetsFor(bins.length, plan);
@@ -421,7 +428,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
         )}
       </StatRow>
 
-      <SegmentedControl label="Seção" options={MODES} value={mode} onChange={setMode} />
+      <SegmentedControl label="Seção" options={visibleModes} value={mode} onChange={setMode} />
 
       {mode === 'mapa' && (
         <WmsStorageMap
@@ -780,6 +787,8 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
       {mode === 'consulta' && (
         <WmsStockInsights onOpenBin={code => { setOperateBin(code); setMode('movimentar'); }} />
       )}
+
+      {mode === 'gestao' && canManage && <WmsAnalytics bins={bins} />}
 
       {mode === 'movimentos' && (
         <Panel>

@@ -64,11 +64,18 @@ export function WmsBinScanner({
   title,
   onClose,
   onDetected,
+  expectCode,
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   onDetected: (code: string) => void;
+  /**
+   * Modo conferência: o operador já escolheu o endereço e aponta a câmera para a
+   * etiqueta para PROVAR que está na vaga certa. Lendo outra, o leitor recusa e continua
+   * lendo — trocar o endereço em silêncio aqui seria o oposto de conferir.
+   */
+  expectCode?: string;
 }) {
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [status, setStatus] = useState<'starting' | 'scanning' | 'error'>('starting');
@@ -79,6 +86,10 @@ export function WmsBinScanner({
   // efeito, isso desligaria e religaria a câmera a cada tecla digitada atrás do modal.
   const detectedRef = useRef(onDetected);
   useEffect(() => { detectedRef.current = onDetected; }, [onDetected]);
+
+  // Mesmo motivo do ref acima: entra pela prop e não pode remontar a câmera ao mudar.
+  const expectRef = useRef(expectCode);
+  useEffect(() => { expectRef.current = expectCode; }, [expectCode]);
 
   useEffect(() => {
     if (!open) return;
@@ -121,6 +132,11 @@ export function WmsBinScanner({
           if (!code) {
             // Segue lendo: o operador pode ter pego a etiqueta errada de raspão.
             setHint('Este QR não é de um endereço do pulmão.');
+            return;
+          }
+          const esperado = expectRef.current;
+          if (esperado && code !== esperado) {
+            setHint(`Esta é a vaga ${code}, e a operação está em ${esperado}.`);
             return;
           }
           done = true;

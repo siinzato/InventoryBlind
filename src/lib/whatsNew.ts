@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-10-31-catalogo-editar-local',
+    date: '2026-10-31',
+    category: 'melhoria',
+    title: 'Catálogo: a localização do produto agora pode ser editada',
+    description: 'Na ficha do produto, dentro de "Estoque e localização", o campo Localização deixou de ser apenas leitura e pode ser preenchido ou corrigido direto ali — útil para ir acertando o local enquanto você organiza o estoque. É texto livre, então dá para usar o endereço do seu galpão, a prateleira ou o ponto de referência que a equipe já usa. A alteração aparece na coluna "Local" da lista assim que você salva, conta na qualidade do cadastro e fica registrada no histórico do produto.',
+  },
+  {
+    id: '2026-10-30-pulmao-gestao',
+    date: '2026-10-30',
+    category: 'novidade',
+    title: 'Pulmão: área de gestão com indicadores, auditoria e relatórios',
+    description: 'O Pulmão ganhou a aba "Gestão", disponível para quem tem permissão de gerir. Ela mostra quantos endereços existem, quantos estão ocupados, livres e bloqueados, e separa isso da ocupação por capacidade — que só aparece quando as vagas tiverem capacidade declarada, em vez de exibir um percentual sem base. Mostra também entradas, retiradas e transferências do período escolhido, separando quantidade de movimentos de quantidade de caixas, os endereços e operadores que mais movimentaram, as caixas por faixa de permanência e os produtos que mais ocupam espaço. O histórico pode ser filtrado por período, endereço, SKU, operador e tipo de movimentação, com origem e destino visíveis em cada linha. Todos os relatórios — ocupação, produtos por endereço, distribuição de SKUs e histórico — podem ser exportados em CSV que abre direto no Excel em português, com acentuação preservada. O histórico continua não podendo ser editado nem apagado: correção se faz com uma movimentação nova, que fica registrada como tal.',
+  },
+  {
+    id: '2026-10-30-pulmao-sugestao-endereco',
+    date: '2026-10-30',
+    category: 'novidade',
+    title: 'Pulmão: o sistema sugere onde guardar',
+    description: 'Ao guardar ou transferir mercadoria no Pulmão, a tela passou a sugerir os melhores endereços para aquela quantidade, explicando o motivo de cada um: se a vaga já tem o mesmo produto (e então consolida, em vez de espalhar), se está vazia, quanto espaço livre tem e se o nível é baixo e mais fácil de alcançar. Basta tocar numa sugestão para usá-la — nada é aplicado sozinho. Endereços bloqueados, sem espaço suficiente ou que já têm o produto com outra quantidade por caixa não são sugeridos, e quando nenhum serve a tela diz isso em vez de mostrar uma lista vazia. Na transferência, o saldo antes e depois dos dois endereços aparece antes de confirmar, e tentar retirar mais do que existe é barrado na hora, com o saldo à vista. Também é possível conferir a vaga pela câmera: apontando para a etiqueta, o sistema confirma que você está no endereço certo e avisa se for outro.',
+  },
+  {
     id: '2026-10-30-tela-carregamento-marca',
     date: '2026-10-30',
     category: 'melhoria',

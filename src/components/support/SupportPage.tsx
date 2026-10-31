@@ -25,11 +25,14 @@ interface SupportPageProps {
   /** A tela em que a pessoa estava antes de vir pedir ajuda. É o campo mais útil
    *  do chamado e o único que ela não teria paciência de digitar. */
   originLabel: string | null;
+  /** Chamado a abrir direto, vindo do clique numa notificação. */
+  initialTicketId?: string | null;
+  onInitialTicketConsumed?: () => void;
 }
 
 type View = 'novo' | 'meus';
 
-export function SupportPage({ userId, userName, companyId, companyName, role, originLabel }: SupportPageProps) {
+export function SupportPage({ userId, userName, companyId, companyName, role, originLabel, initialTicketId, onInitialTicketConsumed }: SupportPageProps) {
   const [view, setView] = useState<View>('novo');
   const [tickets, setTickets] = useState<SupportTicket[] | null>(null);
   const [names, setNames] = useState<Map<string, string>>(new Map());
@@ -50,6 +53,15 @@ export function SupportPage({ userId, userName, companyId, companyName, role, or
   }, [userId]);
 
   useEffect(() => { load(); }, [load]);
+
+  // Chegou pelo sino: vai direto para a conversa daquele chamado, em vez de
+  // largar a pessoa no formulário de abrir outro.
+  useEffect(() => {
+    if (!initialTicketId) return;
+    setView('meus');
+    setSelected(initialTicketId);
+    onInitialTicketConsumed?.();
+  }, [initialTicketId, onInitialTicketConsumed]);
 
   const mine = useMemo(() => sortForMine(tickets ?? []), [tickets]);
   const waitingOnMe = countNeedingAttention(tickets ?? [], 'author');

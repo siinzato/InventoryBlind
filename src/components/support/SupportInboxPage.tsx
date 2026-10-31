@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { ArrowLeft, RefreshCw } from 'lucide-react';
 import { Button, Notice, Page, PageHeader, SegmentedControl, Stat, StatRow } from '../ui';
 import {
@@ -18,12 +18,15 @@ interface SupportInboxPageProps {
   isStaff: boolean;
   /** Owner/admin — atende o canal `interno` da própria empresa. */
   canAnswerInternal: boolean;
+  /** Chamado a abrir direto, vindo do clique numa notificação. */
+  initialTicketId?: string | null;
+  onInitialTicketConsumed?: () => void;
 }
 
 /** Caixa de entrada de quem responde. Os dois canais aparecem lado a lado para
  *  quem atende os dois, mas continuam sendo listas separadas: misturá-las
  *  perderia justamente a distinção que a migration 119 existe para garantir. */
-export function SupportInboxPage({ userId, userName, companyId, isStaff, canAnswerInternal }: SupportInboxPageProps) {
+export function SupportInboxPage({ userId, userName, companyId, isStaff, canAnswerInternal, initialTicketId, onInitialTicketConsumed }: SupportInboxPageProps) {
   const channels = useMemo<SupportChannel[]>(() => {
     const list: SupportChannel[] = [];
     if (isStaff) list.push('produto');
@@ -58,6 +61,35 @@ export function SupportInboxPage({ userId, userName, companyId, isStaff, canAnsw
   }, [channel, userId]);
 
   useEffect(() => { setSelected(null); load(); }, [load]);
+
+  // Chegou pelo sino. A notificação não guarda o canal do chamado, então a
+  // busca é pela lista já carregada; não achou, tenta o outro canal UMA vez
+  // (`tried`), senão as duas abas ficariam alternando para sempre quando o
+  // chamado tiver sido apagado.
+  const pendingRef = useRef<string | null>(null);
+  const triedRef = useRef<Set<SupportChannel>>(new Set());
+  useEffect(() => {
+    if (initialTicketId) { pendingRef.current = initialTicketId; triedRef.current = new Set(); }
+  }, [initialTicketId]);
+
+  useEffect(() => {
+    const pending = pendingRef.current;
+    if (!pending || tickets === null) return;
+
+    if (tickets.some(t => t.id === pending)) {
+      setSelected(pending);
+      pendingRef.current = null;
+      onInitialTicketConsumed?.();
+      return;
+    }
+
+    triedRef.current.add(channel);
+    const outro = channels.find(c => !triedRef.current.has(c));
+    if (outro) { setChannel(outro); return; }
+
+    pendingRef.current = null;
+    onInitialTicketConsumed?.();
+  }, [tickets, channel, channels, onInitialTicketConsumed]);
 
   const ordered = useMemo(() => sortForInbox(tickets ?? []), [tickets]);
   const current = ordered.find(t => t.id === selected) ?? null;

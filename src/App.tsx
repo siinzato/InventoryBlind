@@ -102,6 +102,8 @@ import { LogoMark } from './components/landing/landingUi';
 import { WhatsNewButton } from './components/WhatsNewPanel';
 import { TaskNotificationBell } from './components/tasks/TaskNotificationBell';
 import { useTaskNotifications } from './lib/tasks/hooks';
+import { useSupportNotifications } from './lib/support/hooks';
+import { mergeFeed, unreadCount, type FeedItem } from './lib/notifications/notificationFeed';
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
@@ -335,7 +337,39 @@ function AppContent() {
   // abrir uma tarefa específica dentro de Meu Trabalho — guarda o id só até a
   // página consumir.
   const [tasksPendingOpenId, setTasksPendingOpenId] = useState<string | null>(null);
+  const [supportPendingTicketId, setSupportPendingTicketId] = useState<string | null>(null);
   const taskNotifications = useTaskNotifications(profile?.id);
+  const supportNotifications = useSupportNotifications(profile?.id);
+
+  // Um sino só para os dois canais. As tabelas, policies e serviços continuam
+  // separados; o que se junta é a lista que a pessoa lê.
+  const notificationFeed = useMemo(
+    () => mergeFeed(taskNotifications.notifications, supportNotifications.notifications),
+    [taskNotifications.notifications, supportNotifications.notifications],
+  );
+  const notificationUnread = unreadCount(notificationFeed);
+
+  const markFeedItemRead = useCallback((item: FeedItem) => {
+    if (item.source === 'support') supportNotifications.markRead(item.id);
+    else taskNotifications.markRead(item.id);
+  }, [supportNotifications, taskNotifications]);
+
+  const markFeedAllRead = useCallback(() => {
+    taskNotifications.markAllRead();
+    supportNotifications.markAllRead();
+  }, [taskNotifications, supportNotifications]);
+
+  // Cada aviso sabe para onde leva: tarefa abre o quadro de tarefas; chamado vai
+  // para Meus chamados ou para a caixa de entrada, conforme o lado avisado.
+  const openFeedItem = useCallback((item: FeedItem) => {
+    if (item.target.kind === 'task') {
+      if (item.target.taskId) setTasksPendingOpenId(item.target.taskId);
+      setActiveTab('tasks');
+      return;
+    }
+    setSupportPendingTicketId(item.target.ticketId);
+    setActiveTab(item.target.audience === 'author' ? 'suporte' : 'suporte-caixa');
+  }, [setActiveTab]);
 
   // ── Diagnóstico da operação ───────────────────────────────────────────────
   // Lido do metadata do próprio usuário, que o AuthProvider já carregou — nenhuma
@@ -1190,11 +1224,11 @@ function AppContent() {
             <>
               <WhatsNewButton />
               <TaskNotificationBell
-                notifications={taskNotifications.notifications}
-                unreadCount={taskNotifications.unreadCount}
-                onMarkRead={taskNotifications.markRead}
-                onMarkAllRead={taskNotifications.markAllRead}
-                onOpenTask={(taskId) => { setTasksPendingOpenId(taskId); setActiveTab('tasks'); }}
+                items={notificationFeed}
+                unreadCount={notificationUnread}
+                onMarkRead={markFeedItemRead}
+                onMarkAllRead={markFeedAllRead}
+                onOpen={openFeedItem}
               />
               <ThemeToggle className="hidden md:flex" />
               {userMenu}
@@ -1790,6 +1824,8 @@ function AppContent() {
               companyName={company?.name ?? null}
               role={profile.role}
               originLabel={labelForTab(previousTabRef.current)}
+              initialTicketId={supportPendingTicketId}
+              onInitialTicketConsumed={() => setSupportPendingTicketId(null)}
             />
           </React.Suspense>
         )}
@@ -1803,6 +1839,8 @@ function AppContent() {
               companyId={companyId}
               isStaff={isSupportStaff}
               canAnswerInternal={canManageUsers(profile.role)}
+              initialTicketId={supportPendingTicketId}
+              onInitialTicketConsumed={() => setSupportPendingTicketId(null)}
             />
           </React.Suspense>
         )}

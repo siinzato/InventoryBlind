@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-10-31-suporte-notificacoes',
+    date: '2026-10-31',
+    category: 'melhoria',
+    title: 'O sino avisa quando o seu chamado se mexe',
+    description: 'Quem abre um chamado não precisa mais voltar na tela para descobrir se foi respondido: o aviso chega no sino do topo, na hora, sem recarregar a página. Vale para os dois destinos, tanto o chamado aberto para a gestão da sua empresa quanto o aberto para a equipe do InventoryBlind. Quem responde também é avisado quando chega chamado novo, quando quem abriu manda mais informação e quando o chamado é dado como resolvido ou reaberto. Clicar no aviso abre direto a conversa daquele chamado. O sino passou a reunir tarefas e chamados numa lista só, em ordem de chegada — ninguém precisa conferir dois lugares. E você nunca é avisado da sua própria ação.',
+  },
+  {
     id: '2026-10-31-suporte-chamados',
     date: '2026-10-31',
     category: 'novidade',

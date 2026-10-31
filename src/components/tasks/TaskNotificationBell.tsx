@@ -1,25 +1,29 @@
 import React, { useEffect, useState } from 'react';
 import { Bell } from 'lucide-react';
-import { TaskNotification } from '../../lib/tasks/types';
+import type { FeedItem } from '../../lib/notifications/notificationFeed';
 import { notifyPanelOpened, registerExclusivePanel } from '../../lib/exclusivePanel';
 import { TaskNotificationPopover } from './TaskNotificationPopover';
 
-interface TaskNotificationBellProps {
-  notifications: TaskNotification[];
+interface NotificationBellProps {
+  items: FeedItem[];
   unreadCount: number;
-  onMarkRead: (id: string) => void;
+  onMarkRead: (item: FeedItem) => void;
   onMarkAllRead: () => void;
-  onOpenTask: (taskId: string) => void;
+  onOpen: (item: FeedItem) => void;
 }
 
 const PANEL_ID = 'task-notifications';
 
-/** Sino do cabeçalho global, exclusivo das notificações pessoais de tarefas —
- *  canal independente do ícone de comunicados gerais (WhatsNewButton). Abrir
- *  um fecha o outro (ver lib/exclusivePanel.ts); os dados/contadores de cada
- *  canal nunca se misturam. Sem e-mail/push/WhatsApp nesta versão. */
-export const TaskNotificationBell: React.FC<TaskNotificationBellProps> = ({
-  notifications, unreadCount, onMarkRead, onMarkAllRead, onOpenTask,
+/** Sino do cabeçalho global — avisos pessoais de tarefas E de chamados de
+ *  suporte, num canal só. Independente do ícone de comunicados gerais
+ *  (WhatsNewButton), que não é pessoal; abrir um fecha o outro (ver
+ *  lib/exclusivePanel.ts). Sem e-mail/push/WhatsApp nesta versão.
+ *
+ *  O arquivo mantém o nome por onde já era importado: mover o módulo renomearia
+ *  arquivos de tarefas que outra sessão pode estar editando em paralelo, e o
+ *  ganho seria só o nome. */
+export const TaskNotificationBell: React.FC<NotificationBellProps> = ({
+  items, unreadCount, onMarkRead, onMarkAllRead, onOpen,
 }) => {
   const [open, setOpen] = useState(false);
 
@@ -37,8 +41,8 @@ export const TaskNotificationBell: React.FC<TaskNotificationBellProps> = ({
     <div className="relative">
       <button
         onClick={handleToggle}
-        aria-label="Notificações das tarefas"
-        title="Notificações das tarefas"
+        aria-label="Notificações"
+        title="Notificações"
         className="relative w-8 h-8 rounded-control flex items-center justify-center text-fg-muted hover:text-fg hover:bg-surface-3 transition-colors"
       >
         <Bell size={16} />
@@ -53,11 +57,11 @@ export const TaskNotificationBell: React.FC<TaskNotificationBellProps> = ({
         <>
           <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
           <TaskNotificationPopover
-            notifications={notifications}
+            items={items}
             unreadCount={unreadCount}
             onMarkRead={onMarkRead}
             onMarkAllRead={onMarkAllRead}
-            onOpenTask={onOpenTask}
+            onOpen={onOpen}
             onClose={() => setOpen(false)}
           />
         </>

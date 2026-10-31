@@ -76,10 +76,12 @@ export const APP_ROUTE_BY_TAB: Record<string, string> = {
   knowledge: '/app/minha-conta/recursos',
   diagnostico: '/app/minha-conta/diagnostico',
   legal: '/app/minha-conta/privacidade-legal',
+  suporte: '/app/minha-conta/suporte',
 
   // Administração
   admin: '/app/administracao/acesso',
   users: '/app/administracao/usuarios',
+  'suporte-caixa': '/app/administracao/suporte',
 
   // Integrações — o Hub é a entrada; 'integracoes' é a gestão do Tiny, que o Hub abre.
   'integracoes-hub': '/app/integracoes',

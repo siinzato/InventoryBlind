@@ -63,6 +63,7 @@ import {
   BookOpen,
   ArrowRight,
   HelpCircle,
+  LifeBuoy,
   FileSearch,
   Barcode,
   GitCompareArrows,
@@ -90,6 +91,7 @@ import { CountManagementCenter } from './components/counting/CountManagementCent
 import WorkspaceSelectorScreen from './components/WorkspaceSelectorScreen';
 import AuthPage from './components/AuthPage';
 import { useAuth, canManageUsers } from './lib/auth';
+import { amISupportStaff } from './lib/support/supportService';
 import { signWorkspaceLogoPaths } from './lib/workspace/workspaceService';
 import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
 import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations } from './lib/permissionService';
@@ -144,6 +146,8 @@ const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'
 const AutomationsPage = React.lazy(() => import('./components/automation/AutomationsPage').then(m => ({ default: m.AutomationsPage })));
 // Diagnóstico da operação — opcional, nunca no caminho crítico da autenticação.
 const OperationDiagnostic = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.OperationDiagnostic })));
+const SupportPage = React.lazy(() => import('./components/support/SupportPage').then(m => ({ default: m.SupportPage })));
+const SupportInboxPage = React.lazy(() => import('./components/support/SupportInboxPage').then(m => ({ default: m.SupportInboxPage })));
 const PrivacyLegalPage = React.lazy(() => import('./components/legal/PrivacyLegalPage').then(m => ({ default: m.PrivacyLegalPage })));
 const DiagnosticInvite = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.DiagnosticInvite })));
 // Lazy: pulls the intelligence engines and only renders on the dashboard tab.
@@ -249,6 +253,27 @@ function AppContent() {
     const path = pathForTab(tab);
     if (path && path !== normalizePath(window.location.pathname)) navigate(path);
   }, [navigate]);
+
+  // A tela em que a pessoa estava antes de abrir o Suporte. É o campo mais útil
+  // do chamado e o único que ninguém teria paciência de digitar.
+  const currentTabRef = useRef(activeTab);
+  const previousTabRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (currentTabRef.current !== activeTab) {
+      previousTabRef.current = currentTabRef.current;
+      currentTabRef.current = activeTab;
+    }
+  }, [activeTab]);
+
+  // Só quem está na lista fechada de staff do InventoryBlind (migration 119)
+  // responde o canal 'produto'. A tabela devolve apenas a própria linha.
+  const [isSupportStaff, setIsSupportStaff] = useState(false);
+  useEffect(() => {
+    if (!profile?.id) { setIsSupportStaff(false); return; }
+    let cancelled = false;
+    amISupportStaff(profile.id).then(v => { if (!cancelled) setIsSupportStaff(v); });
+    return () => { cancelled = true; };
+  }, [profile?.id]);
 
   // Trocar de workspace remonta AppContent (key={companyId}) e, antes da URL virar fonte
   // de verdade, isso sozinho zerava o activeTab para o dashboard — a seção aberta
@@ -852,6 +877,9 @@ function AppContent() {
       items: [
         { id: 'conta', label: 'Produtividade', icon: <User />, onClick: () => { setActiveTab('conta'); setMobileOpen(false); }, active: activeTab === 'conta' },
         { id: 'knowledge', label: 'Recursos e Conhecimento', icon: <BookOpen />, onClick: () => { setActiveTab('knowledge'); setMobileOpen(false); }, active: activeTab === 'knowledge' },
+        // Visível para todo papel: pedir ajuda não é função administrativa. O
+        // destino do chamado (empresa ou InventoryBlind) é escolhido lá dentro.
+        { id: 'suporte', label: 'Suporte', icon: <LifeBuoy />, onClick: () => { setActiveTab('suporte'); setMobileOpen(false); }, active: activeTab === 'suporte' },
         // Entrada permanente: quem já usava o sistema antes do diagnóstico existir
         // acha por aqui, e quem já respondeu pode refazer quando a operação mudar.
         { id: 'diagnostico', label: 'Diagnóstico da operação', icon: <ClipboardList />, onClick: () => { setActiveTab('diagnostico'); setMobileOpen(false); }, active: activeTab === 'diagnostico' },
@@ -867,6 +895,10 @@ function AppContent() {
       items: [
         { id: 'admin', label: 'Acesso Administrativo', icon: <Lock />, onClick: () => { setActiveTab('admin'); setMobileOpen(false); }, active: activeTab === 'admin' },
         ...(canManageUsers(profile?.role) ? [{ id: 'users', label: 'Usuários', icon: <UserCog />, onClick: () => { setActiveTab('users'); setMobileOpen(false); }, active: activeTab === 'users' }] : []),
+        // Caixa de entrada: owner/admin respondem a própria equipe; staff do
+        // InventoryBlind responde o canal do produto. Quem não é nenhum dos dois
+        // não vê a entrada.
+        ...(canManageUsers(profile?.role) || isSupportStaff ? [{ id: 'suporte-caixa', label: 'Chamados recebidos', icon: <LifeBuoy />, onClick: () => { setActiveTab('suporte-caixa'); setMobileOpen(false); }, active: activeTab === 'suporte-caixa' }] : []),
         ...(hasPermission(profile?.role, 'security.view') ? [{ id: 'security', label: 'Segurança', icon: <ShieldCheck />, onClick: () => { setActiveTab('security'); setMobileOpen(false); }, active: activeTab === 'security' }] : []),
       ],
     },
@@ -901,6 +933,18 @@ function AppContent() {
       ],
     },
   ];
+
+  // Nome humano da tela, lido do próprio menu — assim o contexto do chamado diz
+  // "Catálogo de Produtos" e não o id interno da aba, e acompanha qualquer
+  // renomeação feita no menu sem uma segunda lista para esquecer de atualizar.
+  const labelForTab = (tab: string | null): string | null => {
+    if (!tab) return null;
+    for (const group of navGroups) {
+      const item = group.items.find(i => i.id === tab);
+      if (item) return item.label;
+    }
+    return null;
+  };
 
   const sidebarHeader = (
     <div className="space-y-3">
@@ -1732,6 +1776,33 @@ function AppContent() {
               userEmail={profile.email ?? ''}
               companyId={companyId}
               role={profile.role}
+            />
+          </React.Suspense>
+        )}
+
+        {/* ABA SUPORTE — abrir chamado e acompanhar os próprios */}
+        {activeTab === 'suporte' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <SupportPage
+              userId={profile.id}
+              userName={profile.name || profile.email || 'Você'}
+              companyId={companyId}
+              companyName={company?.name ?? null}
+              role={profile.role}
+              originLabel={labelForTab(previousTabRef.current)}
+            />
+          </React.Suspense>
+        )}
+
+        {/* ABA CHAMADOS RECEBIDOS — caixa de entrada de quem responde */}
+        {activeTab === 'suporte-caixa' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <SupportInboxPage
+              userId={profile.id}
+              userName={profile.name || profile.email || 'Você'}
+              companyId={companyId}
+              isStaff={isSupportStaff}
+              canAnswerInternal={canManageUsers(profile.role)}
             />
           </React.Suspense>
         )}

@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-10-31-suporte-chamados',
+    date: '2026-10-31',
+    category: 'novidade',
+    title: 'Suporte: abra um chamado sem sair do sistema',
+    description: 'Agora existe a seção "Suporte", em Minha Conta. Qualquer pessoa da equipe pode abrir um chamado descrevendo o que aconteceu, anexando até três prints, e acompanhar a resposta no mesmo lugar — tudo fica registrado no acesso de quem abriu, com o histórico completo da conversa. O chamado leva junto, automaticamente, a tela em que a pessoa estava, o papel dela, a empresa e o navegador, e a própria tela avisa exatamente o que está sendo enviado; nenhum dado de estoque vai junto. Há dois destinos: chamados sobre a operação do dia a dia vão para a gestão da sua empresa, e chamados sobre o sistema vão para a equipe do InventoryBlind. Quem responde tem a caixa "Chamados recebidos", em Administração, com os mais antigos e urgentes à frente. Uma resposta nunca encerra o chamado sozinha: quem abriu confirma que resolveu, e pode reabrir a qualquer momento se o problema voltar.',
+  },
+  {
     id: '2026-10-31-catalogo-editar-local',
     date: '2026-10-31',
     category: 'melhoria',

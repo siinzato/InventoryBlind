@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import {
-  CAPACITY_MAX, DEFAULT_CYCLE_CONFIG, normalizeConfig, planDailyBatch, programStatus,
+  CAPACITY_MAX, CYCLE_SESSION_MARKER, cycleSessionDayLabel, cycleSessionObservation,
+  cycleSessionProductIds, cycleSessionRange, DEFAULT_CYCLE_CONFIG, normalizeConfig,
+  planDailyBatch, programStatus,
   type CycleProgramConfig,
 } from '../cycleProgramDomain';
 import type { AbcClass, CoverageItem } from '../coverageDomain';
@@ -256,5 +258,78 @@ describe('programStatus', () => {
     const futuro = new Date(NOW.getTime() + 5 * 86_400_000).toISOString();
     const status = programStatus([item({ abc: 'A', lastCountedAt: futuro })], config(), NOW);
     expect(status).toEqual({ total: 1, emDia: 1, vencidos: 0, nunca: 0 });
+  });
+});
+
+// ── Materialização do lote numa contagem ─────────────────────────────────────
+
+describe('cycleSessionDayLabel', () => {
+  // Construído com o construtor LOCAL de propósito: o rótulo é o dia do relógio de quem
+  // está no galpão, e um teste em UTC esconderia a diferença de fuso que importa aqui.
+  it('usa a data local, com dia e mês de dois dígitos', () => {
+    expect(cycleSessionDayLabel(new Date(2026, 10, 3, 12, 0))).toBe('03/11/2026');
+    expect(cycleSessionDayLabel(new Date(2026, 0, 9, 23, 59))).toBe('09/01/2026');
+  });
+
+  it('não muda ao longo do mesmo dia local — é o que marca a contagem do dia', () => {
+    const manha = cycleSessionDayLabel(new Date(2026, 10, 3, 0, 1));
+    const noite = cycleSessionDayLabel(new Date(2026, 10, 3, 23, 59));
+    expect(manha).toBe(noite);
+  });
+});
+
+describe('cycleSessionRange', () => {
+  it('a faixa marca a origem do lote e o dia', () => {
+    expect(cycleSessionRange(new Date(2026, 10, 3, 12, 0))).toEqual({
+      from: CYCLE_SESSION_MARKER,
+      to: '03/11/2026',
+    });
+  });
+});
+
+describe('cycleSessionProductIds', () => {
+  it('devolve os produtos na ordem de prioridade do lote', () => {
+    const itens = [
+      item({ productId: 'vencido', abc: 'A', lastCountedAt: diasAtras(90), value: 10 }),
+      item({ productId: 'nunca-caro', lastCountedAt: null, value: 500 }),
+      item({ productId: 'nunca-barato', lastCountedAt: null, value: 1 }),
+    ];
+    const lote = planDailyBatch(itens, config({ dailyCapacity: 3 }), NOW);
+    expect(cycleSessionProductIds(lote)).toEqual(['vencido', 'nunca-caro', 'nunca-barato']);
+  });
+
+  it('lote vazio não gera produto nenhum', () => {
+    const lote = planDailyBatch([], config(), NOW);
+    expect(cycleSessionProductIds(lote)).toEqual([]);
+  });
+});
+
+describe('cycleSessionObservation', () => {
+  it('registra a composição do lote, que a tela recalcula mas a sessão não', () => {
+    const itens = [
+      item({ abc: 'A', lastCountedAt: diasAtras(90) }),
+      item({ lastCountedAt: null, value: 5 }),
+    ];
+    const lote = planDailyBatch(itens, config({ dailyCapacity: 2 }), NOW);
+    const texto = cycleSessionObservation(lote, new Date(2026, 10, 3, 12, 0));
+
+    expect(texto).toContain('03/11/2026');
+    expect(texto).toContain('2 SKU(s)');
+    expect(texto).toContain('1 por cadência vencida');
+    expect(texto).toContain('1 nunca contado(s)');
+  });
+
+  it('diz quantos vencidos ficaram de fora quando a capacidade não os cobre', () => {
+    const itens = Array.from({ length: 5 }, () =>
+      item({ abc: 'A', lastCountedAt: diasAtras(90) })
+    );
+    const lote = planDailyBatch(itens, config({ dailyCapacity: 2 }), NOW);
+    expect(cycleSessionObservation(lote, NOW)).toContain('3 com cadência vencida não couberam');
+  });
+
+  it('não menciona sobra quando tudo coube', () => {
+    const itens = [item({ abc: 'A', lastCountedAt: diasAtras(90) })];
+    const lote = planDailyBatch(itens, config({ dailyCapacity: 10 }), NOW);
+    expect(cycleSessionObservation(lote, NOW)).not.toContain('não couberam');
   });
 });

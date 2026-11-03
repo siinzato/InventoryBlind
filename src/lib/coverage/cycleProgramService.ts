@@ -10,8 +10,10 @@
 // não liga nada.
 
 import { supabase } from '../supabase';
+import { createSession } from '../physicalCount/physicalCountService';
 import {
-  DEFAULT_CYCLE_CONFIG, normalizeConfig, type CycleProgramConfig,
+  cycleSessionObservation, cycleSessionProductIds, cycleSessionRange,
+  DEFAULT_CYCLE_CONFIG, normalizeConfig, type CycleProgramConfig, type DailyBatch,
 } from './cycleProgramDomain';
 
 const TABELA = 'cycle_program_settings';
@@ -89,4 +91,91 @@ export async function saveCycleProgramConfig(
 
   if (error) throw error;
   return limpa;
+}
+
+// ── Gerar a contagem do dia ─────────────────────────────────────────────────
+//
+// Reusa `pc_create_session` da Contagem Física — a mesma RPC que a tela de contagem chama.
+// Ela já recebe a lista explícita de produtos e já valida a empresa de cada um no servidor,
+// então a ciclagem não precisa de tabela, RPC nem permissão própria no banco: o lote do dia
+// é uma contagem física comum, criada com um recorte diferente.
+
+export interface OpenCycleSession {
+  id: string;
+  totalItems: number;
+  status: string;
+}
+
+/** A contagem de ciclagem de hoje que ainda está aberta, se houver.
+ *
+ *  Existe para a tela não gerar o mesmo lote duas vezes — o acidente provável aqui não é
+ *  má-fé, é o segundo clique ou duas pessoas abrindo a tela na mesma manhã. Duas sessões com
+ *  os mesmos SKUs dividiriam a contagem do dia em duas listas concorrentes, e a segunda
+ *  nasceria já errada: os itens da primeira ainda não foram contados, então continuariam
+ *  vencidos.
+ *
+ *  Só sessões ABERTAS bloqueiam. Se a de hoje já foi finalizada, o histórico de contagem dos
+ *  itens mudou e um lote novo é legitimamente diferente — recusar aí seria impedir a equipe
+ *  de continuar trabalhando depois de terminar cedo. */
+export async function findOpenCycleSession(
+  companyId: string,
+  now: Date
+): Promise<OpenCycleSession | null> {
+  const { from, to } = cycleSessionRange(now);
+
+  const { data, error } = await supabase
+    .from('physical_count_sessions')
+    .select('id, total_items, status')
+    .eq('company_id', companyId)
+    .eq('street_from', from)
+    .eq('street_to', to)
+    .is('deleted_at', null)
+    .in('status', ['draft', 'in_progress'])
+    .order('created_at', { ascending: false })
+    .limit(1);
+
+  if (error) throw error;
+  const linha = (data ?? [])[0];
+  if (!linha) return null;
+  return {
+    id: linha.id as string,
+    totalItems: (linha.total_items as number | null) ?? 0,
+    status: linha.status as string,
+  };
+}
+
+export interface CreatedCycleSession {
+  sessionId: string;
+  totalItems: number;
+}
+
+/** Cria a contagem do dia a partir do lote.
+ *
+ *  Nasce como RASCUNHO, e isso é deliberado: a tela de contagem inicia a sessão no mesmo
+ *  clique porque quem cria ali é quem vai contar em seguida. Aqui não — quem gera o lote é
+ *  quem gere, e a contagem pode ficar esperando a equipe por horas. Iniciar agora colocaria
+ *  essa espera dentro da duração da contagem (`started_at`), que passaria a medir o atraso
+ *  do turno em vez do trabalho. Quem for contar inicia na própria tela de Contagens.
+ *
+ *  Sem `responsibleId`: o lote é da equipe, não de uma pessoa. Atribuir a sessão a quem
+ *  clicou faria o nome de um gestor aparecer como responsável por uma contagem que ele não
+ *  vai fazer. */
+export async function createCycleSession(batch: DailyBatch, now: Date): Promise<CreatedCycleSession> {
+  const produtos = cycleSessionProductIds(batch);
+  if (produtos.length === 0) {
+    throw new Error('Não há nada no lote de hoje para gerar uma contagem.');
+  }
+
+  const { from, to } = cycleSessionRange(now);
+  const sessionId = await createSession({
+    warehouse: null,
+    area: null,
+    streetFrom: from,
+    streetTo: to,
+    responsibleId: null,
+    observation: cycleSessionObservation(batch, now),
+    productIds: produtos,
+  });
+
+  return { sessionId, totalItems: produtos.length };
 }

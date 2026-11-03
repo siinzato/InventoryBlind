@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { RefreshCw, Save } from 'lucide-react';
+import { ClipboardList, RefreshCw, Save } from 'lucide-react';
 import {
   Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection, SegmentedControl,
   Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
@@ -11,7 +11,8 @@ import {
   normalizeConfig, planDailyBatch, programStatus, type CycleProgramConfig,
 } from '../../lib/coverage/cycleProgramDomain';
 import {
-  fetchCycleProgramConfig, saveCycleProgramConfig,
+  createCycleSession, fetchCycleProgramConfig, findOpenCycleSession, saveCycleProgramConfig,
+  type OpenCycleSession,
 } from '../../lib/coverage/cycleProgramService';
 
 interface CycleProgramPageProps {
@@ -19,6 +20,13 @@ interface CycleProgramPageProps {
   /** Owner/admin/manager — só quem manda altera a cadência, porque ela decide quanto
    *  trabalho de contagem entra na fila da equipe todo dia. */
   canManage: boolean;
+  /** Quem pode criar uma contagem a partir do lote. Mesma capacidade de escrita de estoque
+   *  que a tela de Contagens exige para abrir uma contagem na mão — a RPC do banco só valida
+   *  a empresa dos produtos, então este gate é de produto, não de segurança. */
+  canCount: boolean;
+  /** Leva para a tela de Contagens, onde a contagem gerada é iniciada e preenchida. Mesmo
+   *  contrato de `onNavigateToCount` já usado por CBC, Risco e Slotting. */
+  onNavigateToCount: () => void;
 }
 
 const inteiro = new Intl.NumberFormat('pt-BR');
@@ -28,7 +36,7 @@ const BUCKETS: AbcBucket[] = ['A', 'B', 'C', 'sem'];
 
 /** Cobertura e programa discordam de propósito sobre o que é "atrasado": a Cobertura usa a
  *  cadência fixa do diagnóstico, e aqui vale a cadência que a empresa escolheu. */
-export function CycleProgramPage({ companyId, canManage }: CycleProgramPageProps) {
+export function CycleProgramPage({ companyId, canManage, canCount, onNavigateToCount }: CycleProgramPageProps) {
   const [itens, setItens] = useState<CoverageItem[] | null>(null);
   const [config, setConfig] = useState<CycleProgramConfig>(DEFAULT_CYCLE_CONFIG);
   const [rascunho, setRascunho] = useState<CycleProgramConfig>(DEFAULT_CYCLE_CONFIG);
@@ -37,6 +45,10 @@ export function CycleProgramPage({ companyId, canManage }: CycleProgramPageProps
   const [aviso, setAviso] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [salvando, setSalvando] = useState(false);
+  const [gerando, setGerando] = useState(false);
+  // A contagem de ciclagem de hoje que já existe e ainda está aberta. Carregada junto do
+  // resto para o botão nascer sabendo o que oferecer, em vez de descobrir só no clique.
+  const [aberta, setAberta] = useState<OpenCycleSession | null>(null);
 
   // `agora` fixo por carga, como na Cobertura: recalcular a cada render faria um SKU entrar
   // ou sair do lote enquanto alguém lê a lista.
@@ -47,7 +59,11 @@ export function CycleProgramPage({ companyId, canManage }: CycleProgramPageProps
     setErro(null);
     setAviso(null);
     try {
-      const [rows, carregada] = await Promise.all([
+      // `agora` precisa ser o mesmo relógio usado para procurar a contagem de hoje: a marca
+      // da sessão é o rótulo do dia, e deixar a busca usar outro `new Date()` faria a
+      // virada de meia-noite procurar o dia errado.
+      const momento = new Date();
+      const [rows, carregada, existente] = await Promise.all([
         fetchCoverageItems(companyId),
         // A configuração é secundária: se a tabela ainda não existe no banco, o programa
         // roda com os padrões em vez de a tela inteira falhar.
@@ -55,12 +71,18 @@ export function CycleProgramPage({ companyId, canManage }: CycleProgramPageProps
           console.error('[Ciclagem] config', err);
           return { config: DEFAULT_CYCLE_CONFIG, saved: false };
         }),
+        // Idem: não achar a contagem de hoje degrada o botão, não derruba a tela.
+        findOpenCycleSession(companyId, momento).catch(err => {
+          console.error('[Ciclagem] contagem de hoje', err);
+          return null;
+        }),
       ]);
-      setAgora(new Date());
+      setAgora(momento);
       setItens(rows);
       setConfig(carregada.config);
       setRascunho(carregada.config);
       setSalvo(carregada.saved);
+      setAberta(existente);
     } catch (err) {
       console.error('[Ciclagem] load', err);
       setErro('Não foi possível carregar o programa agora. Tente atualizar em instantes.');
@@ -117,6 +139,43 @@ export function CycleProgramPage({ companyId, canManage }: CycleProgramPageProps
       setErro('Não foi possível salvar o programa. Verifique se você tem permissão de gestão.');
     } finally {
       setSalvando(false);
+    }
+  };
+
+  /** Materializa o lote numa contagem física.
+   *
+   *  Reconsulta a contagem de hoje antes de criar, em vez de confiar no estado carregado: a
+   *  tela pode estar aberta desde cedo e outra pessoa ter gerado o lote nesse meio-tempo. É
+   *  uma verificação, não uma garantia — duas pessoas clicando no mesmo segundo ainda criam
+   *  duas contagens, e o banco não tem como impedir isso sem uma restrição que a Contagem
+   *  Física não tem hoje. O caso real que isto cobre é o segundo clique e a manhã dividida.
+   */
+  const gerar = async () => {
+    setGerando(true);
+    setErro(null);
+    setAviso(null);
+    try {
+      const jaExiste = await findOpenCycleSession(companyId, agora);
+      if (jaExiste) {
+        setAberta(jaExiste);
+        setErro(
+          `Já existe uma contagem de ciclagem aberta para hoje, com ${inteiro.format(jaExiste.totalItems)} item(ns). ` +
+          'Conclua ou remova essa contagem antes de gerar outra — duas listas do mesmo dia dividiriam a contagem da equipe.'
+        );
+        return;
+      }
+
+      const criada = await createCycleSession(lote, agora);
+      setAberta({ id: criada.sessionId, totalItems: criada.totalItems, status: 'draft' });
+      setAviso(
+        `Contagem criada com ${inteiro.format(criada.totalItems)} item(ns), como rascunho. ` +
+        'Ela aparece em Contagens e começa a valer quando a equipe iniciar a contagem por lá.'
+      );
+    } catch (err) {
+      console.error('[Ciclagem] gerar contagem', err);
+      setErro('Não foi possível gerar a contagem do dia. Tente novamente em instantes.');
+    } finally {
+      setGerando(false);
     }
   };
 
@@ -271,12 +330,46 @@ export function CycleProgramPage({ companyId, canManage }: CycleProgramPageProps
 
           <Panel>
             <PanelSection>
-              <p className="text-overline mb-1">O que contar hoje</p>
-              <p className="mb-4 text-xs leading-relaxed text-fg-subtle">
-                A recontagem de quem já venceu a cadência entra primeiro — é o ciclo funcionando. O
-                que sobrar do lote é preenchido com os nunca contados, do mais caro para o mais
-                barato. A lista não muda ao longo do dia.
-              </p>
+              <div className="mb-4 flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p className="text-overline mb-1">O que contar hoje</p>
+                  <p className="text-xs leading-relaxed text-fg-subtle">
+                    A recontagem de quem já venceu a cadência entra primeiro — é o ciclo funcionando. O
+                    que sobrar do lote é preenchido com os nunca contados, do mais caro para o mais
+                    barato. A lista não muda ao longo do dia.
+                  </p>
+                </div>
+
+                {canCount && (
+                  aberta ? (
+                    <Button variant="secondary" onClick={onNavigateToCount}>
+                      <ClipboardList size={16} /> Abrir em Contagens
+                    </Button>
+                  ) : (
+                    <Button onClick={gerar} disabled={gerando || lote.entries.length === 0}>
+                      <ClipboardList size={16} /> {gerando ? 'Gerando…' : 'Gerar contagem do dia'}
+                    </Button>
+                  )
+                )}
+              </div>
+
+              {aberta && (
+                <Notice tone="neutral">
+                  A contagem de hoje já existe, com {inteiro.format(aberta.totalItems)} item(ns)
+                  {aberta.status === 'draft'
+                    ? ' e ainda não foi iniciada pela equipe.'
+                    : ' e já está em andamento.'}
+                  {' '}Enquanto ela estiver aberta, a lista abaixo continua mostrando o lote
+                  calculado agora — os itens só saem da fila depois de contados.
+                </Notice>
+              )}
+
+              {!canCount && (
+                <p className="mb-4 text-xs leading-relaxed text-fg-subtle">
+                  Gerar a contagem do dia exige permissão para movimentar estoque. A lista abaixo
+                  continua disponível para consulta e conferência.
+                </p>
+              )}
 
               {lote.entries.length === 0 ? (
                 <Notice tone="success">

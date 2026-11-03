@@ -239,3 +239,53 @@ export function programStatus(
 
   return status;
 }
+
+// ── Materialização: do lote para uma contagem física ─────────────────────────
+//
+// O lote vira uma sessão de contagem comum, pelo mesmo caminho que a Contagem Física já
+// usa — nada de tabela nova nem de tipo de sessão paralelo. A sessão guarda a faixa
+// contada em `street_from`/`street_to`, que ali são texto livre, e é isso que marca a
+// sessão como vinda da ciclagem: a "faixa" de um lote de ciclagem não é um trecho do
+// galpão, é o dia. Essa marca também é o que impede gerar o mesmo lote duas vezes.
+
+export const CYCLE_SESSION_MARKER = 'Ciclagem';
+
+/** Rótulo do dia, montado das partes locais da data em vez de `toLocaleDateString`.
+ *
+ *  É comparado por igualdade exata para achar o lote de hoje, então precisa ser estável:
+ *  o formato de `toLocaleDateString` muda com o locale do navegador, e dois aparelhos da
+ *  mesma equipe gerariam marcas diferentes para o mesmo dia. O fuso é o local de propósito
+ *  — "hoje" para quem está no galpão é o dia do relógio dele, não UTC. */
+export function cycleSessionDayLabel(now: Date): string {
+  const dia = String(now.getDate()).padStart(2, '0');
+  const mes = String(now.getMonth() + 1).padStart(2, '0');
+  return `${dia}/${mes}/${now.getFullYear()}`;
+}
+
+/** A "faixa" da sessão gerada. Na lista de contagens aparece como `Ciclagem → 03/11/2026`. */
+export function cycleSessionRange(now: Date): { from: string; to: string } {
+  return { from: CYCLE_SESSION_MARKER, to: cycleSessionDayLabel(now) };
+}
+
+/** Observação da sessão: a composição do lote, em texto, para quem abrir a contagem semanas
+ *  depois saber por que aqueles SKUs estavam ali. A tela de ciclagem recalcula o lote a cada
+ *  carga; a sessão é o único lugar onde a composição do dia fica registrada. */
+export function cycleSessionObservation(batch: DailyBatch, now: Date): string {
+  const partes = [
+    `Lote gerado pelo programa de ciclagem em ${cycleSessionDayLabel(now)}.`,
+    `${batch.entries.length} SKU(s): ${batch.dueTaken} por cadência vencida, ${batch.backlogTaken} nunca contado(s).`,
+  ];
+  if (batch.dueTotal > batch.dueTaken) {
+    partes.push(`${batch.dueTotal - batch.dueTaken} com cadência vencida não couberam na capacidade do dia.`);
+  }
+  return partes.join(' ');
+}
+
+/** Os produtos do lote, na ordem em que o lote os priorizou.
+ *
+ *  A ordem importa: `pc_create_session` insere os itens a partir da tabela de produtos, então
+ *  ela não sobrevive até a tela de contagem — mas o que entra na lista sim, e enviar o lote
+ *  inteiro de uma vez é o que garante que o recorte contado é exatamente o recorte mostrado. */
+export function cycleSessionProductIds(batch: DailyBatch): string[] {
+  return batch.entries.map(e => e.productId);
+}

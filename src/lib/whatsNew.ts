@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-03-ciclagem-gerar-contagem',
+    date: '2026-11-03',
+    category: 'novidade',
+    title: 'A lista do dia vira contagem num clique',
+    description: 'O Programa de Ciclagem deixou de parar na lista: agora o botão "Gerar contagem do dia" transforma o lote numa contagem física de verdade, já com os produtos daquele dia dentro, sem ninguém precisar escolher produto por produto. A contagem nasce como rascunho e aparece em Contagens — ela só começa a valer quando a equipe iniciar a contagem por lá, para o tempo gasto medir o trabalho e não as horas em que a lista ficou esperando. Ninguém sai como responsável pela contagem, porque o lote é da equipe. Na lista de contagens ela aparece identificada como "Ciclagem" com a data do dia, e guarda por escrito como o lote foi montado: quantos itens entraram por cadência vencida, quantos por nunca terem sido contados e quantos ficaram de fora por não caberem na capacidade. Se a contagem do dia já existir e ainda estiver aberta, o sistema avisa e leva você até ela em vez de criar uma segunda lista para o mesmo dia. Gerar a contagem exige permissão para movimentar estoque; quem não tem continua consultando a lista normalmente.',
+  },
+  {
     id: '2026-11-03-aceite-e-administracao-de-contagens',
     date: '2026-11-03',
     category: 'correcao',

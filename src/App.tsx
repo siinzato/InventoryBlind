@@ -96,7 +96,7 @@ import { useAuth, canManageUsers } from './lib/auth';
 import { amISupportStaff } from './lib/support/supportService';
 import { signWorkspaceLogoPaths } from './lib/workspace/workspaceService';
 import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
-import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations, canManageCycleProgram } from './lib/permissionService';
+import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations, canManageCycleProgram, canWrite } from './lib/permissionService';
 import type { DrillTarget } from './lib/intelligence/contracts';
 import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
@@ -1830,7 +1830,12 @@ function AppContent() {
         {/* ABA PROGRAMA DE CICLAGEM — cadência por classe e o lote do dia */}
         {activeTab === 'ciclagem' && profile && (
           <React.Suspense fallback={<PageLoader />}>
-            <CycleProgramPage companyId={companyId} canManage={canManageCycleProgram(profile?.role)} />
+            <CycleProgramPage
+              companyId={companyId}
+              canManage={canManageCycleProgram(profile?.role)}
+              canCount={canWrite(profile?.role)}
+              onNavigateToCount={() => setActiveTab('input')}
+            />
           </React.Suspense>
         )}
 

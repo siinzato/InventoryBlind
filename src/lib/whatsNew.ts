@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-03-aceite-e-administracao-de-contagens',
+    date: '2026-11-03',
+    category: 'correcao',
+    title: 'Aceite dos documentos e administração de contagens voltaram a funcionar',
+    description: 'Três ações que a tela oferecia mas que não chegavam a se concluir foram corrigidas. O aceite dos Termos de Uso e da Política de Privacidade passa a ficar registrado de fato, com a data vinda do sistema e a versão exata do documento que foi apresentada a você; se a mesma versão for aceita de novo, o registro original é mantido, sem duplicar. Restaurar uma contagem removida do histórico e excluir definitivamente um rascunho de contagem também voltaram a funcionar — a exclusão definitiva continua valendo só para rascunho que nunca foi contado e exige justificativa. E reabrir uma contagem já finalizada, que desfaz o resultado dela, passou a ser ação de proprietário ou administrador e fica registrada no histórico com quem reabriu e quando.',
+  },
+  {
     id: '2026-11-03-programa-de-ciclagem',
     date: '2026-11-03',
     category: 'novidade',

@@ -14,7 +14,10 @@ const RAW = import.meta.glob(
     '/src/components/brandLogos/BrandMark.tsx',
     '/src/components/productBrands/BrandLineFormModal.tsx',
     '/src/components/productBrands/ProductBrandsPage.tsx',
-    '/supabase/migrations/20260908160000_108_product_brand_logos.sql',
+    // Curinga no timestamp de propósito: o Supabase versiona pelo timestamp do nome, e ele
+    // muda quando a migration é aplicada pelo servidor em vez de pelo arquivo. O que
+    // identifica a migration aqui é o `108_product_brand_logos`, que não muda.
+    '/supabase/migrations/*_108_product_brand_logos.sql',
   ],
   { query: '?raw', import: 'default', eager: true },
 ) as Record<string, string>;

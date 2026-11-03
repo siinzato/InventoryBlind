@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   CAPACITY_MAX, CYCLE_SESSION_MARKER, cycleSessionDayLabel, cycleSessionObservation,
   cycleSessionProductIds, cycleSessionRange, DEFAULT_CYCLE_CONFIG, normalizeConfig,
+  describeSchedule, isScheduledDay, normalizeSchedule,
   planDailyBatch, programStatus,
   type CycleProgramConfig,
 } from '../cycleProgramDomain';
@@ -331,5 +332,61 @@ describe('cycleSessionObservation', () => {
     const itens = [item({ abc: 'A', lastCountedAt: diasAtras(90) })];
     const lote = planDailyBatch(itens, config({ dailyCapacity: 10 }), NOW);
     expect(cycleSessionObservation(lote, NOW)).not.toContain('não couberam');
+  });
+});
+
+describe('agendamento do lembrete', () => {
+  it('nasce desligado, de segunda a sexta, às 8h', () => {
+    expect(DEFAULT_CYCLE_CONFIG.schedule).toEqual({
+      enabled: false,
+      weekdays: [1, 2, 3, 4, 5],
+      hour: 8,
+      timezone: 'America/Sao_Paulo',
+    });
+  });
+
+  // Uma lista vazia com o lembrete ligado é o estado que parece configurado e nunca
+  // dispara — o banco tem o mesmo CHECK, e os dois precisam concordar.
+  it('lista de dias vazia volta para o padrão', () => {
+    expect(normalizeSchedule({ enabled: true, weekdays: [] }).weekdays).toEqual([1, 2, 3, 4, 5]);
+  });
+
+  it('descarta dia inválido, ordena e remove repetido', () => {
+    expect(normalizeSchedule({ weekdays: [6, 1, 1, 9, -2, 0] }).weekdays).toEqual([0, 1, 6]);
+  });
+
+  it('hora fora da faixa é presa nos limites, e hora ausente vira o padrão', () => {
+    expect(normalizeSchedule({ hour: 99 }).hour).toBe(23);
+    expect(normalizeSchedule({ hour: -5 }).hour).toBe(0);
+    expect(normalizeSchedule({}).hour).toBe(8);
+  });
+
+  it('fuso em branco vira o padrão', () => {
+    expect(normalizeSchedule({ timezone: '   ' }).timezone).toBe('America/Sao_Paulo');
+    expect(normalizeSchedule({ timezone: 'America/Manaus' }).timezone).toBe('America/Manaus');
+  });
+
+  it('normalizeConfig normaliza o agendamento junto', () => {
+    const cfg = normalizeConfig({ schedule: { enabled: true, weekdays: [3], hour: 50 } } as Partial<CycleProgramConfig>);
+    expect(cfg.schedule).toEqual({
+      enabled: true, weekdays: [3], hour: 23, timezone: 'America/Sao_Paulo',
+    });
+  });
+
+  // 0 = domingo, igual a Date.getDay() e a EXTRACT(DOW) da rotina do banco.
+  it('reconhece o dia da semana pela mesma numeração do banco', () => {
+    const schedule = normalizeSchedule({ weekdays: [1, 2, 3, 4, 5] });
+    // 2026-11-03 é uma terça; 2026-11-08, um domingo.
+    expect(isScheduledDay(schedule, new Date(2026, 10, 3, 9))).toBe(true);
+    expect(isScheduledDay(schedule, new Date(2026, 10, 8, 9))).toBe(false);
+  });
+
+  it('resume os padrões comuns em uma linha', () => {
+    const com = (weekdays: number[], hour = 8) => describeSchedule(normalizeSchedule({ weekdays, hour }));
+    expect(com([1, 2, 3, 4, 5])).toBe('De segunda a sexta, a partir das 08:00');
+    expect(com([0, 1, 2, 3, 4, 5, 6])).toBe('Todos os dias, a partir das 08:00');
+    expect(com([0, 6])).toBe('Fins de semana, a partir das 08:00');
+    expect(com([1], 14)).toBe('Seg, a partir das 14:00');
+    expect(com([1, 3, 5])).toBe('Seg, Qua e Sex, a partir das 08:00');
   });
 });

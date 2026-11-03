@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-03-ciclagem-lembrete',
+    date: '2026-11-03',
+    category: 'novidade',
+    title: 'A ciclagem lembra a equipe nos dias de contagem',
+    description: 'O Programa de Ciclagem passou a ter dias marcados. Você escolhe em quais dias da semana a contagem é esperada e a partir de que horas — de segunda a sexta às 8h, por padrão — e, nesses dias, quem pode gerar ou executar a contagem recebe um aviso no sino do topo. São dois avisos possíveis. O primeiro é quando o lote do dia ainda não foi gerado. O segundo é o que costuma passar despercebido: uma contagem de ciclagem de um dia anterior que ficou aberta e nunca foi concluída — ela não aparece na lista de hoje, então some da vista sem sumir do estoque. Nesse caso o aviso pede para concluir a anterior antes de abrir outra, porque duas listas em aberto dividem a contagem da equipe. Clicar no aviso leva direto ao programa. O lembrete não gera a contagem sozinho: quem decide continua sendo uma pessoa, na tela, com a lista na frente. Ele nasce desligado e é ligado por quem tem permissão de gestão, junto com a cadência. No máximo um aviso por pessoa por dia.',
+  },
+  {
     id: '2026-11-03-ciclagem-gerar-contagem',
     date: '2026-11-03',
     category: 'novidade',

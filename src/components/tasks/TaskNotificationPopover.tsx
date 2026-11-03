@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   Check, UserPlus, MessageSquare, CalendarClock, AlarmClock, AlertTriangle,
-  LifeBuoy, Reply, CheckCircle2, RotateCcw,
+  LifeBuoy, Reply, CheckCircle2, RotateCcw, ClipboardList, Hourglass,
 } from 'lucide-react';
 import type { FeedItem } from '../../lib/notifications/notificationFeed';
 import { formatRelativeTime } from '../../lib/tasks/taskDomain';
@@ -31,8 +31,14 @@ const SUPPORT_ICON: Record<string, React.ReactNode> = {
   reaberto: <RotateCcw size={14} className="text-amber-500" />,
 };
 
+const CYCLE_ICON: Record<string, React.ReactNode> = {
+  lote_pendente: <ClipboardList size={14} className="text-accent" />,
+  contagem_atrasada: <Hourglass size={14} className="text-amber-500" />,
+};
+
 function iconFor(item: FeedItem): React.ReactNode {
-  const map = item.source === 'support' ? SUPPORT_ICON : TASK_ICON;
+  const map =
+    item.source === 'support' ? SUPPORT_ICON : item.source === 'cycle' ? CYCLE_ICON : TASK_ICON;
   return map[item.kind] ?? <MessageSquare size={14} className="text-fg-muted" />;
 }
 
@@ -53,8 +59,13 @@ export const TaskNotificationPopover: React.FC<NotificationPopoverProps> = ({
     onOpen(item);
   };
 
-  const missing = (item: FeedItem) =>
-    item.target.kind === 'task' ? !item.target.taskId : !item.target.ticketId;
+  // O aviso da ciclagem nunca fica órfão: ele leva para a tela do programa, não para um
+  // registro que possa ter sido excluído.
+  const missing = (item: FeedItem) => {
+    if (item.target.kind === 'task') return !item.target.taskId;
+    if (item.target.kind === 'support') return !item.target.ticketId;
+    return false;
+  };
 
   return (
     <div className="absolute right-0 top-full mt-2 z-50 w-80 max-w-[90vw] bg-surface border border-edge rounded-lg shadow-panel max-h-96 overflow-y-auto">

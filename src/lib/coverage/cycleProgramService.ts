@@ -13,7 +13,7 @@ import { supabase } from '../supabase';
 import { createSession } from '../physicalCount/physicalCountService';
 import {
   cycleSessionObservation, cycleSessionProductIds, cycleSessionRange,
-  DEFAULT_CYCLE_CONFIG, normalizeConfig, type CycleProgramConfig, type DailyBatch,
+  DEFAULT_CYCLE_CONFIG, DEFAULT_CYCLE_SCHEDULE, normalizeConfig, type CycleProgramConfig, type DailyBatch,
 } from './cycleProgramDomain';
 
 const TABELA = 'cycle_program_settings';
@@ -25,10 +25,17 @@ interface SettingsRow {
   cadence_days_c: number | null;
   cadence_days_unclassified: number | null;
   daily_capacity: number | null;
+  schedule_enabled: boolean | null;
+  /** `smallint[]` no banco; o PostgREST devolve array de números. */
+  schedule_weekdays: number[] | null;
+  schedule_hour: number | null;
+  schedule_timezone: string | null;
 }
 
+// Uma linha só, sem concatenação: o supabase-js lê o literal para tipar a resposta, e um
+// `'a' + 'b'` o faz desistir e devolver um tipo genérico que o cast abaixo recusa.
 const COLUNAS =
-  'enabled, cadence_days_a, cadence_days_b, cadence_days_c, cadence_days_unclassified, daily_capacity';
+  'enabled, cadence_days_a, cadence_days_b, cadence_days_c, cadence_days_unclassified, daily_capacity, schedule_enabled, schedule_weekdays, schedule_hour, schedule_timezone';
 
 function paraConfig(row: SettingsRow): CycleProgramConfig {
   return normalizeConfig({
@@ -40,6 +47,14 @@ function paraConfig(row: SettingsRow): CycleProgramConfig {
       sem: row.cadence_days_unclassified ?? DEFAULT_CYCLE_CONFIG.cadenceDays.sem,
     },
     dailyCapacity: row.daily_capacity ?? DEFAULT_CYCLE_CONFIG.dailyCapacity,
+    // `normalizeConfig` cuida do resto: lista de dias vazia, hora fora da faixa ou fuso em
+    // branco viram o padrão, em vez de um agendamento ligado que nunca dispara.
+    schedule: {
+      enabled: row.schedule_enabled ?? false,
+      weekdays: row.schedule_weekdays ?? DEFAULT_CYCLE_SCHEDULE.weekdays,
+      hour: row.schedule_hour ?? DEFAULT_CYCLE_SCHEDULE.hour,
+      timezone: row.schedule_timezone ?? DEFAULT_CYCLE_SCHEDULE.timezone,
+    },
   });
 }
 
@@ -85,6 +100,10 @@ export async function saveCycleProgramConfig(
       cadence_days_c: limpa.cadenceDays.C,
       cadence_days_unclassified: limpa.cadenceDays.sem,
       daily_capacity: limpa.dailyCapacity,
+      schedule_enabled: limpa.schedule.enabled,
+      schedule_weekdays: limpa.schedule.weekdays,
+      schedule_hour: limpa.schedule.hour,
+      schedule_timezone: limpa.schedule.timezone,
     },
     { onConflict: 'company_id' }
   );

@@ -45,12 +45,114 @@ export interface CycleProgramConfig {
    *  foi a única concluída. Lote que não termina no turno não vira contagem — vira sessão
    *  aberta para sempre. */
   dailyCapacity: number;
+  /** Quando o sistema lembra a equipe de que o lote do dia ainda não saiu. */
+  schedule: CycleSchedule;
+}
+
+// ── Agendamento do lembrete ─────────────────────────────────────────────────
+//
+// O que é agendado é o LEMBRETE, não a geração. O lote continua sendo criado por uma
+// pessoa, na tela, pelo caminho único que já existe — o servidor só percebe que o dia
+// programado chegou e o lote de hoje ainda não saiu.
+//
+// Por que não gerar sozinho: o lote é calculado aqui, no navegador, cruzando catálogo,
+// curva ABC, última contagem de duas origens e saldo da Fonte de Saldo. Para o servidor
+// gerar por conta própria, essa regra teria de existir também em SQL — e duas
+// implementações da mesma regra divergem em silêncio. O dia em que a tela mostrasse um
+// lote e a rotina criasse outro, ninguém descobriria até alguém comparar os dois.
+
+/** 0 = domingo, igual a `Date.getDay()` e a `EXTRACT(DOW)` do Postgres. A rotina do banco
+ *  compara com o mesmo número, então mudar esta convenção exige mudar os dois lados. */
+export type Weekday = 0 | 1 | 2 | 3 | 4 | 5 | 6;
+
+export const WEEKDAY_LABEL: Record<number, string> = {
+  0: 'Domingo', 1: 'Segunda', 2: 'Terça', 3: 'Quarta', 4: 'Quinta', 5: 'Sexta', 6: 'Sábado',
+};
+
+export const WEEKDAY_SHORT: Record<number, string> = {
+  0: 'Dom', 1: 'Seg', 2: 'Ter', 3: 'Qua', 4: 'Qui', 5: 'Sex', 6: 'Sáb',
+};
+
+export interface CycleSchedule {
+  /** Lembrete ligado. Nasce desligado, como o próprio programa: uma atualização não começa
+   *  a cobrar a equipe sozinha. */
+  enabled: boolean;
+  /** Dias em que a contagem é esperada. Ordenado e sem repetição. */
+  weekdays: number[];
+  /** Hora local a partir da qual o lembrete vale para o dia. Não é o instante exato do
+   *  disparo: a rotina do banco roda de hora em hora e avisa na primeira passagem a partir
+   *  dessa hora, para que um atraso do agendador não engula o aviso do dia. */
+  hour: number;
+  /** Fuso em que "hoje" e "08:00" são lidos. Guardado por empresa, com o mesmo padrão do
+   *  agendador de automações (053): em UTC, "às 08:00" chegaria às 5h da manhã aqui. */
+  timezone: string;
+}
+
+export const DEFAULT_CYCLE_SCHEDULE: CycleSchedule = {
+  enabled: false,
+  // Segunda a sexta: contagem cíclica acompanha o turno, e o fim de semana sem equipe só
+  // geraria aviso para ninguém ler na segunda.
+  weekdays: [1, 2, 3, 4, 5],
+  hour: 8,
+  timezone: 'America/Sao_Paulo',
+};
+
+export const SCHEDULE_HOUR_MIN = 0;
+export const SCHEDULE_HOUR_MAX = 23;
+
+/** Normaliza o que veio do banco (ou de uma versão anterior da tela).
+ *
+ *  Lista de dias vazia volta para o padrão em vez de ficar vazia: um agendamento ligado
+ *  que nunca pode disparar é pior que um desligado — ele parece configurado. A tela impede
+ *  chegar aqui com zero dias; esta é a guarda para linha gravada por outro caminho. */
+export function normalizeSchedule(bruto: Partial<CycleSchedule> | null | undefined): CycleSchedule {
+  const dias = Array.isArray(bruto?.weekdays)
+    ? [...new Set(bruto.weekdays.filter(d => Number.isInteger(d) && d >= 0 && d <= 6))].sort((a, b) => a - b)
+    : [];
+
+  const hora = bruto?.hour;
+  return {
+    enabled: bruto?.enabled === true,
+    weekdays: dias.length > 0 ? dias : [...DEFAULT_CYCLE_SCHEDULE.weekdays],
+    hour:
+      typeof hora === 'number' && Number.isFinite(hora)
+        ? clamp(hora, SCHEDULE_HOUR_MIN, SCHEDULE_HOUR_MAX)
+        : DEFAULT_CYCLE_SCHEDULE.hour,
+    timezone: bruto?.timezone?.trim() || DEFAULT_CYCLE_SCHEDULE.timezone,
+  };
+}
+
+/** Hoje é um dia em que a contagem é esperada? Usa o dia da semana LOCAL do aparelho — a
+ *  tela mostra a situação de quem está olhando; quem decide de verdade é a rotina do banco,
+ *  que usa o fuso guardado na configuração. */
+export function isScheduledDay(schedule: CycleSchedule, now: Date): boolean {
+  return normalizeSchedule(schedule).weekdays.includes(now.getDay());
+}
+
+const doisDigitos = (n: number) => String(n).padStart(2, '0');
+
+/** O agendamento em uma linha, para a tela não obrigar ninguém a ler sete caixas marcadas
+ *  e deduzir o padrão. */
+export function describeSchedule(schedule: CycleSchedule): string {
+  const { weekdays, hour } = normalizeSchedule(schedule);
+  const horario = `${doisDigitos(hour)}:00`;
+
+  const chave = weekdays.join(',');
+  if (chave === '0,1,2,3,4,5,6') return `Todos os dias, a partir das ${horario}`;
+  if (chave === '1,2,3,4,5') return `De segunda a sexta, a partir das ${horario}`;
+  if (chave === '0,6') return `Fins de semana, a partir das ${horario}`;
+
+  const nomes = weekdays.map(d => WEEKDAY_SHORT[d]);
+  const lista =
+    nomes.length === 1 ? nomes[0] : `${nomes.slice(0, -1).join(', ')} e ${nomes[nomes.length - 1]}`;
+  return `${lista}, a partir das ${horario}`;
 }
 
 export const DEFAULT_CYCLE_CONFIG: CycleProgramConfig = {
   enabled: false,
   cadenceDays: { A: 30, B: 90, C: 180, sem: 180 },
   dailyCapacity: 30,
+  schedule: DEFAULT_CYCLE_SCHEDULE,
 };
 
 export const CAPACITY_MIN = 1;
@@ -86,6 +188,7 @@ export function normalizeConfig(bruto: Partial<CycleProgramConfig> | null | unde
       typeof capacidade === 'number' && Number.isFinite(capacidade)
         ? clamp(capacidade, CAPACITY_MIN, CAPACITY_MAX)
         : DEFAULT_CYCLE_CONFIG.dailyCapacity,
+    schedule: normalizeSchedule(bruto?.schedule),
   };
 }
 

@@ -105,6 +105,7 @@ import { WhatsNewButton } from './components/WhatsNewPanel';
 import { TaskNotificationBell } from './components/tasks/TaskNotificationBell';
 import { useTaskNotifications } from './lib/tasks/hooks';
 import { useSupportNotifications } from './lib/support/hooks';
+import { useCycleNotifications } from './lib/coverage/hooks';
 import { mergeFeed, unreadCount, type FeedItem } from './lib/notifications/notificationFeed';
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
@@ -344,31 +345,43 @@ function AppContent() {
   const [supportPendingTicketId, setSupportPendingTicketId] = useState<string | null>(null);
   const taskNotifications = useTaskNotifications(profile?.id);
   const supportNotifications = useSupportNotifications(profile?.id);
+  const cycleNotifications = useCycleNotifications(profile?.id);
 
-  // Um sino só para os dois canais. As tabelas, policies e serviços continuam
+  // Um sino só para os três canais. As tabelas, policies e serviços continuam
   // separados; o que se junta é a lista que a pessoa lê.
   const notificationFeed = useMemo(
-    () => mergeFeed(taskNotifications.notifications, supportNotifications.notifications),
-    [taskNotifications.notifications, supportNotifications.notifications],
+    () => mergeFeed(
+      taskNotifications.notifications,
+      supportNotifications.notifications,
+      cycleNotifications.notifications,
+    ),
+    [taskNotifications.notifications, supportNotifications.notifications, cycleNotifications.notifications],
   );
   const notificationUnread = unreadCount(notificationFeed);
 
   const markFeedItemRead = useCallback((item: FeedItem) => {
     if (item.source === 'support') supportNotifications.markRead(item.id);
+    else if (item.source === 'cycle') cycleNotifications.markRead(item.id);
     else taskNotifications.markRead(item.id);
-  }, [supportNotifications, taskNotifications]);
+  }, [supportNotifications, cycleNotifications, taskNotifications]);
 
   const markFeedAllRead = useCallback(() => {
     taskNotifications.markAllRead();
     supportNotifications.markAllRead();
-  }, [taskNotifications, supportNotifications]);
+    cycleNotifications.markAllRead();
+  }, [taskNotifications, supportNotifications, cycleNotifications]);
 
   // Cada aviso sabe para onde leva: tarefa abre o quadro de tarefas; chamado vai
-  // para Meus chamados ou para a caixa de entrada, conforme o lado avisado.
+  // para Meus chamados ou para a caixa de entrada, conforme o lado avisado; a
+  // ciclagem leva para o programa, que é onde a contagem do dia é gerada.
   const openFeedItem = useCallback((item: FeedItem) => {
     if (item.target.kind === 'task') {
       if (item.target.taskId) setTasksPendingOpenId(item.target.taskId);
       setActiveTab('tasks');
+      return;
+    }
+    if (item.target.kind === 'cycle') {
+      setActiveTab('ciclagem');
       return;
     }
     setSupportPendingTicketId(item.target.ticketId);

@@ -9,12 +9,16 @@
 
 import type { TaskNotification } from '../tasks/types';
 import type { SupportNotification } from '../support/supportNotificationService';
+import type { CycleNotification } from '../coverage/cycleNotificationService';
 
-export type FeedSource = 'task' | 'support';
+export type FeedSource = 'task' | 'support' | 'cycle';
 
 export type FeedTarget =
   | { kind: 'task'; taskId: string | null }
-  | { kind: 'support'; ticketId: string | null; audience: 'author' | 'answerers' };
+  | { kind: 'support'; ticketId: string | null; audience: 'author' | 'answerers' }
+  // A ciclagem não leva a um registro, e sim à tela do programa — o aviso é sobre o
+  // trabalho do dia, não sobre uma linha que alguém possa abrir.
+  | { kind: 'cycle' };
 
 export interface FeedItem {
   /** Único entre os canais: os ids são de tabelas diferentes e poderiam colidir. */
@@ -45,10 +49,25 @@ export function fromSupport(n: SupportNotification): FeedItem {
   };
 }
 
+export function fromCycle(n: CycleNotification): FeedItem {
+  return {
+    key: `cycle:${n.id}`, source: 'cycle', id: n.id, kind: n.kind,
+    message: n.message, createdAt: n.created_at, readAt: n.read_at,
+    target: { kind: 'cycle' },
+  };
+}
+
 /** Mais recente primeiro, sem olhar de que canal veio: ordenar por canal e
- *  depois por data faria um aviso de ontem aparecer acima de um de agora. */
-export function mergeFeed(tasks: TaskNotification[], support: SupportNotification[]): FeedItem[] {
-  return [...tasks.map(fromTask), ...support.map(fromSupport)]
+ *  depois por data faria um aviso de ontem aparecer acima de um de agora.
+ *
+ *  `cycle` entra com padrão vazio: o canal da ciclagem depende de uma rotina no banco,
+ *  e uma empresa que ainda não a tem continua com os dois canais de sempre. */
+export function mergeFeed(
+  tasks: TaskNotification[],
+  support: SupportNotification[],
+  cycle: CycleNotification[] = [],
+): FeedItem[] {
+  return [...tasks.map(fromTask), ...support.map(fromSupport), ...cycle.map(fromCycle)]
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 

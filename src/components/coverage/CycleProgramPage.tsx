@@ -8,7 +8,9 @@ import { ABC_LABEL, type AbcBucket, type CoverageItem } from '../../lib/coverage
 import { fetchCoverageItems } from '../../lib/coverage/coverageService';
 import {
   CADENCE_MAX, CADENCE_MIN, CAPACITY_MAX, CAPACITY_MIN, DEFAULT_CYCLE_CONFIG, ORIGIN_LABEL,
-  normalizeConfig, planDailyBatch, programStatus, type CycleProgramConfig,
+  SCHEDULE_HOUR_MAX, SCHEDULE_HOUR_MIN, WEEKDAY_LABEL, WEEKDAY_SHORT,
+  describeSchedule, normalizeConfig, planDailyBatch, programStatus,
+  type CycleProgramConfig, type CycleSchedule, type Weekday,
 } from '../../lib/coverage/cycleProgramDomain';
 import {
   createCycleSession, fetchCycleProgramConfig, findOpenCycleSession, saveCycleProgramConfig,
@@ -33,6 +35,10 @@ const inteiro = new Intl.NumberFormat('pt-BR');
 const moeda = new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 });
 
 const BUCKETS: AbcBucket[] = ['A', 'B', 'C', 'sem'];
+
+/** Segunda primeiro: a semana de trabalho começa na segunda, e domingo no fim é onde
+ *  quem olha espera encontrá-lo. A numeração continua a de `Date.getDay()`. */
+const WEEKDAYS: Weekday[] = [1, 2, 3, 4, 5, 6, 0];
 
 /** Cobertura e programa discordam de propósito sobre o que é "atrasado": a Cobertura usa a
  *  cadência fixa do diagnóstico, e aqui vale a cadência que a empresa escolheu. */
@@ -117,6 +123,23 @@ export function CycleProgramPage({ companyId, canManage, canCount, onNavigateToC
       cadenceDays: { ...atual.cadenceDays, [bucket]: Number.isFinite(numero) ? numero : Number.NaN },
     }));
   };
+
+  const setAgendamento = (mudanca: Partial<CycleSchedule>) =>
+    setRascunho(atual => ({ ...atual, schedule: { ...atual.schedule, ...mudanca } }));
+
+  /** Dia vazio é permitido no rascunho e barrado no Salvar: desmarcar o último dia para
+   *  marcar outro é um gesto normal, e impedir o estado intermediário tornaria a edição
+   *  dependente da ordem dos cliques. */
+  const alternarDia = (dia: Weekday) =>
+    setRascunho(atual => {
+      const atuais = atual.schedule.weekdays;
+      const proximos = atuais.includes(dia)
+        ? atuais.filter(d => d !== dia)
+        : [...atuais, dia].sort((a, b) => a - b);
+      return { ...atual, schedule: { ...atual.schedule, weekdays: proximos } };
+    });
+
+  const semDia = rascunho.schedule.weekdays.length === 0;
 
   const salvar = async () => {
     setSalvando(true);
@@ -303,18 +326,115 @@ export function CycleProgramPage({ companyId, canManage, canCount, onNavigateToC
                 </label>
               </div>
 
+              <div className="mt-6 border-t border-edge pt-5">
+                <p className="text-overline mb-1">Lembrete</p>
+                <p className="mb-4 text-xs leading-relaxed text-fg-subtle">
+                  Nos dias marcados, quem pode gerar ou executar a contagem recebe um aviso no
+                  sino — quando o lote do dia ainda não saiu, ou quando uma contagem de ciclagem
+                  anterior continua aberta. O lembrete não gera a contagem sozinho: a lista do dia
+                  continua sendo criada aqui, por uma pessoa.
+                </p>
+
+                {canManage ? (
+                  <div className="flex flex-wrap items-end gap-4">
+                    <div>
+                      <span className="mb-1.5 block text-xs text-fg-subtle">Lembrete</span>
+                      <SegmentedControl
+                        label="Lembrete"
+                        value={rascunho.schedule.enabled ? 'on' : 'off'}
+                        onChange={v => setAgendamento({ enabled: v === 'on' })}
+                        options={[
+                          { value: 'off', label: 'Desligado' },
+                          { value: 'on', label: 'Ligado' },
+                        ]}
+                      />
+                    </div>
+
+                    <div>
+                      <span className="mb-1.5 block text-xs text-fg-subtle">Dias de contagem</span>
+                      {/* Mesma gramática do SegmentedControl: uma trilha com borda e segmentos
+                          sem borda. Sete caixinhas lado a lado leriam como sete controles. */}
+                      <div
+                        role="group"
+                        aria-label="Dias da semana em que a contagem é esperada"
+                        className="inline-flex max-w-full items-center gap-1 overflow-x-auto rounded-control border border-edge bg-surface-3 p-1 [-ms-overflow-style:none] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+                      >
+                        {WEEKDAYS.map(dia => {
+                          const marcado = rascunho.schedule.weekdays.includes(dia);
+                          return (
+                            <button
+                              key={dia}
+                              type="button"
+                              onClick={() => alternarDia(dia)}
+                              aria-pressed={marcado}
+                              aria-label={WEEKDAY_LABEL[dia]}
+                              className={`flex min-h-[36px] flex-shrink-0 items-center justify-center whitespace-nowrap rounded-control px-3 text-xs font-medium transition-colors [@media(pointer:coarse)]:min-h-[44px] ${
+                                marcado ? 'bg-surface text-fg shadow-control' : 'text-fg-muted hover:text-fg'
+                              }`}
+                            >
+                              {WEEKDAY_SHORT[dia]}
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+
+                    {/* Sem legenda abaixo do campo, ao contrário da grade de cadência: aqui ela
+                        desalinharia o campo dos dois controles ao lado. A unidade aparece na
+                        linha de resumo logo abaixo, já formatada como hora. */}
+                    <label className="block">
+                      <span className="mb-1.5 block text-xs text-fg-subtle">Hora de início</span>
+                      <Input
+                        type="number"
+                        inputMode="numeric"
+                        min={SCHEDULE_HOUR_MIN}
+                        max={SCHEDULE_HOUR_MAX}
+                        className="w-24"
+                        value={Number.isFinite(rascunho.schedule.hour) ? rascunho.schedule.hour : ''}
+                        onChange={e => {
+                          const numero = Number(e.target.value);
+                          setAgendamento({ hour: Number.isFinite(numero) ? numero : Number.NaN });
+                        }}
+                      />
+                    </label>
+                  </div>
+                ) : (
+                  <p className="text-xs leading-relaxed text-fg-subtle">
+                    {rascunho.schedule.enabled
+                      ? `Lembrete ligado: ${describeSchedule(rascunho.schedule).toLowerCase()}.`
+                      : 'O lembrete está desligado para esta empresa.'}
+                  </p>
+                )}
+
+                {canManage && (
+                  <p className="mt-3 text-xs leading-relaxed text-fg-subtle">
+                    {semDia
+                      ? 'Marque pelo menos um dia da semana — um lembrete ligado sem dia nenhum nunca avisaria.'
+                      : rascunho.schedule.enabled
+                        ? `${describeSchedule(rascunho.schedule)}, no fuso de ${rascunho.schedule.timezone.replace('_', ' ')}.`
+                        : `Se ligado: ${describeSchedule(rascunho.schedule).toLowerCase()}.`}
+                  </p>
+                )}
+              </div>
+
               {canManage && (
-                <div className="mt-5 flex flex-wrap items-center gap-3">
-                  <SegmentedControl
-                    label="Programa"
-                    value={rascunho.enabled ? 'on' : 'off'}
-                    onChange={v => setRascunho(atual => ({ ...atual, enabled: v === 'on' }))}
-                    options={[
-                      { value: 'off', label: 'Desligado' },
-                      { value: 'on', label: 'Ligado' },
-                    ]}
-                  />
-                  <Button onClick={salvar} disabled={salvando || !alterado}>
+                <div className="mt-5 flex flex-wrap items-end gap-3">
+                  {/* A legenda deixou de ser dispensável quando o lembrete ganhou um
+                      interruptor idêntico logo acima: dois "Desligado/Ligado" na mesma
+                      tela precisam dizer cada um do que são. */}
+                  <div>
+                    <span className="mb-1.5 block text-xs text-fg-subtle">Programa</span>
+                    <SegmentedControl
+                      label="Programa"
+                      value={rascunho.enabled ? 'on' : 'off'}
+                      onChange={v => setRascunho(atual => ({ ...atual, enabled: v === 'on' }))}
+                      options={[
+                        { value: 'off', label: 'Desligado' },
+                        { value: 'on', label: 'Ligado' },
+                      ]}
+                    />
+                  </div>
+                  <Button onClick={salvar} disabled={salvando || !alterado || semDia}>
                     <Save size={16} /> {salvando ? 'Salvando…' : 'Salvar programa'}
                   </Button>
                 </div>

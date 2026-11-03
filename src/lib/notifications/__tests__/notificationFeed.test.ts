@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { mergeFeed, unreadCount, unreadIdsOf } from '../notificationFeed';
 import type { TaskNotification } from '../../tasks/types';
 import type { SupportNotification } from '../../support/supportNotificationService';
+import type { CycleNotification } from '../../coverage/cycleNotificationService';
 
 const tarefa = (id: string, createdAt: string, readAt: string | null = null): TaskNotification => ({
   id, task_id: 't1', type: 'assigned', title: null, message: `tarefa ${id}`,
@@ -62,5 +63,47 @@ describe('um sino só, dois canais', () => {
     expect(mergeFeed([], [])).toEqual([]);
     expect(unreadCount([])).toBe(0);
     expect(unreadIdsOf([], 'support')).toEqual([]);
+  });
+});
+
+describe('terceiro canal: ciclagem', () => {
+  const ciclagem = (
+    id: string, createdAt: string, readAt: string | null = null,
+  ): CycleNotification => ({
+    id, kind: 'lote_pendente', message: `ciclagem ${id}`,
+    reference_date: '2026-11-03', read_at: readAt, created_at: createdAt,
+  });
+
+  // O canal é opcional de propósito: uma empresa sem a rotina no banco continua
+  // com os dois canais de sempre, sem nenhuma mudança de chamada.
+  it('o parâmetro é opcional e não muda o resto do sino', () => {
+    const feed = mergeFeed([tarefa('t', '2026-10-01T00:00:00Z')], [chamado('c', '2026-10-02T00:00:00Z')]);
+    expect(feed.map(i => i.id)).toEqual(['c', 't']);
+  });
+
+  it('entra na mesma ordenação por data, sem agrupar por origem', () => {
+    const feed = mergeFeed(
+      [tarefa('t', '2026-10-01T00:00:00Z')],
+      [chamado('c', '2026-10-03T00:00:00Z')],
+      [ciclagem('y', '2026-10-02T00:00:00Z')],
+    );
+    expect(feed.map(i => i.id)).toEqual(['c', 'y', 't']);
+  });
+
+  it('a chave separa o canal e o alvo é a tela do programa', () => {
+    const [item] = mergeFeed([], [], [ciclagem('mesmo-id', '2026-10-01T00:00:00Z')]);
+    expect(item.key).toBe('cycle:mesmo-id');
+    expect(item.source).toBe('cycle');
+    expect(item.target).toEqual({ kind: 'cycle' });
+  });
+
+  it('conta e separa os não lidos junto dos outros canais', () => {
+    const feed = mergeFeed(
+      [tarefa('t', '2026-10-01T00:00:00Z')],
+      [],
+      [ciclagem('y1', '2026-10-02T00:00:00Z'), ciclagem('y2', '2026-10-03T00:00:00Z', '2026-10-04T00:00:00Z')],
+    );
+    expect(unreadCount(feed)).toBe(2);
+    expect(unreadIdsOf(feed, 'cycle')).toEqual(['y1']);
   });
 });

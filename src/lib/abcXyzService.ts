@@ -17,6 +17,48 @@ import {
 } from './abcXyzAlgorithm';
 import { logAuditEvent } from './auditLogService';
 
+/** Tamanho da página de leitura e do lote de escrita.
+ *
+ *  Existe porque o PostgREST corta QUALQUER select em 1.000 linhas por padrão, sem erro e
+ *  sem aviso. Numa classificação de empresa inteira isso não é "ler menos": a classe ABC de
+ *  um SKU depende do rank dele entre todos os outros, então ler 1.000 de 4.628 produtos
+ *  produz um Pareto calculado sobre uma amostra arbitrária — números plausíveis e errados.
+ *  Foi exatamente o que aconteceu na apuração de 03/11/2026, que gravou 1.000 linhas
+ *  redondas. O mesmo valia para as vendas: a janela de 12 meses tinha 1.787 registros e
+ *  apenas 1.000 chegavam ao cálculo. */
+const PAGE_SIZE = 1000;
+
+/** Lê uma tabela inteira em páginas, parando quando a página volta menor que o pedido. */
+async function fetchAllPages<T>(
+  build: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>
+): Promise<{ rows: T[]; error: unknown }> {
+  const rows: T[] = [];
+  for (let from = 0; ; from += PAGE_SIZE) {
+    const { data, error } = await build(from, from + PAGE_SIZE - 1);
+    if (error) return { rows, error };
+    const page = data ?? [];
+    rows.push(...page);
+    if (page.length < PAGE_SIZE) break;
+  }
+  return { rows, error: null };
+}
+
+/** Envia um array grande em lotes.
+ *
+ *  Contrapartida da paginação na leitura: com os 4.628 produtos agora chegando ao cálculo,
+ *  a gravação passou de 1.000 para 4.628 linhas num único corpo de requisição. Em lotes, um
+ *  catálogo grande não depende do limite de tamanho do corpo HTTP. */
+async function sendInChunks<T>(
+  rows: T[],
+  send: (chunk: T[]) => PromiseLike<{ error: unknown }>
+): Promise<unknown> {
+  for (let from = 0; from < rows.length; from += PAGE_SIZE) {
+    const { error } = await send(rows.slice(from, from + PAGE_SIZE));
+    if (error) return error;
+  }
+  return null;
+}
+
 export const PERIOD_DAYS: Record<AbcXyzPeriod, number> = { '90d': 90, '6m': 182, '12m': 365 };
 export const PERIOD_LABEL: Record<AbcXyzPeriod, string> = { '90d': '90 dias', '6m': '6 meses', '12m': 'Últimos 12 meses' };
 const SOURCE = 'sales_records';
@@ -41,11 +83,19 @@ async function gatherWeeklyMovement(companyId: string, periodDays: number): Prom
   const since = new Date(Date.now() - weeks * 7 * 86400000);
   const sinceIso = since.toISOString().slice(0, 10);
 
-  const { data, error } = await supabase
-    .from('sales_records')
-    .select('sku, product_id, quantity, sale_date')
-    .eq('company_id', companyId)
-    .gte('sale_date', sinceIso);
+  // Paginado: a janela de 12 meses passa de 1.000 registros com folga, e uma venda que não
+  // chega aqui vira "SKU sem movimento" — ou seja, sai da curva por um corte de página.
+  const { rows: data, error } = await fetchAllPages<{
+    sku: string | null; product_id: string | null; quantity: number | null; sale_date: string;
+  }>((from, to) =>
+    supabase
+      .from('sales_records')
+      .select('sku, product_id, quantity, sale_date')
+      .eq('company_id', companyId)
+      .gte('sale_date', sinceIso)
+      .order('id', { ascending: true })
+      .range(from, to)
+  );
   if (error) console.error('[ABC/XYZ] Error loading sales records:', error);
 
   const now = Date.now();
@@ -93,8 +143,18 @@ export async function recomputeAbcXyzForCompany(
   period: AbcXyzPeriod = '12m',
   thresholds: XyzThresholds = DEFAULT_XYZ_THRESHOLDS
 ): Promise<RecomputeSummary> {
-  const { data: products, error: productsError } = await supabase
-    .from('products').select('id, sku, price').eq('company_id', companyId);
+  // Paginado: o rank de Pareto só é válido sobre o catálogo INTEIRO. Ler uma página e
+  // classificar sobre ela devolve classes com cara de certas e sem relação com a empresa.
+  const { rows: products, error: productsError } = await fetchAllPages<{
+    id: string; sku: string; price: number | null;
+  }>((from, to) =>
+    supabase
+      .from('products')
+      .select('id, sku, price')
+      .eq('company_id', companyId)
+      .order('id', { ascending: true })
+      .range(from, to)
+  );
   if (productsError) throw new Error('Não foi possível carregar os produtos para recalcular.');
   if (!products || products.length === 0) return { classified: 0, unclassified: 0, reasonBreakdown: emptyReasonBreakdown() };
 
@@ -118,6 +178,11 @@ export async function recomputeAbcXyzForCompany(
   const reasonBreakdown = emptyReasonBreakdown();
   let classified = 0;
 
+  // Índice em vez de `find` dentro do laço: com a leitura paginada o catálogo passou de
+  // 1.000 para 4.628 produtos, e uma varredura linear por produto cresce ao quadrado —
+  // 21 milhões de comparações onde um Map resolve em uma.
+  const abcInputById = new Map(abcInputs.map(i => [i.productId, i]));
+
   const upsertRows = products.map(p => {
     const abc = abcResults.get(p.id)!;
     const xyz = xyzByProduct.get(p.id)!;
@@ -128,7 +193,7 @@ export async function recomputeAbcXyzForCompany(
     if (combined) classified += 1;
     else if (unclassifiedReason) reasonBreakdown[unclassifiedReason] += 1;
 
-    const abcInput = abcInputs.find(i => i.productId === p.id)!;
+    const abcInput = abcInputById.get(p.id)!;
     return {
       company_id: companyId,
       product_id: p.id,
@@ -150,15 +215,21 @@ export async function recomputeAbcXyzForCompany(
     };
   });
 
-  const { error: upsertError } = await supabase
-    .from('product_abc_xyz_classifications').upsert(upsertRows, { onConflict: 'product_id' });
-  if (upsertError) throw new Error('Falha ao salvar a classificação — nenhum valor foi atualizado.');
+  const upsertError = await sendInChunks(upsertRows, chunk =>
+    supabase.from('product_abc_xyz_classifications').upsert(chunk, { onConflict: 'product_id' })
+  );
+  // A mensagem não promete mais "nenhum valor foi atualizado": a gravação agora vai em
+  // lotes, então uma falha no meio deixa os lotes anteriores já gravados. Dizer o contrário
+  // mandaria a pessoa procurar um estado que não é o do banco.
+  if (upsertError) throw new Error('Falha ao salvar a classificação. Recalcule para refazer a apuração por inteiro.');
 
   const historyRows = upsertRows
     .filter(r => r.abc_xyz_class != null)
     .map(r => ({ company_id: companyId, product_id: r.product_id, abc_xyz_class: r.abc_xyz_class as string, value_moved: r.value_moved, period }));
   if (historyRows.length > 0) {
-    const { error: historyError } = await supabase.from('product_abc_xyz_history').insert(historyRows);
+    const historyError = await sendInChunks(historyRows, chunk =>
+      supabase.from('product_abc_xyz_history').insert(chunk)
+    );
     if (historyError) console.error('[ABC/XYZ] Error inserting history:', historyError);
   }
 

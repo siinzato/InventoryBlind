@@ -35,6 +35,8 @@ export const APP_ROUTE_BY_TAB: Record<string, string> = {
 
   // Operações
   input: '/app/operacoes/nova-contagem',
+  cobertura: '/app/operacoes/cobertura-de-contagem',
+  ciclagem: '/app/operacoes/programa-de-ciclagem',
   'nfe-conference': '/app/operacoes/conferencia-nfe',
   'purchase-orders': '/app/operacoes/ordens-de-compra',
   'reverse-logistics': '/app/operacoes/logistica-reversa',

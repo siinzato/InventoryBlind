@@ -43,6 +43,8 @@ import {
   LayoutDashboard,
   Gauge,
   ClipboardCheck,
+  CalendarCheck,
+  CalendarClock,
   ClipboardList,
   Monitor,
   BarChart3,
@@ -94,7 +96,7 @@ import { useAuth, canManageUsers } from './lib/auth';
 import { amISupportStaff } from './lib/support/supportService';
 import { signWorkspaceLogoPaths } from './lib/workspace/workspaceService';
 import { LegalAcceptanceGate } from './components/legal/LegalAcceptanceGate';
-import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations } from './lib/permissionService';
+import { hasPermission, getRoleLabel, canSyncIntegrations, canManageAutomations, canManageCycleProgram } from './lib/permissionService';
 import type { DrillTarget } from './lib/intelligence/contracts';
 import { usePWAInstall } from './lib/usePWAInstall';
 import { useTheme } from './lib/useTheme';
@@ -148,6 +150,8 @@ const AccessDeniedPage = React.lazy(() => import('./components/AccessDeniedPage'
 const AutomationsPage = React.lazy(() => import('./components/automation/AutomationsPage').then(m => ({ default: m.AutomationsPage })));
 // Diagnóstico da operação — opcional, nunca no caminho crítico da autenticação.
 const OperationDiagnostic = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.OperationDiagnostic })));
+const CoveragePage = React.lazy(() => import('./components/coverage/CoveragePage').then(m => ({ default: m.CoveragePage })));
+const CycleProgramPage = React.lazy(() => import('./components/coverage/CycleProgramPage').then(m => ({ default: m.CycleProgramPage })));
 const SupportPage = React.lazy(() => import('./components/support/SupportPage').then(m => ({ default: m.SupportPage })));
 const SupportInboxPage = React.lazy(() => import('./components/support/SupportInboxPage').then(m => ({ default: m.SupportInboxPage })));
 const PrivacyLegalPage = React.lazy(() => import('./components/legal/PrivacyLegalPage').then(m => ({ default: m.PrivacyLegalPage })));
@@ -841,6 +845,8 @@ function AppContent() {
       icon: <SidebarFolderIcon />,
       items: [
         { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
+        { id: 'cobertura',      label: 'Cobertura de Contagem', icon: <CalendarCheck />, onClick: () => { setActiveTab('cobertura'); setMobileOpen(false); },     active: activeTab === 'cobertura' },
+        { id: 'ciclagem',       label: 'Programa de Ciclagem',  icon: <CalendarClock />, onClick: () => { setActiveTab('ciclagem'); setMobileOpen(false); },      active: activeTab === 'ciclagem' },
         { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
         { id: 'purchase-orders', label: 'Ordens de Compra',    icon: <ShoppingCart />, onClick: () => { setActiveTab('purchase-orders'); setMobileOpen(false); }, active: activeTab === 'purchase-orders' },
         { id: 'reverse-logistics', label: 'Logística Reversa', icon: <PackageX />,    onClick: () => { setActiveTab('reverse-logistics'); setMobileOpen(false); }, active: activeTab === 'reverse-logistics' },
@@ -1811,6 +1817,20 @@ function AppContent() {
               companyId={companyId}
               role={profile.role}
             />
+          </React.Suspense>
+        )}
+
+        {/* ABA COBERTURA DE CONTAGEM — linha de base da ciclagem, só leitura */}
+        {activeTab === 'cobertura' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <CoveragePage companyId={companyId} />
+          </React.Suspense>
+        )}
+
+        {/* ABA PROGRAMA DE CICLAGEM — cadência por classe e o lote do dia */}
+        {activeTab === 'ciclagem' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <CycleProgramPage companyId={companyId} canManage={canManageCycleProgram(profile?.role)} />
           </React.Suspense>
         )}
 

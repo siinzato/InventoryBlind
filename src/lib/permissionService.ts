@@ -165,6 +165,20 @@ export function canSyncIntegrations(role: Role | string | undefined): boolean {
   return role === 'owner' || role === 'admin' || role === 'manager';
 }
 
+/** Quem altera a cadência e o lote diário do programa de ciclagem.
+ *
+ *  A lista espelha as policies de `cycle_program_settings` (migration 122), que são o
+ *  barreira de verdade — esta cópia só evita oferecer um formulário que voltaria negado.
+ *
+ *  Não é `canManageAutomations` reaproveitada apesar da lista idêntica: as duas respondem a
+ *  perguntas diferentes, e no dia em que uma das listas mudar, compartilhar a função faria
+ *  a outra mudar junto sem ninguém pedir. Também não passa por `hasPermission`: não existe
+ *  permissão 'cycle.*' no mapa, e inventar uma sugeriria uma checagem de servidor que
+ *  ninguém lê. */
+export function canManageCycleProgram(role: Role | string | undefined): boolean {
+  return role === 'owner' || role === 'admin' || role === 'manager';
+}
+
 export function canWrite(role: Role | string | undefined): boolean {
   return hasPermission(role, 'inventory.write');
 }

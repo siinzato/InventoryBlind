@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-03-programa-de-ciclagem',
+    date: '2026-11-03',
+    category: 'novidade',
+    title: 'Programa de ciclagem: o sistema diz o que contar hoje',
+    description: 'Em vez de parar a operação para um inventário geral, agora dá para contar um pouco todo dia e nunca mais perder o controle. Você define de quantos em quantos dias cada classe da curva ABC deve ser recontada — os produtos de maior valor movimentado com mais frequência — e quantos produtos a sua equipe consegue contar por dia. A partir daí o sistema monta sozinho a lista do dia. Quem já passou do prazo da própria classe entra primeiro, porque é a ciclagem funcionando; o que sobra do lote é preenchido com os produtos que nunca foram contados, começando pelos mais caros. A tela ainda mostra em quantos dias os produtos sem contagem nenhuma devem acabar no ritmo que você escolheu, para o tamanho do lote ser uma decisão com número e não um chute. O programa nasce desligado e a lista pode ser consultada antes de ligar, para você ver o que ele faria. Alterar a cadência é só para quem tem permissão de gestão; a equipe vê a lista do dia normalmente.',
+  },
+  {
+    id: '2026-11-03-cobertura-de-contagem',
+    date: '2026-11-03',
+    category: 'novidade',
+    title: 'Cobertura de contagem: o que já foi contado e o que ficou para trás',
+    description: 'Nova tela em Operações que responde, de uma olhada, quanto do seu estoque foi realmente contado e há quanto tempo. Mostra a porcentagem de produtos contados nos últimos 30, 90 ou 180 dias — e também a porcentagem do VALOR parado em estoque, que costuma contar outra história: dá para ter metade dos produtos em dia e mesmo assim quase nenhum dos itens caros. Tem ainda a quebra por classe da curva ABC, cada uma com a sua própria frequência esperada (os produtos de maior giro precisam ser recontados mais vezes), e uma fila de prioridade dizendo o que contar primeiro — quem nunca foi contado vem na frente, do mais caro para o mais barato. Para calcular o valor, a tela usa a quantidade do catálogo e, nos produtos em que ela está zerada, a quantidade da última importação da sua Fonte de Saldo — e avisa na própria tela quantos produtos entraram por esse caminho, para você nunca confundir a foto do estoque com o saldo do cadastro. A tela só lê informações que o sistema já guarda; nada é alterado no estoque.',
+  },
+  {
     id: '2026-10-31-suporte-notificacoes',
     date: '2026-10-31',
     category: 'melhoria',

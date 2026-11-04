@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-04-recebimento-enderecamento',
+    date: '2026-11-04',
+    category: 'novidade',
+    title: 'Da nota conferida direto para o endereço',
+    description: 'A conferência por NF-e terminava no relatório e a mercadoria ficava sem endereço — quem recebia tinha que ir até o Pulmão e lançar tudo de novo, de memória. Agora o relatório tem o botão "Endereçar recebimento", e de lá cada linha conferida vai para um endereço do galpão. A tela mostra, item a item, quantas unidades já foram guardadas e quantas faltam, e aceita dividir o mesmo item entre vários endereços — o normal quando a carga não cabe numa posição só. O progresso fica guardado: fechar a tela no meio e voltar depois mostra exatamente onde parou, sem risco de endereçar duas vezes. Quando o produto já está guardado em algum lugar, a tela oferece esses endereços em primeiro lugar, para a mesma mercadoria não se espalhar pelo galpão; e já sugere a quantidade por caixa usada da última vez, sem perguntar de novo. As regras do galpão continuam valendo: endereço bloqueado não recebe, capacidade declarada não é estourada e um endereço não mistura caixas do mesmo produto com quantidades diferentes por caixa. Nunca é possível endereçar mais do que foi conferido. Vale também para nota com divergência: o que chegou precisa ser guardado mesmo tendo chegado diferente. Endereçar registra onde a mercadoria está e não altera a quantidade do catálogo.',
+  },
+  {
     id: '2026-11-03-livro-razao-produto',
     date: '2026-11-03',
     category: 'novidade',

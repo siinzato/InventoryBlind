@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import {
-  ArrowLeft, Loader2, AlertCircle, Search, Printer, FileSpreadsheet, RotateCcw,
+  ArrowLeft, Loader2, AlertCircle, Search, Printer, FileSpreadsheet, RotateCcw, PackagePlus,
 } from 'lucide-react';
 import { useReactToPrint } from 'react-to-print';
 import * as XLSX from 'xlsx';
@@ -15,11 +15,14 @@ interface Props {
   invoice: NfeInvoice;
   onReopened: () => void;
   onBack: () => void;
+  /** Abre o endereçamento. A conferência fecha aqui, mas o recebimento só termina
+   *  quando a mercadoria tem endereço. */
+  onPutaway: () => void;
 }
 
 type Filter = 'all' | 'ok' | 'missing' | 'surplus' | 'pending';
 
-export function NFeReportView({ invoice, onReopened, onBack }: Props) {
+export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props) {
   const { profile } = useAuth();
   const [items, setItems] = useState<NfeInvoiceItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -103,6 +106,11 @@ export function NFeReportView({ invoice, onReopened, onBack }: Props) {
           <ArrowLeft size={16} /> Voltar
         </button>
         <div className="flex flex-wrap gap-2">
+          {/* Primeiro da fila de propósito: é o que ainda falta fazer. Exportar e
+              imprimir são o registro do que já aconteceu. */}
+          <Button size="sm" onClick={onPutaway}>
+            <PackagePlus size={15} /> Endereçar recebimento
+          </Button>
           <Button variant="secondary" size="sm" onClick={exportExcel}>
             <FileSpreadsheet size={15} /> Excel
           </Button>

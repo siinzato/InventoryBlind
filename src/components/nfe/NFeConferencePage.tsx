@@ -9,6 +9,7 @@ import {
   type InvoiceProgress, type InvoiceCountEvent,
 } from '../../lib/nfe/nfeService';
 import { canAdministerRecords } from '../../lib/admin/recordAdmin';
+import { canWrite } from '../../lib/permissionService';
 import { useAuth } from '../../lib/auth';
 import { getTeamProductivity } from '../../lib/productivityService';
 import { NfeInvoiceAdminActions } from './NfeInvoiceAdminActions';
@@ -16,10 +17,11 @@ import { NFeImportView } from './NFeImportView';
 import { NFePreparationView } from './NFePreparationView';
 import { NFeCountingView } from './NFeCountingView';
 import { NFeReportView } from './NFeReportView';
+import { NFePutawayView } from './NFePutawayView';
 import { formatDate, formatDateTime } from './nfeUi';
 import { Button, Input, Notice, Panel, PanelSection, Select } from '../ui';
 
-type View = 'list' | 'import' | 'prep' | 'counting' | 'report';
+type View = 'list' | 'import' | 'prep' | 'counting' | 'report' | 'putaway';
 type ViewMode = 'supervision' | 'stages';
 
 const VIEW_MODE_KEY = 'inventoryblind:nfe:view-mode';
@@ -367,7 +369,25 @@ export default function NFeConferencePage({ onBack, initialInvoiceId, onConsumed
     }} />;
   }
   if (view === 'report' && selected) {
-    return <NFeReportView invoice={selected} onBack={backToList} onReopened={() => setView('counting')} />;
+    return (
+      <NFeReportView
+        invoice={selected}
+        onBack={backToList}
+        onReopened={() => setView('counting')}
+        onPutaway={() => setView('putaway')}
+      />
+    );
+  }
+  // Endereçamento: só depois de a conferência fechar — a RPC recusa nota em contagem,
+  // e aqui a tela concorda com ela em vez de oferecer um caminho que o banco nega.
+  if (view === 'putaway' && selected) {
+    return (
+      <NFePutawayView
+        invoice={selected}
+        canPutaway={canWrite(profile?.role)}
+        onBack={() => setView('report')}
+      />
+    );
   }
 
   return (

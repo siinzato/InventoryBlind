@@ -38,6 +38,7 @@ export const APP_ROUTE_BY_TAB: Record<string, string> = {
   cobertura: '/app/operacoes/cobertura-de-contagem',
   ciclagem: '/app/operacoes/programa-de-ciclagem',
   'livro-razao': '/app/operacoes/livro-razao',
+  validade: '/app/operacoes/controle-de-validade',
   'nfe-conference': '/app/operacoes/conferencia-nfe',
   'purchase-orders': '/app/operacoes/ordens-de-compra',
   'reverse-logistics': '/app/operacoes/logistica-reversa',
@@ -97,6 +98,7 @@ export const APP_ROUTE_BY_TAB: Record<string, string> = {
   'config-logs': '/app/configuracoes/logs',
   'config-empresas-fiscais': '/app/configuracoes/empresas-fiscais',
   'config-workspaces': '/app/configuracoes/workspaces',
+  'config-lote-validade': '/app/configuracoes/lote-e-validade',
 };
 
 const TAB_BY_APP_ROUTE: Record<string, string> = Object.fromEntries(

@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-04-lote-e-validade',
+    date: '2026-11-04',
+    category: 'novidade',
+    title: 'Lote e validade, para quem precisa deles',
+    description: 'Duas opções novas em Configurações › Lote e Validade, desligadas por padrão. Quem não trabalha com perecível não vê nada mudar: nenhum campo novo no recebimento, nenhuma aba nova no menu. São duas chaves separadas porque resolvem problemas diferentes — lote responde "onde foi parar o que saiu daquela remessa" num recall, validade responde "o que vence primeiro" — e dá para usar uma sem a outra. Com lote ligado, o endereçamento do recebimento passa a aceitar o número do lote em cada colocação. Com validade ligada, aceita também a data, e aparece a aba Controle de Validade em Operações: a lista do que vence, do mais urgente para o mais distante, com o que já venceu no topo. Você escolhe com quantos dias de antecedência um vencimento vira aviso. Os dois campos são sempre opcionais — mercadoria que chega sem lote visível não pode ficar sem endereço por causa disso. Desligar não apaga o que já foi registrado: apenas para de pedir e de exibir, e religar devolve a lista como estava. Importante saber o limite desta primeira versão: o estoque por endereço ainda não separa por lote, então o sistema sabe que um lote entrou num endereço e quando vence, mas não sabe quanto daquele lote restou depois de separar mercadoria.',
+  },
+  {
     id: '2026-11-04-recebimento-enderecamento',
     date: '2026-11-04',
     category: 'novidade',

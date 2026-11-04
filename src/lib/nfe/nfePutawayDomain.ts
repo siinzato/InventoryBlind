@@ -24,6 +24,10 @@ export interface PutawayAssignment {
   /** `boxes × unitsPerBox`, calculado no banco. */
   units: number;
   createdAt: string;
+  /** Preenchidos só quando a empresa ligou a chave de lote/validade (migration 125).
+   *  `null` é o estado normal de quem não usa, não uma ausência a corrigir. */
+  lotNumber: string | null;
+  expiryDate: string | null;
 }
 
 /** Situação de um item da nota diante do endereçamento. */

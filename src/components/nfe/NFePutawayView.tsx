@@ -10,6 +10,7 @@ import {
   binsHoldingProducts, listInvoiceAssignments, placeItem, type ExistingSpot,
 } from '../../lib/nfe/nfePutawayService';
 import { lastKnownPackSize } from '../../lib/wms/wmsService';
+import { useLotControl } from '../../lib/lotControl/hooks';
 import { Badge, Button, Card, Input } from '../ui';
 
 interface Props {
@@ -52,7 +53,14 @@ export function NFePutawayView({ invoice, canPutaway, onBack }: Props) {
   const [bin, setBin] = useState('');
   const [caixas, setCaixas] = useState('');
   const [pack, setPack] = useState('');
+  const [lote, setLote] = useState('');
+  const [validade, setValidade] = useState('');
   const [salvando, setSalvando] = useState(false);
+
+  // A chave da empresa. Desligada — o normal — nada de lote ou validade aparece:
+  // nem campo, nem etiqueta, nem menção. A RPC cobra a mesma chave, então uma tela
+  // desatualizada também não consegue gravar.
+  const { settings: chave } = useLotControl(invoice.company_id);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -88,6 +96,11 @@ export function NFePutawayView({ invoice, canPutaway, onBack }: Props) {
     setErro(null);
     setAviso(null);
     setBin('');
+    // Lote e validade NÃO são herdados da colocação anterior: são da caixa que está
+    // na mão agora, e repetir o último valor é como uma remessa inteira acaba
+    // gravada com o lote da anterior.
+    setLote('');
+    setValidade('');
 
     const ultimo = linha.item.product_id
       ? await lastKnownPackSize(linha.item.product_id).catch(() => null)
@@ -114,6 +127,11 @@ export function NFePutawayView({ invoice, canPutaway, onBack }: Props) {
         binCode: bin.trim().toUpperCase(),
         boxes: nCaixas,
         unitsPerBox: nPack,
+        // Só envia o que a chave permite. Mandar um valor com a chave desligada
+        // faria a RPC recusar a colocação inteira — e o operador levaria a culpa
+        // por um campo que a tela não deveria ter oferecido.
+        lotNumber: chave.lotEnabled ? lote : null,
+        expiryDate: chave.expiryEnabled ? validade : null,
       });
       setAviso(
         `${inteiro.format(nCaixas * nPack)} unidade(s) de ${linha.item.snapshot_sku ?? linha.item.nfe_code ?? 'item'} em ${bin.trim().toUpperCase()}.`
@@ -210,6 +228,10 @@ export function NFePutawayView({ invoice, canPutaway, onBack }: Props) {
               bin={bin} setBin={setBin}
               caixas={caixas} setCaixas={setCaixas}
               pack={pack} setPack={setPack}
+              lote={lote} setLote={setLote}
+              validade={validade} setValidade={setValidade}
+              pedeLote={chave.lotEnabled}
+              pedeValidade={chave.expiryEnabled}
               onAbrir={() => abrir(linha)}
               onConfirmar={() => confirmar(linha)}
             />
@@ -238,13 +260,19 @@ interface LinhaProps {
   bin: string; setBin: (v: string) => void;
   caixas: string; setCaixas: (v: string) => void;
   pack: string; setPack: (v: string) => void;
+  lote: string; setLote: (v: string) => void;
+  validade: string; setValidade: (v: string) => void;
+  pedeLote: boolean;
+  pedeValidade: boolean;
   onAbrir: () => void;
   onConfirmar: () => void;
 }
 
 function LinhaItem({
   linha, spots, aberto, podeEnderecar, salvando,
-  bin, setBin, caixas, setCaixas, pack, setPack, onAbrir, onConfirmar,
+  bin, setBin, caixas, setCaixas, pack, setPack,
+  lote, setLote, validade, setValidade, pedeLote, pedeValidade,
+  onAbrir, onConfirmar,
 }: LinhaProps) {
   const { item } = linha;
   const nome = item.snapshot_product_name ?? item.description ?? 'Item sem descrição';
@@ -279,6 +307,8 @@ function LinhaItem({
           {linha.assignments.map(a => (
             <span key={a.id} className="inline-flex items-center gap-1 rounded-full bg-surface-3 px-2.5 py-1 text-xs text-fg-muted">
               <MapPin size={12} /> {a.binCode} · {inteiro.format(a.boxes)}×{inteiro.format(a.unitsPerBox)}
+              {a.lotNumber && <span className="font-mono"> · {a.lotNumber}</span>}
+              {a.expiryDate && <span> · vence {a.expiryDate.split('-').reverse().join('/')}</span>}
             </span>
           ))}
         </div>
@@ -338,6 +368,30 @@ function LinhaItem({
                     onChange={e => setPack(e.target.value)}
                   />
                 </label>
+                {pedeLote && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs text-fg-subtle">Lote (opcional)</span>
+                    <Input
+                      value={lote}
+                      onChange={e => setLote(e.target.value)}
+                      placeholder="L2314"
+                      className="w-32 font-mono"
+                    />
+                  </label>
+                )}
+
+                {pedeValidade && (
+                  <label className="block">
+                    <span className="mb-1.5 block text-xs text-fg-subtle">Validade (opcional)</span>
+                    <Input
+                      type="date"
+                      value={validade}
+                      onChange={e => setValidade(e.target.value)}
+                      className="w-44"
+                    />
+                  </label>
+                )}
+
                 <Button onClick={onConfirmar} disabled={salvando}>
                   {salvando ? 'Endereçando…' : 'Confirmar'}
                 </Button>

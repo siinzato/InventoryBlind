@@ -17,9 +17,11 @@ interface AssignmentRow {
   units_per_box: number;
   units: number;
   created_at: string;
+  lot_number: string | null;
+  expiry_date: string | null;
 }
 
-const COLUNAS = 'id, item_id, bin_code, boxes, units_per_box, units, created_at';
+const COLUNAS = 'id, item_id, bin_code, boxes, units_per_box, units, created_at, lot_number, expiry_date';
 
 export async function listInvoiceAssignments(invoiceId: string): Promise<PutawayAssignment[]> {
   const { data, error } = await supabase
@@ -37,6 +39,8 @@ export async function listInvoiceAssignments(invoiceId: string): Promise<Putaway
     unitsPerBox: r.units_per_box,
     units: r.units,
     createdAt: r.created_at,
+    lotNumber: r.lot_number,
+    expiryDate: r.expiry_date,
   }));
 }
 
@@ -84,6 +88,10 @@ export interface PlaceParams {
   binCode: string;
   boxes: number;
   unitsPerBox: number;
+  /** Só quando a empresa ligou a chave. A RPC recusa receber estes dois de
+   *  empresa que não ligou — a chave é cobrada no banco, não só na tela. */
+  lotNumber?: string | null;
+  expiryDate?: string | null;
 }
 
 /** Endereça uma parte do item. Devolve o id do movimento gerado no Pulmão.
@@ -97,6 +105,10 @@ export async function placeItem(params: PlaceParams): Promise<string> {
     p_bin_code: params.binCode,
     p_boxes: params.boxes,
     p_units_per_box: params.unitsPerBox,
+    // Vazio vira `null`: string em branco gravaria um lote que não existe e que
+    // depois apareceria na busca por lote como se fosse um.
+    p_lot_number: params.lotNumber?.trim() || null,
+    p_expiry_date: params.expiryDate || null,
   });
 
   if (error) throw new Error(error.message);

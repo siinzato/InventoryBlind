@@ -38,6 +38,8 @@ function atrib(itemId: string, boxes: number, unitsPerBox: number, createdAt: st
   return {
     id: `a-${itemId}-${createdAt}`, itemId, binCode: 'PP-A01-N1',
     boxes, unitsPerBox, units: boxes * unitsPerBox, createdAt,
+    // Nulos: a empresa-padrão dos testes não liga a chave de lote/validade.
+    lotNumber: null, expiryDate: null,
   };
 }
 

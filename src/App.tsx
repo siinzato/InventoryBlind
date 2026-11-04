@@ -47,6 +47,7 @@ import {
   CalendarClock,
   ClipboardList,
   ScrollText,
+  CalendarX,
   Monitor,
   BarChart3,
   ShieldAlert,
@@ -107,6 +108,7 @@ import { TaskNotificationBell } from './components/tasks/TaskNotificationBell';
 import { useTaskNotifications } from './lib/tasks/hooks';
 import { useSupportNotifications } from './lib/support/hooks';
 import { useCycleNotifications } from './lib/coverage/hooks';
+import { useLotControl } from './lib/lotControl/hooks';
 import { mergeFeed, unreadCount, type FeedItem } from './lib/notifications/notificationFeed';
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
@@ -155,6 +157,8 @@ const OperationDiagnostic = React.lazy(() => import('./components/onboarding/Ope
 const CoveragePage = React.lazy(() => import('./components/coverage/CoveragePage').then(m => ({ default: m.CoveragePage })));
 const CycleProgramPage = React.lazy(() => import('./components/coverage/CycleProgramPage').then(m => ({ default: m.CycleProgramPage })));
 const ProductLedgerPage = React.lazy(() => import('./components/ledger/ProductLedgerPage').then(m => ({ default: m.ProductLedgerPage })));
+const ExpiryPage = React.lazy(() => import('./components/lotControl/ExpiryPage').then(m => ({ default: m.ExpiryPage })));
+const LotControlSettingsPage = React.lazy(() => import('./components/settings/LotControlSettingsPage').then(m => ({ default: m.LotControlSettingsPage })));
 const SupportPage = React.lazy(() => import('./components/support/SupportPage').then(m => ({ default: m.SupportPage })));
 const SupportInboxPage = React.lazy(() => import('./components/support/SupportInboxPage').then(m => ({ default: m.SupportInboxPage })));
 const PrivacyLegalPage = React.lazy(() => import('./components/legal/PrivacyLegalPage').then(m => ({ default: m.PrivacyLegalPage })));
@@ -348,6 +352,9 @@ function AppContent() {
   const taskNotifications = useTaskNotifications(profile?.id);
   const supportNotifications = useSupportNotifications(profile?.id);
   const cycleNotifications = useCycleNotifications(profile?.id);
+  // Chave de lote/validade da empresa. Governa o menu e o recebimento: desligada
+  // — o padrão —, a aba de validade não existe e o endereçamento não pede nada.
+  const lotControl = useLotControl(companyId);
 
   // Um sino só para os três canais. As tabelas, policies e serviços continuam
   // separados; o que se junta é a lista que a pessoa lê.
@@ -863,6 +870,11 @@ function AppContent() {
         { id: 'cobertura',      label: 'Cobertura de Contagem', icon: <CalendarCheck />, onClick: () => { setActiveTab('cobertura'); setMobileOpen(false); },     active: activeTab === 'cobertura' },
         { id: 'ciclagem',       label: 'Programa de Ciclagem',  icon: <CalendarClock />, onClick: () => { setActiveTab('ciclagem'); setMobileOpen(false); },      active: activeTab === 'ciclagem' },
         { id: 'livro-razao',    label: 'Livro-Razão do Produto', icon: <ScrollText />, onClick: () => { setActiveTab('livro-razao'); setMobileOpen(false); },   active: activeTab === 'livro-razao' },
+        // Só existe para quem ligou a chave de validade: uma aba permanente de um
+        // recurso que a maioria não usa é ruído no menu de todo mundo.
+        ...(lotControl.settings.expiryEnabled
+          ? [{ id: 'validade', label: 'Controle de Validade', icon: <CalendarX />, onClick: () => { setActiveTab('validade'); setMobileOpen(false); }, active: activeTab === 'validade' }]
+          : []),
         { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
         { id: 'purchase-orders', label: 'Ordens de Compra',    icon: <ShoppingCart />, onClick: () => { setActiveTab('purchase-orders'); setMobileOpen(false); }, active: activeTab === 'purchase-orders' },
         { id: 'reverse-logistics', label: 'Logística Reversa', icon: <PackageX />,    onClick: () => { setActiveTab('reverse-logistics'); setMobileOpen(false); }, active: activeTab === 'reverse-logistics' },
@@ -986,6 +998,7 @@ function AppContent() {
         { id: 'config-logs',     label: 'Logs',      icon: <FileText />, onClick: () => { setActiveTab('config-logs'); setMobileOpen(false); },     active: activeTab === 'config-logs' },
         { id: 'config-empresas-fiscais', label: 'Empresas e Dados Fiscais', icon: <Building2 />, onClick: () => { setActiveTab('config-empresas-fiscais'); setMobileOpen(false); }, active: activeTab === 'config-empresas-fiscais' },
         { id: 'config-workspaces', label: 'Workspaces', icon: <Layers />, onClick: () => { setActiveTab('config-workspaces'); setMobileOpen(false); }, active: activeTab === 'config-workspaces' },
+        { id: 'config-lote-validade', label: 'Lote e Validade', icon: <CalendarX />, onClick: () => { setActiveTab('config-lote-validade'); setMobileOpen(false); }, active: activeTab === 'config-lote-validade' },
       ],
     },
   ];
@@ -1851,6 +1864,24 @@ function AppContent() {
               canManage={canManageCycleProgram(profile?.role)}
               canCount={canWrite(profile?.role)}
               onNavigateToCount={() => setActiveTab('input')}
+            />
+          </React.Suspense>
+        )}
+
+        {/* ABA CONTROLE DE VALIDADE — só quando a empresa ligou a chave */}
+        {activeTab === 'validade' && profile && lotControl.settings.expiryEnabled && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ExpiryPage companyId={companyId} alertDays={lotControl.settings.expiryAlertDays} />
+          </React.Suspense>
+        )}
+
+        {/* CONFIGURAÇÃO DE LOTE E VALIDADE — a chave em si */}
+        {activeTab === 'config-lote-validade' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <LotControlSettingsPage
+              companyId={companyId}
+              canManage={canManageCycleProgram(profile?.role)}
+              onChanged={lotControl.reload}
             />
           </React.Suspense>
         )}

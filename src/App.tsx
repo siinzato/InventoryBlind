@@ -46,6 +46,7 @@ import {
   CalendarCheck,
   CalendarClock,
   ClipboardList,
+  ScrollText,
   Monitor,
   BarChart3,
   ShieldAlert,
@@ -153,6 +154,7 @@ const AutomationsPage = React.lazy(() => import('./components/automation/Automat
 const OperationDiagnostic = React.lazy(() => import('./components/onboarding/OperationDiagnostic').then(m => ({ default: m.OperationDiagnostic })));
 const CoveragePage = React.lazy(() => import('./components/coverage/CoveragePage').then(m => ({ default: m.CoveragePage })));
 const CycleProgramPage = React.lazy(() => import('./components/coverage/CycleProgramPage').then(m => ({ default: m.CycleProgramPage })));
+const ProductLedgerPage = React.lazy(() => import('./components/ledger/ProductLedgerPage').then(m => ({ default: m.ProductLedgerPage })));
 const SupportPage = React.lazy(() => import('./components/support/SupportPage').then(m => ({ default: m.SupportPage })));
 const SupportInboxPage = React.lazy(() => import('./components/support/SupportInboxPage').then(m => ({ default: m.SupportInboxPage })));
 const PrivacyLegalPage = React.lazy(() => import('./components/legal/PrivacyLegalPage').then(m => ({ default: m.PrivacyLegalPage })));
@@ -860,6 +862,7 @@ function AppContent() {
         { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
         { id: 'cobertura',      label: 'Cobertura de Contagem', icon: <CalendarCheck />, onClick: () => { setActiveTab('cobertura'); setMobileOpen(false); },     active: activeTab === 'cobertura' },
         { id: 'ciclagem',       label: 'Programa de Ciclagem',  icon: <CalendarClock />, onClick: () => { setActiveTab('ciclagem'); setMobileOpen(false); },      active: activeTab === 'ciclagem' },
+        { id: 'livro-razao',    label: 'Livro-Razão do Produto', icon: <ScrollText />, onClick: () => { setActiveTab('livro-razao'); setMobileOpen(false); },   active: activeTab === 'livro-razao' },
         { id: 'nfe-conference', label: 'Conferência por NF-e', icon: <ScanLine />,    onClick: () => { setActiveTab('nfe-conference'); setMobileOpen(false); }, active: activeTab === 'nfe-conference' },
         { id: 'purchase-orders', label: 'Ordens de Compra',    icon: <ShoppingCart />, onClick: () => { setActiveTab('purchase-orders'); setMobileOpen(false); }, active: activeTab === 'purchase-orders' },
         { id: 'reverse-logistics', label: 'Logística Reversa', icon: <PackageX />,    onClick: () => { setActiveTab('reverse-logistics'); setMobileOpen(false); }, active: activeTab === 'reverse-logistics' },
@@ -1849,6 +1852,13 @@ function AppContent() {
               canCount={canWrite(profile?.role)}
               onNavigateToCount={() => setActiveTab('input')}
             />
+          </React.Suspense>
+        )}
+
+        {/* ABA LIVRO-RAZÃO — o que foi registrado sobre um SKU, só leitura */}
+        {activeTab === 'livro-razao' && profile && (
+          <React.Suspense fallback={<PageLoader />}>
+            <ProductLedgerPage companyId={companyId} />
           </React.Suspense>
         )}
 

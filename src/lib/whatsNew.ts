@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-03-livro-razao-produto',
+    date: '2026-11-03',
+    category: 'novidade',
+    title: 'Livro-Razão: tudo o que aconteceu com um produto, em ordem',
+    description: 'Nova tela em Operações que responde "o que aconteceu com este item". Você busca o produto por código ou nome e vê, do mais recente para o mais antigo, tudo o que o sistema registrou sobre ele: contagens físicas, inventários por SKU, o saldo que o ERP gravou em cada sincronização, devoluções e seus destinos, ajustes enviados ao ERP e movimentações entre endereços — que hoje ficam cada um em uma tela diferente. Cada linha diz, com todas as letras, se aquilo alterou o saldo ou apenas ficou registrado. Essa distinção é o ponto da tela: contar não muda o estoque. A contagem apura a diferença e para ali; corrigir o estoque é um passo separado, o ajuste enviado ao ERP. Por isso a tela avisa em destaque quando uma contagem encontrou diferença e nenhum ajuste foi enviado depois dela — o jeito silencioso de o estoque continuar errado mesmo depois do trabalho todo de contar. A tela só lê informações que o sistema já guarda; nada é alterado no estoque. Se alguma das origens estiver indisponível no momento, ela avisa qual faltou em vez de mostrar um histórico incompleto como se fosse completo.',
+  },
+  {
     id: '2026-11-03-ciclagem-lembrete',
     date: '2026-11-03',
     category: 'novidade',

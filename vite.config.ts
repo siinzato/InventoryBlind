@@ -1,4 +1,4 @@
-import { copyFileSync, existsSync } from 'node:fs';
+import { copyFileSync, existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { defineConfig, type Plugin } from 'vite';
 import react from '@vitejs/plugin-react';
@@ -33,6 +33,37 @@ function spaFallback(): Plugin {
   };
 }
 
+/**
+ * Fim de linha estável nas leituras `?raw`.
+ *
+ * Os testes de guarda leem migrations e fontes com `import.meta.glob(..., '?raw')` e
+ * comparam o conteúdo com regex. No Git o arquivo é gravado com LF, mas o checkout no
+ * Windows (`core.autocrlf`) entrega CRLF — então qualquer regex que atravesse uma quebra
+ * de linha passa no Linux e falha no Windows, sem nada de errado no código testado.
+ *
+ * Normalizar na leitura faz o teste comparar com o conteúdo canônico do repositório, que
+ * é o que ele quer afirmar, em vez de um artefato de como a máquina fez o checkout.
+ *
+ * `apply: 'serve'` mantém isto fora do build de produção. Hoje é irrelevante — nada no
+ * app usa `?raw`, só os testes —, mas garante que um `?raw` futuro em código de produção
+ * receba o arquivo exatamente como está em disco.
+ */
+function rawEolNormalize(): Plugin {
+  return {
+    name: 'ib-raw-eol-normalize',
+    apply: 'serve',
+    enforce: 'pre',
+    load(id) {
+      const [file, query] = id.split('?');
+      if (query == null || !/(^|&)raw(&|$)/.test(query)) return null;
+      if (!existsSync(file)) return null;
+      return `export default ${JSON.stringify(
+        readFileSync(file, 'utf8').replace(/\r\n/g, '\n')
+      )};`;
+    },
+  };
+}
+
 // https://vite.dev/config/
 export default defineConfig({
   server: {
@@ -45,6 +76,8 @@ export default defineConfig({
     react(),
 
     spaFallback(),
+
+    rawEolNormalize(),
 
     VitePWA({
       registerType: 'autoUpdate',

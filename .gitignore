@@ -23,3 +23,7 @@ dist-ssr
 .env
 .originkit/
 supabase/.temp/
+
+# Instalador do InventoryFull: mora num Release do GitHub, nao no pacote de deploy.
+# Ver o comentario em src/components/InventoryFullPage.tsx.
+public/downloads/

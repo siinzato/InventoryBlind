@@ -24,7 +24,15 @@ interface InventoryFullPageProps {
   onBack: () => void;
 }
 
-const DOWNLOAD_URL = '/downloads/InventoryFull-win-x64.zip';
+/** O instalador fica num Release do GitHub, não em `public/`: dentro do pacote de deploy
+ *  ele eram 70 dos 153MB reenviados a cada publicação, o que fazia o upload falhar.
+ *
+ *  O Release serve o arquivo com `Content-Disposition: attachment` e o nome correto, então
+ *  o download é idêntico para quem usa. O que não sobrevive à mudança de origem é a
+ *  verificação prévia por `fetch`: o GitHub não devolve `Access-Control-Allow-Origin` nos
+ *  assets, e a checagem falharia sempre — derrubando o download em vez de protegê-lo. */
+const DOWNLOAD_URL =
+  'https://github.com/siinzato/InventoryBlind/releases/download/inventoryfull-v1/InventoryFull-win-x64.zip';
 const FILE_NAME = 'InventoryFull-win-x64.zip';
 const FILE_SIZE_LABEL = '≈ 74 MB (73,8 MB)';
 const FILE_SHA256 = 'f14e35a3098c3d7099496644eacf3c11a8634ee8cf85aae1b59bfb8d2bc41858';
@@ -77,11 +85,10 @@ export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) 
     if (!agreed || state === 'loading') return;
     setState('loading');
     try {
-      // HEAD-only reachability check — the actual 73MB transfer is handled
-      // natively by the browser via the anchor below, never buffered in JS.
-      const res = await fetch(DOWNLOAD_URL, { method: 'HEAD' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-
+      // A transferência de 73MB é nativa do navegador, pelo anchor abaixo — nunca
+      // passa pela memória do JS. O `catch` ficou defensivo: sem a verificação prévia
+      // (ver DOWNLOAD_URL), nada aqui costuma lançar, mas o estado de erro continua
+      // disponível para qualquer falha inesperada ao disparar o download.
       const a = document.createElement('a');
       a.href = DOWNLOAD_URL;
       a.download = FILE_NAME;

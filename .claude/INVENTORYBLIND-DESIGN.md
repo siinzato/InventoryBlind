@@ -244,6 +244,7 @@ variedade" a uma tela.
 | Tertiary Text | Texto de menor prioridade, placeholders, ícones inertes | `--fg-subtle` |
 | Separator | Linha divisória entre blocos, borda de Card/Panel/Table | `--edge` |
 | Accent | Ação primária, item ativo, foco | `--accent` / `--accent-strong` (hover/pressed) |
+| Danger (ação) | **Superfície** de ação destrutiva — o preenchimento do `Button variant="danger"` | `--danger` / `--danger-strong` (hover/pressed) |
 | Success | Estado saudável, aprovado, concluído | `emerald-500/600` (semântico, não é token de tema — ver nota) |
 | Warning | Atenção, divergência moderada | `amber-500/600` |
 | Error | Crítico, falha, destrutivo | `red-500/600` |
@@ -258,6 +259,27 @@ contrário do "azul de marca" que sim precisa reagir a light/dark via
 `--accent`). Não promover Success/Warning/Error a custom property só por
 consistência estética; isso é uma decisão arquitetural deliberada, não uma
 lacuna a corrigir.
+
+**Exceção, e a linha que a define — `--danger`.** A regra acima vale para
+cor **semântica de rótulo**: um `Badge variant="danger"` com "Falta" é uma
+etiqueta, e a etiqueta vermelha não muda com o tema. O preenchimento de um
+`Button variant="danger"` é outra coisa: é **superfície de ação**, da mesma
+categoria que `--accent`, e por isso reage ao tema pelo mesmo motivo que ele
+— o valor que funciona sobre a página clara fica saturado demais sobre o
+fundo quase preto do dark. O `red-600` cru vinha de uma família mais clara e
+saturada que o azul da marca, então o botão destrutivo pesava mais que o
+primário ao lado dele.
+
+O critério, portanto, não é "qual cor" e sim **qual papel**:
+
+- **Superfície de ação** (botão preenchido) → token de tema:
+  `--accent` para a ação primária, `--danger` para a destrutiva.
+- **Rótulo, texto ou ícone semântico** (Badge, status, ícone de alerta) →
+  escala fixa do Tailwind: `emerald-`, `amber-`, `red-`.
+
+Não existe `--success`/`--warning`: não há superfície de ação verde nem
+âmbar no produto. Se um dia houver, ela entra por esta mesma porta — e só
+por ela.
 
 ### 5.2 Dois mundos de cor, por design
 
@@ -449,10 +471,23 @@ por gosto:
 
 | Token | Valor | Uso |
 |---|---|---|
-| `rounded-control` | `0.625rem` (10px) | Botões, inputs, controles pequenos |
-| `rounded-container` | `0.75rem` (12px) | Cards, Panels |
-| `rounded-sheet` | `1.25rem` (20px) | Modais, drawers, bottom sheets |
+| `rounded-control` | `0.375rem` (6px) | Botões, inputs, controles pequenos |
+| `rounded-container` | `0.4375rem` (7px) | Cards, Panels |
+| `rounded-sheet` | `0.5rem` (8px) | Modais, drawers, bottom sheets |
 | `rounded-full` | — | **Somente** pills reais: Badge, toggle de view mode, indicador de status (dot) |
+
+**A escala cresce com o elemento: `control` < `container` < `sheet`.** Essa
+ordem não é estética, é a regra que impede a escala de se desfazer. Um
+controle mais arredondado que o painel que o contém inverte a leitura de
+profundidade — e foi exatamente o que aconteceu: a escala original
+(10/12/20) foi apertada para 7px no `container` e 8px no `sheet` em nome do
+canto "reto e técnico", mas o `control` ficou nos 10px antigos. O botão
+virou o elemento mais arredondado do sistema, mais que o painel que o
+contém e que o modal que o cobre — e é esse canto macio solto num ambiente
+reto que lê como template genérico.
+
+Ao mexer em **qualquer** um dos três valores, confira os outros dois. A
+restrição a preservar é a ordem, não os números.
 
 ### Estado Atual — a evoluir
 
@@ -892,7 +927,7 @@ este documento:
 - nova fonte (fora do stack `sans`/`display`/`mono` já definido);
 - novo radius (fora de `control`/`container`/`sheet`/`full`);
 - nova sombra (fora de `control`/`panel`/`overlay`, ou "nenhuma");
-- nova cor (fora de `surface*`/`fg*`/`edge`/`accent*` para o app, ou
+- nova cor (fora de `surface*`/`fg*`/`edge`/`accent*`/`danger*` para o app, ou
   `ink`/`mist`/`enterprise` para Landing/Auth, ou as 4 cores semânticas
   fixas — emerald/amber/red/accent-azul);
 - nova família de ícones (fora de `lucide-react`);

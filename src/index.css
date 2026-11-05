@@ -97,6 +97,21 @@ html, body {
   --accent: 30 95 191;
   --accent-strong: 18 60 130;
 
+  /* Vermelho de AÇÃO destrutiva — par de `--accent`, não da escala semântica.
+     A §5.1 decidiu, com razão, não promover Success/Warning/Error a custom
+     property: um badge "Falta" é um ROTULO, e o vermelho de rótulo não deve
+     mudar com o tema. Isto aqui é outra categoria: um botão preenchido é uma
+     SUPERFÍCIE DE AÇÃO, e superfície de ação precisa reagir ao tema pelo mesmo
+     motivo que `--accent` reage — o valor que funciona sobre uma página clara
+     fica saturado demais sobre o fundo quase preto do dark.
+
+     O `red-600` cru do Tailwind (#DC2626) era de uma família mais clara e
+     saturada que o azul da marca, então o botão destrutivo gritava ao lado de
+     um primário sóbrio. Estes valores ficam no mesmo registro do `--accent`.
+     Badge/texto/ícone continuam no `red-*` do Tailwind, por decisão da §5.1. */
+  --danger: 180 35 24;         /* #B42318 — branco por cima: 6.6:1 */
+  --danger-strong: 145 32 24;  /* #912018 — hover/pressed: escurece, como accent-strong */
+
   /* Sidebar "rail" — the deep-navy icon strip, fixed brand identity like the
      Landing's ink/mist/enterprise scale (not a new arbitrary color: derived
      from the same enterprise-900/700 already declared in tailwind.config.js).
@@ -120,6 +135,11 @@ html, body {
   --fg-subtle: 100 108 122;
   --accent: 62 123 224;
   --accent-strong: 127 179 245;
+
+  /* Clareia no dark, igual a `--accent`, e por isso `-strong` aqui é MAIS claro
+     que o base — hover ilumina no escuro e escurece no claro. */
+  --danger: 196 56 43;         /* #C4382B — branco por cima: 5.3:1 */
+  --danger-strong: 217 83 69;  /* #D95345 */
 
   /* Deeper than the light theme's rail, per spec — still the same navy family. */
   --rail: 6 20 38;           /* ~#061426 */

@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-05-botoes-mais-sobrios',
+    date: '2026-11-05',
+    category: 'melhoria',
+    title: 'Botões mais sóbrios, em todas as telas',
+    description: 'Os botões ficaram com o canto mais reto e o texto em peso mais leve, acompanhando o resto do sistema: até agora eles eram o elemento mais arredondado da interface — mais que os painéis que os contêm —, o que dava um ar genérico ao produto. Botões secundários, como "Exportar CSV", passam a ser desenhados por contorno em vez de um bloco preenchido, de modo que a ação principal da tela se destaque sozinha, sem dois blocos disputando atenção lado a lado. Os botões de ação destrutiva, como "Excluir", ganharam um vermelho mais fechado, no mesmo tom de seriedade do azul do sistema, em vez do vermelho vivo de antes — continua inconfundível, sem gritar na tela. Os botões também passaram a mostrar um anel de foco visível: quem navega pelo teclado agora enxerga onde está. Nada mudou de lugar nem de função — é a mesma ação, no mesmo canto, com o mesmo texto.',
+  },
+  {
     id: '2026-11-04-livro-razao-enviar-ajuste',
     date: '2026-11-04',
     category: 'novidade',

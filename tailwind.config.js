@@ -46,6 +46,11 @@ export default {
         'fg-subtle': 'rgb(var(--fg-subtle) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
         'accent-strong': 'rgb(var(--accent-strong) / <alpha-value>)',
+        // Par de `accent` para a ação destrutiva — superfície de ação, não a
+        // cor semântica de rótulo (que segue em `red-*`). Ver §5.1 e o
+        // comentário em src/index.css.
+        danger: 'rgb(var(--danger) / <alpha-value>)',
+        'danger-strong': 'rgb(var(--danger-strong) / <alpha-value>)',
         rail: 'rgb(var(--rail) / <alpha-value>)',
         'rail-active': 'rgb(var(--rail-active) / <alpha-value>)',
         'rail-fg': 'rgb(var(--rail-fg) / <alpha-value>)',
@@ -59,7 +64,12 @@ export default {
         // Explicit scale (brief §6/§22) instead of one flat radius reused for
         // every concern. Existing rounded-xl/lg usage is untouched — these
         // are additive, semantic names for the redesign to grow into.
-        control: '0.625rem',   // buttons, inputs, small controls
+        // 6px: um passo ABAIXO de container (7px). Antes eram 10px, o que deixava o
+        // controle mais arredondado que o painel que o contém e que o modal que o
+        // cobre — o canto macio destoava do "reto e técnico" adotado no resto da
+        // escala e dava ao botão um ar de template genérico. A escala agora cresce
+        // junto com o tamanho do elemento: controle < container < sheet.
+        control: '0.375rem',   // buttons, inputs, small controls
         container: '0.4375rem', // cards, panels — 7px: canto reto e técnico, ainda suavizado
         sheet: '0.5rem',        // modals, drawers, bottom sheets — 8px, um passo acima de container
       },

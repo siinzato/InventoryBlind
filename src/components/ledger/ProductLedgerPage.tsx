@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { ArrowLeft, Search } from 'lucide-react';
+import { ArrowLeft, Search, Upload } from 'lucide-react';
 import {
-  Badge, Input, ListRow, Notice, Page, PageHeader, Panel, PanelSection,
+  Badge, Button, Input, ListRow, Notice, Page, PageHeader, Panel, PanelSection,
   Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
 } from '../ui';
 import {
@@ -11,6 +11,11 @@ import {
 import {
   fetchProductLedger, searchProducts, type ProductLedger, type ProductRef,
 } from '../../lib/ledger/ledgerService';
+import { BLOCK_MESSAGE, blockReason, draftFromCount, type AdjustmentTarget } from '../../lib/ledger/adjustmentDomain';
+import { fetchAdjustmentTarget, sendCountAdjustment } from '../../lib/ledger/adjustmentService';
+import { canSyncIntegrations } from '../../lib/permissionService';
+import { logAuditEvent } from '../../lib/auditLogService';
+import { useAuth } from '../../lib/auth';
 
 interface ProductLedgerPageProps {
   companyId: string;
@@ -48,6 +53,15 @@ export function ProductLedgerPage({ companyId }: ProductLedgerPageProps) {
   const [carregando, setCarregando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
+  // Envio do ajuste ao ERP. `alvo === undefined` é "ainda não perguntei"; `null` é
+  // "não há conexão ativa" — a diferença evita mostrar "configure a integração"
+  // durante o meio segundo em que a resposta não chegou.
+  const { profile } = useAuth();
+  const podeEnviar = canSyncIntegrations(profile?.role);
+  const [alvo, setAlvo] = useState<AdjustmentTarget | null | undefined>(undefined);
+  const [enviando, setEnviando] = useState(false);
+  const [envio, setEnvio] = useState<{ ok: boolean; message: string } | null>(null);
+
   // Protege contra resposta fora de ordem: digitar rápido dispara várias buscas, e a
   // antiga pode voltar depois da nova e sobrescrever a lista com resultado velho.
   const buscaAtual = useRef(0);
@@ -78,6 +92,8 @@ export function ProductLedgerPage({ companyId }: ProductLedgerPageProps) {
     setProduto(p);
     setRazao(null);
     setErro(null);
+    setEnvio(null);
+    setAlvo(undefined);
     setCarregando(true);
     try {
       setRazao(await fetchProductLedger(companyId, p.id));
@@ -89,11 +105,80 @@ export function ProductLedgerPage({ companyId }: ProductLedgerPageProps) {
     }
   }, [companyId]);
 
-  const voltar = () => { setProduto(null); setRazao(null); setErro(null); };
+  // O vínculo com o ERP vem numa consulta à parte, e não dentro de `abrir`: é a
+  // resposta a uma pergunta diferente ("dá para enviar?"), e falhar nela não pode
+  // impedir o razão de aparecer — ele é útil sozinho, só leitura.
+  useEffect(() => {
+    if (!produto || !podeEnviar) { setAlvo(undefined); return; }
+    let vivo = true;
+    fetchAdjustmentTarget(companyId, produto.id)
+      .then(t => { if (vivo) setAlvo(t); })
+      .catch(err => {
+        console.error('[Livro-razão] vínculo com o ERP', err);
+        if (vivo) setAlvo(null);
+      });
+    return () => { vivo = false; };
+  }, [companyId, produto, podeEnviar]);
+
+  const voltar = () => {
+    setProduto(null); setRazao(null); setErro(null); setEnvio(null); setAlvo(undefined);
+  };
 
   const lancamentos = useMemo(() => razao?.entries ?? [], [razao]);
   const resumo = useMemo(() => summarize(lancamentos), [lancamentos]);
   const pendente = useMemo(() => contagemSemAjuste(lancamentos), [lancamentos]);
+
+  // `undefined` enquanto o vínculo não chegou: não dá para dizer se bloqueia.
+  const bloqueio = useMemo(
+    () => (alvo === undefined ? undefined : blockReason(pendente, alvo, podeEnviar)),
+    [pendente, alvo, podeEnviar]
+  );
+  const rascunho = useMemo(() => (pendente ? draftFromCount(pendente) : null), [pendente]);
+
+  const enviarAjuste = useCallback(async () => {
+    if (!produto || !pendente || !alvo) return;
+    setEnviando(true);
+    setEnvio(null);
+    try {
+      const r = await sendCountAdjustment({
+        companyId, productId: produto.id, sku: produto.sku, entry: pendente, target: alvo,
+      });
+      setEnvio({ ok: r.ok, message: r.message });
+
+      if (profile) {
+        logAuditEvent({
+          companyId,
+          userId: profile.id,
+          userEmail: profile.email ?? '',
+          action: 'ledger.adjustment_sent',
+          resourceType: 'integration_stock_adjustments',
+          resourceId: r.adjustmentId ?? undefined,
+          description: `Ajuste de contagem enviado ao ERP para o SKU ${produto.sku}.`,
+          metadata: {
+            sku: produto.sku,
+            productId: produto.id,
+            previousQuantity: rascunho?.previousQuantity ?? null,
+            countedQuantity: rascunho?.countedQuantity ?? null,
+            aceito: r.ok,
+            jaExistia: r.jaExistia,
+          },
+        });
+      }
+
+      // Recarrega o razão: o ajuste recém-criado é um lançamento novo, e o alerta de
+      // "contagem sem ajuste" precisa sumir sozinho. Deixá-lo na tela depois do envio
+      // faria o usuário apertar o botão de novo.
+      if (r.ok) setRazao(await fetchProductLedger(companyId, produto.id));
+    } catch (err) {
+      console.error('[Livro-razão] enviar ajuste', err);
+      setEnvio({
+        ok: false,
+        message: 'Não foi possível registrar o ajuste agora. Nada foi enviado ao ERP.',
+      });
+    } finally {
+      setEnviando(false);
+    }
+  }, [companyId, produto, pendente, alvo, profile, rascunho]);
 
   return (
     <Page>
@@ -218,6 +303,33 @@ export function ProductLedgerPage({ companyId }: ProductLedgerPageProps) {
               {inteiro.format(pendente.divergence ?? 0)} e não há ajuste enviado ao ERP depois
               dela. Enquanto o ajuste não for enviado, o estoque continua com o número antigo,
               mesmo com a contagem feita.
+
+              {/* A ação fica dentro do próprio alerta: quem lê o problema resolve ali,
+                  sem sair da tela e refazer o raciocínio em outro lugar. */}
+              {rascunho && (
+                <span className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-2">
+                  <Button
+                    size="sm"
+                    onClick={enviarAjuste}
+                    disabled={enviando || bloqueio !== null || alvo === undefined}
+                  >
+                    <Upload size={14} />
+                    {enviando ? 'Enviando…' : `Enviar ajuste: o saldo passa a ser ${inteiro.format(rascunho.countedQuantity)}`}
+                  </Button>
+                  {bloqueio && (
+                    <span className="text-xs leading-relaxed">{BLOCK_MESSAGE[bloqueio.code]}</span>
+                  )}
+                </span>
+              )}
+            </Notice>
+          )}
+
+          {/* Fora do alerta amarelo porque o resultado tem cor própria: deixá-lo
+              dentro faria um sucesso aparecer pintado de aviso. */}
+          {envio && (
+            <Notice tone={envio.ok ? 'success' : 'danger'}>
+              {envio.message}
+              {!envio.ok && ' O ajuste fica registrado e pode ser reenviado pela tela de Integrações.'}
             </Notice>
           )}
 

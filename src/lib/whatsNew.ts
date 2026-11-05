@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-04-livro-razao-enviar-ajuste',
+    date: '2026-11-04',
+    category: 'novidade',
+    title: 'Corrigir o estoque no ERP sem sair do Livro-Razão',
+    description: 'O Livro-Razão já avisava quando uma contagem encontrou diferença e nenhum ajuste foi enviado depois dela, mas não oferecia saída: era preciso sair da tela e resolver em outro lugar. Agora o próprio aviso traz o botão de enviar, e ele diz exatamente o que vai acontecer — "o saldo passa a ser 47". É isso que vai ao ERP: o número contado na prateleira, e não um "tire 3". A diferença importa se o saldo tiver mudado entre contar e enviar, porque antes de escrever o sistema relê o saldo real no ERP e recusa o envio se os números não baterem, em vez de passar por cima. Apertar o botão duas vezes não envia duas vezes: cada contagem só vira um ajuste, e uma contagem já enviada é reconhecida como tal. Quando não dá para enviar, a tela diz o motivo em vez de só desabilitar o botão — a integração não está configurada, o produto ainda não está vinculado ao cadastro do ERP ou nenhum depósito foi vinculado. Se o ERP recusar ou estiver fora do ar, o ajuste fica registrado e pode ser reenviado pela tela de Integrações, sem precisar recontar. Enviar ajuste é permitido a proprietário, administrador e gerente, e toda tentativa fica registrada no histórico de auditoria — inclusive as recusadas.',
+  },
+  {
     id: '2026-11-04-lote-e-validade',
     date: '2026-11-04',
     category: 'novidade',

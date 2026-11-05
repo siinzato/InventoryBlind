@@ -1,6 +1,10 @@
 import { supabase } from './supabase';
 
 export type AuditAction =
+  // Livro-razão: ajuste de contagem física enviado ao ERP. Gravado pelo client, na
+  // tela do razão, logo depois da tentativa — registra tanto o aceite quanto a
+  // recusa pela guarda, que é justamente a parte que interessa numa auditoria.
+  | 'ledger.adjustment_sent'
   | 'product_brand.logo_uploaded'
   | 'product_brand.logo_removed'
   | 'login'

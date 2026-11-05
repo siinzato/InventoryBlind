@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import {
   Rocket, ClipboardList, ShieldCheck, BrainCircuit, Plug, GraduationCap, HelpCircle, Building2,
   Search, ChevronDown, ArrowRight, LayoutGrid, MapPin, ListChecks, ClipboardCheck, EyeOff, X,
+  PackageCheck, Package, Wrench, Workflow, UserCog,
 } from 'lucide-react';
 import { Page, PageHeader, Panel, PanelSection, Badge, Input } from '../ui';
 import { KB_CATEGORIES, PRODUCT_FAQ, ABOUT_CONTENT, type KbArticle } from '../../lib/knowledgeBaseContent';
@@ -11,8 +12,11 @@ interface KnowledgeCenterPageProps {
   onNavigateToAcademy: () => void;
 }
 
+// Toda chave de `icon` usada em KB_CATEGORIES precisa existir aqui — uma categoria nova
+// com um ícone não mapeado cai no fallback e some visualmente da grade.
 const CATEGORY_ICON: Record<string, typeof Rocket> = {
-  Rocket, ClipboardList, ShieldCheck, BrainCircuit, Plug,
+  Rocket, ClipboardList, PackageCheck, ShieldCheck, BrainCircuit,
+  Package, Wrench, Workflow, Plug, UserCog,
 };
 
 const PILAR_ICON: Record<string, typeof LayoutGrid> = {

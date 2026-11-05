@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-05-central-conhecimento-atualizada',
+    date: '2026-11-05',
+    category: 'melhoria',
+    title: 'Central de Conhecimento atualizada com tudo o que o sistema faz hoje',
+    description: 'A Central de Conhecimento estava descrevendo uma versão antiga da plataforma: faltavam módulos inteiros e dois recursos apareciam como "em breve" mesmo já estando no ar. Ela foi refeita do zero e passou de 30 para 92 artigos, agora organizados nas mesmas categorias do menu lateral — você procura pelo nome que vê na tela. Entraram áreas que não tinham nenhuma explicação: Recebimento e Armazenagem (conferência cega por NF-e, Pulmão, ordens de compra, logística reversa, lote e validade), Catálogo e Dados de Produto, Ferramentas do dia a dia, Agentes e Automações, e Conta, Suporte e Administração. BlindScore e Inventory Health deixaram de ser descritos como promessa e passaram a ser explicados como funcionam. As Perguntas Frequentes também cresceram, com dúvidas práticas como por onde começar, se dá para usar no celular e se é preciso contar o estoque inteiro de uma vez.',
+  },
+  {
     id: '2026-11-05-botoes-mais-sobrios',
     date: '2026-11-05',
     category: 'melhoria',

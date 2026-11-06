@@ -10,9 +10,45 @@ import {
   Package,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { ImportHistoryRecord } from '../lib/productImportTypes';
-import { formatDateTime, formatFileSize, downloadFile } from '../lib/productImportUtils';
+import type { ImportHistoryRecord, ColumnMapping } from '../lib/productImportTypes';
+import { formatDateTime, downloadFile } from '../lib/productImportUtils';
 import { Page, PageHeader, Panel, PanelSection, Badge, Button } from './ui';
+
+// A tabela guarda as colunas em snake_case e a tela le em camelCase. Sem esta
+// conversao, `data` entrava direto no estado e nome do arquivo, data, autor e
+// contagens apareciam vazios na lista, alem de o botao de baixar ficar sempre
+// desabilitado por `fileContent` indefinido.
+interface ImportHistoryRow {
+  id: string;
+  file_name: string;
+  file_size: number | null;
+  file_content: string | null;
+  total_products: number;
+  new_products: number;
+  updated_products: number;
+  errors: number;
+  imported_by: string;
+  created_at: string;
+  status: 'completed' | 'undone';
+  undone_at: string | null;
+  column_mapping: ColumnMapping | null;
+}
+
+const toHistoryRecord = (row: ImportHistoryRow): ImportHistoryRecord => ({
+  id: row.id,
+  fileName: row.file_name,
+  fileSize: row.file_size,
+  fileContent: row.file_content,
+  totalProducts: row.total_products,
+  newProducts: row.new_products,
+  updatedProducts: row.updated_products,
+  errors: row.errors,
+  importedBy: row.imported_by,
+  createdAt: row.created_at,
+  status: row.status,
+  undoneAt: row.undone_at ?? undefined,
+  columnMapping: row.column_mapping,
+});
 
 interface ImportHistoryPageProps {
   onBack: () => void;
@@ -40,7 +76,7 @@ export const ImportHistoryPage: React.FC<ImportHistoryPageProps> = ({
         .limit(50);
 
       if (error) throw error;
-      setHistory(data || []);
+      setHistory((data ?? []).map(toHistoryRecord));
     } catch (err) {
       console.error('Error loading import history:', err);
     }

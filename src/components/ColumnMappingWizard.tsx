@@ -2,8 +2,8 @@
 
 import React, { useState, useMemo } from 'react';
 import { MapPin, AlertTriangle, CheckCircle, ArrowRight, Info } from 'lucide-react';
-import type { ColumnMapping, DetectedColumn } from '../lib/productImportTypes';
-import { detectColumnMappings, suggestMapping, STANDARD_FIELDS } from '../lib/productImportUtils';
+import type { ColumnMapping } from '../lib/productImportTypes';
+import { detectColumnMappings, STANDARD_FIELDS } from '../lib/productImportUtils';
 import { Panel, PanelSection, Button, Badge, Table, Thead, Tr, Th, Td } from './ui';
 
 interface ColumnMappingWizardProps {
@@ -20,7 +20,6 @@ export const ColumnMappingWizard: React.FC<ColumnMappingWizardProps> = ({
   onCancel,
 }) => {
   const detectedColumns = useMemo(() => detectColumnMappings(headers), [headers]);
-  const suggestedMapping = useMemo(() => suggestMapping(detectedColumns), [detectedColumns]);
 
   const [mapping, setMapping] = useState<ColumnMapping>(() => {
     // Initialize with detected columns
@@ -34,7 +33,8 @@ export const ColumnMappingWizard: React.FC<ColumnMappingWizardProps> = ({
 
     detectedColumns.forEach(detected => {
       if (detected.detectedField && detected.confidence !== 'none') {
-        (m as Record<string, string | null>)[detected.detectedField] = detected.name;
+        // Ver productImportUtils: a chave detectada vem de STANDARD_FIELDS.
+        m[detected.detectedField as keyof ColumnMapping] = detected.name;
       }
     });
 
@@ -54,15 +54,6 @@ export const ColumnMappingWizard: React.FC<ColumnMappingWizardProps> = ({
       case 'medium': return 'bg-amber-500/10 border-amber-500/20 text-amber-600 dark:text-amber-400';
       case 'low': return 'bg-orange-500/10 border-orange-500/20 text-orange-600 dark:text-orange-400';
       default: return 'bg-surface-3 border-edge text-fg-muted';
-    }
-  };
-
-  const getConfidenceIcon = (confidence: string): string => {
-    switch (confidence) {
-      case 'high': return 'Detectado com alta confiança';
-      case 'medium': return 'Possível correspondencia';
-      case 'low': return 'Correspondencia aproximada';
-      default: return 'Nao detectado';
     }
   };
 

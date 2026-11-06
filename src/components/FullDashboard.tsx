@@ -3,7 +3,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import {
   LayoutDashboard, Calendar, Plus, Package, CheckSquare,
-  Clock, TrendingUp, RefreshCw, AlertTriangle,
+  Clock, TrendingUp, RefreshCw,
 } from 'lucide-react';
 import type { FullOperation } from '../lib/fullManagerTypes';
 import {

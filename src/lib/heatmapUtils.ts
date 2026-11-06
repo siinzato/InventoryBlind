@@ -109,7 +109,6 @@ export const generateDiagnosis = (area: HeatmapArea): RiskDiagnosis => {
   }
 
   // Check progress
-  const pending = calculatePending(area.totalSku, area.concluidos);
   if (area.progresso < 30 && area.progresso > 0) {
     issues.push('Progresso lento');
     factors.push({ name: 'Progresso', impact: 'média', value: `${area.progresso.toFixed(1)}%` });

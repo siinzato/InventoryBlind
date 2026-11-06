@@ -25,7 +25,13 @@ export async function renderBarcodeSVG(
   const info = symbologyInfo(symbology);
   const scale = Math.max(0.6, Math.min(1.4, opts.scale || 1));
 
-  const params: Record<string, unknown> = {
+  // Tipado pelo proprio parametro do bwip-js em vez de Record<string, unknown>: o
+  // objeto passa a ser conferido na montagem, e um nome de opcao errado vira erro
+  // de compilacao em vez de ser ignorado em silencio na renderizacao. O `eclevel`
+  // entra por intersecao porque e opcao valida do BWIPP para QR que falta na
+  // tipagem publicada do bwip-js.
+  type BwipParams = Parameters<typeof bwipjs.toSVG>[0] & { eclevel?: string };
+  const params: BwipParams = {
     bcid: info.bwipBcid,
     text: value,
     scale: info.kind === '1d' ? Math.max(2, Math.round(2.6 * scale)) : Math.max(3, Math.round(4 * scale)),
@@ -42,7 +48,7 @@ export async function renderBarcodeSVG(
     params.eclevel = opts.eccLevel;
   }
 
-  return bwipjs.toSVG(params as Parameters<typeof bwipjs.toSVG>[0]);
+  return bwipjs.toSVG(params);
 }
 
 const SVG_DIMENSION_RE = /<svg[^>]*\bwidth="([\d.]+)"[^>]*\bheight="([\d.]+)"/;

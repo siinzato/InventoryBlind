@@ -19,10 +19,9 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { SafeDropdown } from './SafeDropdown';
 import {
-  ShieldAlert, RefreshCw, Search, Filter, ChevronDown, ChevronUp,
-  Edit2, Trash2, XCircle, RotateCcw, Check, X, Download,
-  AlertTriangle, Package, User, Calendar, Clock, ArrowUpDown,
-  ChevronRight, Save,
+  ShieldAlert, RefreshCw, Search, ChevronDown,
+  Edit2, Trash2, XCircle, RotateCcw, X, Download,
+  AlertTriangle, Package, ArrowUpDown, Save,
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem, FullStatus } from '../lib/fullManagerTypes';
 import {

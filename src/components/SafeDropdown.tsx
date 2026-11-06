@@ -30,7 +30,6 @@ interface DropdownPosition {
 export const SafeDropdown: React.FC<SafeDropdownProps> = ({
   trigger,
   items,
-  active,
   className = '',
 }) => {
   const [isOpen, setIsOpen] = useState(false);

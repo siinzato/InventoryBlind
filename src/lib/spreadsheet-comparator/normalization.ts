@@ -93,10 +93,12 @@ export function numbersMatch(a: number, b: number, toleranceAbsolute: number, to
 
 // ── Datas ─────────────────────────────────────────────────────────────────────
 
-export interface DateParseResult {
-  value: Date | null;
-  ok: boolean;
-}
+// União discriminada, e nao `{ value: Date | null; ok: boolean }`: toda saida da
+// funcao ja pareia ok=true com uma data e ok=false com null. Dito no tipo, quem
+// checa `ok` recebe a data ja estreitada e nao precisa de asserção.
+export type DateParseResult =
+  | { ok: true; value: Date }
+  | { ok: false; value: null };
 
 const EXCEL_EPOCH_UTC_MS = Date.UTC(1899, 11, 30);
 const MS_PER_DAY = 86400000;

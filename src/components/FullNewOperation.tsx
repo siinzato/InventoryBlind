@@ -2,8 +2,8 @@ import React, { useState, useCallback, useRef } from 'react';
 import * as XLSX from 'xlsx';
 import { supabase } from '../lib/supabase';
 import {
-  Upload, ChevronRight, ChevronLeft, AlertTriangle, Check,
-  RefreshCw, X, Package, FileSpreadsheet, Download,
+  ChevronRight, ChevronLeft, AlertTriangle, Check,
+  RefreshCw, X, FileSpreadsheet, Download,
 } from 'lucide-react';
 import type { FullItemStatus } from '../lib/fullManagerTypes';
 import { ITEM_STATUS_LABEL, ITEM_STATUS_COLOR, MARKETPLACES } from '../lib/fullManagerTypes';

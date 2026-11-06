@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
-import { RefreshCw, ChevronDown, ChevronUp, Clock, Package, User, ClipboardCheck } from 'lucide-react';
+import { RefreshCw, ChevronDown, ChevronUp, Clock, Package, User } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR, formatFullDate } from '../lib/fullManagerTypes';
 

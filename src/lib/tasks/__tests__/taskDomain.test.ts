@@ -12,12 +12,23 @@ import { Task, TaskAssignee, TaskWithAssignees } from '../types';
 const assignee = (user_id: string, status: TaskAssignee['status']): TaskAssignee => ({
   id: `a-${user_id}`, task_id: 't1', user_id, status,
   assigned_at: '2026-08-21T00:00:00Z', assigned_by: null, started_at: null, completed_at: null,
+  // Nunca bloqueada, nunca pausada, nunca arquivada: o estado neutro do responsavel.
+  // Quem testa bloqueio ou pausa sobrescreve o campo no proprio teste.
+  block_reason: null, block_note: null, blocked_at: null, blocked_by: null,
+  expected_resolver_user_id: null, paused_at: null, archived_at: null,
 });
 
 const baseTask = (over: Partial<Task> = {}): Task => ({
   id: 't1', company_id: 'c1', type: 'corporate', title: 'Tarefa', description: null, category: null,
   priority: 'medium', due_date: '2026-08-21', due_time: null, status: 'todo', created_by: 'manager-1',
   cancelled_at: null, cancelled_by: null, cancellation_reason: null,
+  // Tarefa avulsa, sem template, sem dados de execucao: os campos obrigatorios de
+  // Task no seu valor neutro. Cada teste sobrescreve o que lhe interessa via `over`.
+  template_key: null, template_version: null, payload: {}, result: {},
+  area: null, location_from: null, location_to: null, sku_or_line: null,
+  planned_quantity: null, executed_quantity: null, quantity_unit: null,
+  estimated_duration_minutes: null, requires_validation: false, tool_key: null,
+  reopened_count: 0, completion_note: null,
   created_at: '2026-08-21T00:00:00Z', updated_at: '2026-08-21T00:00:00Z',
   ...over,
 });

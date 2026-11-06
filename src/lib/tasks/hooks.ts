@@ -4,7 +4,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
-  TaskWithAssignees, TaskNotification, AssigneeStatus, TeamMember, TaskTemplate,
+  TaskWithAssignees, TaskNotification, DirectAssigneeStatus, TeamMember, TaskTemplate,
 } from './types';
 import {
   listMyDayTasks, listCompanyTasks, listTeamMembers, TeamTaskFilters,
@@ -38,7 +38,7 @@ export function useMyDayTasks(userId: string | undefined) {
 
   useEffect(() => { reload(); }, [reload]);
 
-  const setStatusOptimistic = useCallback(async (taskId: string, status: AssigneeStatus) => {
+  const setStatusOptimistic = useCallback(async (taskId: string, status: DirectAssigneeStatus) => {
     if (!userId) return;
     const previous = tasks;
     setTasks(ts => ts.map(t => t.id === taskId

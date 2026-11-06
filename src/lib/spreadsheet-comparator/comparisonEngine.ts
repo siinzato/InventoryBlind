@@ -124,7 +124,7 @@ function buildRecord(partial: Omit<ComparisonRecord, 'id'>): ComparisonRecord {
   return { id: nextId(), ...partial };
 }
 
-function sumNumericField(field: FieldMapping, rows: SpreadsheetDataRow[], column: string | null): number | null {
+function sumNumericField(_field: FieldMapping, rows: SpreadsheetDataRow[], column: string | null): number | null {
   if (!column) return null;
   let sum = 0;
   let anyOk = false;
@@ -212,7 +212,7 @@ export async function runComparison(
 }
 
 function buildAggregateRecord(
-  key: string, keyValues: Record<string, CellValue>,
+  _key: string, keyValues: Record<string, CellValue>,
   groupA: KeyedRow[], groupB: KeyedRow[], fields: FieldMapping[], settings: ComparisonSettings
 ): ComparisonRecord {
   const keyDisplay = Object.values(keyValues).map(v => v ?? '').join(' / ');
@@ -255,7 +255,7 @@ function buildAggregateRecord(
 }
 
 function buildRowByRowRecords(
-  key: string, keyValues: Record<string, CellValue>,
+  _key: string, keyValues: Record<string, CellValue>,
   groupA: KeyedRow[], groupB: KeyedRow[], fields: FieldMapping[], settings: ComparisonSettings
 ): ComparisonRecord[] {
   const keyDisplay = Object.values(keyValues).map(v => v ?? '').join(' / ');

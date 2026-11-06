@@ -1,4 +1,3 @@
-import React from 'react';
 import { Lock, ArrowLeft, LogOut } from 'lucide-react';
 import { useAuth } from '../lib/auth';
 import { Panel, PanelSection, Button } from './ui';

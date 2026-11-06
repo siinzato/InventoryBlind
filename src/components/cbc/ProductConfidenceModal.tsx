@@ -174,9 +174,14 @@ export function ProductConfidenceModal({ open, onClose, productId, productName, 
                   </div>
                 </div>
 
-                <p className="text-xs text-accent font-medium">
-                  {ABC_XYZ_STRATEGIES[classification.abc_xyz_class].countingGuidance}
-                </p>
+                {/* Produto sem combinação ABC+XYZ ainda nao tem estrategia de contagem:
+                    indexar com null devolvia undefined e derrubava o modal inteiro.
+                    Mesma guarda ja usada em AbcXyzDetailDrawer e no dashboard. */}
+                {classification.abc_xyz_class && (
+                  <p className="text-xs text-accent font-medium">
+                    {ABC_XYZ_STRATEGIES[classification.abc_xyz_class].countingGuidance}
+                  </p>
+                )}
 
                 <div>
                   <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-2 flex items-center gap-1.5">

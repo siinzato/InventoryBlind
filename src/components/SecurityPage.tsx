@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import {
   ShieldCheck, Shield, ShieldAlert,
-  CheckCircle2, AlertTriangle, XCircle, Info,
-  Lock, Unlock, Users, Activity, Database,
-  Eye, RefreshCw, ChevronDown, ChevronUp,
-  FileText, Globe, Clock, Server, Key,
-  Upload, Link, Settings, KeyRound, ArrowLeft, Check,
+  CheckCircle2, AlertTriangle, XCircle,
+  Lock, Users, Activity, Database,
+  RefreshCw, ChevronDown, ChevronUp,
+  FileText, Globe, Server, Key,
+  Link, Settings, KeyRound, ArrowLeft, Check,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';

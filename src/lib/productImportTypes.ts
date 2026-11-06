@@ -51,7 +51,9 @@ export interface ImportError {
   error: string;
 }
 
-export type ImportStatus = 'upload' | 'mapping' | 'preview' | 'importing' | 'complete' | 'error';
+// `validating` cobre a janela assincrona entre confirmar o mapeamento e ter o
+// preview pronto. A pagina ja definia esse estado; faltava ele no tipo.
+export type ImportStatus = 'upload' | 'mapping' | 'validating' | 'preview' | 'importing' | 'complete' | 'error';
 
 // Column mapping types
 export interface ColumnMapping {
@@ -93,6 +95,7 @@ export interface ProductFromDB {
   ean: string | null;
   location: string | null;
   price: number | null;
-  createdAt: string;
-  updatedAt: string;
+  // snake_case de proposito: e a linha como vem de `products`, sem conversao.
+  created_at: string;
+  updated_at: string;
 }

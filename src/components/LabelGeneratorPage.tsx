@@ -430,7 +430,6 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
   const toggleAll = () => setSelectedIds(p => p.size === batchProducts.length ? new Set() : new Set(batchProducts.map(x => x.id)));
 
   const labelProduct = product ? labelAsProduct(product) : null;
-  const activeFonts = labelType === 'shelf' ? shelfFonts : excessFonts;
 
   return (
     <div className="min-h-screen bg-surface-3">

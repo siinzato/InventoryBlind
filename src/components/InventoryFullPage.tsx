@@ -77,7 +77,7 @@ const BENEFITS = [
 type DownloadState = 'idle' | 'loading' | 'started' | 'error';
 
 export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) => {
-  const { company, companyId, profile } = useAuth();
+  const { companyId, profile } = useAuth();
   const [agreed, setAgreed] = useState(false);
   const [state, setState] = useState<DownloadState>('idle');
 

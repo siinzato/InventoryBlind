@@ -191,7 +191,9 @@ export async function getTaskDetail(taskId: string): Promise<TaskDetail | null> 
     supabase.from('task_time_segments').select(TIME_SEGMENT_COLUMNS).eq('task_id', taskId).order('started_at'),
   ]);
 
-  const assignees = await attachProfileNames((assigneeRows as TaskAssignee[]) ?? []);
+  // `| null` no alvo, como na linha 60: ASSIGNEE_COLUMNS e montado com join, entao
+  // o supabase-js nao consegue inferir a forma da linha e devolve GenericStringError[].
+  const assignees = await attachProfileNames((assigneeRows as TaskAssignee[] | null) ?? []);
   const comments = (commentRows as TaskComment[]) ?? [];
   const activity = (activityRows as TaskActivityLog[]) ?? [];
   const names = await fetchProfileNames([...comments.map(c => c.user_id), ...activity.map(a => a.user_id).filter((id): id is string => !!id)]);

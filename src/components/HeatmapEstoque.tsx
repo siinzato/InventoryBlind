@@ -3,7 +3,7 @@
 import React, { useState, useMemo, useCallback, useEffect } from 'react';
 // `Map as MapIcon`: o ícone homônimo sombreava o Map nativo, e o estado de detalhes por
 // marca é um Map de verdade.
-import { Grid3X3, List, BarChart3, Map as MapIcon, RefreshCw, AlertTriangle, FileDown, Download } from 'lucide-react';
+import { BarChart3, Map as MapIcon, RefreshCw, AlertTriangle } from 'lucide-react';
 import type { HeatmapArea, HeatmapFilters, ViewMode } from '../lib/heatmapTypes';
 import {
   filterHeatmapAreas,

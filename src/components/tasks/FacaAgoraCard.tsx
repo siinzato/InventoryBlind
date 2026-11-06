@@ -1,6 +1,6 @@
 import React from 'react';
 import { Zap, Sun } from 'lucide-react';
-import { TaskWithAssignees, AssigneeStatus, BlockReason } from '../../lib/tasks/types';
+import { TaskWithAssignees, DirectAssigneeStatus, BlockReason } from '../../lib/tasks/types';
 import { recommendNextTask, RECOMMENDATION_REASON_LABEL } from '../../lib/tasks/taskDomain';
 import { TaskCard } from './TaskCard';
 
@@ -10,7 +10,7 @@ interface FacaAgoraCardProps {
   nowMs: number;
   dueSoonThresholdMinutes: number;
   onOpenTask: (id: string) => void;
-  onChangeMyStatus: (taskId: string, status: AssigneeStatus) => void;
+  onChangeMyStatus: (taskId: string, status: DirectAssigneeStatus) => void;
   onPause: (taskId: string, note?: string) => void;
   onResume: (taskId: string) => void;
   onBlock: (taskId: string, reason: BlockReason, note?: string) => void;

@@ -97,7 +97,9 @@ export const suggestMapping = (detected: DetectedColumn[]): ColumnMapping => {
 
   for (const col of detected) {
     if (col.detectedField && col.confidence !== 'none') {
-      (mapping as Record<string, string | null>)[col.detectedField] = col.name;
+      // A chave vem sempre de STANDARD_FIELDS, cujas chaves sao exatamente as de
+      // ColumnMapping — por isso a asserção recai sobre a chave, nao sobre o objeto.
+      mapping[col.detectedField as keyof ColumnMapping] = col.name;
     }
   }
 
@@ -163,8 +165,7 @@ const parsePrice = (value: string | number | undefined | null): number | null =>
 // Validate a single product
 export const validateProduct = (
   mappedData: ProductRaw,
-  existingProducts: Map<string, ProductFromDB>,
-  rowIndex: number
+  existingProducts: Map<string, ProductFromDB>
 ): ProductValidated => {
   const errors: string[] = [];
 
@@ -311,7 +312,7 @@ export const processRawProducts = async (
     const chunk = mappedData.slice(i, i + CHUNK_SIZE);
 
     chunk.forEach((data, j) => {
-      const validated = validateProduct(data, existingProducts, i + j + 2);
+      const validated = validateProduct(data, existingProducts);
 
       if (validated.status === 'error') {
         errors.push({
@@ -367,7 +368,11 @@ export const exportErrorsToCSV = (errors: ImportError[]): string => {
 };
 
 // Export products to CSV
-export const exportProductsToCSV = (products: ProductValidated[]): string => {
+// So o que a planilha precisa: pedir ProductValidated inteiro obrigava quem exporta
+// um catalogo ja salvo a inventar `isNew` e `isValid`, que nada significam ali.
+type ProductCsvRow = Pick<ProductValidated, 'name' | 'sku' | 'ean' | 'location' | 'price' | 'status'>;
+
+export const exportProductsToCSV = (products: ProductCsvRow[]): string => {
   const headers = ['Nome', 'SKU', 'EAN', 'Local', 'Preço', 'Status'];
   const lines = [headers.join(';')];
 

@@ -52,6 +52,7 @@ class FakeRepository implements AutomationRepository {
   counters: Record<string, number> = {};
   eventStatus: Record<string, string> = {};
   resumes: (Parameters<AutomationRepository['scheduleResume']>[0] & { id: string })[] = [];
+  webhookWaits: (Parameters<AutomationRepository['scheduleWebhookWait']>[0] & { token: string })[] = [];
   private seq = 0;
 
   async findActiveAutomations(companyId: string, triggerType: string): Promise<Automation[]> {
@@ -99,6 +100,19 @@ class FakeRepository implements AutomationRepository {
     const id = `resume-${this.seq}`;
     this.resumes.push({ id, ...input });
     return id;
+  }
+
+  // Mesma semantica do scheduleResume: sem no seguinte nao ha o que retomar, entao
+  // nao se grava espera nenhuma. O que muda e o retorno — aqui e o token que o POST
+  // externo usa para continuar o workflow.
+  async scheduleWebhookWait(
+    input: Parameters<AutomationRepository['scheduleWebhookWait']>[0]
+  ): Promise<{ token: string } | null> {
+    if (input.resumeNodeId == null) return null;
+    this.seq += 1;
+    const token = `wait-${this.seq}`;
+    this.webhookWaits.push({ token, ...input });
+    return { token };
   }
 
   logsFor(executionId: string): NodeLogEntry[] {

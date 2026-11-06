@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { AlertCircle, RefreshCw, Sun, X } from 'lucide-react';
-import { TaskWithAssignees, AssigneeStatus, BlockReason } from '../../lib/tasks/types';
+import { TaskWithAssignees, DirectAssigneeStatus, BlockReason } from '../../lib/tasks/types';
 import {
   groupTasksForMyDay, computeOperationalIndicators, isOverdue, isDueSoon, computeDueTimestamp,
   findMyAssignment,
@@ -16,7 +16,7 @@ interface MyDayViewProps {
   currentUserId: string;
   dueSoonThresholdMinutes: number;
   onOpenTask: (id: string) => void;
-  onChangeMyStatus: (taskId: string, status: AssigneeStatus) => void;
+  onChangeMyStatus: (taskId: string, status: DirectAssigneeStatus) => void;
   onPause: (taskId: string, note?: string) => void;
   onResume: (taskId: string) => void;
   onBlock: (taskId: string, reason: BlockReason, note?: string) => void;
@@ -48,7 +48,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
 
   const cardProps = (t: TaskWithAssignees) => ({
     task: t, currentUserId, onOpen: () => onOpenTask(t.id),
-    onChangeMyStatus: (s: AssigneeStatus) => onChangeMyStatus(t.id, s),
+    onChangeMyStatus: (s: DirectAssigneeStatus) => onChangeMyStatus(t.id, s),
     onPause: (note?: string) => onPause(t.id, note),
     onResume: () => onResume(t.id),
     onBlock: (reason: BlockReason, note?: string) => onBlock(t.id, reason, note),

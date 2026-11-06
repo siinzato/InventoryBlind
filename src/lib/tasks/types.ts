@@ -8,6 +8,11 @@ export type TaskPriority = 'low' | 'medium' | 'high' | 'urgent';
 export type TaskStatus = 'todo' | 'in_progress' | 'paused' | 'blocked' | 'done' | 'validated' | 'cancelled';
 export type AssigneeStatus = 'todo' | 'in_progress' | 'paused' | 'blocked' | 'done';
 
+/** O subconjunto que `task_set_my_status` aceita. `paused` e `blocked` nao entram
+ *  por aqui: tem RPC propria porque carregam motivo, nota e responsavel esperado.
+ *  Os controles de status na UI oferecem exatamente estes tres. */
+export type DirectAssigneeStatus = Extract<AssigneeStatus, 'todo' | 'in_progress' | 'done'>;
+
 export type BlockReason =
   | 'falta_estoque' | 'produto_nao_localizado' | 'divergencia_sistema' | 'endereco_bloqueado'
   | 'material_avariado' | 'equipamento_indisponivel' | 'sistema_indisponivel' | 'aguardando_decisao'

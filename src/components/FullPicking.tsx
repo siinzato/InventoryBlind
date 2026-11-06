@@ -6,7 +6,7 @@ import {
   ChevronLeft, RefreshCw, Package, MapPin,
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
-import { STATUS_LABEL, STATUS_COLOR, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR } from '../lib/fullManagerTypes';
+import { STATUS_LABEL, STATUS_COLOR } from '../lib/fullManagerTypes';
 import { Card } from './ui';
 
 // ── Operation selector ────────────────────────────────────────────────────────

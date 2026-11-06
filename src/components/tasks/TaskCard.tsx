@@ -4,7 +4,7 @@ import {
   ArrowDown, Minus, ArrowUp, AlertTriangle, MapPin, ListChecks, Paperclip,
 } from 'lucide-react';
 import { Badge } from '../ui';
-import { TaskWithAssignees, AssigneeStatus, TaskPriority, TaskStatus, BlockReason, BLOCK_REASONS } from '../../lib/tasks/types';
+import { TaskWithAssignees, DirectAssigneeStatus, TaskPriority, TaskStatus, BlockReason, BLOCK_REASONS } from '../../lib/tasks/types';
 import {
   findMyAssignment, formatAssigneeProgress, formatTaskTimeline, isOverdue,
   canTransitionAssigneeStatus, TASK_STATUS_LABEL, TASK_PRIORITY_LABEL, BLOCK_REASON_LABEL, formatDuration,
@@ -14,7 +14,7 @@ interface TaskCardProps {
   task: TaskWithAssignees;
   currentUserId: string;
   onOpen: () => void;
-  onChangeMyStatus?: (status: AssigneeStatus) => void;
+  onChangeMyStatus?: (status: DirectAssigneeStatus) => void;
   onPause?: (note?: string) => void;
   onResume?: () => void;
   onBlock?: (reason: BlockReason, note?: string) => void;
@@ -196,7 +196,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     <Ban size={12} />Bloquear
                   </button>
                 )}
-                {onChangeMyStatus && (['todo', 'in_progress', 'done'] as AssigneeStatus[])
+                {onChangeMyStatus && (['todo', 'in_progress', 'done'] as DirectAssigneeStatus[])
                   .filter(s => canTransitionAssigneeStatus(mine.status, s))
                   .map(s => (
                     <button key={s} onClick={() => { onChangeMyStatus(s); setMenuOpen(false); }}

@@ -13,6 +13,7 @@ export const ProductImportProgress: React.FC<ProductImportProgressProps> = ({ pr
   const statusMessages = {
     idle: 'Aguardando início...',
     reading: 'Lendo planilha...',
+    mapping: 'Mapeando colunas...',
     validating: 'Validando dados...',
     importing: 'Importando produtos...',
     completed: 'Importação concluída!',
@@ -22,6 +23,7 @@ export const ProductImportProgress: React.FC<ProductImportProgressProps> = ({ pr
   const statusColors = {
     idle: 'bg-edge',
     reading: 'bg-accent',
+    mapping: 'bg-accent',
     validating: 'bg-accent',
     importing: 'bg-accent',
     completed: 'bg-emerald-500',

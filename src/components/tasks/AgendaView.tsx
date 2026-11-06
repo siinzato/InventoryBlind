@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { ChevronLeft, ChevronRight, RefreshCw, AlertCircle, CalendarDays } from 'lucide-react';
-import { TaskWithAssignees, AssigneeStatus } from '../../lib/tasks/types';
+import { TaskWithAssignees, DirectAssigneeStatus } from '../../lib/tasks/types';
 import { TaskCard } from './TaskCard';
 
 interface AgendaViewProps {
@@ -9,7 +9,7 @@ interface AgendaViewProps {
   error: string | null;
   currentUserId: string;
   onOpenTask: (id: string) => void;
-  onChangeMyStatus: (taskId: string, status: AssigneeStatus) => void;
+  onChangeMyStatus: (taskId: string, status: DirectAssigneeStatus) => void;
 }
 
 type AgendaMode = 'day' | 'week' | 'month';

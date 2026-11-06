@@ -1,13 +1,13 @@
 import React from 'react';
 import { PlayCircle, CheckCircle2, Lock, Archive, MapPin, Clock } from 'lucide-react';
-import { TaskWithAssignees, AssigneeStatus } from '../../lib/tasks/types';
+import { TaskWithAssignees, DirectAssigneeStatus } from '../../lib/tasks/types';
 import { findMyAssignment, formatTaskTimeline, isOverdue, TASK_PRIORITY_LABEL } from '../../lib/tasks/taskDomain';
 
 interface KanbanTaskCardProps {
   task: TaskWithAssignees;
   currentUserId: string;
   onOpen: () => void;
-  onChangeMyStatus: (status: AssigneeStatus) => void;
+  onChangeMyStatus: (status: DirectAssigneeStatus) => void;
   onArchive?: () => void;
   draggable?: boolean;
   onDragStart?: (e: React.DragEvent) => void;

@@ -1,7 +1,7 @@
 import React, { useMemo, useState } from 'react';
 import { RefreshCw, AlertCircle, LayoutGrid, Search, SlidersHorizontal, ArrowUpDown, Archive as ArchiveIcon } from 'lucide-react';
 import { Input, Select, Button } from '../ui';
-import { TaskWithAssignees, AssigneeStatus, TaskPriority } from '../../lib/tasks/types';
+import { TaskWithAssignees, AssigneeStatus, DirectAssigneeStatus, TaskPriority } from '../../lib/tasks/types';
 import { findMyAssignment, isAssigneeArchived, TASK_PRIORITY_LABEL } from '../../lib/tasks/taskDomain';
 import { KanbanTaskCard } from './KanbanTaskCard';
 import { ArchivedTasksDrawer } from './ArchivedTasksDrawer';
@@ -12,13 +12,13 @@ interface KanbanViewProps {
   error: string | null;
   currentUserId: string;
   onOpenTask: (id: string) => void;
-  onChangeMyStatus: (taskId: string, status: AssigneeStatus) => void;
+  onChangeMyStatus: (taskId: string, status: DirectAssigneeStatus) => void;
   onArchiveTask: (taskId: string) => void;
   onRestoreTask: (taskId: string) => void;
   onArchiveEligible: () => Promise<number>;
 }
 
-const COLUMNS: { status: AssigneeStatus; label: string }[] = [
+const COLUMNS: { status: DirectAssigneeStatus; label: string }[] = [
   { status: 'todo', label: 'A fazer' },
   { status: 'in_progress', label: 'Em andamento' },
   { status: 'done', label: 'Concluído' },
@@ -46,7 +46,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   tasks, loading, error, currentUserId, onOpenTask, onChangeMyStatus, onArchiveTask, onRestoreTask, onArchiveEligible,
 }) => {
   const [draggedId, setDraggedId] = useState<string | null>(null);
-  const [dragOverCol, setDragOverCol] = useState<AssigneeStatus | null>(null);
+  const [dragOverCol, setDragOverCol] = useState<DirectAssigneeStatus | null>(null);
   const [search, setSearch] = useState('');
   const [typeFilter, setTypeFilter] = useState<TypeFilter>('all');
   const [priorityFilter, setPriorityFilter] = useState<PriorityFilter>('all');
@@ -114,7 +114,7 @@ export const KanbanView: React.FC<KanbanViewProps> = ({
   if (loading) return <div className="flex items-center justify-center py-16 text-fg-subtle gap-2"><RefreshCw size={20} className="animate-spin" />Carregando quadro...</div>;
   if (error) return <div className="flex items-center gap-2 p-4 bg-red-500/10 text-red-700 dark:text-red-400 rounded-lg text-sm"><AlertCircle size={16} />{error}</div>;
 
-  const handleDrop = (targetStatus: AssigneeStatus) => {
+  const handleDrop = (targetStatus: DirectAssigneeStatus) => {
     setDragOverCol(null);
     if (!draggedId) return;
     const task = myTasks.find(t => t.id === draggedId);

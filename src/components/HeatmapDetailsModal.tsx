@@ -20,7 +20,6 @@ import {
 import type { HeatmapArea, LocalFisico } from '../lib/heatmapTypes';
 import {
   getCriticalityLevel,
-  getCriticalityBgClass,
   getCriticalityTextClass,
   calculatePending,
   formatDateTime,
@@ -59,7 +58,6 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
   if (!isOpen || !area) return null;
 
   const criticality = getCriticalityLevel(area);
-  const bgClass = getCriticalityBgClass(criticality);
   const textClass = getCriticalityTextClass(criticality);
   const pending = calculatePending(area.totalSku, area.concluidos);
 
@@ -117,14 +115,6 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
     setEditMode(false);
     setLocaisEditados([]);
     setHasChanges(false);
-  };
-
-  const criticalityLabels: Record<string, string> = {
-    success: 'Saudável',
-    warning: 'Atenção',
-    danger: 'Risco',
-    critical: 'Crítico',
-    neutral: 'Não iniciado',
   };
 
   return (

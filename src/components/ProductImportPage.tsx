@@ -1,6 +1,6 @@
 // Product Import Page Component - Full Featured
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback } from 'react';
 import { FileSpreadsheet, ArrowLeft, Lock, XCircle, Package } from 'lucide-react';
 import { ProductUploadArea } from './ProductUploadArea';
 import { ColumnMappingWizard } from './ColumnMappingWizard';

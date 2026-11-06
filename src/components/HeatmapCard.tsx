@@ -5,7 +5,6 @@ import { MapPin, Package, AlertTriangle, CheckCircle, TrendingUp, ChevronRight, 
 import type { HeatmapArea, RiskLevel } from '../lib/heatmapTypes';
 import {
   getCriticalityLevel,
-  getCriticalityBgClass,
   getCriticalityTextClass,
   getProgressBgClass,
   calculatePending,
@@ -37,7 +36,6 @@ const RISK_SCORE_TEXT_CLASS: Record<RiskLevel, string> = {
 
 export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMode, rank }) => {
   const criticality = getCriticalityLevel(area);
-  const bgClass = getCriticalityBgClass(criticality);
   const textClass = getCriticalityTextClass(criticality);
   const progressBg = getProgressBgClass(criticality);
   const pending = calculatePending(area.totalSku, area.concluidos);

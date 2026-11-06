@@ -20,11 +20,18 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-06-historico-importacoes-e-modal-produto',
+    date: '2026-11-06',
+    category: 'correcao',
+    title: 'Histórico de importações volta a mostrar os dados de cada arquivo',
+    description: 'A tela de Histórico de Importações listava as importações sem preencher nada: nome do arquivo, data, quem importou e a quantidade de produtos apareciam em branco, e o botão de baixar a planilha original ficava sempre indisponível. Agora cada linha mostra as informações completas e o download volta a funcionar. Também corrigimos a ficha de confiabilidade do produto, que ficava em branco ao abrir um produto que ainda não tinha classificação ABC+XYZ — agora ela abre normalmente e apenas omite a recomendação de contagem enquanto a classificação não existe.',
+  },
+  {
     id: '2026-11-05-central-conhecimento-atualizada',
     date: '2026-11-05',
     category: 'melhoria',
     title: 'Central de Conhecimento atualizada com tudo o que o sistema faz hoje',
-    description: 'A Central de Conhecimento estava descrevendo uma versão antiga da plataforma: faltavam módulos inteiros e dois recursos apareciam como "em breve" mesmo já estando no ar. Ela foi refeita do zero e passou de 30 para 92 artigos, agora organizados nas mesmas categorias do menu lateral — você procura pelo nome que vê na tela. Entraram áreas que não tinham nenhuma explicação: Recebimento e Armazenagem (conferência cega por NF-e, Pulmão, ordens de compra, logística reversa, lote e validade), Catálogo e Dados de Produto, Ferramentas do dia a dia, Agentes e Automações, e Conta, Suporte e Administração. BlindScore e Inventory Health deixaram de ser descritos como promessa e passaram a ser explicados como funcionam. As Perguntas Frequentes também cresceram, com dúvidas práticas como por onde começar, se dá para usar no celular e se é preciso contar o estoque inteiro de uma vez.',
+    description: 'A Central de Conhecimento estava descrevendo uma versão antiga da plataforma: faltavam módulos inteiros e dois recursos apareciam como "em breve" mesmo já estando no ar. Ela foi refeita do zero e passou de 30 para 92 artigos, agora organizados nas mesmas categorias do menu lateral — você procura pelo nome que vê na tela. Entraram áreas que não tinham nenhuma explicação: Recebimento e Armazenagem (conferência cega por NF-e, Pulmão, ordens de compra, logística reversa, lote e validade), Catálogo e Dados de Produto, Ferramentas do dia a dia, Agentes e Automações, e Conta, Suporte e Administração. BlindScore e Inventory Health deixaram de ser descritos como promessa e passaram a ser explicados como funcionam. As Perguntas Frequentes também cresceram, com dúvidas práticas como por onde começar, se dá para usar no celular e se é preciso contar o estoque inteiro de uma vez. Ao clicar numa categoria, a página agora leva você direto até os artigos dela, em vez de deixar o conteúdo lá embaixo.',
   },
   {
     id: '2026-11-05-botoes-mais-sobrios',

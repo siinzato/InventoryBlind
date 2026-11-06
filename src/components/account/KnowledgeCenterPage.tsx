@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
   Rocket, ClipboardList, ShieldCheck, BrainCircuit, Plug, GraduationCap, HelpCircle, Building2,
   Search, ChevronDown, ArrowRight, LayoutGrid, MapPin, ListChecks, ClipboardCheck, EyeOff, X,
@@ -82,6 +82,21 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
   const activeCategory = KB_CATEGORIES.find(c => c.id === activeId) ?? null;
   const activeIsFaq = activeId === 'faq';
   const activeIsSobre = activeId === 'sobre';
+
+  // O conteúdo abre ABAIXO da grade inteira, e a grade tem treze blocos: quem
+  // clica num bloco da primeira linha ficaria olhando para a mesma tela, sem
+  // sinal de que algo aconteceu. Levar o painel até a viewport é o que torna o
+  // clique legível. Só no clique — a dependência é `activeId`, então nada rola
+  // na montagem nem ao fechar.
+  const detailRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!activeId) return;
+    const node = detailRef.current;
+    if (!node) return;
+    const reduced = typeof window !== 'undefined'
+      && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    node.scrollIntoView({ behavior: reduced ? 'auto' : 'smooth', block: 'start' });
+  }, [activeId]);
 
   const handleTileClick = (id: string) => {
     if (id === 'academia') { onNavigateToAcademy(); return; }
@@ -185,32 +200,39 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
             })}
           </div>
 
-          {activeCategory && (
-            <Panel>
-              {activeCategory.articles.map(article => <ArticleRow key={article.id} article={article} />)}
-            </Panel>
-          )}
+          {/* Um só invólucro para o conteúdo aberto — é o alvo da rolagem. Fica
+              condicionado porque o `space-y` do `Page` conta filhos: um div vazio
+              permanente abriria um vão extra abaixo da grade. */}
+          {(activeCategory || activeIsFaq || activeIsSobre) && (
+            <div ref={detailRef} className="scroll-mt-6">
+              {activeCategory && (
+                <Panel>
+                  {activeCategory.articles.map(article => <ArticleRow key={article.id} article={article} />)}
+                </Panel>
+              )}
 
-          {activeIsFaq && (
-            <Panel>
-              {allFaq.map(entry => (
-                <FaqRow key={entry.title} entry={entry} open={openFaqTitle === entry.title} onToggle={() => setOpenFaqTitle(curr => (curr === entry.title ? null : entry.title))} />
-              ))}
-            </Panel>
-          )}
+              {activeIsFaq && (
+                <Panel>
+                  {allFaq.map(entry => (
+                    <FaqRow key={entry.title} entry={entry} open={openFaqTitle === entry.title} onToggle={() => setOpenFaqTitle(curr => (curr === entry.title ? null : entry.title))} />
+                  ))}
+                </Panel>
+              )}
 
-          {activeIsSobre && (
-            <Panel>
-              {ABOUT_CONTENT.sections.map(section => (
-                <PanelSection key={section.heading} padding="md">
-                  <p className="font-semibold text-fg text-sm">{section.heading}</p>
-                  <p className="text-sm text-fg-muted mt-1.5 leading-relaxed">{section.body}</p>
-                </PanelSection>
-              ))}
-              <PanelSection padding="lg" className="text-center">
-                <p className="text-base font-semibold text-fg italic">"{ABOUT_CONTENT.closingMessage}"</p>
-              </PanelSection>
-            </Panel>
+              {activeIsSobre && (
+                <Panel>
+                  {ABOUT_CONTENT.sections.map(section => (
+                    <PanelSection key={section.heading} padding="md">
+                      <p className="font-semibold text-fg text-sm">{section.heading}</p>
+                      <p className="text-sm text-fg-muted mt-1.5 leading-relaxed">{section.body}</p>
+                    </PanelSection>
+                  ))}
+                  <PanelSection padding="lg" className="text-center">
+                    <p className="text-base font-semibold text-fg italic">"{ABOUT_CONTENT.closingMessage}"</p>
+                  </PanelSection>
+                </Panel>
+              )}
+            </div>
           )}
 
           {!activeCategory && !activeIsFaq && !activeIsSobre && (

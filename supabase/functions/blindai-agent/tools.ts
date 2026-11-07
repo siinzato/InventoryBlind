@@ -291,6 +291,17 @@ async function getConfidenceTrend(supabase: SupabaseClient, companyId: string, d
  *  aqui ja usa `?.`, mas nada obrigava. */
 type JoinedProduct = { name?: string | null; sku?: string | null; location?: string | null } | null;
 
+/** O rotulo da causa, resolvido como o resto do app ja faz (ver rcaAlgorithm.ts):
+ *  divergencia sem causa classificada vira "Nao classificado", e uma categoria que o
+ *  workspace criou e que nao esta no mapa padrao aparece com a propria chave.
+ *
+ *  Indexar CAUSE_LABEL direto devolvia `undefined` nos dois casos — e como estes
+ *  valores vao para a resposta do agente, o usuario lia "A causa foi undefined". */
+function causeLabel(category: string | null | undefined): string {
+  if (!category) return 'Nao classificado';
+  return CAUSE_LABEL[category] ?? category;
+}
+
 async function getAbcXyzSummary(supabase: SupabaseClient, companyId: string, combo?: string) {
   const { data, error } = await supabase.from('abc_xyz_company_summary_v').select('*').eq('company_id', companyId);
   if (error) throw error;
@@ -333,13 +344,13 @@ async function getDivergenceRecords(supabase: SupabaseClient, companyId: string,
 
   return {
     total_registros: records.length,
-    pareto_causas: pareto.map(p => ({ causa: CAUSE_LABEL[p.category], quantidade: p.count, pct_do_total: round1(p.pctOfTotal) })),
+    pareto_causas: pareto.map(p => ({ causa: causeLabel(p.category), quantidade: p.count, pct_do_total: round1(p.pctOfTotal) })),
     agrupamento: grouping?.map(g => ({ chave: g.label, quantidade: g.count })) ?? null,
     amostra_recente: records.slice(0, 5).map(r => ({
       sku: r.sku,
       produto: r.product_name,
       local: r.location,
-      causa: CAUSE_LABEL[r.cause_category],
+      causa: causeLabel(r.cause_category),
       data: r.occurred_at,
     })),
   };
@@ -387,7 +398,7 @@ async function getProductDetail(supabase: SupabaseClient, companyId: string, pro
     risco: riskRes.data ? { nivel: riskRes.data.risk_level, score: riskRes.data.risk_score, motivo: riskRes.data.risk_reason } : null,
     confianca: confidenceRes.data ? { nivel: confidenceRes.data.risk_level, score: confidenceRes.data.confidence_score, proxima_contagem: confidenceRes.data.next_count_date } : null,
     abc_xyz: abcXyzRes.data ? { combo: abcXyzRes.data.abc_xyz_class, valor_movimentado: abcXyzRes.data.value_moved } : null,
-    divergencias_recentes: (rcaRes.data ?? []).map((r: { cause_category: keyof typeof CAUSE_LABEL; occurred_at: string; divergence_qty: number | null }) => ({ causa: CAUSE_LABEL[r.cause_category], data: r.occurred_at, quantidade: r.divergence_qty })),
+    divergencias_recentes: (rcaRes.data ?? []).map((r: { cause_category: string | null; occurred_at: string; divergence_qty: number | null }) => ({ causa: causeLabel(r.cause_category), data: r.occurred_at, quantidade: r.divergence_qty })),
   };
 }
 

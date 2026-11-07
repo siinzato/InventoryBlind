@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-07-blindai-atualizado',
+    date: '2026-11-07',
+    category: 'melhoria',
+    title: 'O BlindAI voltou a falar da versão atual do sistema',
+    description: 'O assistente estava respondendo com base em uma versão antiga do conteúdo da Central de Conhecimento, anterior aos módulos que você usa hoje — quem lia a Central e depois perguntava ao BlindAI podia receber respostas que não batiam. Ele agora usa o mesmo conteúdo que está na plataforma. Na mesma atualização, ao listar as causas das divergências ele deixou de mostrar "undefined" quando a divergência ainda não tinha causa classificada ou quando a categoria foi criada pela sua equipe: agora aparece "Não classificado" ou o nome da própria categoria.',
+  },
+  {
     id: '2026-11-07-heatmap-detalhe-area',
     date: '2026-11-07',
     category: 'correcao',

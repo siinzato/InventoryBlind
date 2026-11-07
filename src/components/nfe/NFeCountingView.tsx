@@ -8,7 +8,7 @@ import { getInvoiceItems, registerCount, finalizeConference } from '../../lib/nf
 import { supabase } from '../../lib/supabase';
 import { normalizeEan, buildEanIndex } from '../../lib/nfe/nfeEanUtils';
 import { formatQty } from './nfeUi';
-import { Card, Button, Modal, Input, Notice, SegmentedControl, StatRow, StatCell, Stat } from '../ui';
+import { Card, Panel, PanelSection, Button, Modal, Input, Notice, SegmentedControl, StatRow, StatCell, Stat } from '../ui';
 import { useAuth } from '../../lib/auth';
 import { RcaClassificationModal, PendingRcaItem } from '../rca/RcaClassificationModal';
 
@@ -250,13 +250,18 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
 
       {loading ? (
         <div className="flex items-center justify-center py-16 text-fg-subtle"><Loader2 size={28} className="animate-spin" /></div>
+      ) : visible.length === 0 ? (
+        <p className="text-center text-sm text-fg-subtle py-10">Nenhum item nesta lista.</p>
       ) : (
-        <div className="space-y-2">
+        // Um painel com divisores, nao uma pilha de caixas: a lista de itens da nota
+        // e um bloco so. Cada item tinha borda, canto e sombra proprios, o que
+        // multiplicava o contorno por linha sem separar nada que o divisor nao separe.
+        <Panel>
           {visible.map((it) => {
             const prod = it.product_id ? products.get(it.product_id) : null;
             const ean = displayEan(it);
             return (
-              <Card key={it.id} padding="sm">
+              <PanelSection key={it.id} padding="sm">
                 <div className="flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="font-semibold text-fg text-sm flex items-center gap-1.5">
@@ -282,11 +287,10 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
                   </div>
                 </div>
                 <CountControls onIncrement={(d) => applyCount(it, 'increment', d, 'manual')} onSet={(v) => applyCount(it, 'set', v, 'manual')} />
-              </Card>
+              </PanelSection>
             );
           })}
-          {visible.length === 0 && <p className="text-center text-sm text-fg-subtle py-10">Nenhum item nesta lista.</p>}
-        </div>
+        </Panel>
       )}
 
       <div className="sticky bottom-0 bg-surface border-t border-edge pt-4 pb-[calc(0.5rem+env(safe-area-inset-bottom))]">

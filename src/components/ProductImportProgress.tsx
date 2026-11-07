@@ -80,15 +80,20 @@ export const ProductImportProgress: React.FC<ProductImportProgressProps> = ({ pr
             <p className="text-caption">Produtos processados</p>
           </div>
 
-          <div className="text-center">
-            <div className="flex items-center justify-center gap-2 mb-1">
-              <Database size={18} className="text-fg-subtle" />
+          {/* "Salvos no banco" so vale durante a gravacao. Nas fases de leitura e
+              validacao nada foi para o banco ainda, e repetir o contador ali afirmaria
+              ao usuario algo que nao aconteceu. */}
+          {progress.status === 'importing' && (
+            <div className="text-center">
+              <div className="flex items-center justify-center gap-2 mb-1">
+                <Database size={18} className="text-fg-subtle" />
+              </div>
+              <p className="text-display text-emerald-600 dark:text-emerald-400">
+                {progress.current}
+              </p>
+              <p className="text-caption">Salvos no banco</p>
             </div>
-            <p className="text-display text-emerald-600 dark:text-emerald-400">
-              {progress.current}
-            </p>
-            <p className="text-caption">Salvos no banco</p>
-          </div>
+          )}
         </div>
       </PanelSection>
     </Panel>

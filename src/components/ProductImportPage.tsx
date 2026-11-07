@@ -171,13 +171,29 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
   const handleMappingConfirm = useCallback(async (mapping: ColumnMapping) => {
     setColumnMapping(mapping);
     setStatus('validating');
+    // Sem isto a tela ficava em branco entre confirmar o mapeamento e o preview
+    // ficar pronto: nenhum ramo de renderizacao casava com `validating`. Numa
+    // planilha grande sao varios segundos sem sinal nenhum de que algo acontece.
+    setProgress({
+      current: 0, total: rawRows.length, percentage: 0, status: 'validating',
+      message: 'Carregando o catálogo atual para comparar...',
+    });
 
     // Load existing products
     const existing = await loadExistingProducts();
     setExistingProducts(existing);
 
     // Process with mapping (async, chunked to avoid blocking UI)
-    const { products: validated, errors: importErrors } = await processRawProducts(rawRows, existing, mapping);
+    // O onProgress ja existia em processRawProducts e nunca tinha sido ligado.
+    const { products: validated, errors: importErrors } = await processRawProducts(
+      rawRows, existing, mapping,
+      (processed, total) => setProgress({
+        current: processed, total,
+        percentage: total > 0 ? Math.round((processed / total) * 100) : 0,
+        status: 'validating',
+        message: 'Conferindo os produtos da planilha...',
+      }),
+    );
 
     const nonEmptyEntries = validated.filter(p =>
       p.sku?.trim() || p.name?.trim()
@@ -610,11 +626,12 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
         }
       />
 
-      {/* Fases da importação */}
+      {/* Fases da importação. `validating` nao e uma etapa da trilha: e o fim do
+          mapeamento. Sem este mapa a trilha nao achava a etapa e zerava o destaque. */}
         <PhaseRail
           label="Progresso da importação"
           steps={IMPORT_PHASES}
-          currentKey={status === 'error' ? 'complete' : status}
+          currentKey={status === 'error' ? 'complete' : status === 'validating' ? 'mapping' : status}
           className="mb-8"
         />
 
@@ -650,7 +667,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
               />
             )}
 
-            {status === 'importing' && (
+            {(status === 'validating' || status === 'importing') && (
               <ProductImportProgress progress={progress} />
             )}
 

@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-06-importacao-progresso-validacao',
+    date: '2026-11-06',
+    category: 'correcao',
+    title: 'A importação de produtos deixou de parecer travada ao conferir a planilha',
+    description: 'Depois de confirmar o mapeamento das colunas, a tela ficava completamente em branco enquanto o sistema carregava o catálogo atual e conferia linha por linha — em planilhas grandes isso durava vários segundos e parecia que a importação tinha travado. Agora essa etapa mostra a barra de progresso, quantos produtos já foram conferidos do total e em que ponto o processo está. A trilha de etapas no topo também deixou de ficar sem destaque nesse intervalo.',
+  },
+  {
+    id: '2026-11-06-nfe-lista-itens',
+    date: '2026-11-06',
+    category: 'melhoria',
+    title: 'Lista de itens da conferência por NF-e com leitura mais limpa',
+    description: 'Na conferência por NF-e, cada item da nota aparecia dentro de uma caixa própria, e uma nota com muitos itens virava uma pilha de molduras. Agora os itens ficam num bloco único, separados por linhas discretas: o mesmo conteúdo e o mesmo espaçamento, com menos contorno disputando a atenção de quem está contando.',
+  },
+  {
     id: '2026-11-06-historico-importacoes-e-modal-produto',
     date: '2026-11-06',
     category: 'correcao',

@@ -55,7 +55,11 @@ export function TrendAnalysisPanel({ companyId }: TrendAnalysisPanelProps) {
   const buckets = useMemo(() => groupByDimension(records, dimension).slice(0, 8), [records, dimension]);
   const concentration = useMemo(() => topConcentration(records, dimension), [records, dimension]);
 
-  useEffect(() => { setSelectedKey(buckets[0]?.key ?? null); }, [dimension, buckets.length]);
+  // `buckets` inteiro, nao `buckets.length`: o comprimento era um proxy barato para
+  // "o conjunto mudou" e deixava a selecao apontando para uma chave que sumiu quando a
+  // lista troca de conteudo sem mudar de tamanho. O memo so troca de identidade quando
+  // `records` ou `dimension` mudam, entao nao ha execucao extra.
+  useEffect(() => { setSelectedKey(buckets[0]?.key ?? null); }, [dimension, buckets]);
 
   const selectedBucket = buckets.find(b => b.key === selectedKey) ?? null;
   const trend = useMemo(

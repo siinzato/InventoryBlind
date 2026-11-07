@@ -46,6 +46,12 @@ export function WarehouseTimelinePanel({ companyId, layoutId, layout, cells, onS
     setLoading(false);
   };
 
+  // Só na montagem: carrega o snapshot da data inicial. Daí em diante quem
+  // reconstrói é o clique numa marca da régua, que chama handleReconstruct
+  // direto. Declarar as dependências aqui seria um laço — handleReconstruct
+  // altera selectedDate e é recriada a cada render, então o efeito se
+  // realimentaria a cada reconstrução.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   useEffect(() => { handleReconstruct(selectedDate); }, []);
 
   return (

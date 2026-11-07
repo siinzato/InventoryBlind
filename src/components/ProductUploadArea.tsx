@@ -4,6 +4,16 @@ import React, { useCallback, useRef, useState } from 'react';
 import { Upload, FileSpreadsheet, CheckCircle2 } from 'lucide-react';
 import { Panel, PanelSection, Table, Thead, Tr, Th, Td } from './ui';
 
+// Fora do componente de proposito: a lista e a checagem nao leem nada do estado
+// nem das props. Dentro, eram recriadas a cada render e os `useCallback` abaixo
+// congelavam a primeira copia — funcionava por acidente, nao por construcao.
+const ACCEPTED_EXTENSIONS = ['.xlsx', '.xls', '.csv'];
+
+const validateFile = (file: File): boolean => {
+  const extension = '.' + file.name.split('.').pop()?.toLowerCase();
+  return ACCEPTED_EXTENSIONS.includes(extension);
+};
+
 interface ProductUploadAreaProps {
   onFileSelect: (file: File) => void;
   isLoading: boolean;
@@ -17,8 +27,6 @@ export const ProductUploadArea: React.FC<ProductUploadAreaProps> = ({
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const acceptedExtensions = ['.xlsx', '.xls', '.csv'];
-
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(true);
@@ -28,11 +36,6 @@ export const ProductUploadArea: React.FC<ProductUploadAreaProps> = ({
     e.preventDefault();
     setIsDragging(false);
   }, []);
-
-  const validateFile = (file: File): boolean => {
-    const extension = '.' + file.name.split('.').pop()?.toLowerCase();
-    return acceptedExtensions.includes(extension);
-  };
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -103,7 +106,7 @@ export const ProductUploadArea: React.FC<ProductUploadAreaProps> = ({
           <input
             ref={fileInputRef}
             type="file"
-            accept={acceptedExtensions.join(',')}
+            accept={ACCEPTED_EXTENSIONS.join(',')}
             onChange={handleFileChange}
             className="hidden"
           />

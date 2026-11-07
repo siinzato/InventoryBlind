@@ -107,6 +107,12 @@ export function ManualCountTab({ brandsData, countingUniverse, universeReconcile
     setEmptyGroupError(null);
     // Selecionar a linha só carrega os totais/pendências — nunca inicia um
     // cronômetro nem preenche início/término, que ficam por conta do operador.
+    //
+    // A dependência é a CHAVE, não o objeto: `groups` é remontado toda vez que o
+    // App relê o universo, e depender de `selectedGroup` faria este efeito disparar
+    // num refresh de fundo e sobrescrever o total que o operador já tinha digitado.
+    // O efeito existe para reagir a trocar de linha, não a recarregar a mesma.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedGroup?.groupKey]);
 
   const metrics = useMemo(() => calculateCountMetrics({

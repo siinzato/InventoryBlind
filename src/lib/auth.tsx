@@ -485,7 +485,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
       subscription.unsubscribe();
       if (timeoutRef.current) clearTimeout(timeoutRef.current);
     };
-  }, [runAuthSequence]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [runAuthSequence]);
 
   // ── signOut ────────────────────────────────────────────────────────────────
   const signOut = useCallback(async () => {

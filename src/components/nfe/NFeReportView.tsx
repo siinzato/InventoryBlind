@@ -96,7 +96,6 @@ export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props)
         (it.snapshot_ean ?? it.nfe_ean ?? '').toLowerCase().includes(q)
       );
     });
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [items, filter, search]);
 
   return (

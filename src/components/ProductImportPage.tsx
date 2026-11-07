@@ -205,6 +205,88 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
     setStatus('preview');
   }, [rawRows]);
 
+  // Create import history record
+  //
+  // Precisa estar ACIMA de handleConfirmImport: entrou na lista de dependencias
+  // dele, e uma dep array e avaliada durante o render — declarada depois, cairia
+  // na zona morta do `const`. Em useCallback porque lia `currentFile`,
+  // `columnMapping` e `fileContent` enquanto o handler que a chamava congelava
+  // uma copia antiga: reimportar um segundo arquivo podia gravar no historico o
+  // nome do anterior.
+  const createImportHistory = useCallback(async (): Promise<string | null> => {
+    if (!currentFile) {
+      console.error('[createImportHistory] Nenhum arquivo selecionado');
+      return null;
+    }
+
+    console.log('[createImportHistory] Criando registro de importacao...');
+    console.log('[createImportHistory] Arquivo:', currentFile.name);
+    console.log('[createImportHistory] Tamanho:', currentFile.size);
+    console.log('[createImportHistory] Mapeamento:', columnMapping);
+
+    // Prepare insert data - avoid large file_content
+    const insertData: Record<string, any> = {
+      file_name: currentFile.name,
+      file_size: currentFile.size,
+      total_products: 0,
+      new_products: 0,
+      updated_products: 0,
+      errors: 0,
+      imported_by: 'admin',
+      status: 'processing',
+    };
+
+    // Only add file_content if it's small (less than 500KB)
+    if (fileContent.length < 500000) {
+      insertData.file_content = fileContent;
+    } else {
+      console.log('[createImportHistory] Arquivo muito grande, nao sera salvo no historico');
+    }
+
+    // Only add column_mapping if it exists and is valid
+    if (columnMapping) {
+      insertData.column_mapping = columnMapping;
+    }
+
+    console.log('[createImportHistory] Dados do insert (resumidos):', {
+      file_name: insertData.file_name,
+      file_size: insertData.file_size,
+      status: insertData.status,
+      has_file_content: !!insertData.file_content,
+      has_column_mapping: !!insertData.column_mapping,
+    });
+
+    try {
+      const { data, error } = await supabase
+        .from('import_history')
+        .insert(insertData)
+        .select('id')
+        .single();
+
+      if (error) {
+        console.error('[createImportHistory] Erro do Supabase:', {
+          message: error.message,
+          details: error.details,
+          hint: error.hint,
+          code: error.code,
+        });
+        throw error;
+      }
+
+      console.log('[createImportHistory] Registro criado com sucesso:', data?.id);
+      return data?.id || null;
+    } catch (err: any) {
+      console.error('[createImportHistory] Erro completo:', err);
+      // Show user-friendly error
+      const errorMsg = err?.message || 'Erro desconhecido';
+      const errorCode = err?.code || '';
+      const errorHint = err?.hint || '';
+
+      alert(`Erro ao criar registro de importacao: ${errorMsg}\n\nCodigo: ${errorCode}\nDica: ${errorHint}\n\nVerifique o console para mais detalhes.`);
+      return null;
+    }
+  }, [currentFile, columnMapping, fileContent]);
+
   // Confirm import
   const handleConfirmImport = useCallback(async () => {
     if (!summary || summary.validProducts === 0 || !columnMapping || !isAdmin) return;
@@ -442,82 +524,8 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
       });
       setStatus('complete');
     }
-  }, [products, summary, columnMapping, isAdmin, existingProducts, errors.length, companyId, profile?.id, profile?.email]);
+  }, [products, summary, columnMapping, isAdmin, existingProducts, errors.length, companyId, profile?.id, profile?.email, createImportHistory]);
 
-  // Create import history record
-  const createImportHistory = async (): Promise<string | null> => {
-    if (!currentFile) {
-      console.error('[createImportHistory] Nenhum arquivo selecionado');
-      return null;
-    }
-
-    console.log('[createImportHistory] Criando registro de importacao...');
-    console.log('[createImportHistory] Arquivo:', currentFile.name);
-    console.log('[createImportHistory] Tamanho:', currentFile.size);
-    console.log('[createImportHistory] Mapeamento:', columnMapping);
-
-    // Prepare insert data - avoid large file_content
-    const insertData: Record<string, any> = {
-      file_name: currentFile.name,
-      file_size: currentFile.size,
-      total_products: 0,
-      new_products: 0,
-      updated_products: 0,
-      errors: 0,
-      imported_by: 'admin',
-      status: 'processing',
-    };
-
-    // Only add file_content if it's small (less than 500KB)
-    if (fileContent.length < 500000) {
-      insertData.file_content = fileContent;
-    } else {
-      console.log('[createImportHistory] Arquivo muito grande, nao sera salvo no historico');
-    }
-
-    // Only add column_mapping if it exists and is valid
-    if (columnMapping) {
-      insertData.column_mapping = columnMapping;
-    }
-
-    console.log('[createImportHistory] Dados do insert (resumidos):', {
-      file_name: insertData.file_name,
-      file_size: insertData.file_size,
-      status: insertData.status,
-      has_file_content: !!insertData.file_content,
-      has_column_mapping: !!insertData.column_mapping,
-    });
-
-    try {
-      const { data, error } = await supabase
-        .from('import_history')
-        .insert(insertData)
-        .select('id')
-        .single();
-
-      if (error) {
-        console.error('[createImportHistory] Erro do Supabase:', {
-          message: error.message,
-          details: error.details,
-          hint: error.hint,
-          code: error.code,
-        });
-        throw error;
-      }
-
-      console.log('[createImportHistory] Registro criado com sucesso:', data?.id);
-      return data?.id || null;
-    } catch (err: any) {
-      console.error('[createImportHistory] Erro completo:', err);
-      // Show user-friendly error
-      const errorMsg = err?.message || 'Erro desconhecido';
-      const errorCode = err?.code || '';
-      const errorHint = err?.hint || '';
-
-      alert(`Erro ao criar registro de importacao: ${errorMsg}\n\nCodigo: ${errorCode}\nDica: ${errorHint}\n\nVerifique o console para mais detalhes.`);
-      return null;
-    }
-  };
 
   // Reset state
   const handleReset = useCallback(() => {

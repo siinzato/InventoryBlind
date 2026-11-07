@@ -671,7 +671,7 @@ function AppContent() {
         setActiveTab('integracoes');
         break;
     }
-  }, []);
+  }, [setActiveTab]);
 
   // BlindAI states
   const [showAIChat, setShowAIChat] = useState(false);

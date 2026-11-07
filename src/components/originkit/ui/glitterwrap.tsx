@@ -479,7 +479,6 @@ export default function GlitterWrap(props: Props) {
         }
         // Single setup. Every animated value is read from propsRef each frame,
         // so control changes apply live without rebuilding stars + RAF.
-        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [isStatic])
 
     return (

@@ -331,6 +331,8 @@ const FullAdminPanel: React.FC = () => {
   const { companyId } = useAuth();
   const [operations, setOperations] = useState<FullOperation[]>([]);
   const [loading, setLoading] = useState(true);
+  // Contador de recarga: o botao "atualizar" e o painel de itens o incrementam para
+  // forcar `load` a rodar de novo. Nao e lido no corpo da funcao — e so o gatilho.
   const [refreshKey, setRefreshKey] = useState(0);
 
   // Filters
@@ -362,6 +364,10 @@ const FullAdminPanel: React.FC = () => {
     if (error) console.error('[FullAdmin] Load error:', error);
     setOperations((data as FullOperation[]) || []);
     setLoading(false);
+    // `refreshKey` aparece como dependencia "desnecessaria" porque nao e lido aqui
+    // dentro; e exatamente o ponto. Tira-lo desliga o botao de atualizar e a recarga
+    // depois de editar um item.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [companyId, sortField, sortDir, refreshKey]);
 
   useEffect(() => { load(); }, [load]);

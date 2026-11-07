@@ -61,11 +61,11 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
 
   const eanIndex = useMemo(() => buildEanIndex(items, products), [items, products]);
 
-  function displayEan(it: NfeInvoiceItem): string | null {
+  const displayEan = useCallback((it: NfeInvoiceItem): string | null => {
     if (it.nfe_ean) return it.nfe_ean;
     const prod = it.product_id ? products.get(it.product_id) : null;
     return prod?.ean ?? null;
-  }
+  }, [products]);
 
   async function applyCount(item: NfeInvoiceItem, mode: 'increment' | 'set', quantity: number, source: 'scanner' | 'manual') {
     const key = crypto.randomUUID();
@@ -129,7 +129,7 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
         (prod?.sku ?? '').toLowerCase().includes(q)
       );
     });
-  }, [items, filter, search, products]);
+  }, [items, filter, search, products, displayEan]);
 
   const doneCount = items.filter((i) => i.physical_quantity != null).length;
 

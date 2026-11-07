@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-07-heatmap-detalhe-area',
+    date: '2026-11-07',
+    category: 'correcao',
+    title: 'O detalhe de uma área do mapa de calor não derruba mais a tela',
+    description: 'No mapa de calor do estoque, abrir os detalhes de uma área podia quebrar a tela e exigir recarregar o sistema, levando junto o que estava aberto. O painel agora abre normalmente, com o diagnóstico de risco, os fatores, as pendências e os locais físicos da área.',
+  },
+  {
     id: '2026-11-06-importacao-progresso-validacao',
     date: '2026-11-06',
     category: 'correcao',

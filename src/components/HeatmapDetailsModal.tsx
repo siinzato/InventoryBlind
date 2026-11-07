@@ -55,7 +55,15 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
   const [locaisEditados, setLocaisEditados] = useState<LocalFisico[]>([]);
   const [hasChanges, setHasChanges] = useState(false);
 
-  if (!isOpen || !area) return null;
+  // Acima do early return de proposito. Este `useMemo` ficava depois dele, entao o
+  // componente rodava tres hooks fechado e quatro aberto — e o pai mantem o modal
+  // sempre montado, alternando so o `isOpen`. Abrir o detalhe derrubava a tela com
+  // "Rendered more hooks than during the previous render".
+  const diagnosis = useMemo(() => (area ? generateDiagnosis(area) : null), [area]);
+
+  // `!diagnosis` nunca e verdade quando ha `area`; esta aqui para estreitar o tipo,
+  // ja que o memo agora pode devolver null.
+  if (!isOpen || !area || !diagnosis) return null;
 
   const criticality = getCriticalityLevel(area);
   const textClass = getCriticalityTextClass(criticality);
@@ -65,7 +73,6 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
   const riskScore = calculateRiskScore(area);
   const riskLevel = getRiskLevel(riskScore);
   const riskLabel = getRiskLevelLabel(riskLevel);
-  const diagnosis = useMemo(() => generateDiagnosis(area), [area]);
 
   const handleStartEdit = () => {
     if (isAdmin) {

@@ -5,7 +5,11 @@ import reactRefresh from 'eslint-plugin-react-refresh';
 import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
-  { ignores: ['dist'] },
+  // `.claude/worktrees` guarda copias inteiras do repo criadas por sessoes
+  // paralelas do Claude. Sem este ignore o `eslint .` lintava a copia junto com o
+  // codigo real e o total virava o dobro do que existe em `src`, o que torna o
+  // numero inutil como criterio de aprovacao.
+  { ignores: ['dist', '.claude/worktrees'] },
   {
     extends: [js.configs.recommended, ...tseslint.configs.recommended],
     files: ['**/*.{ts,tsx}'],

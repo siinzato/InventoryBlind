@@ -30,7 +30,7 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ summar
           <button
             key={`${card.key}-${idx}`}
             onClick={() => onFilterChange(card.key)}
-            className={`text-left bg-surface-2 rounded-xl border p-4 transition ${activeFilter === card.key ? 'border-accent' : 'border-edge hover:border-fg-subtle'}`}
+            className={`text-left bg-surface-2 rounded-container border p-4 transition ${activeFilter === card.key ? 'border-accent' : 'border-edge hover:border-fg-subtle'}`}
           >
             <p className="text-xs text-fg-subtle uppercase font-semibold">{card.label}</p>
             <p className={`text-2xl font-bold mt-1 ${card.tone ?? 'text-fg'}`}>{card.value.toLocaleString('pt-BR')}</p>
@@ -39,7 +39,7 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ summar
       </div>
 
       {summary.fieldTotals.length > 0 && (
-        <div className="bg-surface-2 rounded-xl border border-edge p-5">
+        <div className="bg-surface-2 rounded-container border border-edge p-5">
           <h2 className="font-bold text-fg text-sm mb-3">Diferenças por campo numérico</h2>
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
             {summary.fieldTotals.map(t => (

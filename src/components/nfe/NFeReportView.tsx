@@ -125,7 +125,7 @@ export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props)
       </div>
 
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 text-red-700 dark:text-red-400">
+        <div className="flex items-start gap-3 p-4 rounded-container bg-red-500/10 text-red-700 dark:text-red-400">
           <AlertCircle size={20} className="flex-shrink-0 mt-0.5" /><p className="text-sm font-medium">{error}</p>
         </div>
       )}

@@ -37,7 +37,7 @@ const HistoryRow: React.FC<{ op: FullOperation }> = ({ op }) => {
   const accuracy = totalReq > 0 ? Math.round((totalPicked / totalReq) * 100) : null;
 
   return (
-    <div className="bg-surface-2 border border-edge rounded-xl overflow-hidden">
+    <div className="bg-surface-2 border border-edge rounded-container overflow-hidden">
       <button
         onClick={loadItems}
         className="w-full flex items-center gap-4 px-5 py-4 hover:bg-surface-3 transition text-left"
@@ -187,7 +187,7 @@ const FullHistory: React.FC = () => {
           <RefreshCw size={20} className="animate-spin" />Carregando histórico...
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 bg-surface-2 rounded-xl border border-edge text-fg-subtle">
+        <div className="flex flex-col items-center justify-center py-16 bg-surface-2 rounded-container border border-edge text-fg-subtle">
           <Package size={40} className="mb-3 opacity-30" />
           <p className="text-sm">Nenhuma operação encontrada.</p>
         </div>

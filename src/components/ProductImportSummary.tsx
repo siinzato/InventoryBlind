@@ -85,7 +85,7 @@ export const ProductImportSummary: React.FC<ProductImportSummaryProps> = ({
         </div>
 
         {/* Details */}
-        <div className="bg-surface-3 rounded-xl p-4 mb-8">
+        <div className="bg-surface-3 rounded-container p-4 mb-8">
           <div className="flex items-center gap-2 mb-3">
             <BarChart3 size={16} className="text-fg-subtle" />
             <h4 className="text-section">Detalhes da Importação</h4>

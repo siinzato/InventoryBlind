@@ -69,7 +69,7 @@ export const FileUploadPanel: React.FC<FileUploadPanelProps> = ({ base, onChange
   const headerRowOptions = base.grid.slice(0, 15);
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <h2 className="font-bold text-fg text-sm mb-3 flex items-center gap-2">
         <FileSpreadsheet size={16} className="text-fg-subtle" />{base.label}
       </h2>
@@ -79,7 +79,7 @@ export const FileUploadPanel: React.FC<FileUploadPanelProps> = ({ base, onChange
           onDragOver={e => { e.preventDefault(); setDragOver(true); }}
           onDragLeave={() => setDragOver(false)}
           onDrop={onDrop}
-          className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors ${dragOver ? 'border-accent bg-accent/5' : 'border-edge hover:border-accent hover:bg-accent/5'}`}
+          className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed rounded-container p-8 text-center cursor-pointer transition-colors ${dragOver ? 'border-accent bg-accent/5' : 'border-edge hover:border-accent hover:bg-accent/5'}`}
         >
           {base.loading ? <RefreshCw size={24} className="animate-spin text-fg-subtle" /> : <Upload size={24} className="text-fg-subtle" />}
           <p className="text-sm text-fg-muted">{base.loading ? 'Lendo arquivo...' : 'Arraste ou clique para enviar XLSX, XLS ou CSV'}</p>

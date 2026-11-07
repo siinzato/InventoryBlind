@@ -99,7 +99,7 @@ export function NFePreparationView({ invoice, onStarted, onBack }: Props) {
       </Card>
 
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
+        <div className="flex items-start gap-3 p-4 rounded-container bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
           <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
           <p className="text-sm font-medium">{error}</p>
         </div>
@@ -110,11 +110,11 @@ export function NFePreparationView({ invoice, onStarted, onBack }: Props) {
       ) : (
         <>
           {allLinked ? (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
+            <div className="flex items-center gap-3 p-4 rounded-container bg-emerald-500/10 border border-emerald-500/20 text-emerald-700 dark:text-emerald-400">
               <Check size={20} /> <p className="text-sm font-semibold">Todos os itens estão vinculados. Você já pode iniciar a conferência.</p>
             </div>
           ) : (
-            <div className="flex items-center gap-3 p-4 rounded-xl bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
+            <div className="flex items-center gap-3 p-4 rounded-container bg-amber-500/10 border border-amber-500/20 text-amber-700 dark:text-amber-400">
               <AlertCircle size={20} />
               <p className="text-sm font-medium">
                 Existem {pending.length} item(ns) não vinculados. Vincule todos os itens a um produto antes de iniciar.

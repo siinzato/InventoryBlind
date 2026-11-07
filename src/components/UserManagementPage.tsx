@@ -85,13 +85,13 @@ const InviteModal: React.FC<{ onClose: () => void; onInvited: () => void }> = ({
   return (
     <Modal open onClose={onClose} title="Convidar Usuário" maxWidth="max-w-md">
       {success ? (
-        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-xl text-sm text-emerald-600 dark:text-emerald-400 flex items-start gap-2">
+        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-container text-sm text-emerald-600 dark:text-emerald-400 flex items-start gap-2">
           <Check size={15} className="flex-shrink-0 mt-0.5" />{success}
         </div>
       ) : (
         <div className="space-y-4">
           {error && (
-            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
+            <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-container text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
               <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />{error}
             </div>
           )}
@@ -104,13 +104,13 @@ const InviteModal: React.FC<{ onClose: () => void; onInvited: () => void }> = ({
               <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">{f.label}</label>
               <input type={f.type || 'text'} value={f.value} onChange={e => f.onChange(e.target.value)}
                 placeholder={f.placeholder}
-                className="w-full px-4 py-2.5 bg-surface-3 border border-edge rounded-xl text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 placeholder-fg-subtle" />
+                className="w-full px-4 py-2.5 bg-surface-3 border border-edge rounded-control text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 placeholder-fg-subtle" />
             </div>
           ))}
           <div>
             <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1.5">Perfil</label>
             <select value={role} onChange={e => setRole(e.target.value as Role)}
-              className="w-full px-4 py-2.5 bg-surface-3 border border-edge rounded-xl text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40">
+              className="w-full px-4 py-2.5 bg-surface-3 border border-edge rounded-control text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40">
               {(Object.entries(ROLE_CONFIG) as [Role, typeof ROLE_CONFIG[Role]][])
                 .filter(([k]) => k !== 'owner')
                 .map(([k, v]) => (
@@ -185,7 +185,7 @@ const InviteCodeModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         </p>
 
         {error && (
-          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-xl text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
+          <div className="p-3 bg-red-500/10 border border-red-500/20 rounded-container text-xs text-red-600 dark:text-red-400 flex items-start gap-2">
             <AlertCircle size={13} className="flex-shrink-0 mt-0.5" />{error}
           </div>
         )}
@@ -196,7 +196,7 @@ const InviteCodeModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
           </div>
         ) : code ? (
           <>
-            <div className="bg-surface-3 border border-edge rounded-xl p-5 text-center">
+            <div className="bg-surface-3 border border-edge rounded-container p-5 text-center">
               <p className="font-mono text-2xl font-bold tracking-[0.3em] text-fg">{code}</p>
             </div>
             <Button variant="secondary" onClick={copy} className="w-full">
@@ -357,7 +357,7 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
         <div className="relative max-w-sm">
           <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-fg-subtle" />
           <input type="text" value={search} onChange={e => setSearch(e.target.value)} placeholder="Buscar por nome ou e-mail..."
-            className="w-full pl-9 pr-4 py-2.5 bg-surface-2 border border-edge rounded-xl text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40 placeholder-fg-subtle" />
+            className="w-full pl-9 pr-4 py-2.5 bg-surface-2 border border-edge rounded-control text-sm text-fg focus:outline-none focus:ring-2 focus:ring-accent/40 placeholder-fg-subtle" />
         </div>
 
         {/* Users list */}
@@ -387,7 +387,7 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
                     <Tr key={u.id}>
                       <Td>
                         <div className="flex items-center gap-3">
-                          <div className="w-9 h-9 rounded-xl bg-surface-3 border border-edge flex items-center justify-center flex-shrink-0 font-bold text-fg-muted text-sm">
+                          <div className="w-9 h-9 rounded-control bg-surface-3 border border-edge flex items-center justify-center flex-shrink-0 font-bold text-fg-muted text-sm">
                             {(u.name || u.email || '?')[0].toUpperCase()}
                           </div>
                           <div>

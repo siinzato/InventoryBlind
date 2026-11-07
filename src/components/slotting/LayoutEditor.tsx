@@ -62,7 +62,7 @@ export function LayoutEditor({ companyId, userId, userEmail, layout, cells, onCe
     <div className="space-y-4">
       <FloorPlanUploadControl companyId={companyId} userId={userId} userEmail={userEmail} layout={layout} onChanged={onCellsChanged} />
 
-      <div className="overflow-auto border border-edge rounded-xl p-2 bg-surface" style={{ maxHeight: 460 }}>
+      <div className="overflow-auto border border-edge rounded-container p-2 bg-surface" style={{ maxHeight: 460 }}>
         <div className="relative inline-grid gap-0.5" style={{ gridTemplateColumns: `repeat(${layout.grid_width}, 22px)` }}>
           <FloorPlanBackground layout={layout} cellPixelSize={22.5} />
           {Array.from({ length: layout.grid_height }).map((_, y) =>

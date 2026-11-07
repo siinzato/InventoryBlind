@@ -77,14 +77,14 @@ export default function NFeXmlLookupPage({ onBack, onTransferToConference }: Pro
         </p>
 
         {error && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
+          <div className="flex items-start gap-3 p-4 rounded-container bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
             <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
             <p className="text-sm font-medium">{error}</p>
           </div>
         )}
 
         {duplicate && (
-          <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-4">
+          <div className="p-5 rounded-container bg-amber-500/10 border border-amber-500/20 space-y-4">
             <div className="flex items-start gap-3 text-amber-700 dark:text-amber-400">
               <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
               <div>

@@ -27,7 +27,7 @@ export const BarcodePreview: React.FC<BarcodePreviewProps> = ({
   const scale = Math.min(MAX_PREVIEW_PX / realWidthPx, MAX_PREVIEW_PX / realHeightPx, 3);
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-bold text-fg text-sm">Pré-visualização</h2>
         <span className="text-xs text-fg-subtle">{sizeLabel}</span>

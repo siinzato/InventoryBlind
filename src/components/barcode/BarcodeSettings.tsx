@@ -37,7 +37,7 @@ export const BarcodeSettings: React.FC<BarcodeSettingsProps> = ({ settings, symb
   const info = symbologyInfo(symbology);
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-bold text-fg text-sm">Personalização</h2>
         <button onClick={onReset} className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-fg font-semibold transition border border-edge rounded-lg px-2.5 py-1.5 hover:bg-surface-3">

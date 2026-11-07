@@ -278,7 +278,7 @@ export const SpreadsheetComparatorPage: React.FC<SpreadsheetComparatorPageProps>
         )}
 
         {step === 6 && (
-          <div className="bg-surface-2 rounded-xl border border-edge p-10 flex flex-col items-center gap-4">
+          <div className="bg-surface-2 rounded-container border border-edge p-10 flex flex-col items-center gap-4">
             <RefreshCw size={32} className="animate-spin text-accent" />
             <p className="text-sm text-fg-muted">
               {progress.total > 0 ? `Processando ${progress.done} de ${progress.total} chave(s)...` : 'Processando...'}

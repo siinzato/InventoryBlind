@@ -54,14 +54,14 @@ export function NFeImportView({ onImported, onOpenExisting }: Props) {
       </div>
 
       {error && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
+        <div className="flex items-start gap-3 p-4 rounded-container bg-red-500/10 border border-red-500/20 text-red-700 dark:text-red-400">
           <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
           <p className="text-sm font-medium">{error}</p>
         </div>
       )}
 
       {duplicate && (
-        <div className="p-5 rounded-xl bg-amber-500/10 border border-amber-500/20 space-y-4">
+        <div className="p-5 rounded-container bg-amber-500/10 border border-amber-500/20 space-y-4">
           <div className="flex items-start gap-3 text-amber-700 dark:text-amber-400">
             <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
             <div>
@@ -84,7 +84,7 @@ export function NFeImportView({ onImported, onOpenExisting }: Props) {
           onClick={() => fileRef.current?.click()}
           className="flex flex-col items-center justify-center gap-3 p-8 rounded-container border-2 border-dashed border-edge hover:border-accent/40 hover:bg-accent/5 transition-colors disabled:opacity-50"
         >
-          <div className="p-3 rounded-xl bg-accent/10 text-accent"><Upload size={24} /></div>
+          <div className="p-3 rounded-control bg-accent/10 text-accent"><Upload size={24} /></div>
           <span className="text-sm font-semibold text-fg">Selecionar arquivo XML</span>
           <span className="text-xs text-fg-subtle">Formato aceito: .xml</span>
         </button>

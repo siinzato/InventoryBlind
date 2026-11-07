@@ -201,7 +201,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                 Diagnóstico Automático
               </h4>
 
-              <div className="bg-surface-3 rounded-xl p-4">
+              <div className="bg-surface-3 rounded-container p-4">
                 {/* Issues */}
                 {diagnosis.issues.length > 0 && (
                   <div className="mb-4">
@@ -389,7 +389,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                 <AlertTriangle size={18} className="text-red-500" />
                 Produtos Divergentes
               </h4>
-              <div className="bg-red-500/10 rounded-xl p-3">
+              <div className="bg-red-500/10 rounded-container p-3">
                 <div className="flex flex-wrap gap-2">
                   {area.produtosDivergentes.map((sku, i) => (
                     <span
@@ -405,7 +405,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
           )}
 
           {/* Additional Info */}
-          <div className="bg-surface-3 rounded-xl p-4">
+          <div className="bg-surface-3 rounded-container p-4">
             <div className="grid grid-cols-2 gap-4 text-sm">
               <div>
                 <p className="text-fg-subtle mb-1 flex items-center gap-1">

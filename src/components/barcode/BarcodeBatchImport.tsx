@@ -50,7 +50,7 @@ export const BarcodeBatchImport: React.FC<BarcodeBatchImportProps> = ({ onConfir
     return (
       <Panel>
         <PanelSection padding="lg" className="space-y-4">
-          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-edge rounded-xl p-10 text-center cursor-pointer transition-colors hover:border-accent hover:bg-accent/5">
+          <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-edge rounded-container p-10 text-center cursor-pointer transition-colors hover:border-accent hover:bg-accent/5">
             <Upload size={28} className="text-fg-subtle" />
             <p className="text-sm text-fg-muted">{loading ? 'Lendo arquivo...' : 'Arraste ou clique para enviar XLSX, XLS ou CSV'}</p>
             <input type="file" accept=".xlsx,.xls,.csv" disabled={loading} className="hidden"

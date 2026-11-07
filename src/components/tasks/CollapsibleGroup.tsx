@@ -16,7 +16,7 @@ export const CollapsibleGroup: React.FC<CollapsibleGroupProps> = ({ title, count
   if (count === 0) return null;
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge">
+    <div className="bg-surface-2 rounded-container border border-edge">
       <button onClick={() => setOpen(v => !v)} className="w-full flex items-center gap-1.5 p-3.5 text-left">
         {open ? <ChevronDown size={14} className="text-fg-subtle flex-shrink-0" /> : <ChevronRight size={14} className="text-fg-subtle flex-shrink-0" />}
         <span className={`font-bold text-sm ${tone ?? 'text-fg'}`}>{title}</span>

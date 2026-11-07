@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-07-cantos-padronizados',
+    date: '2026-11-07',
+    category: 'melhoria',
+    title: 'Cantos mais consistentes nas telas do sistema',
+    description: 'Em várias telas, caixas e botões tinham cantos mais arredondados do que os painéis e janelas que os continham, o que deixava a interface com um ar inconsistente. Agora botões, campos, cards e janelas seguem a mesma escala em todo o sistema. É um ajuste visual: nada mudou de lugar nem de funcionamento.',
+  },
+  {
     id: '2026-11-07-blindai-atualizado',
     date: '2026-11-07',
     category: 'melhoria',

@@ -90,13 +90,13 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ tasks, loading, error, c
       </div>
 
       {mode === 'day' && (
-        <div className="bg-surface-2 rounded-xl border border-edge p-5">{renderDayList(reference)}</div>
+        <div className="bg-surface-2 rounded-container border border-edge p-5">{renderDayList(reference)}</div>
       )}
 
       {mode === 'week' && (
         <div className="grid grid-cols-1 sm:grid-cols-7 gap-3">
           {Array.from({ length: 7 }, (_, i) => addDays(startOfWeek(reference), i)).map(day => (
-            <div key={toISODate(day)} className="bg-surface-2 rounded-xl border border-edge p-3">
+            <div key={toISODate(day)} className="bg-surface-2 rounded-container border border-edge p-3">
               <p className="text-xs font-bold text-fg-subtle uppercase mb-2">{WEEKDAY_LABELS[day.getDay()]} {day.getDate()}</p>
               {renderDayList(day)}
             </div>
@@ -105,7 +105,7 @@ export const AgendaView: React.FC<AgendaViewProps> = ({ tasks, loading, error, c
       )}
 
       {mode === 'month' && (
-        <div className="bg-surface-2 rounded-xl border border-edge p-4">
+        <div className="bg-surface-2 rounded-container border border-edge p-4">
           <div className="grid grid-cols-7 gap-1 mb-2">
             {WEEKDAY_LABELS.map(w => <p key={w} className="text-xs font-bold text-fg-subtle text-center">{w}</p>)}
           </div>

@@ -174,13 +174,13 @@ function HealthCheck({ companyId }: { companyId: string }) {
       <PanelSection className="space-y-2">
         {loading
           ? Array.from({ length: 8 }).map((_, i) => (
-              <div key={i} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-surface-3 animate-pulse">
+              <div key={i} className="flex items-center justify-between py-2.5 px-3 rounded-control bg-surface-3 animate-pulse">
                 <div className="h-3 w-48 bg-edge rounded" />
                 <div className="h-3 w-16 bg-edge rounded" />
               </div>
             ))
           : items.map((item) => (
-              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-xl bg-surface-3">
+              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-control bg-surface-3">
                 <div>
                   <span className="text-fg text-sm">{item.label}</span>
                   {item.detail && <span className="text-fg-subtle text-xs ml-2">— {item.detail}</span>}
@@ -576,7 +576,7 @@ function SecuritySettingsPanel({ companyId }: { companyId: string }) {
           </div>
         </div>
         {!settings
-          ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-surface-3 rounded-xl animate-pulse" />)}</div>
+          ? <div className="space-y-3">{Array.from({ length: 4 }).map((_, i) => <div key={i} className="h-10 bg-surface-3 rounded-container animate-pulse" />)}</div>
           : (
             <div>
               <Row label="Confirmação de e-mail obrigatória" sub="Usuários devem confirmar o e-mail">
@@ -832,7 +832,7 @@ export default function SecurityPage({ onBack }: SecurityPageProps) {
       <div className="border-b border-edge bg-surface/80 backdrop-blur-sm sticky top-0 z-10">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <div className="flex items-center gap-4 py-4">
-            <button onClick={onBack} className="p-2 text-fg-subtle hover:text-fg hover:bg-surface-3 rounded-xl transition">
+            <button onClick={onBack} className="p-2 text-fg-subtle hover:text-fg hover:bg-surface-3 rounded-control transition">
               <ArrowLeft size={20} />
             </button>
             <div className="flex items-center gap-3">

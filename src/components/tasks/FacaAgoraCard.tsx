@@ -28,7 +28,7 @@ export const FacaAgoraCard: React.FC<FacaAgoraCardProps> = ({
   const recommendation = recommendNextTask(tasks, currentUserId, nowMs, dueSoonThresholdMinutes);
 
   return (
-    <div className="bg-surface-2 rounded-xl border-2 border-accent/30 p-4">
+    <div className="bg-surface-2 rounded-container border-2 border-accent/30 p-4">
       <div className="flex items-center gap-2 mb-3">
         <div className="p-1.5 bg-accent rounded-lg"><Zap size={14} className="text-white" /></div>
         <h2 className="font-bold text-sm text-fg uppercase tracking-wide">Faça agora</h2>

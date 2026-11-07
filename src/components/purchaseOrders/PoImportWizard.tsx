@@ -150,7 +150,7 @@ export function PoImportWizard({ companyId, existingOrders, onClose, onImported 
                 </Select>
               </div>
             )}
-            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-edge rounded-xl p-10 text-center cursor-pointer hover:border-accent hover:bg-accent/5 transition-colors">
+            <label className="flex flex-col items-center justify-center gap-2 border-2 border-dashed border-edge rounded-container p-10 text-center cursor-pointer hover:border-accent hover:bg-accent/5 transition-colors">
               <Upload size={28} className="text-fg-subtle" />
               <p className="text-sm text-fg-muted">Arraste ou clique para enviar XLSX ou CSV</p>
               <input type="file" accept=".xlsx,.csv" className="hidden" onChange={e => { const f = e.target.files?.[0]; if (f) handleFile(f); }} />

@@ -105,7 +105,7 @@ export function SkuMoveSimulator({ companyId, userId, userEmail, layout, cells, 
             </div>
 
             {simulation && (
-              <div className="p-4 rounded-xl bg-surface-3/50 space-y-2">
+              <div className="p-4 rounded-container bg-surface-3/50 space-y-2">
                 <div className="flex items-center gap-2 text-sm text-fg-muted">
                   <span>{Math.round(simulation.currentDistanceMeters)} m da expedição</span>
                   <ArrowRight size={14} />

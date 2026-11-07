@@ -64,7 +64,7 @@ const Step1: React.FC<{ form: Step1Form; onChange: (f: Step1Form) => void; onNex
 
   return (
     <div className="max-w-lg mx-auto">
-      <div className="bg-surface-2 rounded-xl border border-edge p-6 space-y-4">
+      <div className="bg-surface-2 rounded-container border border-edge p-6 space-y-4">
         <div>
           <label className="block text-xs font-bold text-fg-subtle uppercase mb-1.5">Número do FULL *</label>
           <div className="flex">
@@ -199,7 +199,7 @@ const Step2: React.FC<{
 
   return (
     <div className="max-w-lg mx-auto space-y-4">
-      <div className="bg-surface-2 rounded-xl border border-edge p-4 text-sm">
+      <div className="bg-surface-2 rounded-container border border-edge p-4 text-sm">
         <p className="font-bold text-fg-muted">FULL #{form.full_number} · {form.marketplace}</p>
         {form.responsible && <p className="text-fg-subtle">{form.responsible}</p>}
       </div>
@@ -209,7 +209,7 @@ const Step2: React.FC<{
         onDragLeave={() => setDragging(false)}
         onDrop={handleDrop}
         onClick={() => inputRef.current?.click()}
-        className={`border-2 border-dashed rounded-xl p-10 text-center cursor-pointer transition ${dragging ? 'border-accent bg-surface-3' : 'border-edge hover:border-fg-subtle hover:bg-surface-3'}`}
+        className={`border-2 border-dashed rounded-container p-10 text-center cursor-pointer transition ${dragging ? 'border-accent bg-surface-3' : 'border-edge hover:border-fg-subtle hover:bg-surface-3'}`}
       >
         <input ref={inputRef} type="file" accept=".xlsx,.xls,.csv" className="hidden" onChange={handleFileInput} />
         {processing ? (
@@ -278,7 +278,7 @@ const Step3: React.FC<{
   return (
     <div className="space-y-4">
       {/* Header */}
-      <div className="bg-surface-2 rounded-xl border border-edge p-4 flex flex-wrap gap-4 items-center justify-between">
+      <div className="bg-surface-2 rounded-container border border-edge p-4 flex flex-wrap gap-4 items-center justify-between">
         <div>
           <p className="font-bold text-fg">FULL #{form.full_number} · {form.marketplace}</p>
           {form.responsible && <p className="text-sm text-fg-subtle">{form.responsible}</p>}
@@ -309,7 +309,7 @@ const Step3: React.FC<{
       </Panel>
 
       {/* Table */}
-      <div className="bg-surface-2 rounded-xl border border-edge overflow-hidden">
+      <div className="bg-surface-2 rounded-container border border-edge overflow-hidden">
         <div className="overflow-x-auto max-h-80">
           <table className="w-full text-sm">
             <thead className="border-b border-edge sticky top-0 bg-surface-2">

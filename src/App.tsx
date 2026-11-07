@@ -1031,7 +1031,7 @@ function AppContent() {
           trigger={
             <button
               disabled={switchingCompany}
-              className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-xl bg-surface-2/70 hover:bg-surface-3 border border-edge/70 transition-colors duration-200 disabled:opacity-60"
+              className="group w-full flex items-center gap-2 px-2 py-1.5 rounded-control bg-surface-2/70 hover:bg-surface-3 border border-edge/70 transition-colors duration-200 disabled:opacity-60"
             >
               {workspaceLogoUrls[company.id] ? (
                 <img src={workspaceLogoUrls[company.id]} alt="" decoding="async" className="w-6 h-6 rounded-md object-cover flex-shrink-0" />
@@ -1106,7 +1106,7 @@ function AppContent() {
   const userMenu = (
     <SafeDropdown
       trigger={
-        <button className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-xl hover:bg-surface-3/70 transition-colors duration-200">
+        <button className="group flex items-center gap-2 pl-1 pr-2 py-1 rounded-control hover:bg-surface-3/70 transition-colors duration-200">
           <span
             title={profile?.email ?? undefined}
             className="relative w-8 h-8 rounded-full bg-accent flex items-center justify-center text-xs font-semibold text-white flex-shrink-0 uppercase"
@@ -2421,7 +2421,7 @@ function AppContent() {
         >
           <div className="bg-surface-2 border border-edge rounded-sheet p-6 max-w-sm mx-4 shadow-overlay" onClick={e => e.stopPropagation()}>
             <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 bg-accent/10 rounded-xl flex items-center justify-center">
+              <div className="w-10 h-10 bg-accent/10 rounded-control flex items-center justify-center">
                 <Smartphone size={20} className="text-accent" />
               </div>
               <h3 className="text-lg font-bold text-fg">Instalar InventoryBlind</h3>
@@ -2432,7 +2432,7 @@ function AppContent() {
               <li className="flex gap-2"><span className="font-bold text-accent">2.</span> Toque no botão <strong>Compartilhar</strong></li>
               <li className="flex gap-2"><span className="font-bold text-accent">3.</span> Selecione <strong>"Adicionar à Tela de Início"</strong></li>
             </ol>
-            <button onClick={() => setShowInstallModal(false)} className="w-full mt-5 py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-semibold text-sm transition">
+            <button onClick={() => setShowInstallModal(false)} className="w-full mt-5 py-3 bg-surface-3 hover:bg-edge text-fg rounded-control font-semibold text-sm transition">
               Entendi
             </button>
           </div>
@@ -2530,7 +2530,7 @@ function LinkCompanyScreen() {
           Sua conta está ativa mas ainda não está vinculada a uma empresa. Crie a sua para continuar.
         </p>
         {error && (
-          <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-xl p-4 mb-4 text-left">
+          <div className="flex items-start gap-2 bg-red-500/10 border border-red-500/30 rounded-container p-4 mb-4 text-left">
             <AlertTriangle size={15} className="flex-shrink-0 mt-0.5 text-red-400" />
             <p className="text-red-400 text-xs">{error}</p>
           </div>
@@ -2544,12 +2544,12 @@ function LinkCompanyScreen() {
             value={companyName}
             onChange={e => setCompanyName(e.target.value)}
             placeholder="Minha Empresa Ltda"
-            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-xl text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
+            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-control text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
           />
           <button
             type="submit"
             disabled={creating}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-xl font-bold text-sm transition"
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-control font-bold text-sm transition"
           >
             {creating ? <Loader2 size={16} className="animate-spin" /> : 'Criar minha empresa'}
           </button>
@@ -2570,12 +2570,12 @@ function LinkCompanyScreen() {
             value={inviteCode}
             onChange={e => setInviteCode(e.target.value.toUpperCase())}
             placeholder="Ex.: AB3DFGHJ"
-            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-xl text-fg text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
+            className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-control text-fg text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
           />
           <button
             type="submit"
             disabled={joiningByCode}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge disabled:opacity-60 text-fg rounded-xl font-bold text-sm transition"
+            className="w-full flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge disabled:opacity-60 text-fg rounded-control font-bold text-sm transition"
           >
             {joiningByCode ? <Loader2 size={16} className="animate-spin" /> : 'Entrar com código de convite'}
           </button>
@@ -2612,13 +2612,13 @@ function AuthErrorScreen() {
         <p className="text-fg-muted text-sm mb-6">{authError ?? 'Ocorreu um erro inesperado.'}</p>
         <button
           onClick={retryAuth}
-          className="w-full py-3 bg-accent hover:bg-accent-strong text-white rounded-xl font-bold text-sm transition mb-3"
+          className="w-full py-3 bg-accent hover:bg-accent-strong text-white rounded-control font-bold text-sm transition mb-3"
         >
           Tentar novamente
         </button>
         <button
           onClick={signOut}
-          className="w-full py-3 bg-surface-3 hover:bg-edge text-fg rounded-xl font-bold text-sm transition mb-3"
+          className="w-full py-3 bg-surface-3 hover:bg-edge text-fg rounded-control font-bold text-sm transition mb-3"
         >
           Sair da conta
         </button>
@@ -2640,7 +2640,7 @@ function ProfileLoadingOverlay() {
     <div className="min-h-screen bg-surface flex items-center justify-center">
       <div className="text-center">
         <div className="flex items-center gap-3 mb-6">
-          <div className="w-9 h-9 bg-accent rounded-xl flex items-center justify-center">
+          <div className="w-9 h-9 bg-accent rounded-control flex items-center justify-center">
             <LogoMark size={20} className="text-white" />
           </div>
           <span className="text-xl font-bold text-fg tracking-wide">

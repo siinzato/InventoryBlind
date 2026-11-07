@@ -13,7 +13,7 @@ import { brandInitials } from '../../lib/brandLogos/brandLogoAlgorithm';
 const SIZE_CLASS = {
   sm: 'w-8 h-8 rounded-md text-[10px]',
   md: 'w-10 h-10 rounded-lg text-xs',
-  lg: 'w-14 h-14 rounded-xl text-sm',
+  lg: 'w-14 h-14 rounded-container text-sm',
 } as const;
 
 interface BrandMarkProps {

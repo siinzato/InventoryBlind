@@ -38,7 +38,7 @@ const AgendaCard: React.FC<{
   const tagCls = STATUS_COLOR[op.status];
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge overflow-hidden flex flex-col">
+    <div className="bg-surface-2 rounded-container border border-edge overflow-hidden flex flex-col">
       {/* Header */}
       <div className="px-4 pt-4 pb-3 border-b border-edge">
         <div className="flex items-start justify-between gap-2">
@@ -297,7 +297,7 @@ const FullAgenda: React.FC<FullAgendaProps> = ({ onNavigateToPicking }) => {
           <RefreshCw size={20} className="animate-spin" />Carregando agendamentos...
         </div>
       ) : filtered.length === 0 ? (
-        <div className="flex flex-col items-center justify-center py-16 text-fg-subtle bg-surface-2 rounded-xl border border-edge">
+        <div className="flex flex-col items-center justify-center py-16 text-fg-subtle bg-surface-2 rounded-container border border-edge">
           <Calendar size={48} className="mb-3 opacity-20" />
           <p className="text-sm font-medium">Nenhum agendamento encontrado.</p>
           <button onClick={() => setModal({ open: true, editing: null })}

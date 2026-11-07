@@ -267,7 +267,7 @@ export function ImportCountTab({ brandsData, companyId, onBrandsUpdated, onSaved
             <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Responsável</label>
             <input value={responsavel} onChange={e => setResponsavel(e.target.value)} className="w-full p-2.5 border border-edge rounded-lg bg-surface text-fg text-sm" placeholder="Nome do responsável" />
           </div>
-          <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed border-edge rounded-xl p-10 text-center transition-colors ${brandId ? 'cursor-pointer hover:border-accent hover:bg-accent/5' : 'opacity-50 cursor-not-allowed'}`}>
+          <label className={`flex flex-col items-center justify-center gap-2 border-2 border-dashed border-edge rounded-container p-10 text-center transition-colors ${brandId ? 'cursor-pointer hover:border-accent hover:bg-accent/5' : 'opacity-50 cursor-not-allowed'}`}>
             <Upload size={28} className="text-fg-subtle" />
             <p className="text-sm text-fg-muted">Arraste ou clique para enviar XLSX, XLS ou CSV</p>
             <input

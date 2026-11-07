@@ -15,7 +15,7 @@ interface PresetStepProps {
 
 export const PresetStep: React.FC<PresetStepProps> = ({ preset, labelA, labelB, onSelectPreset, onLabelAChange, onLabelBChange, onNext }) => (
   <div className="space-y-5">
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <h2 className="font-bold text-fg text-sm mb-1">Tipo de comparação</h2>
       <p className="text-xs text-fg-subtle mb-4">Os modelos abaixo só sugerem nomes e configurações — você pode alterar qualquer campo depois.</p>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
@@ -32,7 +32,7 @@ export const PresetStep: React.FC<PresetStepProps> = ({ preset, labelA, labelB, 
       </div>
     </div>
 
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <h2 className="font-bold text-fg text-sm mb-4">Nomes das bases</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
         <div>

@@ -69,7 +69,7 @@ const ConfirmDialog: React.FC<{
 }> = ({ title, message, confirmLabel = 'Confirmar', danger, onConfirm, onCancel }) => (
   <Modal open onClose={onCancel} title={title} maxWidth="max-w-sm">
     <div className="flex items-start gap-3">
-      <div className={`flex-shrink-0 p-2 rounded-xl ${danger ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
+      <div className={`flex-shrink-0 p-2 rounded-control ${danger ? 'bg-red-500/10' : 'bg-amber-500/10'}`}>
         <AlertTriangle size={20} className={danger ? 'text-red-600 dark:text-red-400' : 'text-amber-600 dark:text-amber-400'} />
       </div>
       <p className="text-sm text-fg-muted">{message}</p>
@@ -508,9 +508,9 @@ const FullAdminPanel: React.FC = () => {
       )}
 
       {/* Header banner */}
-      <div className="bg-red-500/5 border border-red-500/20 rounded-xl p-5 flex items-center justify-between gap-4">
+      <div className="bg-red-500/5 border border-red-500/20 rounded-container p-5 flex items-center justify-between gap-4">
         <div className="flex items-center gap-3">
-          <div className="p-2.5 bg-red-500/10 rounded-xl">
+          <div className="p-2.5 bg-red-500/10 rounded-control">
             <ShieldAlert size={22} className="text-red-600 dark:text-red-400" />
           </div>
           <div>

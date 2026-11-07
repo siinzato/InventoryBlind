@@ -70,7 +70,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
         </div>
       )}
 
-      <div className="bg-surface-2 rounded-xl border border-edge">
+      <div className="bg-surface-2 rounded-container border border-edge">
         <button onClick={() => setShowWorkload(v => !v)} className="w-full flex items-center justify-between p-4 text-left">
           <span className="font-bold text-fg text-sm flex items-center gap-2"><Users size={16} className="text-fg-subtle" />Carga de trabalho</span>
           <span className="text-xs text-fg-subtle">{showWorkload ? 'Ocultar' : 'Mostrar'}</span>
@@ -89,7 +89,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
         )}
       </div>
 
-      <div className="bg-surface-2 rounded-xl border border-edge p-5">
+      <div className="bg-surface-2 rounded-container border border-edge p-5">
         <h2 className="font-bold text-fg text-sm mb-4">Tarefas da empresa ({tasks.length})</h2>
         {tasks.length === 0 ? (
           <p className="text-sm text-fg-subtle text-center py-8">Nenhuma tarefa para os filtros aplicados.</p>

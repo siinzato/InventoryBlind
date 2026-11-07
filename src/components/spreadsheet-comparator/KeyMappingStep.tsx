@@ -31,7 +31,7 @@ export const KeyMappingStep: React.FC<KeyMappingStepProps> = ({ headersA, header
     : null;
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <h2 className="font-bold text-fg text-sm mb-1 flex items-center gap-2"><KeyRound size={16} className="text-fg-subtle" />Chave de comparação</h2>
       <p className="text-xs text-fg-subtle mb-4">Simples (uma parte) ou composta (várias). As colunas podem ter nomes diferentes em cada base.</p>
 

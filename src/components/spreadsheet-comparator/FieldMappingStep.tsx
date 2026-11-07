@@ -23,7 +23,7 @@ export const FieldMappingStep: React.FC<FieldMappingStepProps> = ({ headersA, he
   const removeField = (id: string) => onChange(fields.filter(f => f.id !== id));
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <h2 className="font-bold text-fg text-sm mb-1 flex items-center gap-2"><ListChecks size={16} className="text-fg-subtle" />Campos comparados</h2>
       <p className="text-xs text-fg-subtle mb-4">Opcional — você pode comparar só a existência das chaves, sem mapear nenhum campo adicional.</p>
 

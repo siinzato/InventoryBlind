@@ -39,7 +39,7 @@ export function AchievementGrid({ definitions, progress }: AchievementGridProps)
               return (
                 <div
                   key={def.id}
-                  className={`rounded-xl border p-3 flex flex-col items-center text-center gap-1.5 ${
+                  className={`rounded-container border p-3 flex flex-col items-center text-center gap-1.5 ${
                     unlocked ? 'border-edge bg-surface-3/40' : 'border-edge/60 opacity-60 grayscale'
                   }`}
                   title={def.description}

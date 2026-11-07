@@ -102,7 +102,7 @@ export const ProductImportPreview: React.FC<ProductImportPreviewProps> = ({
 
       {/* Error Alert */}
       {hasErrors && (
-        <div className="bg-red-500/10 rounded-xl p-4">
+        <div className="bg-red-500/10 rounded-container p-4">
           <div className="flex items-start gap-3">
             <AlertTriangle size={20} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">

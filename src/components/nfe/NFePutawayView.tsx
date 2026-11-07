@@ -187,14 +187,14 @@ export function NFePutawayView({ invoice, canPutaway, onBack }: Props) {
       </Card>
 
       {erro && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-red-500/10 text-red-700 dark:text-red-400">
+        <div className="flex items-start gap-3 p-4 rounded-container bg-red-500/10 text-red-700 dark:text-red-400">
           <AlertCircle size={20} className="flex-shrink-0 mt-0.5" />
           <p className="text-sm font-medium">{erro}</p>
         </div>
       )}
 
       {aviso && (
-        <div className="flex items-start gap-3 p-4 rounded-xl bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
+        <div className="flex items-start gap-3 p-4 rounded-container bg-emerald-500/10 text-emerald-700 dark:text-emerald-400">
           <CheckCircle2 size={20} className="flex-shrink-0 mt-0.5" />
           <p className="text-sm font-medium">{aviso}</p>
         </div>

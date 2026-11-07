@@ -27,7 +27,7 @@ const CheckingSelector: React.FC<{
         <RefreshCw size={18} className="animate-spin" /> Carregando...
       </div>
     ) : operations.length === 0 ? (
-      <div className="flex flex-col items-center justify-center py-16 bg-surface-2 rounded-xl border border-edge text-fg-subtle">
+      <div className="flex flex-col items-center justify-center py-16 bg-surface-2 rounded-container border border-edge text-fg-subtle">
         <ClipboardCheck size={40} className="mb-3 opacity-30" />
         <p className="text-sm font-medium">Nenhuma operação aguardando conferência.</p>
         <p className="text-xs mt-1">Operações precisam estar no status "Conferência".</p>
@@ -37,7 +37,7 @@ const CheckingSelector: React.FC<{
         const tagCls = STATUS_COLOR[op.status];
         return (
           <button key={op.id} onClick={() => onSelect(op)}
-            className="w-full flex items-center gap-4 p-4 bg-surface-2 border border-edge rounded-xl hover:border-fg-subtle hover:bg-surface-3 transition text-left">
+            className="w-full flex items-center gap-4 p-4 bg-surface-2 border border-edge rounded-container hover:border-fg-subtle hover:bg-surface-3 transition text-left">
             <div className="flex-1 min-w-0">
               <p className="font-bold text-fg">FULL #{op.full_number}</p>
               <p className="text-sm text-fg-subtle">{op.marketplace} · {op.responsible || '—'}</p>

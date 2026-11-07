@@ -9,7 +9,7 @@ interface ComparisonSettingsProps {
 
 export const ComparisonSettings: React.FC<ComparisonSettingsProps> = ({ settings, onChange }) => (
   <div className="space-y-4">
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <h2 className="font-bold text-fg text-sm mb-3">Duplicados</h2>
       <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         {([
@@ -32,7 +32,7 @@ export const ComparisonSettings: React.FC<ComparisonSettingsProps> = ({ settings
       <p className="text-xs text-fg-subtle mt-2">Duplicados nunca são descartados silenciosamente — o painel de resultados mostra quantas chaves duplicadas existem em cada base.</p>
     </div>
 
-    <div className="bg-surface-2 rounded-xl border border-edge p-5">
+    <div className="bg-surface-2 rounded-container border border-edge p-5">
       <h2 className="font-bold text-fg text-sm mb-3">Normalização padrão</h2>
       <div className="space-y-3">
         <label className="flex items-center justify-between gap-3 cursor-pointer">

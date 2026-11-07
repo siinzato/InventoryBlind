@@ -138,7 +138,7 @@ export const MyDayView: React.FC<MyDayViewProps> = ({
           />
 
           {Object.values(groups).every(g => g.length === 0) ? (
-            <div className="flex flex-col items-center justify-center py-16 text-fg-subtle bg-surface-2 rounded-xl border border-edge">
+            <div className="flex flex-col items-center justify-center py-16 text-fg-subtle bg-surface-2 rounded-container border border-edge">
               <Sun size={40} className="mb-3 opacity-30" />
               <p className="text-sm">Nenhuma tarefa pendente — bom trabalho!</p>
             </div>

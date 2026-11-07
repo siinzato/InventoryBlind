@@ -175,7 +175,7 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
       {/* LEFT */}
       <div className="space-y-4">
         {/* Sub-abas de preenchimento */}
-        <div className="bg-surface-2 rounded-xl border border-edge p-2 flex gap-1">
+        <div className="bg-surface-2 rounded-control border border-edge p-2 flex gap-1">
           {([
             { id: 'free', label: 'Valor livre', icon: Type },
             { id: 'catalog', label: 'Catálogo', icon: Package },
@@ -189,7 +189,7 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
         </div>
 
         {/* Tipo do código — sempre visível, vale para os 3 sub-modos */}
-        <div className="bg-surface-2 rounded-xl border border-edge p-5">
+        <div className="bg-surface-2 rounded-container border border-edge p-5">
           <label className="block text-xs font-semibold text-fg-subtle uppercase mb-2">Tipo de código</label>
           <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
             {BARCODE_SYMBOLOGIES.map(s => (
@@ -204,7 +204,7 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
 
         {/* VALOR LIVRE */}
         {fillMode === 'free' && (
-          <div className="bg-surface-2 rounded-xl border border-edge p-5">
+          <div className="bg-surface-2 rounded-container border border-edge p-5">
             <label className="block text-xs font-semibold text-fg-subtle uppercase mb-2">
               Conteúdo {numericInfo.fixedLength ? `(${numericInfo.fixedLength.withoutCheck} ou ${numericInfo.fixedLength.withCheck} dígitos)` : ''}
             </label>
@@ -229,7 +229,7 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
 
         {/* CATÁLOGO */}
         {fillMode === 'catalog' && (
-          <div className="bg-surface-2 rounded-xl border border-edge p-5">
+          <div className="bg-surface-2 rounded-container border border-edge p-5">
             <label className="block text-xs font-semibold text-fg-subtle uppercase mb-2">Buscar no catálogo (nome, SKU ou EAN)</label>
             <div className="flex gap-2 mb-3">
               <input type="text" value={catalogQuery} onChange={e => setCatalogQuery(e.target.value)}
@@ -275,7 +275,7 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
 
         {/* COLAR DADOS */}
         {fillMode === 'paste' && (
-          <div className="bg-surface-2 rounded-xl border border-edge p-5">
+          <div className="bg-surface-2 rounded-container border border-edge p-5">
             <label className="block text-xs font-semibold text-fg-subtle uppercase mb-2">Cole um valor ou uma lista (uma linha por código)</label>
             <textarea value={pasteText} onChange={e => setPasteText(e.target.value)} rows={5}
               placeholder="Cole aqui..."
@@ -299,7 +299,7 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
         <BarcodeSettings settings={settings} symbology={symbology} onChange={onSettingsChange} onReset={onResetSettings} />
 
         {/* AÇÕES */}
-        <div className="bg-surface-2 rounded-xl border border-edge p-5">
+        <div className="bg-surface-2 rounded-container border border-edge p-5">
           <h2 className="font-bold text-fg text-sm mb-3">Ações</h2>
           <div className="space-y-2">
             <button onClick={handlePrint} disabled={busy || !finalValue}

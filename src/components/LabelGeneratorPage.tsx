@@ -482,7 +482,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
             <div className="space-y-4">
 
               {/* SEARCH */}
-              <div className="bg-surface-2 rounded-xl border border-edge p-5">
+              <div className="bg-surface-2 rounded-container border border-edge p-5">
                 <h2 className="font-bold text-fg text-sm mb-4 flex items-center gap-2">
                   <Search size={16} className="text-fg-subtle" />Buscar Produto
                 </h2>
@@ -516,7 +516,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
 
               {/* PRODUCT INFO */}
               {product && (
-                <div className="bg-surface-2 rounded-xl border border-emerald-500/20 p-5">
+                <div className="bg-surface-2 rounded-container border border-emerald-500/20 p-5">
                   <div className="flex items-center justify-between mb-3">
                     <h2 className="font-bold text-emerald-700 dark:text-emerald-400 text-sm flex items-center gap-2">
                       <CheckCircle2 size={16} className="text-emerald-600 dark:text-emerald-400" />Produto Encontrado
@@ -539,7 +539,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
               )}
 
               {/* LABEL TYPE + CONFIG */}
-              <div className="bg-surface-2 rounded-xl border border-edge p-5">
+              <div className="bg-surface-2 rounded-container border border-edge p-5">
                 <h2 className="font-bold text-fg text-sm mb-4 flex items-center gap-2">
                   <Tag size={16} className="text-fg-subtle" />Configurações
                 </h2>
@@ -579,7 +579,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
               </div>
 
               {/* FONT SETTINGS */}
-              <div className="bg-surface-2 rounded-xl border border-edge p-5">
+              <div className="bg-surface-2 rounded-container border border-edge p-5">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-bold text-fg text-sm flex items-center gap-2">
                     <span className="text-base">Aa</span> Tamanho das Fontes
@@ -616,7 +616,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
 
               {/* ACTIONS */}
               {product && (
-                <div className="bg-surface-2 rounded-xl border border-edge p-5">
+                <div className="bg-surface-2 rounded-container border border-edge p-5">
                   <h2 className="font-bold text-fg text-sm mb-3">Ações</h2>
                   <div className="space-y-2">
                     <button onClick={handlePrint} disabled={busy}
@@ -644,7 +644,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
 
             {/* RIGHT — PREVIEW */}
             <div>
-              <div className="bg-surface-2 rounded-xl border border-edge p-5 sticky top-28">
+              <div className="bg-surface-2 rounded-container border border-edge p-5 sticky top-28">
                 <div className="flex items-center justify-between mb-4">
                   <h2 className="font-bold text-fg text-sm">Pré-visualização</h2>
                   <span className="text-xs text-fg-subtle">{labelType === 'shelf' ? '100 × 40mm' : '100 × 150mm'}</span>
@@ -720,7 +720,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
         {/* ══ BATCH MODE ════════════════════════════════════════════════════ */}
         {mode === 'batch' && (
           <div className="space-y-4">
-            <div className="bg-surface-2 rounded-xl border border-edge p-5">
+            <div className="bg-surface-2 rounded-container border border-edge p-5">
               <h2 className="font-bold text-fg text-sm mb-4 flex items-center gap-2">
                 <Search size={16} className="text-fg-subtle" />Filtros
               </h2>
@@ -765,7 +765,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
             </div>
 
             {selectedIds.size > 0 && (
-              <div className="bg-accent/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+              <div className="bg-accent/10 rounded-container p-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-accent">
                   {selectedIds.size} produto(s) · {selectedIds.size * batchCopies} etiqueta(s)
                   <span className="ml-2 text-xs font-normal text-fg-muted">
@@ -788,7 +788,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
               </div>
             )}
 
-            <div className="bg-surface-2 rounded-xl border border-edge overflow-hidden">
+            <div className="bg-surface-2 rounded-container border border-edge overflow-hidden">
               <div className="bg-surface-3 px-4 py-3 border-b border-edge flex items-center justify-between">
                 <h2 className="font-bold text-fg text-sm">Produtos ({batchProducts.length})</h2>
                 <button onClick={toggleAll} className="text-xs text-fg-muted hover:text-fg flex items-center gap-1.5 font-medium">

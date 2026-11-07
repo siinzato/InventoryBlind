@@ -21,7 +21,7 @@ const OpSelector: React.FC<{ operations: FullOperation[]; onSelect: (op: FullOpe
         <RefreshCw size={18} className="animate-spin" /> Carregando...
       </div>
     ) : operations.length === 0 ? (
-      <div className="flex flex-col items-center justify-center py-16 bg-surface-2 rounded-xl border border-edge text-fg-subtle">
+      <div className="flex flex-col items-center justify-center py-16 bg-surface-2 rounded-container border border-edge text-fg-subtle">
         <Package size={40} className="mb-3 opacity-30" />
         <p className="text-sm font-medium">Nenhuma operação em separação.</p>
         <p className="text-xs mt-1">Crie uma nova operação ou mude o status para "Preparando".</p>
@@ -31,7 +31,7 @@ const OpSelector: React.FC<{ operations: FullOperation[]; onSelect: (op: FullOpe
         const tagCls = STATUS_COLOR[op.status];
         return (
           <button key={op.id} onClick={() => onSelect(op)}
-            className="w-full flex items-center gap-4 p-4 bg-surface-2 border border-edge rounded-xl hover:border-fg-subtle hover:bg-surface-3 transition text-left">
+            className="w-full flex items-center gap-4 p-4 bg-surface-2 border border-edge rounded-container hover:border-fg-subtle hover:bg-surface-3 transition text-left">
             <div className="flex-1 min-w-0">
               <p className="font-bold text-fg">FULL #{op.full_number}</p>
               <p className="text-sm text-fg-subtle">{op.marketplace} · {op.responsible || '—'}</p>
@@ -110,7 +110,7 @@ const PickingCard: React.FC<{
           </div>
 
           {/* Quantity */}
-          <div className="bg-emerald-500/10 rounded-xl p-3 flex items-center justify-between">
+          <div className="bg-emerald-500/10 rounded-container p-3 flex items-center justify-between">
             <div>
               <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold uppercase">Quantidade Solicitada</p>
               <p className="font-bold text-emerald-700 dark:text-emerald-400 text-3xl leading-none mt-0.5">{item.quantity_requested}</p>
@@ -128,20 +128,20 @@ const PickingCard: React.FC<{
       {/* Action buttons */}
       <div className="grid grid-cols-2 gap-2">
         <button disabled={actioning} onClick={() => act('picked')}
-          className="flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-bold text-sm transition disabled:opacity-60">
+          className="flex items-center justify-center gap-2 py-3.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-control font-bold text-sm transition disabled:opacity-60">
           {actioning ? <RefreshCw size={16} className="animate-spin" /> : <Check size={16} />}
           Separado
         </button>
         <button disabled={actioning} onClick={() => act('not_found')}
-          className="flex items-center justify-center gap-2 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-xl font-bold text-sm transition disabled:opacity-60">
+          className="flex items-center justify-center gap-2 py-3.5 bg-red-500 hover:bg-red-600 text-white rounded-control font-bold text-sm transition disabled:opacity-60">
           <X size={16} /> Não encontrado
         </button>
         <button disabled={actioning} onClick={() => act('picking_error')}
-          className="flex items-center justify-center gap-2 py-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-xl font-semibold text-sm transition disabled:opacity-60">
+          className="flex items-center justify-center gap-2 py-3.5 bg-orange-500 hover:bg-orange-600 text-white rounded-control font-semibold text-sm transition disabled:opacity-60">
           <AlertTriangle size={16} /> Qtd insuficiente
         </button>
         <button disabled={actioning} onClick={() => act('skipped')}
-          className="flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge text-fg-muted rounded-xl font-semibold text-sm transition disabled:opacity-60">
+          className="flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge text-fg-muted rounded-control font-semibold text-sm transition disabled:opacity-60">
           <SkipForward size={16} /> Pular
         </button>
       </div>
@@ -172,23 +172,23 @@ const PickingSummary: React.FC<{
         <h3 className="font-bold text-fg text-xl mb-1">Separação Concluída!</h3>
         <p className="text-fg-subtle text-sm">FULL #{operation.full_number}</p>
         <div className="grid grid-cols-2 gap-3 mt-5">
-          <div className="bg-emerald-500/10 rounded-xl p-3">
+          <div className="bg-emerald-500/10 rounded-container p-3">
             <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{picked}</p>
             <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">Separados</p>
           </div>
-          <div className="bg-red-500/10 rounded-xl p-3">
+          <div className="bg-red-500/10 rounded-container p-3">
             <p className="text-2xl font-bold text-red-600 dark:text-red-400">{errors}</p>
             <p className="text-xs text-red-600 dark:text-red-400 font-semibold">Com erro</p>
           </div>
         </div>
       </Card>
       <button onClick={send} disabled={sending}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-xl font-bold text-sm transition disabled:opacity-60">
+        className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-control font-bold text-sm transition disabled:opacity-60">
         {sending ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
         Enviar para Conferência
       </button>
       <button onClick={onFinish}
-        className="w-full py-2.5 border border-edge text-fg-muted rounded-xl font-semibold text-sm hover:bg-surface-3 transition">
+        className="w-full py-2.5 border border-edge text-fg-muted rounded-control font-semibold text-sm hover:bg-surface-3 transition">
         Voltar ao início
       </button>
     </div>

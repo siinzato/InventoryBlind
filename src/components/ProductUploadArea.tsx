@@ -93,7 +93,7 @@ export const ProductUploadArea: React.FC<ProductUploadAreaProps> = ({
           onDragLeave={handleDragLeave}
           onDrop={handleDrop}
           className={`
-            border-2 border-dashed rounded-xl p-8 text-center cursor-pointer transition-colors
+            border-2 border-dashed rounded-container p-8 text-center cursor-pointer transition-colors
             ${isDragging
               ? 'border-accent bg-accent/10'
               : selectedFile

@@ -27,7 +27,7 @@ export const ComparisonReview: React.FC<ComparisonReviewProps> = ({ baseA, baseB
 
   return (
     <div className="space-y-4">
-      <div className="bg-surface-2 rounded-xl border border-edge p-5">
+      <div className="bg-surface-2 rounded-container border border-edge p-5">
         <h2 className="font-bold text-fg text-sm mb-3">Resumo da configuração</h2>
         <Row label="Planilha A" value={`${baseA.label} — ${baseA.meta?.name ?? '—'} ${baseA.activeSheet ? `(${baseA.activeSheet})` : ''}`} />
         <Row label="Planilha B" value={`${baseB.label} — ${baseB.meta?.name ?? '—'} ${baseB.activeSheet ? `(${baseB.activeSheet})` : ''}`} />

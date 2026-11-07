@@ -94,7 +94,7 @@ export function PickingRouteViewer({ companyId, layout, cells }: PickingRouteVie
               <span>Tempo estimado: <strong className="text-fg">{Math.round(totalSeconds / 60)} min</strong></span>
               <span>Paradas: <strong className="text-fg">{stopOrder.size}</strong></span>
             </div>
-            <div className="overflow-auto border border-edge rounded-xl p-2 bg-surface" style={{ maxHeight: 420 }}>
+            <div className="overflow-auto border border-edge rounded-container p-2 bg-surface" style={{ maxHeight: 420 }}>
               <div className="relative inline-grid gap-0.5" style={{ gridTemplateColumns: `repeat(${layout.grid_width}, 20px)` }}>
                 <FloorPlanBackground layout={layout} cellPixelSize={20.5} />
                 {Array.from({ length: layout.grid_height }).map((_, y) =>

@@ -107,7 +107,7 @@ export const ComparisonTable: React.FC<ComparisonTableProps> = ({ records, field
   const col = (key: ColumnKey) => visibleColumns.has(key);
 
   return (
-    <div className="bg-surface-2 rounded-xl border border-edge overflow-hidden">
+    <div className="bg-surface-2 rounded-container border border-edge overflow-hidden">
       <div className="p-4 border-b border-edge flex flex-wrap items-end gap-3">
         <div className="flex-1 min-w-[200px]">
           <label className="block text-xs font-semibold text-fg-subtle uppercase mb-1">Buscar</label>

@@ -175,7 +175,7 @@ export function PickingReplay({ companyId, layout, cells, onSelectPosition }: Pi
                 className="w-full accent-accent"
               />
 
-              <div className="overflow-auto border border-edge rounded-xl p-2 bg-surface" style={{ maxHeight: 420 }}>
+              <div className="overflow-auto border border-edge rounded-container p-2 bg-surface" style={{ maxHeight: 420 }}>
                 <div className="relative inline-grid gap-0.5" style={{ gridTemplateColumns: `repeat(${layout.grid_width}, ${CELL_PX}px)` }}>
                   <FloorPlanBackground layout={layout} cellPixelSize={CELL_PX + 0.5} />
                   {Array.from({ length: layout.grid_height }).map((_, y) =>

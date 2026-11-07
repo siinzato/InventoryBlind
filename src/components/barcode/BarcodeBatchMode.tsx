@@ -178,7 +178,7 @@ export const BarcodeBatchMode: React.FC<BarcodeBatchModeProps> = ({
             { label: 'Duplicados', value: summary.duplicate, icon: CopyIcon, filterVal: 'duplicate' as BatchFilter, tone: 'text-amber-600 dark:text-amber-400' },
           ].map(card => (
             <button key={card.label} onClick={() => setFilter(card.filterVal)}
-              className={`text-left bg-surface-2 rounded-xl border p-4 transition ${filter === card.filterVal ? 'border-accent' : 'border-edge hover:border-fg-subtle'}`}>
+              className={`text-left bg-surface-2 rounded-container border p-4 transition ${filter === card.filterVal ? 'border-accent' : 'border-edge hover:border-fg-subtle'}`}>
               <p className="text-xs text-fg-subtle uppercase font-semibold">{card.label}</p>
               <p className={`text-2xl font-bold mt-1 ${card.tone ?? 'text-fg'}`}>{card.value}</p>
             </button>
@@ -187,7 +187,7 @@ export const BarcodeBatchMode: React.FC<BarcodeBatchModeProps> = ({
       )}
 
       {summary && summary.valid > 0 && (
-        <div className="bg-accent/10 rounded-xl p-4 flex flex-wrap items-center justify-between gap-3">
+        <div className="bg-accent/10 rounded-container p-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-accent">
             {summary.valid} linha(s) válida(s) · {summary.totalLabels} etiqueta(s) · {summary.totalLabels} página(s) no PDF consolidado
           </p>

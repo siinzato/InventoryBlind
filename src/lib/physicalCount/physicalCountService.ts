@@ -246,24 +246,20 @@ export async function registerCount(params: {
     queuedAt: Date.now(),
   };
   enqueue(entry);
-  try {
-    const { data, error } = await supabase.rpc('pc_register_count', {
-      p_item_id: params.itemId,
-      p_mode: params.mode,
-      p_quantity: params.quantity,
-      p_source: params.source,
-      p_idempotency_key: params.idempotencyKey,
-    });
-    if (error) throw error;
-    dequeue(params.idempotencyKey);
-    return Number(data);
-  } catch (err) {
-    // Kept in the offline queue on purpose — flushPendingCounts() retries it
-    // later with the SAME idempotency key, which pc_register_count treats as
-    // a no-op replay if it already landed. The caller already applied the
-    // count optimistically in local UI state.
-    throw err;
-  }
+  const { data, error } = await supabase.rpc('pc_register_count', {
+    p_item_id: params.itemId,
+    p_mode: params.mode,
+    p_quantity: params.quantity,
+    p_source: params.source,
+    p_idempotency_key: params.idempotencyKey,
+  });
+  if (error) throw error;
+  // So aqui — um erro acima sai por cima desta linha e a entrada FICA na fila
+  // offline de proposito: flushPendingCounts() a repete depois com a MESMA chave
+  // de idempotencia, que pc_register_count trata como replay inofensivo se ja
+  // tiver entrado. Quem chamou ja aplicou a contagem na tela de forma otimista.
+  dequeue(params.idempotencyKey);
+  return Number(data);
 }
 
 /**

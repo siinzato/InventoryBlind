@@ -19,7 +19,7 @@ export const detectColumnMappings = (headers: string[]): DetectedColumn[] => {
     const headerLower = header.toLowerCase().trim();
     let detectedField: string | null = null;
     let confidence: 'high' | 'medium' | 'low' | 'none' = 'none';
-    let sampleValues: string[] = [];
+    const sampleValues: string[] = [];
 
     for (const field of STANDARD_FIELDS) {
       // Exact match
@@ -193,7 +193,7 @@ export const validateProduct = (
   let isNew = false;
   let status: 'new' | 'update' | 'error' = 'new';
   let oldData: ProductValidated['oldData'] = undefined;
-  let changesDetected: string[] = [];
+  const changesDetected: string[] = [];
 
   if (errors.length > 0) {
     status = 'error';

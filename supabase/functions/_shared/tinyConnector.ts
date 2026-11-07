@@ -88,8 +88,7 @@ export class TinyConnector implements Connector {
   private async call(
     ctx: ConnectorContext,
     endpoint: string,
-    params: Record<string, string>,
-    operation: string
+    params: Record<string, string>
   ): Promise<{ ok: true; retorno: Record<string, unknown>; durationMs: number } | { ok: false; error: IntegrationError; durationMs: number }> {
     await this.pace();
 
@@ -152,7 +151,7 @@ export class TinyConnector implements Connector {
    *  multi_store: false — without an account id there is no safe way to tell two
    *  Tiny accounts apart, so one connection per token is the only honest model. */
   async testConnection(ctx: ConnectorContext): Promise<OperationResult<ConnectionTestResult>> {
-    const result = await this.call(ctx, TINY_ENDPOINTS.listProducts, { pagina: '1' }, 'testConnection');
+    const result = await this.call(ctx, TINY_ENDPOINTS.listProducts, { pagina: '1' });
 
     if (!result.ok) {
       return failed('testConnection', result.error, { durationMs: result.durationMs });
@@ -187,7 +186,7 @@ export class TinyConnector implements Connector {
       params.dataAlteracao = request.updatedSince.slice(0, 10).split('-').reverse().join('/');
     }
 
-    const result = await this.call(ctx, TINY_ENDPOINTS.listProducts, params, 'getProducts');
+    const result = await this.call(ctx, TINY_ENDPOINTS.listProducts, params);
     if (!result.ok) return failed('getProducts', result.error, { durationMs: result.durationMs });
 
     const rows = unwrapTinyList(result.retorno, 'produtos', 'produto');
@@ -233,8 +232,7 @@ export class TinyConnector implements Connector {
       const result = await this.call(
         ctx,
         TINY_ENDPOINTS.getProductStock,
-        { id: product.externalId },
-        'getStockByLocation'
+        { id: product.externalId }
       );
 
       if (!result.ok) {
@@ -275,8 +273,7 @@ export class TinyConnector implements Connector {
     const result = await this.call(
       ctx,
       TINY_ENDPOINTS.getProductStock,
-      { id: externalId },
-      'getProductStock'
+      { id: externalId }
     );
 
     if (!result.ok) {
@@ -325,13 +322,13 @@ export class TinyConnector implements Connector {
 
     for (const write of writes) {
       if (write.kind === 'transfer') {
-        acks.push(await this.applyTransfer(ctx, write, operation));
+        acks.push(await this.applyTransfer(ctx, write));
         continue;
       }
 
       const isReturn = (write.reason ?? '').toLowerCase().includes('devolu');
       const payload = buildTinyStockPayload(write, 1, isReturn);
-      const ack = await this.sendStockPayload(ctx, write, payload, operation);
+      const ack = await this.sendStockPayload(ctx, write, payload);
       acks.push(ack);
     }
 
@@ -347,8 +344,7 @@ export class TinyConnector implements Connector {
    *  surfaced it. */
   private async applyTransfer(
     ctx: ConnectorContext,
-    write: TransferStockWrite,
-    operation: string
+    write: TransferStockWrite
   ): Promise<WriteAck> {
     const { legs } = buildTinyTransferLegs({
       productExternalId: write.productExternalId,
@@ -359,10 +355,10 @@ export class TinyConnector implements Connector {
       reason: write.reason,
     });
 
-    const outbound = await this.sendStockPayload(ctx, write, legs[0], operation);
+    const outbound = await this.sendStockPayload(ctx, write, legs[0]);
     if (!outbound.ok) return outbound;
 
-    const inbound = await this.sendStockPayload(ctx, write, legs[1], operation);
+    const inbound = await this.sendStockPayload(ctx, write, legs[1]);
     if (!inbound.ok) {
       return {
         productExternalId: write.productExternalId,
@@ -387,16 +383,14 @@ export class TinyConnector implements Connector {
   private async sendStockPayload(
     ctx: ConnectorContext,
     write: StockWrite,
-    payload: TinyStockPayload,
-    operation: string
+    payload: TinyStockPayload
   ): Promise<WriteAck> {
     // VERIFY the wrapper name and whether the current endpoint expects JSON or
     // XML in this parameter. Everything else in the payload is settled.
     const result = await this.call(
       ctx,
       TINY_ENDPOINTS.updateStock,
-      { estoque: JSON.stringify({ estoque: payload }) },
-      operation
+      { estoque: JSON.stringify({ estoque: payload }) }
     );
 
     if (!result.ok) {

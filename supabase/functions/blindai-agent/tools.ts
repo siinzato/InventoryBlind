@@ -179,7 +179,7 @@ async function getRiskSummary(supabase: SupabaseClient, companyId: string) {
   if (rowsRes.error) throw rowsRes.error;
 
   const summary = summaryRes.data;
-  const top = (rowsRes.data ?? []).map((r: any) => ({
+  const top = (rowsRes.data ?? []).map((r: { products?: JoinedProduct; risk_score: number | null; risk_level: string | null; risk_reason: string | null }) => ({
     sku: r.products?.sku ?? null,
     produto: r.products?.name ?? null,
     localizacao: r.products?.location ?? null,
@@ -226,7 +226,7 @@ async function getRiskTrend(supabase: SupabaseClient, companyId: string, days: n
     .gte('recorded_at', since)
     .order('recorded_at', { ascending: true });
   if (error) throw error;
-  const series = averageByDay((data ?? []).map((r: any) => ({ value: r.risk_score, recorded_at: r.recorded_at })));
+  const series = averageByDay((data ?? []).map((r: { risk_score: number; recorded_at: string }) => ({ value: r.risk_score, recorded_at: r.recorded_at })));
   if (series.length === 0) return { serie: [], observacao: `Sem histórico de risco nos últimos ${days} dias.` };
   return { serie: series };
 }
@@ -246,7 +246,7 @@ async function getConfidenceSummary(supabase: SupabaseClient, companyId: string)
   if (rowsRes.error) throw rowsRes.error;
 
   const summary = summaryRes.data;
-  const critical = (rowsRes.data ?? []).map((r: any) => ({
+  const critical = (rowsRes.data ?? []).map((r: { products?: JoinedProduct; confidence_score: number | null; next_count_date: string | null; top_reasons: unknown }) => ({
     sku: r.products?.sku ?? null,
     produto: r.products?.name ?? null,
     confidence_score: r.confidence_score,
@@ -281,15 +281,20 @@ async function getConfidenceTrend(supabase: SupabaseClient, companyId: string, d
     .gte('recorded_at', since)
     .order('recorded_at', { ascending: true });
   if (error) throw error;
-  const series = averageByDay((data ?? []).map((r: any) => ({ value: r.confidence_score, recorded_at: r.recorded_at })));
+  const series = averageByDay((data ?? []).map((r: { confidence_score: number; recorded_at: string }) => ({ value: r.confidence_score, recorded_at: r.recorded_at })));
   if (series.length === 0) return { serie: [], observacao: `Sem histórico de confiança nos últimos ${days} dias.` };
   return { serie: series };
 }
 
+/** O `products(...)` embutido nas consultas abaixo. O PostgREST devolve null quando
+ *  a linha nao tem produto associado, e era isso que o `any` escondia: todo acesso
+ *  aqui ja usa `?.`, mas nada obrigava. */
+type JoinedProduct = { name?: string | null; sku?: string | null; location?: string | null } | null;
+
 async function getAbcXyzSummary(supabase: SupabaseClient, companyId: string, combo?: string) {
   const { data, error } = await supabase.from('abc_xyz_company_summary_v').select('*').eq('company_id', companyId);
   if (error) throw error;
-  const matrix = (data ?? []).map((r: any) => ({ combo: r.abc_xyz_class, quantidade_skus: r.sku_count, valor_movimentado: r.total_value_moved }));
+  const matrix = (data ?? []).map((r: { abc_xyz_class: string | null; sku_count: number | null; total_value_moved: number | null }) => ({ combo: r.abc_xyz_class, quantidade_skus: r.sku_count, valor_movimentado: r.total_value_moved }));
 
   if (!combo) return { matriz: matrix };
 
@@ -304,7 +309,7 @@ async function getAbcXyzSummary(supabase: SupabaseClient, companyId: string, com
 
   return {
     matriz: matrix,
-    exemplos_do_combo: (examples ?? []).map((r: any) => ({ sku: r.products?.sku ?? null, produto: r.products?.name ?? null, valor_movimentado: r.value_moved })),
+    exemplos_do_combo: (examples ?? []).map((r: { products?: JoinedProduct; value_moved: number | null }) => ({ sku: r.products?.sku ?? null, produto: r.products?.name ?? null, valor_movimentado: r.value_moved })),
   };
 }
 
@@ -349,7 +354,8 @@ async function searchProduct(supabase: SupabaseClient, companyId: string, query:
   if (bySku.error) throw bySku.error;
   if (byName.error) throw byName.error;
 
-  const merged = new Map<string, any>();
+  type ProductHit = { id: string; sku: string | null; name: string | null; location: string | null; stock_quantity: number | null };
+  const merged = new Map<string, ProductHit>();
   for (const p of [...(bySku.data ?? []), ...(byName.data ?? [])]) merged.set(p.id, p);
   const produtos = Array.from(merged.values()).slice(0, 10);
   if (produtos.length === 0) return { produtos: [], observacao: `Nenhum produto encontrado para "${query}".` };
@@ -381,7 +387,7 @@ async function getProductDetail(supabase: SupabaseClient, companyId: string, pro
     risco: riskRes.data ? { nivel: riskRes.data.risk_level, score: riskRes.data.risk_score, motivo: riskRes.data.risk_reason } : null,
     confianca: confidenceRes.data ? { nivel: confidenceRes.data.risk_level, score: confidenceRes.data.confidence_score, proxima_contagem: confidenceRes.data.next_count_date } : null,
     abc_xyz: abcXyzRes.data ? { combo: abcXyzRes.data.abc_xyz_class, valor_movimentado: abcXyzRes.data.value_moved } : null,
-    divergencias_recentes: (rcaRes.data ?? []).map((r: any) => ({ causa: CAUSE_LABEL[r.cause_category as keyof typeof CAUSE_LABEL], data: r.occurred_at, quantidade: r.divergence_qty })),
+    divergencias_recentes: (rcaRes.data ?? []).map((r: { cause_category: keyof typeof CAUSE_LABEL; occurred_at: string; divergence_qty: number | null }) => ({ causa: CAUSE_LABEL[r.cause_category], data: r.occurred_at, quantidade: r.divergence_qty })),
   };
 }
 
@@ -396,7 +402,7 @@ async function getProductivityEstimate(supabase: SupabaseClient, companyId: stri
   const stats = computeGlobalStats((brandsRes.data ?? []) as BrandData[]);
   const pending = stats.totalSku - stats.totalDone;
   const productivityPerHour = estimateHistoricalProductivity(
-    (statsRes.data ?? []).map((s: any) => ({ skusContados: s.skus_contados, tempoMedioSegundos: s.tempo_medio_segundos }))
+    (statsRes.data ?? []).map((s: { skus_contados: number; tempo_medio_segundos: number }) => ({ skusContados: s.skus_contados, tempoMedioSegundos: s.tempo_medio_segundos }))
   );
 
   if (pending <= 0) return { skus_pendentes: 0, observacao: 'Todos os SKUs já foram contados.' };
@@ -428,7 +434,7 @@ async function getSmartCountQueue(supabase: SupabaseClient, companyId: string) {
     .limit(200);
   if (error) throw error;
 
-  const rows = (data ?? []).map((r: any) => ({
+  const rows = (data ?? []).map((r: { products?: JoinedProduct; risk_level: string | null }) => ({
     sku: r.products?.sku ?? '—',
     produto: r.products?.name ?? '—',
     localizacao: r.products?.location ?? null,

@@ -11,6 +11,9 @@ export function escapeHtml(str: string): string {
   return String(str).replace(/[&<>"'/]/g, (ch) => HTML_ENTITIES[ch]);
 }
 
+// Os caracteres de controle estao aqui de proposito: esta constante existe
+// justamente para remove-los do texto que vem de fora.
+// eslint-disable-next-line no-control-regex
 const CONTROL_CHARS = /[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g;
 const SCRIPT_TAG    = /<script[\s\S]*?>[\s\S]*?<\/script>/gi;
 const ON_HANDLER    = /\bon\w+\s*=/gi;

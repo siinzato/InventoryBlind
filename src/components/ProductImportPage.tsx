@@ -20,6 +20,29 @@ import { useAuth } from '../lib/auth';
 import { classifyCompanyProducts } from '../lib/productBrands/productBrandService';
 import { syncActiveCycleItems } from '../lib/inventoryCycle/inventoryCycleService';
 
+/** A linha de `import_history` como esta tela a grava. Era `Record<string, any>`,
+ *  o que aceitava qualquer chave: um nome de coluna errado so aparecia como erro do
+ *  Postgres em tempo de execucao. `file_content` e `column_mapping` sao opcionais
+ *  porque so entram quando ha conteudo pequeno o bastante e mapeamento definido. */
+interface ImportHistoryInsert {
+  file_name: string;
+  file_size: number;
+  total_products: number;
+  new_products: number;
+  updated_products: number;
+  errors: number;
+  imported_by: string;
+  status: string;
+  file_content?: string;
+  column_mapping?: ColumnMapping;
+}
+
+/** Os campos que o erro do Supabase traz e que as mensagens abaixo mostram.
+ *  `catch (err: any)` deixava passar `err.mesage` sem reclamar; aqui um campo
+ *  inexistente vira erro de compilacao. */
+const errorDetail = (err: unknown): { message?: string; code?: string; hint?: string } =>
+  typeof err === 'object' && err !== null ? err : {};
+
 interface ProductImportPageProps {
   onBack: () => void;
   isAdmin: boolean;
@@ -225,7 +248,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
     console.log('[createImportHistory] Mapeamento:', columnMapping);
 
     // Prepare insert data - avoid large file_content
-    const insertData: Record<string, any> = {
+    const insertData: ImportHistoryInsert = {
       file_name: currentFile.name,
       file_size: currentFile.size,
       total_products: 0,
@@ -275,12 +298,13 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
 
       console.log('[createImportHistory] Registro criado com sucesso:', data?.id);
       return data?.id || null;
-    } catch (err: any) {
+    } catch (err) {
       console.error('[createImportHistory] Erro completo:', err);
       // Show user-friendly error
-      const errorMsg = err?.message || 'Erro desconhecido';
-      const errorCode = err?.code || '';
-      const errorHint = err?.hint || '';
+      const detail = errorDetail(err);
+      const errorMsg = detail.message || 'Erro desconhecido';
+      const errorCode = detail.code || '';
+      const errorHint = detail.hint || '';
 
       alert(`Erro ao criar registro de importacao: ${errorMsg}\n\nCodigo: ${errorCode}\nDica: ${errorHint}\n\nVerifique o console para mais detalhes.`);
       return null;
@@ -318,11 +342,11 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
         // Fallback: continue without history record
         console.warn('[handleConfirmImport] Sem registro de historico, continuando sem auditoria');
       }
-    } catch (err: any) {
+    } catch (err) {
       console.error('[handleConfirmImport] Erro ao criar historico:', err);
       // Fallback: ask user if they want to continue
       const continueWithoutHistory = confirm(
-        `Nao foi possivel criar o registro de importacao no historico.\n\nErro: ${err?.message || 'Desconhecido'}\n\nDeseja continuar mesmo assim? (Os produtos serao importados, mas sem historico)`
+        `Nao foi possivel criar o registro de importacao no historico.\n\nErro: ${errorDetail(err).message || 'Desconhecido'}\n\nDeseja continuar mesmo assim? (Os produtos serao importados, mas sem historico)`
       );
       if (!continueWithoutHistory) {
         setStatus('preview');

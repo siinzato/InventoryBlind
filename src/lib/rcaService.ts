@@ -67,7 +67,18 @@ export interface RcaFilters {
   recurringOnly?: boolean;
 }
 
-function applyFilters(query: any, filters?: RcaFilters) {
+/** Generico sobre o proprio builder em vez de `any`: o tipo que entra e o tipo que
+ *  sai (cada `.gte/.eq/.ilike` do PostgREST devolve o mesmo builder), entao o
+ *  chamador nao perde a tipagem da consulta ao passar por aqui, e um metodo que nao
+ *  existe deixa de ser aceito em silencio. */
+type RcaQuery<Q> = {
+  gte(column: string, value: string): Q;
+  lte(column: string, value: string): Q;
+  eq(column: string, value: string): Q;
+  ilike(column: string, pattern: string): Q;
+};
+
+function applyFilters<Q extends RcaQuery<Q>>(query: Q, filters?: RcaFilters): Q {
   if (!filters) return query;
   if (filters.from) query = query.gte('occurred_at', filters.from);
   if (filters.to) query = query.lte('occurred_at', filters.to);

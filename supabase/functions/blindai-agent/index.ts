@@ -37,7 +37,17 @@ function jsonResponse(body: unknown, status = 200): Response {
   });
 }
 
-async function callClaude(system: string, messages: unknown[]): Promise<any> {
+/** O recorte da resposta da Messages API que este agente realmente le. Nao e o tipo
+ *  completo do SDK — so os campos usados aqui —, mas ja basta para um nome de campo
+ *  errado virar erro de compilacao em vez de `undefined` silencioso em producao. */
+type ClaudeTextBlock = { type: 'text'; text: string };
+type ClaudeToolUseBlock = { type: 'tool_use'; id: string; name: string; input?: Record<string, unknown> };
+type ClaudeToolResultBlock = { type: 'tool_result'; tool_use_id: string; content: string; is_error?: boolean };
+type ClaudeContentBlock = ClaudeTextBlock | ClaudeToolUseBlock;
+type ClaudeResponse = { content?: ClaudeContentBlock[]; stop_reason?: string };
+type ClaudeMessage = { role: 'user' | 'assistant'; content: string | ClaudeContentBlock[] | ClaudeToolResultBlock[] };
+
+async function callClaude(system: string, messages: unknown[]): Promise<ClaudeResponse> {
   const res = await fetch('https://api.anthropic.com/v1/messages', {
     method: 'POST',
     headers: {
@@ -58,7 +68,7 @@ async function callClaude(system: string, messages: unknown[]): Promise<any> {
 
 async function runAgentLoop(supabase: SupabaseClient, companyId: string, history: ChatMessage[]): Promise<string> {
   const systemPrompt = buildSystemPrompt();
-  const messages: any[] = history.map(m => ({ role: m.role, content: m.content }));
+  const messages: ClaudeMessage[] = history.map(m => ({ role: m.role, content: m.content }));
 
   for (let round = 0; round < MAX_TOOL_ROUNDTRIPS; round++) {
     const response = await callClaude(systemPrompt, messages);
@@ -68,18 +78,18 @@ async function runAgentLoop(supabase: SupabaseClient, companyId: string, history
     }
 
     const content = response.content ?? [];
-    const toolUseBlocks = content.filter((b: any) => b.type === 'tool_use');
-    const textBlocks = content.filter((b: any) => b.type === 'text');
+    const toolUseBlocks = content.filter((b): b is ClaudeToolUseBlock => b.type === 'tool_use');
+    const textBlocks = content.filter((b): b is ClaudeTextBlock => b.type === 'text');
 
     if (toolUseBlocks.length === 0) {
-      const text = textBlocks.map((b: any) => b.text).join('\n').trim();
+      const text = textBlocks.map((b) => b.text).join('\n').trim();
       return text || 'Não consegui formular uma resposta agora. Tente reformular a pergunta.';
     }
 
     messages.push({ role: 'assistant', content });
 
     const toolResults = await Promise.all(
-      toolUseBlocks.map(async (block: any) => {
+      toolUseBlocks.map(async (block): Promise<ClaudeToolResultBlock> => {
         try {
           const result = await executeTool(supabase, companyId, block.name, block.input ?? {});
           return { type: 'tool_result', tool_use_id: block.id, content: JSON.stringify(result) };

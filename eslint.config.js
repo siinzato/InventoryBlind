@@ -23,6 +23,11 @@ export default tseslint.config(
     },
     rules: {
       ...reactHooks.configs.recommended.rules,
+      // O repo ja marca parametro intencionalmente nao usado com `_` (`_ctx`,
+      // `_field`, `_match`). Sem este padrao a regra so os tolerava por acidente
+      // de posicao — `args: 'after-used'` ignora o que vem antes de um parametro
+      // usado, e acusava exatamente os mesmos `_` quando eram o ultimo ou o unico.
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
       'react-refresh/only-export-components': [
         'warn',
         { allowConstantExport: true },

@@ -426,7 +426,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
   }, [batchProducts, selectedIds, batchLabelType, batchCopies, batchExcessQty, shelfFonts, excessFonts, toast]);
 
   const handleClear = () => { setProduct(null); setNotFound(false); setSearchQuery(''); setExcessQty(0); setCopies(1); };
-  const toggleSelect = (id: string) => setSelectedIds(p => { const n = new Set(p); n.has(id) ? n.delete(id) : n.add(id); return n; });
+  const toggleSelect = (id: string) => setSelectedIds(p => { const n = new Set(p); if (n.has(id)) n.delete(id); else n.add(id); return n; });
   const toggleAll = () => setSelectedIds(p => p.size === batchProducts.length ? new Set() : new Set(batchProducts.map(x => x.id)));
 
   const labelProduct = product ? labelAsProduct(product) : null;

@@ -386,15 +386,16 @@ export function isOverridable(rejection: GuardRejection): boolean {
     case 'increase_too_large':
     case 'decrease_too_large':
       return true;
+    // `insufficient_source_balance` nao e sobreponivel de proposito: aprovar uma
+    // transferencia maior do que a origem tem levaria o deposito Full a negativo, e
+    // a causa provavel e um deposito mal mapeado — problema de dado a corrigir, nao
+    // julgamento a confirmar.
     case 'absolute_multi_warehouse':
     case 'absolute_without_expected':
     case 'stale_balance':
     case 'observation_too_old':
     case 'negative_result':
     case 'wrong_direction':
-    // Not overridable on purpose: approving a transfer larger than the source
-    // holds would drive the Full deposit negative, and the likely cause is a
-    // mismapped deposit — a data problem to fix, not a judgement to confirm.
     case 'insufficient_source_balance':
     case 'same_warehouse_transfer':
     case 'no_op':

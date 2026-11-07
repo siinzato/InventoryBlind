@@ -27,25 +27,38 @@ function asNumber(v: unknown): number | null {
   return Number.isFinite(n) ? n : null;
 }
 
-function findInfNFe(root: any): any | null {
+/** Um no do XML ja interpretado. Em vez de `any`, continua permitindo navegar por
+ *  chave — o que o formato da NF-e exige, porque a arvore muda conforme a nota —, mas
+ *  o que sai de cada chave e `unknown`: tem de passar por asString/asNumber/toArray
+ *  antes de virar valor. Com `any`, uma tag escrita errada (`vUncom` por `vUnCom`)
+ *  compilava e devolvia null em silencio numa nota real. */
+type XmlNode = { [key: string]: unknown };
+
+/** O no como objeto navegavel, ou um vazio. Substitui o `?? {}` que havia antes com
+ *  o mesmo efeito: toda leitura seguinte da undefined. */
+function asNode(v: unknown): XmlNode {
+  return v != null && typeof v === 'object' ? (v as XmlNode) : {};
+}
+
+function findInfNFe(root: unknown): XmlNode | null {
   // Accept <nfeProc><NFe><infNFe> or isolated <NFe><infNFe>, regardless of order.
   const candidates = [
-    root?.nfeProc?.NFe?.infNFe,
-    root?.NFe?.infNFe,
-    root?.nfeProc?.infNFe,
-    root?.infNFe,
+    asNode(asNode(asNode(root).nfeProc).NFe).infNFe,
+    asNode(asNode(root).NFe).infNFe,
+    asNode(asNode(root).nfeProc).infNFe,
+    asNode(root).infNFe,
   ];
   for (const c of candidates) {
-    if (c) return c;
+    if (c) return asNode(c);
   }
   // Deep fallback: breadth-first search for an infNFe key.
-  const queue: any[] = [root];
+  const queue: unknown[] = [root];
   while (queue.length) {
     const node = queue.shift();
     if (node == null || typeof node !== 'object') continue;
     for (const key of Object.keys(node)) {
-      if (key === 'infNFe' && node[key]) return node[key];
-      const val = node[key];
+      const val = (node as XmlNode)[key];
+      if (key === 'infNFe' && val) return asNode(val);
       if (val && typeof val === 'object') queue.push(val);
     }
   }
@@ -62,7 +75,7 @@ export function parseNfeXml(xml: string): ParsedNfe {
     throw new NfeParseError('XML vazio.');
   }
 
-  let root: any;
+  let root: unknown;
   try {
     root = parser.parse(xml);
   } catch {
@@ -84,11 +97,11 @@ export function parseNfeXml(xml: string): ParsedNfe {
     throw new NfeParseError('Chave de acesso inválida.');
   }
 
-  const ide = infNFe.ide ?? {};
-  const emit = infNFe.emit ?? {};
-  const dest = infNFe.dest ?? {};
-  const infAdic = infNFe.infAdic ?? {};
-  const infIntermed = infNFe.infIntermed ?? {};
+  const ide = asNode(infNFe.ide);
+  const emit = asNode(infNFe.emit);
+  const dest = asNode(infNFe.dest);
+  const infAdic = asNode(infNFe.infAdic);
+  const infIntermed = asNode(infNFe.infIntermed);
 
   const detRaw = toArray(infNFe.det);
   if (detRaw.length === 0) {
@@ -96,10 +109,13 @@ export function parseNfeXml(xml: string): ParsedNfe {
   }
 
   const items: ParsedNfeItem[] = [];
-  detRaw.forEach((det: any, idx: number) => {
-    const prod = det?.prod;
-    if (!prod) return;
-    const ean = resolveItemEan(prod.cEAN, prod.cEANTrib);
+  detRaw.forEach((detRaw: unknown, idx: number) => {
+    const det = asNode(detRaw);
+    if (!det.prod) return;
+    const prod = asNode(det.prod);
+    // asString antes de resolveItemEan: o parser entrega tudo como texto, e a unica
+    // diferenca e que '' vira null — que normalizeEan ja tratava igual a ausente.
+    const ean = resolveItemEan(asString(prod.cEAN), asString(prod.cEANTrib));
     // rastro pode ser objeto único ou array (vários lotes do mesmo item) — usa o
     // primeiro. A maioria dos itens não declara rastro; nesse caso fica null.
     const rastroList = toArray(prod.rastro);

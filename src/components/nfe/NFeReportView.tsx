@@ -9,7 +9,7 @@ import { getInvoiceItems, reopenConference } from '../../lib/nfe/nfeService';
 import { computeReportStats, computeItemStatus } from '../../lib/nfe/nfeReportUtils';
 import { useAuth } from '../../lib/auth';
 import { ItemStatusBadge, InvoiceStatusBadge, formatDate, formatDateTime, formatQty } from './nfeUi';
-import { Card, Button, Panel, PanelSection, Stat } from '../ui';
+import { Card, Button, Modal, Panel, PanelSection, Stat } from '../ui';
 
 interface Props {
   invoice: NfeInvoice;
@@ -30,9 +30,14 @@ export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props)
   const [filter, setFilter] = useState<Filter>('all');
   const [search, setSearch] = useState('');
   const [reopening, setReopening] = useState(false);
+  const [confirmReopen, setConfirmReopen] = useState(false);
   const printRef = useRef<HTMLDivElement>(null);
 
-  const canReopen = ['owner', 'admin', 'manager'].includes(profile?.role ?? '');
+  // owner/admin apenas — e exatamente o que a RPC `nfe_reopen_conference` aceita
+  // ("Apenas owner ou admin podem reabrir uma conferência"). Com `manager` na lista,
+  // esse papel via o botao, confirmava o dialogo e recebia erro do servidor: um
+  // caminho sem saida. A permissao em si nao mudou — ela vive na RPC e segue igual.
+  const canReopen = ['owner', 'admin'].includes(profile?.role ?? '');
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -70,6 +75,7 @@ export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props)
   }
 
   async function handleReopen() {
+    setConfirmReopen(false);
     setReopening(true);
     setError(null);
     try {
@@ -124,15 +130,30 @@ export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props)
                botoes de quatro aparencias.
 
                O ambar tentava avisar que reabrir desfaz uma conferencia finalizada,
-               mas `handleReopen` chama `reopenConference` direto, sem confirmacao: a
-               cor fazia o papel de uma guarda que o fluxo nao tem. Se a acao merecer
-               protecao, isso e um dialogo, nao um tom. */
-            <Button variant="secondary" size="sm" onClick={handleReopen} disabled={reopening}>
+               mas a acao disparava direto no clique: a cor fazia o papel de uma guarda
+               que o fluxo nao tinha. A guarda agora e o dialogo abaixo. */
+            <Button variant="secondary" size="sm" onClick={() => setConfirmReopen(true)} disabled={reopening}>
               {reopening ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />} Recontar
             </Button>
           )}
         </div>
       </div>
+
+      {/* Reabrir desfaz uma conferencia finalizada e devolve os itens para contagem.
+          Antes a acao disparava direto no clique, e a unica coisa que sinalizava
+          consequencia era a cor ambar do botao — cor nao segura clique. O aviso agora
+          esta onde ele funciona, e o botao voltou a ser um botao comum. */}
+      <Modal open={confirmReopen} onClose={() => setConfirmReopen(false)} title="Recontar esta nota?" maxWidth="max-w-sm">
+        <p className="text-sm text-fg-muted">
+          A nota volta para contagem e os itens ficam editáveis de novo. As quantidades já
+          contadas são mantidas; o que se desfaz é o resultado da conferência — cada item
+          deixa de estar marcado como OK, falta ou sobra até ser conferido outra vez.
+        </p>
+        <div className="flex justify-end gap-2 mt-5">
+          <Button variant="ghost" size="sm" onClick={() => setConfirmReopen(false)}>Cancelar</Button>
+          <Button variant="primary" size="sm" onClick={handleReopen}>Recontar</Button>
+        </div>
+      </Modal>
 
       {error && (
         <div className="flex items-start gap-3 p-4 rounded-container bg-red-500/10 text-red-700 dark:text-red-400">

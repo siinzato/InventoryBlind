@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-09-recontar-confirmacao',
+    date: '2026-11-09',
+    category: 'melhoria',
+    title: 'Recontar uma nota agora pede confirmação',
+    description: 'No relatório de conferência por NF-e, o botão Recontar desfazia a conferência finalizada no primeiro clique, sem perguntar nada — o único sinal de que a ação tinha consequência era a cor amarela do botão. Agora aparece uma confirmação explicando o que acontece: a nota volta para contagem, as quantidades já contadas são mantidas e o que se desfaz é a marcação de OK, falta ou sobra de cada item. O botão voltou a ter a aparência dos demais da barra.',
+  },
+  {
     id: '2026-11-09-numeros-e-cores-com-sentido',
     date: '2026-11-09',
     category: 'melhoria',

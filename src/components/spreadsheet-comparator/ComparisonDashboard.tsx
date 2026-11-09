@@ -1,5 +1,6 @@
 import React from 'react';
 import { ComparisonSummary, ComparisonStatus } from '../../lib/spreadsheet-comparator/types';
+import { Stat } from '../ui';
 
 interface ComparisonDashboardProps {
   summary: ComparisonSummary;
@@ -7,20 +8,23 @@ interface ComparisonDashboardProps {
   onFilterChange: (filter: ComparisonStatus | 'all' | 'duplicates-a' | 'duplicates-b') => void;
 }
 
-interface CardDef { key: ComparisonStatus | 'all' | 'duplicates-a' | 'duplicates-b'; label: string; value: number; tone?: string }
+/** `tone` e a intencao semantica, nao uma classe de cor: quem decide se pinta e o
+ *  valor. Antes cada card carregava a cor fixa, entao "Divergentes: 0" aparecia em
+ *  ambar e "Invalidos: 0" em vermelho — anunciando um problema inexistente. */
+interface CardDef { key: ComparisonStatus | 'all' | 'duplicates-a' | 'duplicates-b'; label: string; value: number; tone?: 'warning' | 'critical' }
 
 export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ summary, activeFilter, onFilterChange }) => {
   const cards: CardDef[] = [
     { key: 'all', label: 'Linhas Base A', value: summary.totalRowsA },
     { key: 'all', label: 'Linhas Base B', value: summary.totalRowsB },
     { key: 'all', label: 'Chaves únicas', value: summary.uniqueKeys },
-    { key: 'equal', label: 'Iguais', value: summary.equalCount, tone: 'text-emerald-600 dark:text-emerald-400' },
-    { key: 'divergent', label: 'Divergentes', value: summary.divergentCount, tone: 'text-amber-600 dark:text-amber-400' },
-    { key: 'only-a', label: 'Somente na A', value: summary.onlyACount, tone: 'text-red-600 dark:text-red-400' },
-    { key: 'only-b', label: 'Somente na B', value: summary.onlyBCount, tone: 'text-red-600 dark:text-red-400' },
-    { key: 'duplicates-a', label: 'Duplicados na A', value: summary.duplicateACount, tone: 'text-amber-600 dark:text-amber-400' },
-    { key: 'duplicates-b', label: 'Duplicados na B', value: summary.duplicateBCount, tone: 'text-amber-600 dark:text-amber-400' },
-    { key: 'invalid', label: 'Inválidos', value: summary.invalidCount, tone: 'text-red-600 dark:text-red-400' },
+    { key: 'equal', label: 'Iguais', value: summary.equalCount },
+    { key: 'divergent', label: 'Divergentes', value: summary.divergentCount, tone: 'warning' },
+    { key: 'only-a', label: 'Somente na A', value: summary.onlyACount, tone: 'critical' },
+    { key: 'only-b', label: 'Somente na B', value: summary.onlyBCount, tone: 'critical' },
+    { key: 'duplicates-a', label: 'Duplicados na A', value: summary.duplicateACount, tone: 'warning' },
+    { key: 'duplicates-b', label: 'Duplicados na B', value: summary.duplicateBCount, tone: 'warning' },
+    { key: 'invalid', label: 'Inválidos', value: summary.invalidCount, tone: 'critical' },
   ];
 
   return (
@@ -32,8 +36,11 @@ export const ComparisonDashboard: React.FC<ComparisonDashboardProps> = ({ summar
             onClick={() => onFilterChange(card.key)}
             className={`text-left bg-surface-2 rounded-container border p-4 transition ${activeFilter === card.key ? 'border-accent' : 'border-edge hover:border-fg-subtle'}`}
           >
-            <p className="text-xs text-fg-subtle uppercase font-semibold">{card.label}</p>
-            <p className={`text-2xl font-bold mt-1 ${card.tone ?? 'text-fg'}`}>{card.value.toLocaleString('pt-BR')}</p>
+            <Stat
+              label={card.label}
+              value={card.value.toLocaleString('pt-BR')}
+              valueTone={card.tone && card.value > 0 ? card.tone : 'default'}
+            />
           </button>
         ))}
       </div>

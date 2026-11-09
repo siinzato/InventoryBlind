@@ -197,6 +197,9 @@ const InviteCodeModal: React.FC<{ onClose: () => void }> = ({ onClose }) => {
         ) : code ? (
           <>
             <div className="bg-surface-3 border border-edge rounded-container p-5 text-center">
+              {/* Mono com tracking largo de proposito: e um codigo para ler em voz alta
+                  e digitar, nao um indicador — a fonte display e tabular-nums do `Stat`
+                  seriam erradas aqui. */}
               <p className="font-mono text-2xl font-bold tracking-[0.3em] text-fg">{code}</p>
             </div>
             <Button variant="secondary" onClick={copy} className="w-full">

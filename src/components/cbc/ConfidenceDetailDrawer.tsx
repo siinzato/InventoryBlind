@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
-import { Button } from '../ui';
+import { Button, Stat } from '../ui';
 import { RISK_LEVEL_LABEL } from '../../lib/cbcAlgorithm';
 import {
   getCountHistoryForProduct, scheduleCount,
@@ -75,21 +75,20 @@ export function ConfidenceDetailDrawer({ row, companyId, userId, onClose, onStar
             </button>
           </div>
 
+          {/* O rotulo vinha depois do valor; o §17 pede rotulo → valor → contexto, que
+              e o que o Stat entrega. O nivel de risco, que era so uma emenda no texto
+              de baixo, vira o contexto do indicador. */}
           <div className="px-6 py-4 border-b border-edge grid grid-cols-2 gap-4">
-            <div>
-              <p className={`text-2xl font-semibold tabular-nums ${row.risk_level === 'critico' ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>
-                {row.confidence_score != null ? `${row.confidence_score}/100` : '—'}
-              </p>
-              <p className="text-xs text-fg-subtle mt-0.5">
-                Confiança {row.risk_level ? `· ${RISK_LEVEL_LABEL[row.risk_level]}` : '· Sem dados suficientes'}
-              </p>
-            </div>
-            <div>
-              <p className="text-2xl font-semibold text-fg tabular-nums">
-                {row.priority_score != null ? `${row.priority_score}/100` : '—'}
-              </p>
-              <p className="text-xs text-fg-subtle mt-0.5">Prioridade de contagem</p>
-            </div>
+            <Stat
+              label="Confiança"
+              value={row.confidence_score != null ? `${row.confidence_score}/100` : '—'}
+              context={row.risk_level ? RISK_LEVEL_LABEL[row.risk_level] : 'Sem dados suficientes'}
+              valueTone={row.risk_level === 'critico' ? 'critical' : 'default'}
+            />
+            <Stat
+              label="Prioridade de contagem"
+              value={row.priority_score != null ? `${row.priority_score}/100` : '—'}
+            />
           </div>
 
           <div className="flex items-center gap-5 px-6 border-b border-edge">

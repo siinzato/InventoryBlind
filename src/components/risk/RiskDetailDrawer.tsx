@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { AnimatePresence, motion } from 'motion/react';
 import { X } from 'lucide-react';
-import { Button } from '../ui';
+import { Button, Stat } from '../ui';
 import { RISK_BAND_LABEL } from '../../lib/riskAlgorithm';
 import { getRecentEvidenceForProduct, type ProductRiskRow, type RiskEvidenceEvent } from '../../lib/riskService';
 
@@ -76,12 +76,14 @@ export function RiskDetailDrawer({ row, companyId, onClose, onStartCount, onAddT
 
           <div className="px-6 py-4 border-b border-edge">
             <div className="flex items-center gap-4">
-              <div>
-                <p className={`text-3xl font-semibold tabular-nums ${isCritical ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>
-                  {row.risk_score != null ? `${row.risk_score}` : '—'}<span className="text-base text-fg-subtle">/100</span>
-                </p>
-                <p className="text-xs text-fg-subtle mt-0.5">{row.risk_level ? RISK_BAND_LABEL[row.risk_level] : 'Dados insuficientes'}</p>
-              </div>
+              {/* A faixa de risco sai de emenda abaixo do numero para o contexto do
+                  proprio indicador, e o rotulo passa a vir primeiro (§17). */}
+              <Stat
+                label="Risco"
+                value={row.risk_score != null ? `${row.risk_score}/100` : '—'}
+                context={row.risk_level ? RISK_BAND_LABEL[row.risk_level] : 'Dados insuficientes'}
+                valueTone={isCritical ? 'critical' : 'default'}
+              />
               <div className="flex-1 grid grid-cols-2 gap-3 text-sm">
                 <div>
                   <p className="text-fg-subtle text-xs">Probabilidade</p>

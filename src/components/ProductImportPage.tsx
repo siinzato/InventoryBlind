@@ -7,7 +7,7 @@ import { ColumnMappingWizard } from './ColumnMappingWizard';
 import { ProductImportPreview } from './ProductImportPreview';
 import { ProductImportProgress } from './ProductImportProgress';
 import { ProductImportSummary } from './ProductImportSummary';
-import { Page, PageHeader, Panel, PanelSection, Button, PhaseRail } from './ui';
+import { Page, PageHeader, Panel, PanelSection, Button, PhaseRail, Stat, StatRow, StatCell } from './ui';
 import type { PhaseRailStep } from './ui';
 import type { ProductValidated, ImportSummary, ImportProgress, ImportError, ImportStatus, ColumnMapping, ProductFromDB } from '../lib/productImportTypes';
 import {
@@ -606,16 +606,16 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
 
       <Panel className="mb-8">
         <PanelSection>
-          <div className="grid grid-cols-2 divide-x divide-edge">
-            <div className="text-center px-4">
-              <p className="text-3xl font-bold text-emerald-600 dark:text-emerald-400">{summary?.importedCount ?? 0}</p>
-              <p className="text-sm text-fg-muted mt-1">Salvos com sucesso</p>
-            </div>
-            <div className="text-center px-4">
-              <p className="text-3xl font-bold text-red-600 dark:text-red-400">{dbErrors.length}</p>
-              <p className="text-sm text-fg-muted mt-1">Falharam ao salvar</p>
-            </div>
-          </div>
+          {/* "Salvos com sucesso" em verde permanente anunciava o normal; o vermelho
+              de "Falharam" so aparece quando houve falha de verdade. */}
+          <StatRow>
+            <StatCell>
+              <Stat label="Salvos com sucesso" value={summary?.importedCount ?? 0} />
+            </StatCell>
+            <StatCell>
+              <Stat label="Falharam ao salvar" value={dbErrors.length} valueTone={dbErrors.length > 0 ? 'critical' : 'default'} />
+            </StatCell>
+          </StatRow>
         </PanelSection>
 
         <PanelSection>

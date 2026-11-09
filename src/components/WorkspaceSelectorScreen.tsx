@@ -61,7 +61,7 @@ export default function WorkspaceSelectorScreen() {
           <div className="w-12 h-12 bg-accent/10 rounded-container flex items-center justify-center mb-4">
             <LogoMark size={24} className="text-accent" />
           </div>
-          <h1 className="text-2xl font-bold text-fg mb-1.5">Selecione seu Workspace</h1>
+          <h1 className="text-title mb-1.5">Selecione seu Workspace</h1>
           <p className="text-fg-muted text-sm">Escolha o ambiente que deseja acessar.</p>
         </div>
 

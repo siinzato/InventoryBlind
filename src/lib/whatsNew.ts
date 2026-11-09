@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-09-numeros-e-cores-com-sentido',
+    date: '2026-11-09',
+    category: 'melhoria',
+    title: 'Números e cores que só chamam atenção quando precisam',
+    description: 'Os números das telas seguiam tamanhos e pesos diferentes conforme o módulo, e vários apareciam coloridos o tempo todo: "Com erro: 0" em vermelho, "Divergentes: 0" em amarelo, como se houvesse problema onde não havia. Agora todos os indicadores usam a mesma tipografia — com os dígitos alinhados, para o número não dançar quando o dado atualiza — e a cor só entra quando o valor realmente pede atenção. No relatório de conferência por NF-e, os nove quadrinhos de indicador viraram um painel único. E no BlindAI, o atalho para cada módulo deixou de parecer um aviso colorido e virou um link, com a gravidade da situação indicada apenas pelo ícone.',
+  },
+  {
     id: '2026-11-09-indicadores-mais-limpos',
     date: '2026-11-09',
     category: 'melhoria',

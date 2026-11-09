@@ -213,7 +213,7 @@ export function AbcXyzDashboardPage({ companyId, userId, userEmail, onOpenProduc
                 <p className="text-section mb-2">Leitura estratégica</p>
                 {strategy ? (
                   <>
-                    <p className="text-2xl font-semibold text-fg">{selectedCombo}</p>
+                    <p className="text-title">{selectedCombo}</p>
                     <p className="text-xs text-fg-subtle mb-3">{strategy.title}</p>
                     <p className="text-sm font-medium text-fg">Política recomendada</p>
                     <p className="text-sm text-fg-muted mb-3">{strategy.countingGuidance}</p>

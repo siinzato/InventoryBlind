@@ -282,7 +282,7 @@ export function NFeCountingView({ invoice, onFinalized, onBack }: Props) {
                     </p>
                   </div>
                   <div className="text-center flex-shrink-0">
-                    <p className="text-2xl font-bold text-fg leading-none">{it.physical_quantity != null ? formatQty(it.physical_quantity) : '0'}</p>
+                    <p className="font-display text-2xl font-semibold tabular-nums tracking-tight text-fg leading-none">{it.physical_quantity != null ? formatQty(it.physical_quantity) : '0'}</p>
                     <p className="text-caption mt-0.5">Físico</p>
                   </div>
                 </div>

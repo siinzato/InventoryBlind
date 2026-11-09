@@ -9,7 +9,7 @@ import { getInvoiceItems, reopenConference } from '../../lib/nfe/nfeService';
 import { computeReportStats, computeItemStatus } from '../../lib/nfe/nfeReportUtils';
 import { useAuth } from '../../lib/auth';
 import { ItemStatusBadge, InvoiceStatusBadge, formatDate, formatDateTime, formatQty } from './nfeUi';
-import { Card, Button } from '../ui';
+import { Card, Button, Panel, PanelSection, Stat } from '../ui';
 
 interface Props {
   invoice: NfeInvoice;
@@ -153,20 +153,28 @@ export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props)
             </div>
           </Card>
 
-          {/* Indicators */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-2">
-            <Indicator label="SKUs na NF" value={stats.skuCount} />
-            <Indicator label="Conferidos" value={stats.conferredCount} />
-            <Indicator label="OK" value={stats.okCount} tone="emerald" />
-            <Indicator label="Faltas" value={stats.missingCount} tone="red" />
-            <Indicator label="Sobras" value={stats.surplusCount} tone="amber" />
-            <Indicator label="Não conferidos" value={stats.uncountedCount + stats.unlinkedCount} />
-          </div>
-          <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-            <Indicator label="Qtd total NF" value={formatQty(stats.totalNfQty)} />
-            <Indicator label="Qtd física" value={formatQty(stats.totalPhysicalQty)} />
-            <Indicator label="Conformidade" value={`${stats.conformityPct}%`} tone={stats.conformityPct === 100 ? 'emerald' : 'amber'} />
-          </div>
+          {/* Indicadores: um painel com dois blocos — contagem de SKUs em cima,
+              quantidades embaixo —, divididos pelo hairline do PanelSection. Antes eram
+              nove Cards soltos em duas grades, que e a "grade de caixas" da §3. */}
+          <Panel>
+            <PanelSection padding="md">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3 lg:grid-cols-6">
+                <Indicator label="SKUs na NF" value={stats.skuCount} />
+                <Indicator label="Conferidos" value={stats.conferredCount} />
+                <Indicator label="OK" value={stats.okCount} tone="positive" />
+                <Indicator label="Faltas" value={stats.missingCount} tone="critical" />
+                <Indicator label="Sobras" value={stats.surplusCount} tone="warning" />
+                <Indicator label="Não conferidos" value={stats.uncountedCount + stats.unlinkedCount} />
+              </div>
+            </PanelSection>
+            <PanelSection padding="md">
+              <div className="grid grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-3">
+                <Indicator label="Qtd total NF" value={formatQty(stats.totalNfQty)} />
+                <Indicator label="Qtd física" value={formatQty(stats.totalPhysicalQty)} />
+                <Indicator label="Conformidade" value={`${stats.conformityPct}%`} tone={stats.conformityPct === 100 ? 'positive' : 'warning'} />
+              </div>
+            </PanelSection>
+          </Panel>
 
           {/* Filters */}
           <div className="flex flex-wrap items-center gap-2 no-print">
@@ -255,12 +263,12 @@ function Detail({ label, value, mono, wide }: { label: string; value: string; mo
   );
 }
 
-function Indicator({ label, value, tone = 'neutral' }: { label: string; value: string | number; tone?: 'neutral' | 'emerald' | 'red' | 'amber' }) {
-  const color = tone === 'emerald' ? 'text-emerald-600 dark:text-emerald-400' : tone === 'red' ? 'text-red-600 dark:text-red-400' : tone === 'amber' ? 'text-amber-600 dark:text-amber-400' : 'text-fg';
-  return (
-    <Card padding="sm" className="text-center">
-      <p className={`text-2xl font-bold ${color}`}>{value}</p>
-      <p className="text-caption mt-0.5">{label}</p>
-    </Card>
-  );
+/** Um indicador do relatorio. Era um `Card` por numero — nove caixas com borda em
+ *  duas grades —, e o tom vinha como nome de cor crua. Agora e o `Stat` do sistema
+ *  dentro de um painel unico, e a cor so entra quando o valor pede: "Faltas: 0" em
+ *  vermelho anunciava um problema inexistente. */
+function Indicator({ label, value, tone }: { label: string; value: string | number; tone?: 'positive' | 'warning' | 'critical' }) {
+  const numeric = typeof value === 'number' ? value : Number(String(value).replace(/[^0-9.-]/g, ''));
+  const shouldTone = tone != null && (Number.isNaN(numeric) || numeric > 0);
+  return <Stat label={label} value={value} valueTone={shouldTone ? tone : 'default'} />;
 }

@@ -268,9 +268,14 @@ export function CBCDashboardPage({ companyId, userId, userEmail, onNavigateToCou
 
         <Panel>
           <PanelSection padding="md">
-            <p className="text-section mb-2">Modelo e cobertura</p>
-            <p className="text-2xl font-semibold text-fg tabular-nums">{coveragePct != null ? `${coveragePct}%` : '—'}</p>
-            <p className="text-xs text-fg-subtle mb-3">dos SKU-locais com dados suficientes</p>
+            <p className="text-section mb-3">Modelo e cobertura</p>
+            <div className="mb-3">
+              <Stat
+                label="Cobertura"
+                value={coveragePct != null ? `${coveragePct}%` : '—'}
+                context="dos SKU-locais com dados suficientes"
+              />
+            </div>
             <div className="h-1.5 w-full rounded-full bg-surface-3 overflow-hidden mb-3">
               <div className="h-full rounded-full bg-accent" style={{ width: `${coveragePct ?? 0}%` }} />
             </div>

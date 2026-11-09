@@ -28,7 +28,7 @@ import {
   getRiskLevelLabel,
   generateDiagnosis,
 } from '../lib/heatmapUtils';
-import { Modal, Panel, PanelSection, Badge } from './ui';
+import { Modal, Panel, PanelSection, Badge, Stat } from './ui';
 
 interface HeatmapDetailsModalProps {
   area: HeatmapArea | null;
@@ -251,19 +251,18 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                 {[
                   { label: 'Total de SKUs', value: area.totalSku },
                   { label: 'SKUs Contados', value: area.concluidos },
-                  { label: 'Pendentes', value: pending, valueClassName: 'text-amber-700 dark:text-amber-400' },
+                  { label: 'Pendentes', value: pending, tone: pending > 0 ? ('warning' as const) : undefined },
                   {
                     label: 'Divergências',
                     value: area.divergencias,
-                    valueClassName: area.divergencias > 0 ? 'text-red-700 dark:text-red-400' : 'text-fg-subtle',
+                    tone: area.divergencias > 0 ? ('critical' as const) : undefined,
                   },
                 ].map((kpi, i) => (
                   <div
                     key={kpi.label}
                     className={`${i % 2 === 1 ? 'pl-4 border-l border-edge' : 'pr-4'} ${i >= 2 ? 'pt-3 border-t border-edge' : 'pb-3'}`}
                   >
-                    <p className="text-caption">{kpi.label}</p>
-                    <p className={`text-2xl font-bold mt-1 ${kpi.valueClassName ?? 'text-fg'}`}>{kpi.value}</p>
+                    <Stat label={kpi.label} value={kpi.value} valueTone={kpi.tone ?? 'default'} />
                   </div>
                 ))}
               </div>

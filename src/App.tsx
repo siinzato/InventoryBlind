@@ -112,7 +112,7 @@ import { useCycleNotifications } from './lib/coverage/hooks';
 import { useLotControl } from './lib/lotControl/hooks';
 import { mergeFeed, unreadCount, type FeedItem } from './lib/notifications/notificationFeed';
 import {
-  ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
+  ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Button,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
   BrandLoader,
 } from './components/ui';
@@ -207,12 +207,6 @@ const LandingFallback = () => <div className="min-h-screen w-full bg-ink-950" />
 // Severity reaches the UI through the icon tint (INSIGHT_ICON_TONE) and this
 // badge variant only — the title stays text-fg so the same signal isn't
 // repeated three times in one row.
-const SITUATION_SEVERITY_BADGE: Record<BlindAISituation['severity'], 'neutral' | 'warning' | 'danger'> = {
-  info: 'neutral',
-  warning: 'warning',
-  critical: 'danger',
-};
-
 function greetingPrefix(hour: number): string {
   if (hour >= 5 && hour < 12) return 'Bom dia';
   if (hour >= 12 && hour < 18) return 'Boa tarde';
@@ -1659,10 +1653,14 @@ function AppContent() {
                               >
                                 <SituationIcon size={15} className={`flex-shrink-0 mt-0.5 ${INSIGHT_ICON_TONE[s.severity]}`} />
                                 <div className="min-w-0 flex-1 space-y-1">
-                                  <div className="flex items-center gap-2 flex-wrap">
-                                    <p className="text-sm font-semibold text-fg">{s.title}</p>
-                                    <Badge variant={SITUATION_SEVERITY_BADGE[s.severity]}>{s.actionLabel}</Badge>
-                                  </div>
+                                  {/* `actionLabel` e um verbo ("Ver Confidence Score"), nao um
+                                      status — e vinha dentro de um Badge tingido pela severidade,
+                                      pintando de aviso aquilo que e um link. A §18 reserva badge
+                                      para dado semantico, e o proprio insightIcon.ts ja registrava
+                                      que icone + badge repetiam o mesmo sinal duas vezes. Agora a
+                                      gravidade e dita so pelo icone e a acao aparece como acao, no
+                                      fim do item. */}
+                                  <p className="text-sm font-semibold text-fg">{s.title}</p>
                                   <p className="text-sm text-fg-muted">{s.evidence}</p>
                                   <ul className="text-xs text-fg-subtle space-y-0.5">
                                     {s.reasons.map((reason, idx) => <li key={idx}>• {reason}</li>)}
@@ -1671,6 +1669,10 @@ function AppContent() {
                                     <ArrowRight size={12} className="mt-0.5 flex-shrink-0" />
                                     {s.recommendation}
                                   </p>
+                                  <span className="inline-flex items-center gap-1 pt-0.5 text-xs font-medium text-accent">
+                                    {s.actionLabel}
+                                    <ArrowRight size={12} className="flex-shrink-0" />
+                                  </span>
                                 </div>
                               </button>
                             );

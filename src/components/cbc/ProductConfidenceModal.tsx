@@ -74,7 +74,7 @@ export function ProductConfidenceModal({ open, onClose, productId, productName, 
                 </div>
                 {confidence.has_sufficient_data && confidence.risk_level ? (
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold text-fg">{confidence.confidence_score}</span>
+                    <span className="font-display text-2xl font-semibold tabular-nums tracking-tight text-fg">{confidence.confidence_score}</span>
                     <ConfidenceBadge riskLevel={confidence.risk_level} />
                   </div>
                 ) : (
@@ -119,7 +119,7 @@ export function ProductConfidenceModal({ open, onClose, productId, productName, 
                     <span className="text-sm font-medium text-fg-muted">Risk Score</span>
                   </div>
                   <div className="flex items-center gap-2">
-                    <span className="text-2xl font-bold text-fg">{risk.risk_score}</span>
+                    <span className="font-display text-2xl font-semibold tabular-nums tracking-tight text-fg">{risk.risk_score}</span>
                     <RiskBadge riskLevel={risk.risk_level} />
                   </div>
                 </div>

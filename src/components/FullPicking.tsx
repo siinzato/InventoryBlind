@@ -90,7 +90,7 @@ const PickingCard: React.FC<{
           <MapPin size={20} className="flex-shrink-0" />
           <div>
             <p className="text-xs text-white/70 uppercase font-bold tracking-wider">Localização</p>
-            <p className="font-bold text-2xl leading-tight">{item.location || '—'}</p>
+            <p className="font-display text-2xl font-semibold tracking-tight tabular-nums leading-tight">{item.location || '—'}</p>
           </div>
         </div>
 
@@ -113,7 +113,7 @@ const PickingCard: React.FC<{
           <div className="bg-emerald-500/10 rounded-container p-3 flex items-center justify-between">
             <div>
               <p className="text-xs text-emerald-700 dark:text-emerald-400 font-bold uppercase">Quantidade Solicitada</p>
-              <p className="font-bold text-emerald-700 dark:text-emerald-400 text-3xl leading-none mt-0.5">{item.quantity_requested}</p>
+              <p className="font-display text-3xl font-semibold tabular-nums tracking-tight text-emerald-700 dark:text-emerald-400 leading-none mt-0.5">{item.quantity_requested}</p>
             </div>
             <div className="flex flex-col items-end gap-1">
               <p className="text-xs text-fg-subtle">Qtd coletada:</p>

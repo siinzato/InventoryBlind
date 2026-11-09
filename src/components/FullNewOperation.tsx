@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { FullItemStatus } from '../lib/fullManagerTypes';
 import { ITEM_STATUS_LABEL, ITEM_STATUS_COLOR, MARKETPLACES } from '../lib/fullManagerTypes';
-import { Panel, PanelSection, Button, PhaseRail } from './ui';
+import { Panel, PanelSection, Button, PhaseRail, Stat, StatRow, StatCell } from './ui';
 import type { PhaseRailStep } from './ui';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -292,19 +292,23 @@ const Step3: React.FC<{
       {/* Status summary */}
       <Panel>
         <PanelSection>
-          <div className="grid grid-cols-2 sm:grid-cols-4 divide-y divide-edge sm:divide-y-0 sm:divide-x">
-            {[
-              { l: 'Encontrados', v: counts.found, cls: 'text-emerald-700 dark:text-emerald-400' },
-              { l: 'Não encontrados', v: counts.not_found, cls: counts.not_found > 0 ? 'text-red-700 dark:text-red-400' : '' },
-              { l: 'Sem localização', v: counts.no_location, cls: counts.no_location > 0 ? 'text-amber-700 dark:text-amber-400' : '' },
-              { l: 'Saldo insuficiente', v: counts.insufficient_stock, cls: counts.insufficient_stock > 0 ? 'text-orange-700 dark:text-orange-400' : '' },
-            ].map(({ l, v, cls }, i) => (
-              <div key={l} className={`px-0 sm:px-4 py-2 sm:py-0 ${i === 0 ? 'sm:pl-0' : ''}`}>
-                <p className={`text-2xl font-bold leading-none ${cls}`}>{v}</p>
-                <p className="text-caption mt-1">{l}</p>
-              </div>
-            ))}
-          </div>
+          {/* Mesma conversao de FullChecking. "Saldo insuficiente" sai do laranja
+              (que so existia aqui e em mais quatro telas) para o ambar de aviso do
+              sistema — os dois significam a mesma coisa. */}
+          <StatRow>
+            <StatCell>
+              <Stat label="Encontrados" value={counts.found} />
+            </StatCell>
+            <StatCell>
+              <Stat label="Não encontrados" value={counts.not_found} valueTone={counts.not_found > 0 ? 'critical' : 'default'} />
+            </StatCell>
+            <StatCell>
+              <Stat label="Sem localização" value={counts.no_location} valueTone={counts.no_location > 0 ? 'warning' : 'default'} />
+            </StatCell>
+            <StatCell>
+              <Stat label="Saldo insuficiente" value={counts.insufficient_stock} valueTone={counts.insufficient_stock > 0 ? 'warning' : 'default'} />
+            </StatCell>
+          </StatRow>
         </PanelSection>
       </Panel>
 

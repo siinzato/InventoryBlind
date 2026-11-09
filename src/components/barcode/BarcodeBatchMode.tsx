@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import {
   Printer, Download, Trash2, RefreshCw, FileWarning, CheckCircle2, XCircle, Copy as CopyIcon,
 } from 'lucide-react';
-import { Panel, PanelSection, Button, Badge, Table, Thead, Tr, Th, Td } from '../ui';
+import { Panel, PanelSection, Button, Badge, Stat, Table, Thead, Tr, Th, Td } from '../ui';
 import { downloadFile } from '../../lib/productImportUtils';
 import { BarcodeSymbology, BarcodeLabSettings, resolveLabelSize, pickLayoutVariant } from '../../lib/barcode/barcodeTypes';
 import {
@@ -173,14 +173,16 @@ export const BarcodeBatchMode: React.FC<BarcodeBatchModeProps> = ({
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
           {[
             { label: 'Total', value: summary.total, icon: null, filterVal: 'all' as BatchFilter },
-            { label: 'Válidos', value: summary.valid, icon: CheckCircle2, filterVal: 'valid' as BatchFilter, tone: 'text-emerald-600 dark:text-emerald-400' },
-            { label: 'Inválidos', value: summary.invalid, icon: XCircle, filterVal: 'invalid' as BatchFilter, tone: 'text-red-600 dark:text-red-400' },
-            { label: 'Duplicados', value: summary.duplicate, icon: CopyIcon, filterVal: 'duplicate' as BatchFilter, tone: 'text-amber-600 dark:text-amber-400' },
+            { label: 'Válidos', value: summary.valid, icon: CheckCircle2, filterVal: 'valid' as BatchFilter },
+            { label: 'Inválidos', value: summary.invalid, icon: XCircle, filterVal: 'invalid' as BatchFilter, tone: 'critical' as const },
+            { label: 'Duplicados', value: summary.duplicate, icon: CopyIcon, filterVal: 'duplicate' as BatchFilter, tone: 'warning' as const },
           ].map(card => (
             <button key={card.label} onClick={() => setFilter(card.filterVal)}
               className={`text-left bg-surface-2 rounded-container border p-4 transition ${filter === card.filterVal ? 'border-accent' : 'border-edge hover:border-fg-subtle'}`}>
-              <p className="text-xs text-fg-subtle uppercase font-semibold">{card.label}</p>
-              <p className={`text-2xl font-bold mt-1 ${card.tone ?? 'text-fg'}`}>{card.value}</p>
+              {/* O cartao continua sendo botao de filtro — a borda accent carrega o
+                  estado ativo, entao ela tem funcao. O que muda e o miolo: tipografia
+                  do sistema e cor so quando o valor justifica. */}
+              <Stat label={card.label} value={card.value} valueTone={card.tone && card.value > 0 ? card.tone : 'default'} />
             </button>
           ))}
         </div>

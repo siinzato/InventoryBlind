@@ -37,7 +37,7 @@ export function LegalDocument({
 
       <main className="mx-auto max-w-3xl px-4 pb-[calc(4rem+env(safe-area-inset-bottom))] pt-8 sm:px-6">
         <article>
-          <h1 className="text-2xl font-semibold tracking-tight text-fg">{title}</h1>
+          <h1 className="text-title">{title}</h1>
           <p className="mt-2 text-sm text-fg-muted">
             Versão {version.version} · Em vigor desde {formatEffectiveDate(version.effectiveDate)}
           </p>

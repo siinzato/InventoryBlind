@@ -6,7 +6,7 @@ import {
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR } from '../lib/fullManagerTypes';
-import { Panel, PanelSection, Button } from './ui';
+import { Panel, PanelSection, Button, Stat, StatRow, StatCell } from './ui';
 import { recomputeForProducts } from '../lib/cbcService';
 import { recomputeRiskForProducts } from '../lib/riskService';
 import { RcaClassificationModal, PendingRcaItem } from './rca/RcaClassificationModal';
@@ -144,19 +144,25 @@ const CheckingForm: React.FC<{
       {/* Summary KPIs */}
       <Panel>
         <PanelSection>
-          <div className="grid grid-cols-2 sm:grid-cols-4 divide-y divide-edge sm:divide-y-0 sm:divide-x">
-            {[
-              { l: 'Separados', v: picked.length, cls: 'text-emerald-700 dark:text-emerald-400' },
-              { l: 'Com erro', v: errors.length, cls: errors.length > 0 ? 'text-red-700 dark:text-red-400' : '' },
-              { l: 'Peças coletadas', v: totalPicked, cls: '' },
-              { l: 'Acurácia', v: `${accuracy}%`, cls: accuracy >= 90 ? 'text-emerald-700 dark:text-emerald-400' : 'text-amber-700 dark:text-amber-400' },
-            ].map(({ l, v, cls }, i) => (
-              <div key={l} className={`px-0 sm:px-4 py-2 sm:py-0 ${i === 0 ? 'sm:pl-0' : ''}`}>
-                <p className={`text-2xl font-bold leading-none ${cls}`}>{v}</p>
-                <p className="text-caption mt-1">{l}</p>
-              </div>
-            ))}
-          </div>
+          {/* StatRow no lugar da grade montada a mao: alem da tipografia do sistema
+              (font-display + tabular-nums, para o digito nao mudar de largura a cada
+              atualizacao), inverte a ordem para rotulo acima do valor, que e a do §17.
+              "Separados" deixa de ser verde sempre — contagem que toda conferencia tem
+              nao e estado de atencao. */}
+          <StatRow>
+            <StatCell>
+              <Stat label="Separados" value={picked.length} />
+            </StatCell>
+            <StatCell>
+              <Stat label="Com erro" value={errors.length} valueTone={errors.length > 0 ? 'critical' : 'default'} />
+            </StatCell>
+            <StatCell>
+              <Stat label="Peças coletadas" value={totalPicked} />
+            </StatCell>
+            <StatCell>
+              <Stat label="Acurácia" value={`${accuracy}%`} valueTone={accuracy >= 90 ? 'positive' : 'warning'} />
+            </StatCell>
+          </StatRow>
         </PanelSection>
       </Panel>
 

@@ -326,7 +326,7 @@ function ResultView({
             </div>
             <p className="mt-2 max-w-xl text-sm leading-relaxed text-fg-muted">{plan.desc}</p>
           </div>
-          <p className="text-numeric text-2xl font-semibold text-fg">
+          <p className="font-display text-numeric text-2xl font-semibold tracking-tight text-fg">
             {plan.price}
             {plan.period && <span className="text-sm font-normal text-fg-subtle">{plan.period}</span>}
           </p>

@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Download, Search, ShieldAlert } from 'lucide-react';
-import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Button, Input } from '../ui';
+import { Panel, PanelSection, Stat, Table, Thead, Tr, Th, Td, Button, Input } from '../ui';
 import { downloadFile } from '../../lib/productImportUtils';
 import { getProductOrigins, type ProductOrigin } from '../../lib/productCatalog/catalogHistoryService';
 import {
@@ -253,10 +253,9 @@ export function ProductQualityQueue({ companyId, snapshot, loading, onOpenProduc
       <Panel className="h-fit">
         <PanelSection padding="md" className="space-y-4">
           <div>
-            <p className="text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-3">Resumo da qualidade</p>
-            <div className="flex flex-col items-center py-2">
-              <p className="text-3xl font-semibold text-fg tabular-nums">{avgScore == null ? '—' : `${avgScore}%`}</p>
-              <p className="text-xs text-fg-subtle mt-1">Completude média</p>
+            <p className="text-section mb-3">Resumo da qualidade</p>
+            <div className="py-2">
+              <Stat label="Completude média" value={avgScore == null ? '—' : `${avgScore}%`} />
               <span className="mt-3 h-1 w-full rounded-full bg-surface-3 overflow-hidden">
                 <span className="block h-full rounded-full bg-accent" style={{ width: `${avgScore ?? 0}%` }} />
               </span>

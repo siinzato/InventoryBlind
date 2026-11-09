@@ -23,9 +23,20 @@ export function ProductivityCards({ stats, rank, totalPeers }: ProductivityCards
     {
       label: 'Divergências Reais',
       value: stats.divergencias_reais.toLocaleString('pt-BR'),
-      context: stats.divergencias_encontradas
-        ? `de ${stats.divergencias_encontradas.toLocaleString('pt-BR')} encontradas`
-        : undefined,
+      // "de N encontradas" afirma que a real e subconjunto da encontrada, e o dado nao
+      // garante isso: as duas colunas sao digitadas separadamente na Nova Contagem e
+      // nada impede a real ficar maior. Com 303 encontradas o painel mostrava
+      // "322 — de 303 encontradas", um subconjunto maior que o conjunto.
+      //
+      // Quando contradizem, a frase muda e o valor recebe tom de atencao, em vez de
+      // esconder: a divergencia real alimenta a acuracidade, entao lancamento furado
+      // ali desloca o indicador — e silencio nao ajuda a achar.
+      context: !stats.divergencias_encontradas
+        ? undefined
+        : stats.divergencias_reais > stats.divergencias_encontradas
+          ? `acima das ${stats.divergencias_encontradas.toLocaleString('pt-BR')} encontradas — conferir lançamento`
+          : `de ${stats.divergencias_encontradas.toLocaleString('pt-BR')} encontradas`,
+      valueTone: stats.divergencias_reais > stats.divergencias_encontradas ? 'warning' : 'default',
     },
     { label: 'Acuracidade Média', value: stats.acuracidade_media !== null ? `${stats.acuracidade_media.toFixed(1)}%` : '—' },
     { label: 'Tempo Médio/Contagem', value: formatSeconds(stats.tempo_medio_segundos) },

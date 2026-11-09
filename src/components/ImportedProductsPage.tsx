@@ -45,7 +45,12 @@ interface ProductRow {
   price: number | null; created_at: string; updated_at: string;
 }
 interface AssociationEmbed { brand_id: string | null; line_id: string | null; match_status: string | null; matched_keyword: string | null }
-interface ClassEmbed { abc_class: AbcClass; xyz_class: XyzClass }
+/** Os dois campos sao NULAVEIS no banco: a linha de classificacao existe para o
+ *  produto antes de a classe ser calculada. O tipo dizia o contrario, e por isso a
+ *  tabela mostrava a string "null / null" ao usuario — o objeto existia, entao o
+ *  `classification ? ... : '—'` da celula passava, e o template literal convertia
+ *  cada null em texto. */
+interface ClassEmbed { abc_class: AbcClass | null; xyz_class: XyzClass | null }
 type ProductQueryRow = ProductRow & {
   product_brand_associations: AssociationEmbed | AssociationEmbed[] | null;
   product_abc_xyz_classifications: ClassEmbed | ClassEmbed[] | null;
@@ -239,7 +244,9 @@ export const ImportedProductsPage: FC<ImportedProductsPageProps> = ({
         const assoc = firstOf(row.product_brand_associations);
         if (assoc) assocMap.set(row.id, assoc);
         const cls = firstOf(row.product_abc_xyz_classifications);
-        if (cls) classMap.set(row.id, cls);
+        // So entra no mapa quem tem classe de verdade. Guardar a linha vazia faria a
+        // celula achar que ha classificacao e imprimir os nulls.
+        if (cls?.abc_class && cls.xyz_class) classMap.set(row.id, cls);
       }
       setAssociationByProduct(assocMap);
       setClassificationByProduct(classMap);
@@ -605,7 +612,11 @@ export const ImportedProductsPage: FC<ImportedProductsPageProps> = ({
                               </Td>
                             )}
                             {showCol('abcXyz') && (
-                              <Td className="text-fg-muted">{classification ? `${classification.abc_class} / ${classification.xyz_class}` : '—'}</Td>
+                              <Td className="text-fg-muted">
+                                {classification?.abc_class && classification.xyz_class
+                                  ? `${classification.abc_class} / ${classification.xyz_class}`
+                                  : '—'}
+                              </Td>
                             )}
                             {showCol('updatedAt') && (
                               <Td className="text-xs text-fg-subtle" title={origin ? (origin.imported ? 'Origem: importação' : 'Origem: cadastro manual') : undefined}>

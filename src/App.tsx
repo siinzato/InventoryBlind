@@ -112,7 +112,7 @@ import { useCycleNotifications } from './lib/coverage/hooks';
 import { useLotControl } from './lib/lotControl/hooks';
 import { mergeFeed, unreadCount, type FeedItem } from './lib/notifications/notificationFeed';
 import {
-  ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Button,
+  ThemeToggle, Sidebar, AppHeader, Page, PageHeader, Panel, PanelSection, Modal, Notice, Button,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
   BrandLoader,
 } from './components/ui';
@@ -1876,6 +1876,30 @@ function AppContent() {
           <React.Suspense fallback={<PageLoader />}>
             <ExpiryPage companyId={companyId} alertDays={lotControl.settings.expiryAlertDays} />
           </React.Suspense>
+        )}
+
+        {/* A chave desligada tira o item do menu, mas NÃO tira a rota do ar: quem chegar
+            por link salvo, histórico do navegador ou endereço digitado caía numa tela
+            completamente vazia — sem título, sem mensagem, sem nada. Agora a tela diz
+            por que está vazia e leva para onde se resolve. */}
+        {activeTab === 'validade' && profile && !lotControl.settings.expiryEnabled && (
+          <Page>
+            <PageHeader
+              eyebrow="Operações"
+              title="Controle de Validade"
+              description="Acompanhamento de datas de validade do estoque recebido."
+            />
+            <Notice tone="neutral">
+              O registro de validade está desligado para esta empresa, então não há datas
+              para acompanhar aqui ainda. Ligue a chave em Configurações Avançadas → Lote e
+              validade e esta tela passa a listar o que vence primeiro.
+            </Notice>
+            <div>
+              <Button variant="secondary" onClick={() => setActiveTab('config-lote-validade')}>
+                Abrir Lote e validade
+              </Button>
+            </div>
+          </Page>
         )}
 
         {/* CONFIGURAÇÃO DE LOTE E VALIDADE — a chave em si */}

@@ -117,9 +117,19 @@ export function NFeReportView({ invoice, onReopened, onBack, onPutaway }: Props)
             <Printer size={15} /> Imprimir / PDF
           </Button>
           {canReopen && (
-            <button onClick={handleReopen} disabled={reopening} className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/10 text-amber-700 dark:text-amber-400 text-sm font-semibold hover:bg-amber-500/15 disabled:opacity-50">
+            /* `secondary`, junto do Excel e do PDF. Era um <button> cru em ambar
+               (`bg-amber-500/10`), inventando uma quinta variante que a §14 nao tem —
+               ela define primary/secondary/ghost/danger — e com `rounded-lg` onde o
+               sistema pede `rounded-control`. O resultado era uma barra com quatro
+               botoes de quatro aparencias.
+
+               O ambar tentava avisar que reabrir desfaz uma conferencia finalizada,
+               mas `handleReopen` chama `reopenConference` direto, sem confirmacao: a
+               cor fazia o papel de uma guarda que o fluxo nao tem. Se a acao merecer
+               protecao, isso e um dialogo, nao um tom. */
+            <Button variant="secondary" size="sm" onClick={handleReopen} disabled={reopening}>
               {reopening ? <Loader2 size={15} className="animate-spin" /> : <RotateCcw size={15} />} Recontar
-            </button>
+            </Button>
           )}
         </div>
       </div>

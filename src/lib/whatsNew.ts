@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-09-telas-mais-claras',
+    date: '2026-11-09',
+    category: 'correcao',
+    title: 'Telas mais claras: sem repetição, sem “null” e com tempo em dias',
+    description: 'Uma revisão tela a tela do sistema corrigiu um conjunto de coisas que atrapalhavam a leitura. O Controle de Validade abria completamente em branco para quem chegava pelo endereço direto com o recurso desligado — agora explica por que está vazio e leva até a configuração. No Catálogo de Produtos, a coluna ABC/XYZ mostrava o texto “null / null” em vez de um traço quando o produto ainda não tinha classificação. No Dashboard, o bloco de Saúde e integrações repetia a mesma frase onze vezes quando faltava configurar a credencial: agora o aviso aparece uma vez, com um botão que leva direto à configuração. Tarefas atrasadas há muito tempo apareciam como “959h09” e passam a mostrar “39 dias”; o tempo médio por contagem também deixou de ser dito em minutos acumulados. E a cor passou a aparecer só quando há algo para olhar: “Áreas Saudáveis” não fica mais verde quando quase nenhuma área está saudável, o maior ponto de risco deixou de ter o nome pintado de amarelo, e quem acabou de ser convidado aparece com “Senha pendente” em cinza, não como alerta. Na Central de Segurança, as verificações que passaram ficam resumidas numa linha e os termos técnicos deram lugar a linguagem comum.',
+  },
+  {
     id: '2026-11-09-recontar-confirmacao',
     date: '2026-11-09',
     category: 'melhoria',

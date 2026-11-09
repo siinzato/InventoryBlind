@@ -342,7 +342,18 @@ export function formatDuration(totalSeconds: number): string {
   const totalMinutes = Math.round(totalSeconds / 60);
   const h = Math.floor(totalMinutes / 60);
   const m = totalMinutes % 60;
-  return h === 0 ? `${m}min` : `${h}h${String(m).padStart(2, '0')}`;
+  if (h === 0) return `${m}min`;
+  // A partir de um dia a conta vira dias. Sem isto uma tarefa atrasada havia
+  // quarenta dias aparecia como "959h09", que ninguem le como tempo — o
+  // formatador parava nas horas e ia somando. O resto em horas so acompanha
+  // ate uma semana; alem disso o numero de dias ja basta e a hora vira ruido.
+  if (h >= 24) {
+    const d = Math.floor(h / 24);
+    const restoH = h % 24;
+    if (d >= 7 || restoH === 0) return `${d} ${d === 1 ? 'dia' : 'dias'}`;
+    return `${d}${d === 1 ? ' dia ' : ' dias '}${restoH}h`;
+  }
+  return `${h}h${String(m).padStart(2, '0')}`;
 }
 
 // ── "Faça Agora" — algoritmo determinístico, não uma IA opaca ──────────────

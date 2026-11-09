@@ -455,6 +455,16 @@ describe('computeTimeBreakdown / formatDuration — tempo real por segmento, nun
     expect(formatDuration(45 * 60)).toBe('45min');
     expect(formatDuration(65 * 60)).toBe('1h05');
   });
+
+  it('formatDuration vira dias a partir de 24h — nunca "959h09"', () => {
+    const h = 3600;
+    expect(formatDuration(23 * h)).toBe('23h00');          // ainda em horas
+    expect(formatDuration(24 * h)).toBe('1 dia');          // vira dia, sem resto
+    expect(formatDuration(25 * h)).toBe('1 dia 1h');       // dia + resto
+    expect(formatDuration(49 * h)).toBe('2 dias 1h');
+    expect(formatDuration(7 * 24 * h)).toBe('7 dias');     // de uma semana em diante,
+    expect(formatDuration(959 * h + 9 * 60)).toBe('39 dias'); // so o dia — era '959h09'
+  });
 });
 
 describe('recommendNextTask — "Faça Agora": determinístico e testável, não uma IA opaca', () => {

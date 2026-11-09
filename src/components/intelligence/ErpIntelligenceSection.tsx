@@ -12,6 +12,7 @@ import {
   type InventoryAlert,
   type InventoryMetrics,
   type MetricValue,
+  type UnavailableReason,
   type SyncState,
 } from '../../lib/intelligence/contracts';
 
@@ -65,6 +66,32 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
   const { metrics, health, alerts } = state;
   const connections = metrics.scope.connections;
 
+  // Quando TODOS os indicadores do bloco estao indisponiveis pelo mesmo motivo, a
+  // frase vale para o bloco, nao para cada celula. Sem credencial configurada eram
+  // onze copias literais de "Configure a credencial da integracao para visualizar
+  // este indicador" — um terco da altura do Dashboard para dizer uma coisa so.
+  // Nenhuma metrica disponivel = o bloco inteiro esta indisponivel, e cada MOTIVO
+  // distinto vale uma frase so. Nao basta exigir motivo unico: sem credencial, onze
+  // celulas respondem `no_credential` e a de estoque minimo responde
+  // `not_configured` — eram doze frases para dois recados.
+  const blockUnavailableReasons = ((): UnavailableReason[] => {
+    const all = [
+      metrics.catalog.linkedProducts, metrics.stock.negativeProducts,
+      metrics.stock.zeroProducts, metrics.discrepancies.open,
+      metrics.stock.negativeWarehouseProducts, metrics.catalog.withoutEan,
+      metrics.stock.withoutWarehouse, metrics.stock.belowMinimum,
+      metrics.adjustments.pending, metrics.adjustments.failed,
+      metrics.activity.movements, metrics.activity.potentiallyAffectedSales,
+    ];
+    if (all.some(isAvailable)) return [];
+    const vistos: UnavailableReason[] = [];
+    for (const m of all) {
+      if (isAvailable(m)) continue;
+      if (!vistos.includes(m.reason)) vistos.push(m.reason);
+    }
+    return vistos;
+  })();
+
   // No integration at all: the onboarding state, built from the same Panel the
   // populated version uses rather than a throwaway screen.
   if (connections.length === 0) {
@@ -103,12 +130,34 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
           <HealthBlock health={health} onDrill={onDrill} />
         </PanelSection>
 
+        {/* O motivo dito UMA vez, com a acao que resolve ao lado. As doze celulas
+            abaixo ficam com travessao. */}
+        {blockUnavailableReasons.length > 0 && (
+          <PanelSection padding="lg">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+              <div className="min-w-0 space-y-1">
+                {blockUnavailableReasons.map(r => (
+                  <p key={r} className="text-sm leading-relaxed text-fg-muted">
+                    {UNAVAILABLE_COPY[r]}
+                  </p>
+                ))}
+              </div>
+              {blockUnavailableReasons.some(r => r === 'no_credential' || r === 'not_configured' || r === 'no_connection') && (
+                <Button variant="secondary" size="sm" onClick={() => onDrill('integration_settings')}>
+                  Configurar integração
+                </Button>
+              )}
+            </div>
+          </PanelSection>
+        )}
+
         <PanelSection padding="lg">
           <StatRow>
             <StatCell>
               <MetricStat
                 label="SKUs sincronizados"
                 metric={metrics.catalog.linkedProducts}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context={contextForCatalog(metrics)}
               />
             </StatCell>
@@ -116,6 +165,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Saldo negativo"
                 metric={metrics.stock.negativeProducts}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="Publicado aos marketplaces como disponível"
                 criticalWhenPositive
                 onClick={() => onDrill('negative_stock')}
@@ -125,6 +175,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Sem estoque"
                 metric={metrics.stock.zeroProducts}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="Saldo exatamente zero"
               />
             </StatCell>
@@ -132,6 +183,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Divergências"
                 metric={metrics.discrepancies.open}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="ERP e InventoryBlind discordam"
                 onClick={() => onDrill('discrepancies')}
               />
@@ -145,6 +197,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Depósito negativo"
                 metric={metrics.stock.negativeWarehouseProducts}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="Total positivo, depósito negativo"
                 onClick={() => onDrill('negative_stock')}
               />
@@ -153,6 +206,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Sem EAN"
                 metric={metrics.catalog.withoutEan}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="Impede conferência por código de barras"
                 onClick={() => onDrill('missing_ean')}
               />
@@ -161,6 +215,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Sem depósito"
                 metric={metrics.stock.withoutWarehouse}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="Fora das análises por localização"
                 onClick={() => onDrill('missing_warehouse')}
               />
@@ -169,6 +224,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Abaixo do mínimo"
                 metric={metrics.stock.belowMinimum}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 onClick={() => onDrill('minimum_stock_settings')}
               />
             </StatCell>
@@ -181,6 +237,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Aguardando envio ao ERP"
                 metric={metrics.adjustments.pending}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="Lançamentos aprovados"
                 onClick={() => onDrill('adjustment_queue')}
               />
@@ -189,6 +246,7 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Falha no envio"
                 metric={metrics.adjustments.failed}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
                 context="ERP segue com o saldo antigo"
                 criticalWhenPositive
                 onClick={() => onDrill('adjustment_queue')}
@@ -198,12 +256,14 @@ export function ErpIntelligenceSection({ onDrill }: Props) {
               <MetricStat
                 label="Movimentações"
                 metric={metrics.activity.movements}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
               />
             </StatCell>
             <StatCell>
               <MetricStat
                 label="Vendas potencialmente afetadas"
                 metric={metrics.activity.potentiallyAffectedSales}
+                reasonShownAbove={blockUnavailableReasons.length > 0}
               />
             </StatCell>
           </StatRow>
@@ -400,6 +460,7 @@ function MetricStat({
   context,
   criticalWhenPositive,
   onClick,
+  reasonShownAbove,
 }: {
   label: string;
   metric: MetricValue<number>;
@@ -408,12 +469,18 @@ function MetricStat({
    *  genuinely a condition — negative stock, failed writes. */
   criticalWhenPositive?: boolean;
   onClick?: () => void;
+  /** O motivo da indisponibilidade ja aparece uma vez, acima da grade. */
+  reasonShownAbove?: boolean;
 }) {
   if (!isAvailable(metric)) {
+    // `reasonShownAbove`: a frase ja esta no aviso do bloco, entao aqui fica so o
+    // travessao. Repeti-la por celula nao acrescenta informacao nenhuma.
     return (
       <div>
         <p className="text-overline">{label}</p>
-        <p className="mt-2 text-sm leading-relaxed text-fg-subtle">{UNAVAILABLE_COPY[metric.reason]}</p>
+        {reasonShownAbove
+          ? <p className="mt-2 font-display text-2xl font-semibold tabular-nums tracking-tight text-fg-subtle">—</p>
+          : <p className="mt-2 text-sm leading-relaxed text-fg-subtle">{UNAVAILABLE_COPY[metric.reason]}</p>}
       </div>
     );
   }

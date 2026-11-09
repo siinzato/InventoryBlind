@@ -412,8 +412,13 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
                         )}
                       </Td>
                       <Td>
+                        {/* `neutral`, nao `warning`: trocar a senha no primeiro acesso e o
+                            estado NORMAL de quem acabou de ser convidado, nao uma anomalia.
+                            Em ambar, quatro das sete linhas desta empresa apareciam
+                            pintadas de aviso — e a §5 pede neutro justamente para o estado
+                            que a maioria das linhas tem, senao a cor para de significar. */}
                         {u.must_change_password ? (
-                          <Badge variant="warning">Deve alterar senha</Badge>
+                          <Badge variant="neutral">Senha pendente</Badge>
                         ) : u.id === profile?.id ? (
                           <Badge variant="accent">Você</Badge>
                         ) : (

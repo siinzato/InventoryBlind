@@ -7,11 +7,15 @@ interface ProductivityCardsProps {
   totalPeers?: number;
 }
 
+/** Mesmo defeito que o formatDuration das tarefas tinha: parava nos minutos e ia
+ *  somando, entao duas horas e meia saiam como "137min 24s". Acima de uma hora o
+ *  segundo nao informa nada numa media, entao some. */
 const formatSeconds = (s: number | null): string => {
   if (s === null) return '—';
-  const m = Math.floor(s / 60);
-  const rem = Math.round(s % 60);
-  return `${m}min ${rem}s`;
+  const totalMin = Math.floor(s / 60);
+  if (totalMin < 60) return `${totalMin}min ${Math.round(s % 60)}s`;
+  const h = Math.floor(totalMin / 60);
+  return `${h}h${String(totalMin % 60).padStart(2, '0')}`;
 };
 
 export function ProductivityCards({ stats, rank, totalPeers }: ProductivityCardsProps) {

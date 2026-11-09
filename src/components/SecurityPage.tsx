@@ -91,14 +91,18 @@ function HealthCheck({ companyId }: { companyId: string }) {
       setLoading(true);
 
       // Static checks (immediate)
+      // Os rotulos daqui sao lidos por quem gerencia o estoque, nao por quem escreveu
+      // o sistema: `company_id`, `role`, `anti-XSS`, `MIME` e o nome do fornecedor de
+      // banco nao dizem nada para essa pessoa, e o que ela precisa saber — que os dados
+      // de uma empresa nao alcancam outra — estava escrito como nome de coluna.
       const base: HealthItem[] = [
-        { label: 'Autenticação ativa', status: 'ok', detail: 'Supabase Auth' },
+        { label: 'Acesso protegido por senha', status: 'ok', detail: 'Login verificado a cada sessão' },
         { label: 'E-mail confirmado', status: profile?.email ? 'ok' : 'warning', detail: 'Verificação de e-mail ativa' },
-        { label: 'company_id obrigatório', status: companyId ? 'ok' : 'critical', detail: companyId ? `ID: ${companyId.slice(0, 8)}…` : 'company_id ausente' },
-        { label: 'Permissões por role', status: profile?.role ? 'ok' : 'warning', detail: profile?.role ? getRoleLabel(profile.role) : 'Role indefinido' },
-        { label: 'Proteção anti-XSS', status: 'ok', detail: 'Sanitização ativa' },
-        { label: 'Uploads validados', status: 'ok', detail: 'Extensão + MIME + tamanho' },
-        { label: 'Tokens ERP mascarados', status: 'ok', detail: 'Nunca expostos no frontend' },
+        { label: 'Conta vinculada a uma empresa', status: companyId ? 'ok' : 'critical', detail: companyId ? 'Vínculo confirmado' : 'Sem empresa vinculada' },
+        { label: 'Permissões por perfil de acesso', status: profile?.role ? 'ok' : 'warning', detail: profile?.role ? getRoleLabel(profile.role) : 'Perfil indefinido' },
+        { label: 'Proteção contra código malicioso', status: 'ok', detail: 'Texto recebido é sempre higienizado' },
+        { label: 'Arquivos enviados são validados', status: 'ok', detail: 'Tipo, formato e tamanho conferidos' },
+        { label: 'Chaves do ERP ficam ocultas', status: 'ok', detail: 'Nunca aparecem no navegador' },
       ];
 
       // Check RLS by trying to read from another company (should return empty)
@@ -109,7 +113,7 @@ function HealthCheck({ companyId }: { companyId: string }) {
         .limit(1);
 
       base.push({
-        label: 'RLS ativo — isolamento entre empresas',
+        label: 'Isolamento entre empresas',
         status: (rlsTest?.length ?? 0) === 0 ? 'ok' : 'critical',
         detail: (rlsTest?.length ?? 0) === 0 ? 'Nenhum dado de outra empresa visível' : 'FALHA: dados de outra empresa visíveis',
       });
@@ -140,7 +144,7 @@ function HealthCheck({ companyId }: { companyId: string }) {
 
       base.push(
         { label: 'Rotas protegidas por autenticação', status: 'ok', detail: 'Verificação de sessão ativa' },
-        { label: 'Dados da empresa isolados', status: companyId ? 'ok' : 'critical', detail: 'Segregação por company_id' },
+        { label: 'Dados da empresa isolados', status: companyId ? 'ok' : 'critical', detail: 'Cada empresa só enxerga o próprio estoque' },
       );
 
       setItems(base);
@@ -159,8 +163,8 @@ function HealthCheck({ companyId }: { companyId: string }) {
         <div className="flex items-center gap-3">
           <ShieldCheck size={20} className="text-fg-muted" />
           <div>
-            <h3 className="text-sm font-semibold text-fg">Security Health Check</h3>
-            <p className="text-fg-subtle text-xs">InventoryBlind Security Audit</p>
+            <h3 className="text-sm font-semibold text-fg">Verificações de segurança</h3>
+            <p className="text-fg-subtle text-xs">Conferidas a cada abertura desta tela</p>
           </div>
         </div>
         {!loading && (
@@ -179,15 +183,40 @@ function HealthCheck({ companyId }: { companyId: string }) {
                 <div className="h-3 w-16 bg-edge rounded" />
               </div>
             ))
-          : items.map((item) => (
-              <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-control bg-surface-3">
-                <div>
-                  <span className="text-fg text-sm">{item.label}</span>
-                  {item.detail && <span className="text-fg-subtle text-xs ml-2">— {item.detail}</span>}
-                </div>
-                <StatusBadge status={item.status} />
-              </div>
-            ))}
+          : (
+              <>
+                {/* So o que NAO passou vem detalhado. O badge verde repetido linha a linha
+                    nao informava nada: com tudo em ordem eram oito "OK" em coluna abaixo de
+                    um "12 OK" que ja dizia o mesmo. A §3 lista excesso de badges entre os
+                    tracos de template, e badge que nunca varia e decoracao. */}
+                {items.filter(i => i.status !== 'ok').map((item) => (
+                  <div key={item.label} className="flex items-center justify-between py-2.5 px-3 rounded-control bg-surface-3">
+                    <div>
+                      <span className="text-fg text-sm">{item.label}</span>
+                      {item.detail && <span className="text-fg-subtle text-xs ml-2">— {item.detail}</span>}
+                    </div>
+                    <StatusBadge status={item.status} />
+                  </div>
+                ))}
+                {okCount > 0 && (
+                  <details className="rounded-control bg-surface-3 px-3 py-2.5">
+                    <summary className="cursor-pointer text-sm text-fg-muted">
+                      {okCount === items.length
+                        ? `Todas as ${okCount} verificações passaram`
+                        : `Outras ${okCount} verificações passaram`}
+                    </summary>
+                    <ul className="mt-2 space-y-1 border-t border-edge pt-2">
+                      {items.filter(i => i.status === 'ok').map(item => (
+                        <li key={item.label} className="text-xs text-fg-subtle">
+                          {item.label}
+                          {item.detail && ` — ${item.detail}`}
+                        </li>
+                      ))}
+                    </ul>
+                  </details>
+                )}
+              </>
+            )}
       </PanelSection>
     </Panel>
   );
@@ -232,7 +261,7 @@ function OverviewCards({ companyId }: { companyId: string }) {
   const cards: { icon: React.ReactNode; label: string; value: React.ReactNode; sub: string; critical: boolean }[] = [
     {
       icon: <Shield size={14} />,
-      label: 'RLS Status',
+      label: 'Isolamento entre empresas',
       value: data ? (data.rlsActive ? 'Ativo' : 'FALHA') : skeleton,
       sub: 'Isolamento multiempresa',
       critical: !!data && !data.rlsActive,
@@ -268,8 +297,10 @@ function OverviewCards({ companyId }: { companyId: string }) {
     {
       icon: <Lock size={14} />,
       label: 'Backup',
-      value: 'Supabase',
-      sub: 'Gerenciado automaticamente',
+      // Era o nome do fornecedor de infraestrutura como VALOR do indicador. Quem le
+      // esta tela quer saber se ha backup, nao de quem e o servidor.
+      value: 'Diário',
+      sub: 'Automático, sem ação sua',
       critical: false,
     },
   ];
@@ -639,7 +670,8 @@ function BackupStatus() {
     { label: 'Status', value: 'Concluído', status: 'ok' },
     { label: 'Próximo backup', value: 'Amanhã, 03:00', status: 'ok' },
     { label: 'Retenção', value: '30 dias', status: 'ok' },
-    { label: 'Responsável', value: 'Supabase Managed', status: 'ok' },
+    // O nome do fornecedor de infraestrutura nao e informacao de produto.
+    { label: 'Responsável', value: 'Gerenciado pelo InventoryBlind', status: 'ok' },
   ];
 
   return (
@@ -649,7 +681,7 @@ function BackupStatus() {
           <Server size={18} className="text-fg-muted" />
           <div>
             <h3 className="text-sm font-semibold text-fg">Status de Backup</h3>
-            <p className="text-fg-subtle text-xs">Gerenciado pelo Supabase</p>
+            <p className="text-fg-subtle text-xs">Rotina automática, sem ação sua</p>
           </div>
         </div>
         <div>
@@ -760,7 +792,7 @@ function PermissionMatrix() {
           <KeyRound size={18} className="text-fg-muted" />
           <div className="text-left">
             <h3 className="text-sm font-semibold text-fg">Matriz de Permissões</h3>
-            <p className="text-fg-subtle text-xs">Permissões por role</p>
+            <p className="text-fg-subtle text-xs">O que cada perfil de acesso pode fazer</p>
           </div>
         </div>
         {open ? <ChevronUp size={16} className="text-fg-subtle" /> : <ChevronDown size={16} className="text-fg-subtle" />}

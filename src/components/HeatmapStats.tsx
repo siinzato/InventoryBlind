@@ -67,14 +67,21 @@ export const HeatmapStatsComponent: React.FC<HeatmapStatsProps> = ({ stats }) =>
       value: stats.areasCriticas,
       subtitle: 'Precisam de atenção urgente',
       icon: AlertTriangle,
-      valueClassName: 'text-red-700 dark:text-red-400',
+      // Zero area critica e boa noticia, nao alarme.
+      valueClassName: stats.areasCriticas > 0 ? 'text-red-700 dark:text-red-400' : undefined,
     },
     {
       title: 'Áreas Saudáveis',
       value: stats.areasSaudaveis,
       subtitle: 'Com bom desempenho',
       icon: CheckCircle,
-      valueClassName: 'text-emerald-700 dark:text-emerald-400',
+      // Era verde SEMPRE, e com 1 de 31 areas saudaveis o verde afirmava "bom" sobre
+      // o pior numero da tela. So pinta quando a maioria das areas esta saudavel —
+      // ai o verde quer dizer alguma coisa.
+      valueClassName:
+        stats.totalAreas > 0 && stats.areasSaudaveis > stats.totalAreas / 2
+          ? 'text-emerald-700 dark:text-emerald-400'
+          : undefined,
     },
     {
       title: 'Não Iniciadas',
@@ -87,7 +94,8 @@ export const HeatmapStatsComponent: React.FC<HeatmapStatsProps> = ({ stats }) =>
       value: stats.maiorPontoRisco || 'Nenhum',
       subtitle: 'Ponto crítico atual',
       icon: TrendingDown,
-      valueClassName: 'text-amber-700 dark:text-amber-400',
+      // Sem cor: o valor aqui e um NOME de area, nao uma medida. A gravidade ja esta
+      // dita no subtitulo, e pintar o nome de ambar nao acrescenta — so gasta a cor.
       isText: true,
     },
   ];

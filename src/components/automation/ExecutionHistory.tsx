@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Loader2, RefreshCw, Search, Timer } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Loader2, Search } from 'lucide-react';
 import { Badge, Button, Input, Panel, PanelSection, Select, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr } from '../ui';
 import { countStepsByExecution, listExecutionsPage } from '../../lib/automation/automationService';
 import { isKnownTrigger, TRIGGERS } from '../../lib/automation/registry';
@@ -10,7 +10,6 @@ import {
   type AutomationExecution,
   type ExecutionStatus,
 } from '../../lib/automation/types';
-import { AutomationKpiCard } from './AutomationKpiCard';
 import { AutomationTestPanel } from './AutomationTestPanel';
 import { ExecutionDetailPanel } from './ExecutionDetailPanel';
 
@@ -167,37 +166,37 @@ export function ExecutionHistory({ automations, canManage }: Props) {
 
   return (
     <div className="space-y-4">
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-        <AutomationKpiCard
-          icon={RefreshCw}
-          iconClass="bg-accent/10 text-accent"
-          title="Execuções"
-          value={metricsLoading ? '—' : metrics.count}
-          context={periodLabel(period)}
-        />
-        <AutomationKpiCard
-          icon={CheckCircle2}
-          iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-          title="Taxa de sucesso"
-          value={metrics.successRate == null ? '—' : `${metrics.successRate}%`}
-          context={periodLabel(period)}
-        />
-        <AutomationKpiCard
-          icon={Timer}
-          iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-          title="Tempo médio"
-          value={formatMs(metrics.avgDurationMs)}
-          context={metrics.minDurationMs == null ? 'sem execuções concluídas' : `${formatMs(metrics.minDurationMs)} – ${formatMs(metrics.maxDurationMs)}`}
-        />
-        <AutomationKpiCard
-          icon={AlertTriangle}
-          iconClass="bg-red-500/10 text-red-600 dark:text-red-400"
-          title="Falhas recentes"
-          value={metrics.recentFailures}
-          context="últimas 24h"
-          tone={metrics.recentFailures > 0 ? 'critical' : 'default'}
-        />
-      </div>
+      <Panel>
+        <PanelSection padding="md">
+          <StatRow>
+            <StatCell>
+              <Stat label="Execuções" value={metricsLoading ? '—' : metrics.count} context={periodLabel(period)} />
+            </StatCell>
+            <StatCell>
+              <Stat
+                label="Taxa de sucesso"
+                value={metrics.successRate == null ? '—' : `${metrics.successRate}%`}
+                context={periodLabel(period)}
+              />
+            </StatCell>
+            <StatCell>
+              <Stat
+                label="Tempo médio"
+                value={formatMs(metrics.avgDurationMs)}
+                context={metrics.minDurationMs == null ? 'sem execuções concluídas' : `${formatMs(metrics.minDurationMs)} – ${formatMs(metrics.maxDurationMs)}`}
+              />
+            </StatCell>
+            <StatCell>
+              <Stat
+                label="Falhas recentes"
+                value={metrics.recentFailures}
+                context="últimas 24h"
+                valueTone={metrics.recentFailures > 0 ? 'critical' : 'default'}
+              />
+            </StatCell>
+          </StatRow>
+        </PanelSection>
+      </Panel>
 
       <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Panel>

@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { ArrowLeft, ArrowRight, CheckCircle2, FileSpreadsheet, Loader2, Upload, XCircle } from 'lucide-react';
-import { Badge, Button, Panel, PanelSection, Select, Table, Thead, Tr, Th, Td } from '../ui';
+import { Badge, Button, Panel, PanelSection, Select, Stat, StatCell, StatRow, Table, Thead, Tr, Th, Td } from '../ui';
 import { readPalletBatchFile, validateFileBeforeParse } from '../../lib/palletCalc/palletBatchFileReader';
 import {
   PALLET_BATCH_FIELDS, applyPalletColumnMapping, detectPalletColumnMappings, requiredFieldsMapped, suggestPalletMapping,
@@ -149,12 +149,36 @@ export function PalletBatchPage({ onBack, toast, customPallets }: PalletBatchPag
 
         {step === 'results' && summary && (
           <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-              <Panel><PanelSection padding="sm"><div className="text-2xl font-bold text-fg">{summary.processed}</div><div className="text-xs text-fg-muted">Processados</div></PanelSection></Panel>
-              <Panel><PanelSection padding="sm"><div className="text-2xl font-bold text-amber-600">{summary.processedWithAlerts}</div><div className="text-xs text-fg-muted">Com alerta</div></PanelSection></Panel>
-              <Panel><PanelSection padding="sm"><div className="text-2xl font-bold text-fg-subtle">{summary.noSolution}</div><div className="text-xs text-fg-muted">Sem solução</div></PanelSection></Panel>
-              <Panel><PanelSection padding="sm"><div className="text-2xl font-bold text-red-600">{summary.invalid}</div><div className="text-xs text-fg-muted">Inválidos</div></PanelSection></Panel>
-            </div>
+            {/* Quatro Panels com um numero cada viravam quatro caixas com borda
+                lado a lado; a §17 pede um painel so, com divisores. O tom de cor
+                tambem passa a depender do valor: "Com alerta" e "Invalidos" em zero
+                nao sao estado de atencao. */}
+            <Panel>
+              <PanelSection padding="md">
+                <StatRow>
+                  <StatCell>
+                    <Stat label="Processados" value={summary.processed} />
+                  </StatCell>
+                  <StatCell>
+                    <Stat
+                      label="Com alerta"
+                      value={summary.processedWithAlerts}
+                      valueTone={summary.processedWithAlerts > 0 ? 'warning' : 'default'}
+                    />
+                  </StatCell>
+                  <StatCell>
+                    <Stat label="Sem solução" value={summary.noSolution} />
+                  </StatCell>
+                  <StatCell>
+                    <Stat
+                      label="Inválidos"
+                      value={summary.invalid}
+                      valueTone={summary.invalid > 0 ? 'critical' : 'default'}
+                    />
+                  </StatCell>
+                </StatRow>
+              </PanelSection>
+            </Panel>
 
             <div className="flex flex-wrap gap-2">
               <Button variant="secondary" onClick={handleExportExcel}>Baixar Excel</Button>

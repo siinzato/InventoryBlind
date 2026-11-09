@@ -1,10 +1,8 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle,
   ArrowLeft,
   Bell,
   Bot,
-  CheckCircle2,
   Copy,
   History,
   Loader2,
@@ -19,7 +17,7 @@ import {
 } from 'lucide-react';
 import {
   Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection, Select,
-  SegmentedControl, Table, Td, Th, Thead, Tr,
+  SegmentedControl, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
 } from '../ui';
 import {
   createAutomation,
@@ -38,7 +36,6 @@ import { TRIGGERS, isKnownTrigger } from '../../lib/automation/registry';
 import { AUTOMATION_STATUS_LABEL, type Automation, type AutomationExecution, type AutomationNotification } from '../../lib/automation/types';
 import { AgentsPanel } from './AgentsPanel';
 import { AutomationEditor } from './AutomationEditor';
-import { AutomationKpiCard } from './AutomationKpiCard';
 import { ExecutionHistory } from './ExecutionHistory';
 
 interface Props {
@@ -226,38 +223,50 @@ export function AutomationsPage({ canManage, onBack }: Props) {
         <NotificationsPanel notifications={notifications} onChanged={load} />
       )}
 
+      {/* Um painel com divisores, nao quatro caixas. A §17 pede os indicadores
+          relacionados dentro do MESMO Panel — e sem o selo de icone em circulo
+          colorido, que ela proibe nominalmente ("um KPI e dado, nao um anuncio").
+          As cores dos selos tambem eram escolhidas por variedade (accent, emerald,
+          violet) e nao por significado. */}
       {!loading && automations.length > 0 && (
-        <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <AutomationKpiCard
-            icon={WorkflowIcon}
-            iconClass="bg-accent/10 text-accent"
-            title="Automações ativas"
-            value={kpis.activeCount}
-            context={`de ${kpis.totalCount} no total`}
-          />
-          <AutomationKpiCard
-            icon={RefreshCw}
-            iconClass="bg-emerald-500/10 text-emerald-600 dark:text-emerald-400"
-            title="Execuções hoje"
-            value={kpis.executionsToday}
-            context={kpis.executionsTrendPct == null ? 'sem execução ontem para comparar' : `${kpis.executionsTrendPct >= 0 ? '↑' : '↓'} ${Math.abs(kpis.executionsTrendPct)}% vs ontem`}
-          />
-          <AutomationKpiCard
-            icon={CheckCircle2}
-            iconClass="bg-violet-500/10 text-violet-600 dark:text-violet-400"
-            title="Taxa de sucesso"
-            value={kpis.successRate == null ? '—' : `${kpis.successRate}%`}
-            context={kpis.successRate == null ? 'sem execuções reais em 7 dias' : 'últimos 7 dias'}
-          />
-          <AutomationKpiCard
-            icon={AlertTriangle}
-            iconClass="bg-red-500/10 text-red-600 dark:text-red-400"
-            title="Falhas recentes"
-            value={kpis.recentFailures}
-            context="últimas 24h"
-            tone={kpis.recentFailures > 0 ? 'critical' : 'default'}
-          />
-        </div>
+        <Panel>
+          <PanelSection padding="md">
+            <StatRow>
+              <StatCell>
+                <Stat label="Automações ativas" value={kpis.activeCount} context={`de ${kpis.totalCount} no total`} />
+              </StatCell>
+              <StatCell>
+                {/* A variacao vira `trend` de verdade: antes era uma seta desenhada a
+                    mao dentro do texto de contexto. Sem `intent`, fica neutra — mais
+                    execucao que ontem nao e por si so bom nem ruim. */}
+                <Stat
+                  label="Execuções hoje"
+                  value={kpis.executionsToday}
+                  context={kpis.executionsTrendPct == null ? 'sem execução ontem para comparar' : 'vs ontem'}
+                  trend={kpis.executionsTrendPct == null ? undefined : {
+                    value: `${Math.abs(kpis.executionsTrendPct)}%`,
+                    direction: kpis.executionsTrendPct >= 0 ? 'up' : 'down',
+                  }}
+                />
+              </StatCell>
+              <StatCell>
+                <Stat
+                  label="Taxa de sucesso"
+                  value={kpis.successRate == null ? '—' : `${kpis.successRate}%`}
+                  context={kpis.successRate == null ? 'sem execuções reais em 7 dias' : 'últimos 7 dias'}
+                />
+              </StatCell>
+              <StatCell>
+                <Stat
+                  label="Falhas recentes"
+                  value={kpis.recentFailures}
+                  context="últimas 24h"
+                  valueTone={kpis.recentFailures > 0 ? 'critical' : 'default'}
+                />
+              </StatCell>
+            </StatRow>
+          </PanelSection>
+        </Panel>
       )}
 
       <SegmentedControl

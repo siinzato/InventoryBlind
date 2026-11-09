@@ -230,37 +230,19 @@ export function BibliotecaPage() {
   );
 }
 
-/** Tintas da capa genérica — classes literais completas para o Tailwind conseguir
- *  encontrá-las no build. A escolha é determinística pelo título, então a mesma obra sempre
- *  tem a mesma capa e a estante não fica monocromática. */
-const COVER_TINTS = [
-  'from-accent/15 to-accent/[0.04]',
-  'from-emerald-500/15 to-emerald-500/[0.04]',
-  'from-amber-500/15 to-amber-500/[0.04]',
-  'from-violet-500/15 to-violet-500/[0.04]',
-  'from-sky-500/15 to-sky-500/[0.04]',
-  'from-rose-500/15 to-rose-500/[0.04]',
-];
-
-const COVER_RULES = [
-  'bg-accent/50', 'bg-emerald-500/50', 'bg-amber-500/50',
-  'bg-violet-500/50', 'bg-sky-500/50', 'bg-rose-500/50',
-];
-
-function tintIndex(seed: string): number {
-  let hash = 0;
-  for (let i = 0; i < seed.length; i++) hash = (hash * 31 + seed.charCodeAt(i)) % 100000;
-  return hash % COVER_TINTS.length;
-}
-
 /** Capa padrão para material sem `cover_url`: só a área e o título da obra, no tom do próprio
  *  design system. Não é imagem gerada nem arquivo — é o card desenhando a capa, então vale
- *  automaticamente para qualquer e-book novo, e um `cover_url` real sempre tem prioridade. */
+ *  automaticamente para qualquer e-book novo, e um `cover_url` real sempre tem prioridade.
+ *
+ *  Tratamento ÚNICO de propósito. Antes a capa sorteava uma de seis tintas pelo hash do
+ *  título — accent, emerald, amber, violet, sky e rose — para a estante não ficar
+ *  monocromática. Era cor escolhida por variedade e não por significado (§3), e três
+ *  desses tons não existiam em mais nenhum lugar do app. O que distingue uma obra da
+ *  outra é o título em display, que é o elemento dominante aqui; se a estante parecer
+ *  chapada, a resposta é capa de verdade em `cover_url`, não mais cor. */
 function GenericCover({ title, subject }: { title: string; subject: string | null }) {
-  const i = tintIndex(title);
-
   return (
-    <div className={`relative flex h-full w-full flex-col justify-between bg-gradient-to-br ${COVER_TINTS[i]} p-4`}>
+    <div className="relative flex h-full w-full flex-col justify-between bg-surface-3 p-4">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.12em] text-fg-subtle truncate">
           {subject ?? 'E-book'}
@@ -272,7 +254,7 @@ function GenericCover({ title, subject }: { title: string; subject: string | nul
         {title}
       </p>
 
-      <span className={`h-0.5 w-10 flex-shrink-0 rounded-full ${COVER_RULES[i]}`} />
+      <span className="h-0.5 w-10 flex-shrink-0 rounded-full bg-accent/40" />
     </div>
   );
 }

@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR } from '../lib/fullManagerTypes';
-import { Card } from './ui';
+import { Card, Panel, PanelSection, Stat, StatRow, StatCell } from './ui';
 
 // ── Operation selector ────────────────────────────────────────────────────────
 
@@ -165,23 +165,31 @@ const PickingSummary: React.FC<{
 
   return (
     <div className="max-w-sm mx-auto space-y-4">
-      <Card padding="none" className="p-6 text-center">
-        <div className="w-16 h-16 rounded-full bg-emerald-500/10 flex items-center justify-center mx-auto mb-4">
-          <Check size={28} className="text-emerald-600 dark:text-emerald-400" />
-        </div>
-        <h3 className="font-bold text-fg text-xl mb-1">Separação Concluída!</h3>
-        <p className="text-fg-subtle text-sm">FULL #{operation.full_number}</p>
-        <div className="grid grid-cols-2 gap-3 mt-5">
-          <div className="bg-emerald-500/10 rounded-container p-3">
-            <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400">{picked}</p>
-            <p className="text-xs text-emerald-700 dark:text-emerald-400 font-semibold">Separados</p>
+      {/* O resultado da separacao, nao um anuncio dela. O selo de 64px num circulo
+          verde com exclamacao era o mesmo `icone gigante em circulo colorido` que a
+          §3 proibe nominalmente; quem terminou a separacao ja sabe que terminou — o
+          que ele precisa ler sao os dois numeros. */}
+      <Panel>
+        <PanelSection padding="md" className="space-y-4">
+          <div>
+            <div className="flex items-center gap-1.5">
+              <Check size={14} className="flex-shrink-0 text-emerald-600 dark:text-emerald-400" />
+              <p className="text-section">Separação concluída</p>
+            </div>
+            <p className="text-caption mt-0.5">FULL #{operation.full_number}</p>
           </div>
-          <div className="bg-red-500/10 rounded-container p-3">
-            <p className="text-2xl font-bold text-red-600 dark:text-red-400">{errors}</p>
-            <p className="text-xs text-red-600 dark:text-red-400 font-semibold">Com erro</p>
-          </div>
-        </div>
-      </Card>
+          <StatRow>
+            <StatCell>
+              <Stat label="Separados" value={picked} />
+            </StatCell>
+            <StatCell>
+              {/* Vermelho so quando ha erro de verdade: zero pintado de vermelho
+                  anunciaria um problema que nao existe. */}
+              <Stat label="Com erro" value={errors} valueTone={errors > 0 ? 'critical' : 'default'} />
+            </StatCell>
+          </StatRow>
+        </PanelSection>
+      </Panel>
       <button onClick={send} disabled={sending}
         className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-control font-bold text-sm transition disabled:opacity-60">
         {sending ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}

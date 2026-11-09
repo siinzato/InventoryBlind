@@ -78,7 +78,8 @@ import {
   PackageX,
   Layers,
   Boxes,
-  FileBarChart2
+  FileBarChart2,
+  Folder,
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -113,7 +114,7 @@ import { mergeFeed, unreadCount, type FeedItem } from './lib/notifications/notif
 import {
   ThemeToggle, Sidebar, AppHeader, Panel, PanelSection, Modal, Badge, Button,
   Stat, StatRow, StatCell, resolveInsightIcon, INSIGHT_ICON_TONE, type StatProps,
-  SidebarFolderIcon, BrandLoader,
+  BrandLoader,
 } from './components/ui';
 import type { SidebarNavGroup } from './components/ui';
 import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnosticStorage';
@@ -864,7 +865,7 @@ function AppContent() {
       label: 'Operações',
       sectionLabel: 'Operação Inteligente',
       railSection: true,
-      icon: <SidebarFolderIcon />,
+      icon: <Folder />,
       items: [
         { id: 'input',          label: 'Nova Contagem',        icon: <Plus />,        onClick: () => { setActiveTab('input'); setMobileOpen(false); },          active: activeTab === 'input' },
         { id: 'cobertura',      label: 'Cobertura de Contagem', icon: <CalendarCheck />, onClick: () => { setActiveTab('cobertura'); setMobileOpen(false); },     active: activeTab === 'cobertura' },
@@ -893,7 +894,7 @@ function AppContent() {
       // torna todo item interno não-interativo.
       id: 'automacoes-group',
       label: 'Automações',
-      icon: <SidebarFolderIcon />,
+      icon: <Folder />,
       items: [
         { id: 'automacoes', label: 'Agentes e Automações', icon: <Workflow />, onClick: () => { setActiveTab('automacoes'); setMobileOpen(false); }, active: activeTab === 'automacoes' },
       ],
@@ -901,7 +902,7 @@ function AppContent() {
     {
       id: 'products-group',
       label: 'Produtos',
-      icon: <SidebarFolderIcon />,
+      icon: <Folder />,
       items: [
         { id: 'import',          label: 'Importar Produtos',        icon: <FileSpreadsheet />, onClick: () => { setActiveTab('import'); setMobileOpen(false); },          active: activeTab === 'import' },
         { id: 'import-history',  label: 'Histórico de Importações', icon: <History />,         onClick: () => { setActiveTab('import-history'); setMobileOpen(false); }, active: activeTab === 'import-history' },
@@ -914,7 +915,7 @@ function AppContent() {
     {
       id: 'tools-group',
       label: 'Ferramentas',
-      icon: <SidebarFolderIcon />,
+      icon: <Folder />,
       items: [
         { id: 'tasks',           label: 'Meu Trabalho',         icon: <ListTodo />, onClick: () => { setActiveTab('tasks'); setMobileOpen(false); },         active: activeTab === 'tasks' },
         { id: 'nfe-xml-lookup',  label: 'Consulta e Download de XML/NFe', icon: <FileSearch />, onClick: () => { setActiveTab('nfe-xml-lookup'); setMobileOpen(false); }, active: activeTab === 'nfe-xml-lookup' },

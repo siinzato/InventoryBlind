@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-09-indicadores-mais-limpos',
+    date: '2026-11-09',
+    category: 'melhoria',
+    title: 'Indicadores e telas de resultado com leitura mais limpa',
+    description: 'Alguns painéis mostravam cada indicador dentro da sua própria caixa, com um selo colorido ao lado do número — o que enchia a tela de molduras e de cores que não queriam dizer nada. Nas Automações, no Histórico de Execuções, no cálculo de paletes e na conclusão da separação, os indicadores agora ficam juntos num painel só, separados por linhas finas. As cores passaram a aparecer apenas quando há algo para olhar: um contador em zero não fica mais pintado de vermelho ou laranja como se fosse um problema. A variação em relação ao dia anterior virou uma seta de verdade, com o número ao lado.',
+  },
+  {
     id: '2026-11-07-cantos-padronizados',
     date: '2026-11-07',
     category: 'melhoria',

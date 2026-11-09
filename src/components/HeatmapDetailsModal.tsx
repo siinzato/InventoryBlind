@@ -28,7 +28,7 @@ import {
   getRiskLevelLabel,
   generateDiagnosis,
 } from '../lib/heatmapUtils';
-import { Modal, Panel, PanelSection, Badge, Stat } from './ui';
+import { Modal, Panel, PanelSection, Badge, Button, Stat } from './ui';
 
 interface HeatmapDetailsModalProps {
   area: HeatmapArea | null;
@@ -309,13 +309,12 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                 <MapPinned size={18} className="text-fg-subtle" />
                 Locais Físicos
               </h4>
-              <button
+              <Button variant="ghost" size="sm"
                 onClick={handleStartEdit}
-                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-accent hover:bg-accent/10 rounded-lg transition"
               >
                 {!isAdmin && <Lock size={12} />}
                 {editMode ? 'Cancelar' : 'Editar'}
-              </button>
+              </Button>
             </div>
 
             {editMode ? (

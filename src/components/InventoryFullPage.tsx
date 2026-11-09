@@ -15,7 +15,7 @@ import {
   ArrowLeft, Download, Loader2, AlertTriangle, ShieldAlert, CheckCircle2,
   Clock, RefreshCcw, HardDrive, FileSpreadsheet, MonitorCheck, ExternalLink,
 } from 'lucide-react';
-import { Panel, PanelSection, Badge } from './ui';
+import { Panel, PanelSection, Badge, Button } from './ui';
 import { useAuth } from '../lib/auth';
 import { logAuditEvent } from '../lib/auditLogService';
 import { WHATSAPP_PLANS_URL } from './landing/landingUi';
@@ -118,9 +118,9 @@ export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) 
     <div className="min-h-screen bg-surface">
       <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-5xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
-          <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-control transition text-sm font-medium">
+          <Button variant="ghost" onClick={onBack}>
             <ArrowLeft size={16} /><span className="hidden sm:inline">Voltar</span>
-          </button>
+          </Button>
           <span className="text-sm font-semibold text-fg">InventoryFull</span>
         </div>
       </div>
@@ -298,14 +298,13 @@ export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) 
               </div>
             )}
 
-            <button
+            <Button variant="primary" size="md" className="w-full sm:w-auto mt-5 disabled:cursor-not-allowed"
               onClick={handleDownload}
               disabled={!agreed || state === 'loading'}
-              className="w-full sm:w-auto mt-5 inline-flex items-center justify-center gap-2 px-6 py-3.5 rounded-control bg-accent hover:bg-accent-strong disabled:opacity-50 disabled:cursor-not-allowed text-white font-semibold text-sm transition-colors"
             >
               {state === 'loading' ? <Loader2 size={16} className="animate-spin" /> : <Download size={16} />}
               Baixar InventoryFull para Windows
-            </button>
+            </Button>
             <p className="text-caption mt-3">
               Versão 1.0.0 · Windows 64 bits · {FILE_NAME} · {FILE_SIZE_LABEL}
             </p>

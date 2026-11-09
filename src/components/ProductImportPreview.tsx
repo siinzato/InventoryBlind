@@ -112,13 +112,12 @@ export const ProductImportPreview: React.FC<ProductImportPreviewProps> = ({
               <p className="text-sm text-fg-muted mt-1">
                 Corrija os erros na planilha e faça o upload novamente, ou prossiga apenas com os produtos válidos.
               </p>
-              <button
+              <Button variant="danger" size="md" className="mt-3"
                 onClick={handleDownloadErrors}
-                className="mt-3 flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-lg text-sm font-medium hover:bg-red-700 transition"
               >
                 <Download size={16} />
                 Baixar relatório de erros
-              </button>
+              </Button>
             </div>
           </div>
         </div>

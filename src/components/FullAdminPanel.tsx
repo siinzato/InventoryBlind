@@ -75,14 +75,16 @@ const ConfirmDialog: React.FC<{
       <p className="text-sm text-fg-muted">{message}</p>
     </div>
     <div className="flex gap-2 justify-end mt-5">
-      <button onClick={onCancel}
-        className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+      <Button variant="secondary" size="md" onClick={onCancel}>
         Cancelar
-      </button>
-      <button onClick={onConfirm}
-        className={`px-4 py-2 rounded-lg text-sm font-bold text-white transition ${danger ? 'bg-red-600 hover:bg-red-700' : 'bg-amber-500 hover:bg-amber-600'}`}>
+      </Button>
+      {/* `primary` quando nao e destrutivo. O ramo nao-danger era `bg-amber-500`,
+          a mesma quinta variante inventada que saiu do Recontar: a §14 define
+          primary, secondary, ghost e danger, e confirmar algo reversivel e uma
+          acao principal, nao um aviso. */}
+      <Button variant={danger ? 'danger' : 'primary'} size="md" onClick={onConfirm}>
         {confirmLabel}
-      </button>
+      </Button>
     </div>
   </Modal>
 );
@@ -98,6 +100,10 @@ const StatusSelector: React.FC<{
   return (
     <SafeDropdown
       trigger={
+        /* Continua <button> cru de proposito: isto e um BADGE de status que tambem
+           abre o dropdown. A forma de pill e a cor do estado estao corretas pela §18 —
+           virar `Button` daria `rounded-control` e perderia a cor do status, que e
+           justamente o dado que o controle exibe. */
         <button
           disabled={loading}
           className={`flex items-center gap-1.5 text-xs font-bold px-2.5 py-1 rounded-full border transition cursor-pointer hover:opacity-80 ${STATUS_COLOR[current]}`}
@@ -185,15 +191,13 @@ const EditOperationForm: React.FC<{
         </div>
       </div>
       <div className="flex gap-2 mt-5 justify-end">
-        <button onClick={onClose} disabled={saving}
-          className="px-4 py-2 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+        <Button variant="secondary" size="md" onClick={onClose} disabled={saving}>
           Cancelar
-        </button>
-        <button onClick={handleSave} disabled={saving || !form.full_number.trim()}
-          className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+        </Button>
+        <Button variant="primary" size="md" onClick={handleSave} disabled={saving || !form.full_number.trim()}>
           {saving ? <RefreshCw size={14} className="animate-spin" /> : <Save size={14} />}
           Salvar
-        </button>
+        </Button>
       </div>
     </Modal>
   );
@@ -583,11 +587,10 @@ const FullAdminPanel: React.FC = () => {
               </select>
             </div>
             {/* Export */}
-            <button onClick={exportCSV}
-              className="flex items-center gap-2 px-3 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition">
+            <Button variant="primary" size="md" onClick={exportCSV}>
               <Download size={14} />
               <span className="hidden sm:inline">Exportar CSV</span>
-            </button>
+            </Button>
           </div>
           {(searchQuery || filterStatus !== 'all' || filterMarketplace !== 'all') && (
             <div className="mt-3 flex items-center gap-2">

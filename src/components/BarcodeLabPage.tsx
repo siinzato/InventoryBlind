@@ -16,7 +16,7 @@ import { BarcodeRow } from '../lib/barcode/barcodeBatchUtils';
 import { loadBarcodeLabPrefs, saveBarcodeLabPrefs } from '../lib/barcode/barcodeLabPrefs';
 import { BarcodeUnitMode } from './barcode/BarcodeUnitMode';
 import { BarcodeBatchMode } from './barcode/BarcodeBatchMode';
-import { ToastStack, useToasts } from './ui';
+import { Button, ToastStack, useToasts } from './ui';
 
 type Mode = 'unit' | 'batch';
 
@@ -56,9 +56,9 @@ export const BarcodeLabPage: React.FC<BarcodeLabPageProps> = ({ onBack }) => {
       <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition text-sm font-medium">
+            <Button variant="ghost" onClick={onBack}>
               <ArrowLeft size={16} /><span className="hidden sm:inline">Voltar</span>
-            </button>
+            </Button>
             <div className="flex items-center gap-2">
               <BarcodeIcon size={22} className="text-accent" />
               <div>

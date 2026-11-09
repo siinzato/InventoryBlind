@@ -3,7 +3,7 @@
 import React from 'react';
 import { Filter, SortAsc, SortDesc, Search, X } from 'lucide-react';
 import type { HeatmapFilters as HeatmapFiltersType, StatusFilter, SortOption, CriticalityLevel, ViewMode } from '../lib/heatmapTypes';
-import { Card, Select } from './ui';
+import { Button, Card, Select } from './ui';
 
 interface HeatmapFiltersProps {
   filters: HeatmapFiltersType;
@@ -159,13 +159,12 @@ export const HeatmapFiltersComponent: React.FC<HeatmapFiltersProps> = ({
 
         {/* Reset Button */}
         {hasActiveFilters && (
-          <button
+          <Button variant="ghost" size="sm"
             onClick={onReset}
-            className="flex items-center gap-1.5 px-3 py-2 text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-500/10 rounded-control transition"
           >
             <X size={14} />
             Limpar filtros
-          </button>
+          </Button>
         )}
       </div>
     </Card>

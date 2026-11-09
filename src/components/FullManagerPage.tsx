@@ -10,6 +10,7 @@ import FullPicking from './FullPicking';
 import FullChecking from './FullChecking';
 import FullHistory from './FullHistory';
 import FullAdminPanel from './FullAdminPanel';
+import { Button } from './ui';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -70,11 +71,10 @@ const FullManagerPage: React.FC<FullManagerPageProps> = ({ onBack }) => {
         <div className="max-w-7xl mx-auto px-4 py-4">
           {/* Top row */}
           <div className="flex items-center gap-3 mb-3">
-            <button onClick={onBack}
-              className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition text-sm font-medium">
+            <Button variant="ghost" onClick={onBack}>
               <ArrowLeft size={16} />
               <span className="hidden sm:inline">Voltar</span>
-            </button>
+            </Button>
             <div className="flex items-center gap-2">
               <div className={`p-1.5 rounded-lg ${activeTab === 'admin' ? 'bg-red-500/10' : 'bg-accent/10'} transition`}>
                 {activeTab === 'admin' ? <ShieldAlert size={18} className="text-red-600 dark:text-red-400" /> : <Package size={18} className="text-accent" />}

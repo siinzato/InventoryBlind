@@ -161,9 +161,9 @@ export function BatchPage({ onBack }: BatchPageProps) {
       <ToastStack toasts={toasts} />
       <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-4xl mx-auto px-4 py-4 flex items-center gap-3">
-          <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition text-sm font-medium">
+          <Button variant="ghost" onClick={onBack}>
             <ArrowLeft size={16} /><span className="hidden sm:inline">Voltar</span>
-          </button>
+          </Button>
           <div className="flex items-center gap-2">
             <Layers size={20} className="text-accent" />
             <h1 className="text-title leading-tight">Processar em lote</h1>

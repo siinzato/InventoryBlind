@@ -17,6 +17,7 @@ import {
 import { BarcodeLabel, BarcodeLabelFields } from './BarcodeLabel';
 import { BarcodePreview } from './BarcodePreview';
 import { BarcodeSettings } from './BarcodeSettings';
+import { Button } from '../ui';
 
 type FillMode = 'free' | 'catalog' | 'paste';
 type ToastType = 'success' | 'error' | 'info';
@@ -236,10 +237,9 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
                 onKeyDown={e => e.key === 'Enter' && handleCatalogSearch()}
                 placeholder="Digite para buscar..."
                 className="flex-1 px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40" />
-              <button onClick={handleCatalogSearch} disabled={catalogSearching || !catalogQuery.trim()}
-                className="px-4 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center gap-2 transition">
+              <Button variant="primary" size="md" onClick={handleCatalogSearch} disabled={catalogSearching || !catalogQuery.trim()}>
                 {catalogSearching ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
-              </button>
+              </Button>
             </div>
 
             {catalogResults.length > 0 && (
@@ -281,10 +281,9 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
               placeholder="Cole aqui..."
               className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm font-mono focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
             <div className="mt-3 flex flex-wrap gap-2">
-              <button onClick={handleApplyPaste} disabled={pasteLines.length === 0}
-                className="px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold disabled:opacity-50 transition">
+              <Button variant="primary" size="md" onClick={handleApplyPaste} disabled={pasteLines.length === 0}>
                 Usar 1º valor no modo unitário
-              </button>
+              </Button>
               {pasteLines.length > 1 && (
                 <button onClick={() => onSendToBatch(pasteLines, symbology)}
                   className="flex items-center gap-2 px-4 py-2 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition">
@@ -302,33 +301,27 @@ export const BarcodeUnitMode: React.FC<BarcodeUnitModeProps> = ({ settings, onSe
         <div className="bg-surface-2 rounded-container border border-edge p-5">
           <h2 className="font-bold text-fg text-sm mb-3">Ações</h2>
           <div className="space-y-2">
-            <button onClick={handlePrint} disabled={busy || !finalValue}
-              className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+            <Button variant="primary" size="md" className="w-full" onClick={handlePrint} disabled={busy || !finalValue}>
               <Printer size={16} />Imprimir {settings.copies > 1 ? `(${settings.copies} cópias)` : ''}
-            </button>
+            </Button>
             <div className="grid grid-cols-3 gap-2">
-              <button onClick={handlePNG} disabled={busy || !finalValue}
-                className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
+              <Button variant="secondary" size="md" onClick={handlePNG} disabled={busy || !finalValue}>
                 {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}PNG
-              </button>
-              <button onClick={handleSVG} disabled={busy || !finalValue}
-                className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
+              </Button>
+              <Button variant="secondary" size="md" onClick={handleSVG} disabled={busy || !finalValue}>
                 {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}SVG
-              </button>
-              <button onClick={handlePDF} disabled={busy || !finalValue}
-                className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
+              </Button>
+              <Button variant="secondary" size="md" onClick={handlePDF} disabled={busy || !finalValue}>
                 {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}PDF
-              </button>
+              </Button>
             </div>
             <div className="grid grid-cols-2 gap-2">
-              <button onClick={handleCopyValue} disabled={!finalValue}
-                className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
+              <Button variant="secondary" size="md" onClick={handleCopyValue} disabled={!finalValue}>
                 <Copy size={14} />Copiar valor
-              </button>
-              <button onClick={handleClear}
-                className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+              </Button>
+              <Button variant="secondary" size="md" onClick={handleClear}>
                 <X size={14} />Limpar
-              </button>
+              </Button>
             </div>
           </div>
         </div>

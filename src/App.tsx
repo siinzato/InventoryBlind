@@ -2290,9 +2290,9 @@ function AppContent() {
               placeholder="Ex: 150"
             />
           </div>
-          <button type="submit" className="w-full bg-accent text-white font-semibold py-3 rounded-lg hover:bg-accent-strong transition mt-2">
+          <Button variant="primary" size="md" className="w-full mt-2" type="submit">
             Cadastrar Linha
-          </button>
+          </Button>
         </form>
       </Modal>
 
@@ -2549,13 +2549,12 @@ function LinkCompanyScreen() {
             placeholder="Minha Empresa Ltda"
             className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-control text-fg text-sm focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
           />
-          <button
+          <Button variant="primary" size="md" className="w-full"
             type="submit"
             disabled={creating}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-accent hover:bg-accent-strong disabled:opacity-60 text-white rounded-control font-bold text-sm transition"
           >
             {creating ? <Loader2 size={16} className="animate-spin" /> : 'Criar minha empresa'}
-          </button>
+          </Button>
         </form>
 
         <div className="flex items-center gap-3 my-4" aria-hidden="true">
@@ -2575,13 +2574,12 @@ function LinkCompanyScreen() {
             placeholder="Ex.: AB3DFGHJ"
             className="w-full px-4 py-3 mb-3 bg-surface border border-edge rounded-control text-fg text-sm tracking-widest focus:outline-none focus:ring-2 focus:ring-accent/30 focus:border-accent/50 transition"
           />
-          <button
+          <Button variant="secondary" size="md" className="w-full"
             type="submit"
             disabled={joiningByCode}
-            className="w-full flex items-center justify-center gap-2 py-3.5 bg-surface-3 hover:bg-edge disabled:opacity-60 text-fg rounded-control font-bold text-sm transition"
           >
             {joiningByCode ? <Loader2 size={16} className="animate-spin" /> : 'Entrar com código de convite'}
-          </button>
+          </Button>
         </form>
         {isDevOwner && (
           <button
@@ -2613,18 +2611,16 @@ function AuthErrorScreen() {
         </div>
         <h2 className="text-xl font-bold text-fg mb-2">Erro ao carregar</h2>
         <p className="text-fg-muted text-sm mb-6">{authError ?? 'Ocorreu um erro inesperado.'}</p>
-        <button
+        <Button variant="primary" size="md" className="w-full mb-3"
           onClick={retryAuth}
-          className="w-full py-3 bg-accent hover:bg-accent-strong text-white rounded-control font-bold text-sm transition mb-3"
         >
           Tentar novamente
-        </button>
-        <button
+        </Button>
+        <Button variant="secondary" size="md" className="w-full mb-3"
           onClick={signOut}
-          className="w-full py-3 bg-surface-3 hover:bg-edge text-fg rounded-control font-bold text-sm transition mb-3"
         >
           Sair da conta
-        </button>
+        </Button>
         <button
           onClick={() => window.location.href = '/'}
           className="text-xs text-fg-subtle hover:text-fg-muted transition"

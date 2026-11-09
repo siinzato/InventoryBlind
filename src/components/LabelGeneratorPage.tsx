@@ -27,7 +27,7 @@ import {
   CheckCircle2, RotateCcw,
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import { ToastStack, useToasts } from './ui';
+import { Button, ToastStack, useToasts } from './ui';
 import ShelfLabel100x40, {
   SHELF_FONT_DEFAULTS,
 } from './ShelfLabel100x40';
@@ -450,9 +450,9 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
       <div className="sticky top-0 z-50 bg-surface border-b border-edge">
         <div className="max-w-7xl mx-auto px-4 py-4 flex items-center justify-between gap-4">
           <div className="flex items-center gap-3">
-            <button onClick={onBack} className="flex items-center gap-2 px-3 py-2 text-fg-muted hover:text-fg hover:bg-surface-3 rounded-lg transition text-sm font-medium">
+            <Button variant="ghost" onClick={onBack}>
               <ArrowLeft size={16} /><span className="hidden sm:inline">Voltar</span>
-            </button>
+            </Button>
             <div className="flex items-center gap-2">
               <Tag size={22} className="text-accent" />
               <div>
@@ -502,10 +502,9 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                     onKeyDown={e => e.key === 'Enter' && handleSearch()}
                     className="flex-1 px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40"
                   />
-                  <button onClick={handleSearch} disabled={searching || !searchQuery.trim()}
-                    className="px-4 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold disabled:opacity-50 flex items-center gap-2 transition">
+                  <Button variant="primary" size="md" onClick={handleSearch} disabled={searching || !searchQuery.trim()}>
                     {searching ? <RefreshCw size={16} className="animate-spin" /> : <Search size={16} />}
-                  </button>
+                  </Button>
                 </div>
                 {notFound && (
                   <div className="mt-3 flex items-center gap-2 p-3 bg-red-500/10 text-red-700 dark:text-red-400 rounded-lg text-sm">
@@ -584,10 +583,9 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                   <h2 className="font-bold text-fg text-sm flex items-center gap-2">
                     <span className="text-base">Aa</span> Tamanho das Fontes
                   </h2>
-                  <button onClick={resetFonts}
-                    className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-fg font-semibold transition border border-edge rounded-lg px-2.5 py-1.5 hover:bg-surface-3">
+                  <Button variant="secondary" size="sm" onClick={resetFonts}>
                     <RotateCcw size={12} />Restaurar padrão
-                  </button>
+                  </Button>
                 </div>
 
                 {labelType === 'shelf' ? (
@@ -619,24 +617,20 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                 <div className="bg-surface-2 rounded-container border border-edge p-5">
                   <h2 className="font-bold text-fg text-sm mb-3">Ações</h2>
                   <div className="space-y-2">
-                    <button onClick={handlePrint} disabled={busy}
-                      className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+                    <Button variant="primary" size="md" className="w-full" onClick={handlePrint} disabled={busy}>
                       <Printer size={16} />Imprimir {copies > 1 ? `(${copies} cópias)` : ''}
-                    </button>
+                    </Button>
                     <div className="grid grid-cols-2 gap-2">
-                      <button onClick={handlePNG} disabled={busy}
-                        className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                      <Button variant="secondary" size="md" onClick={handlePNG} disabled={busy}>
                         {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}Download PNG
-                      </button>
-                      <button onClick={handlePDF} disabled={busy}
-                        className="flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                      </Button>
+                      <Button variant="secondary" size="md" onClick={handlePDF} disabled={busy}>
                         {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}Download PDF
-                      </button>
+                      </Button>
                     </div>
-                    <button onClick={handleClear}
-                      className="w-full flex items-center justify-center gap-2 py-2.5 bg-surface-3 hover:bg-edge text-fg-muted rounded-lg text-sm font-semibold transition">
+                    <Button variant="secondary" size="md" className="w-full" onClick={handleClear}>
                       <X size={14} />Limpar
-                    </button>
+                    </Button>
                   </div>
                 </div>
               )}
@@ -757,10 +751,9 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                 </div>
               )}
               <div className="mt-4">
-                <button onClick={loadBatch} disabled={batchLoading}
-                  className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition disabled:opacity-50">
+                <Button variant="primary" size="md" onClick={loadBatch} disabled={batchLoading}>
                   {batchLoading ? <RefreshCw size={14} className="animate-spin" /> : <Search size={14} />}Buscar
-                </button>
+                </Button>
               </div>
             </div>
 
@@ -773,14 +766,12 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
                   </span>
                 </p>
                 <div className="flex gap-2">
-                  <button onClick={handleBatchPrint} disabled={busy}
-                    className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                  <Button variant="primary" size="md" onClick={handleBatchPrint} disabled={busy}>
                     {busy ? <RefreshCw size={14} className="animate-spin" /> : <Printer size={14} />}Imprimir
-                  </button>
-                  <button onClick={handleBatchPDF} disabled={busy}
-                    className="flex items-center gap-2 px-4 py-2 bg-surface-3 hover:bg-edge text-fg rounded-lg text-sm font-semibold transition disabled:opacity-60">
+                  </Button>
+                  <Button variant="secondary" size="md" onClick={handleBatchPDF} disabled={busy}>
                     {busy ? <RefreshCw size={14} className="animate-spin" /> : <Download size={14} />}PDF
-                  </button>
+                  </Button>
                   <button onClick={() => setSelectedIds(new Set())} className="px-3 py-2 bg-edge hover:bg-fg-subtle/30 text-fg-muted rounded-lg">
                     <X size={14} />
                   </button>

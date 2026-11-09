@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { SafeDropdown } from './SafeDropdown';
-import { Modal } from './ui';
+import { Button, Modal } from './ui';
 import {
   Plus, Calendar, RefreshCw, Check, Pencil, AlertTriangle,
   Package, User, Clock,
@@ -78,9 +78,9 @@ const AgendaCard: React.FC<{
         {/* Status change */}
         <SafeDropdown
           trigger={
-            <button className="flex items-center gap-1.5 px-3 py-1.5 border border-edge bg-surface-3 hover:bg-edge rounded-lg text-xs font-semibold text-fg-muted transition">
+            <Button variant="secondary" size="sm">
               <Clock size={12} /> Status
-            </button>
+            </Button>
           }
           items={ALL_STATUSES.map(s => ({
             id: s,
@@ -90,10 +90,9 @@ const AgendaCard: React.FC<{
           }))}
         />
 
-        <button onClick={onEdit}
-          className="flex items-center gap-1.5 px-3 py-1.5 border border-edge bg-surface-3 hover:bg-edge rounded-lg text-xs font-semibold text-fg-muted transition">
+        <Button variant="secondary" size="sm" onClick={onEdit}>
           <Pencil size={12} /> Editar
-        </button>
+        </Button>
 
         {(op.status === 'preparing' || op.status === 'picking') && (
           <button onClick={() => onNavigate(op.id)}
@@ -181,15 +180,13 @@ const AgendaModal: React.FC<{
           </div>
         </div>
         <div className="flex gap-3 pt-2">
-          <button type="submit" disabled={saving}
-            className="flex-1 flex items-center justify-center gap-2 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-60">
+          <Button variant="primary" size="md" className="flex-1" type="submit" disabled={saving}>
             {saving ? <RefreshCw size={14} className="animate-spin" /> : <Check size={14} />}
             {initial ? 'Salvar alterações' : 'Criar agendamento'}
-          </button>
-          <button type="button" onClick={onClose}
-            className="px-4 py-2.5 border border-edge text-fg-muted rounded-lg text-sm font-semibold hover:bg-surface-3 transition">
+          </Button>
+          <Button variant="secondary" size="md" type="button" onClick={onClose}>
             Cancelar
-          </button>
+          </Button>
         </div>
       </form>
     </Modal>

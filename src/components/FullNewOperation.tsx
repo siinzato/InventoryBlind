@@ -92,10 +92,9 @@ const Step1: React.FC<{ form: Step1Form; onChange: (f: Step1Form) => void; onNex
           <textarea rows={2} value={form.notes} onChange={e => set('notes', e.target.value)}
             className="w-full px-4 py-2.5 border border-edge rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-accent/40 resize-none" />
         </div>
-        <button onClick={onNext} disabled={!valid}
-          className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-bold transition disabled:opacity-50">
+        <Button variant="primary" size="md" className="w-full" onClick={onNext} disabled={!valid}>
           Próximo — Upload da planilha <ChevronRight size={16} />
-        </button>
+        </Button>
       </div>
     </div>
   );

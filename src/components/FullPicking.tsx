@@ -7,7 +7,7 @@ import {
 } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR } from '../lib/fullManagerTypes';
-import { Card, Panel, PanelSection, Stat, StatRow, StatCell } from './ui';
+import { Button, Card, Panel, PanelSection, Stat, StatRow, StatCell } from './ui';
 
 // ── Operation selector ────────────────────────────────────────────────────────
 
@@ -190,15 +190,13 @@ const PickingSummary: React.FC<{
           </StatRow>
         </PanelSection>
       </Panel>
-      <button onClick={send} disabled={sending}
-        className="w-full flex items-center justify-center gap-2 py-3 bg-accent hover:bg-accent-strong text-white rounded-control font-bold text-sm transition disabled:opacity-60">
+      <Button variant="primary" size="md" className="w-full" onClick={send} disabled={sending}>
         {sending ? <RefreshCw size={16} className="animate-spin" /> : <ArrowRight size={16} />}
         Enviar para Conferência
-      </button>
-      <button onClick={onFinish}
-        className="w-full py-2.5 border border-edge text-fg-muted rounded-control font-semibold text-sm hover:bg-surface-3 transition">
+      </Button>
+      <Button variant="secondary" size="md" className="w-full" onClick={onFinish}>
         Voltar ao início
-      </button>
+      </Button>
     </div>
   );
 };

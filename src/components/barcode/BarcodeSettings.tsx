@@ -1,5 +1,6 @@
 import React from 'react';
 import { RotateCcw } from 'lucide-react';
+import { Button } from '../ui';
 import {
   BarcodeLabSettings, BarcodeSymbology, LABEL_SIZES, LabelSizeId,
   CUSTOM_SIZE_LIMITS_MM, BARCODE_SETTINGS_LIMITS, symbologyInfo,
@@ -40,9 +41,9 @@ export const BarcodeSettings: React.FC<BarcodeSettingsProps> = ({ settings, symb
     <div className="bg-surface-2 rounded-container border border-edge p-5">
       <div className="flex items-center justify-between mb-4">
         <h2 className="font-bold text-fg text-sm">Personalização</h2>
-        <button onClick={onReset} className="flex items-center gap-1.5 text-xs text-fg-subtle hover:text-fg font-semibold transition border border-edge rounded-lg px-2.5 py-1.5 hover:bg-surface-3">
+        <Button variant="secondary" size="sm" onClick={onReset}>
           <RotateCcw size={12} />Restaurar padrão
-        </button>
+        </Button>
       </div>
 
       {/* Tamanho */}

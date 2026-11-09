@@ -3,7 +3,7 @@ import {
   Lock, PlayCircle, PauseCircle, CheckCircle2, Ban, Unlock, MoreVertical, Circle,
   ArrowDown, Minus, ArrowUp, AlertTriangle, MapPin, ListChecks, Paperclip,
 } from 'lucide-react';
-import { Badge } from '../ui';
+import { Badge, Button } from '../ui';
 import { TaskWithAssignees, DirectAssigneeStatus, TaskPriority, TaskStatus, BlockReason, BLOCK_REASONS } from '../../lib/tasks/types';
 import {
   findMyAssignment, formatAssigneeProgress, formatTaskTimeline, isOverdue,
@@ -213,7 +213,7 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                 <input value={pauseNote} onChange={e => setPauseNote(e.target.value)} placeholder="Motivo (opcional)"
                   className="w-full px-2 py-1.5 border border-edge rounded text-xs bg-surface text-fg" />
                 <div className="flex gap-1.5">
-                  <button onClick={confirmPause} className="flex-1 px-2 py-1 bg-accent text-white rounded text-xs font-semibold">Confirmar</button>
+                  <Button variant="primary" size="sm" className="flex-1" onClick={confirmPause}>Confirmar</Button>
                   <button onClick={closeMenus} className="px-2 py-1 text-xs text-fg-muted">Cancelar</button>
                 </div>
               </div>
@@ -233,10 +233,9 @@ export const TaskCard: React.FC<TaskCardProps> = ({
                     className="w-full px-2 py-1.5 border border-edge rounded text-xs bg-surface text-fg" />
                 )}
                 <div className="flex gap-1.5">
-                  <button onClick={confirmBlock} disabled={!blockReason || (blockReason === 'outro' && !blockNote.trim())}
-                    className="flex-1 px-2 py-1 bg-red-600 text-white rounded text-xs font-semibold disabled:opacity-40">
+                  <Button variant="danger" size="sm" className="flex-1" onClick={confirmBlock} disabled={!blockReason || (blockReason === 'outro' && !blockNote.trim())}>
                     Confirmar
-                  </button>
+                  </Button>
                   <button onClick={closeMenus} className="px-2 py-1 text-xs text-fg-muted">Cancelar</button>
                 </div>
               </div>

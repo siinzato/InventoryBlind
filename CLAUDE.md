@@ -70,6 +70,22 @@ Não corrija erros preexistentes e não relacionados.
 
 
 
+\## Scripts de varredura (edição ou auditoria em lote)
+
+Ausência de resultado não é resultado negativo: um comando que não rodou devolve vazio igual a um comando que não achou nada.
+
+\- O script deve falhar alto quando a consulta não roda. Nunca trate saída vazia como "nenhuma ocorrência", nem engula o erro num catch silencioso.
+
+\- Afirme o efeito, não o retorno. Ao substituir, compare a linha antes e depois e aborte se alguma não mudou — contar iterações do laço não prova substituição.
+
+\- Confira por fora antes de reportar. `git status`, `git diff --stat`, grep do padrão antigo ou um novo build: se a operação diz ter mudado 50 arquivos, o diff tem que mostrar 50.
+
+\- Grep é case-sensitive. `refreshKey` não casa com `setRefreshKey` — confirme com `-i` antes de concluir que algo é código morto.
+
+\- Em edição programática, prefira comparação de string a regex. Montada dentro de heredoc ou `node -e`, a sequência de escape do limite de palavra pode chegar ao script como caractere de controle e nunca casar.
+
+\- Vale o mesmo para deploy: confira o conteúdo publicado contra o do repositório, não a mensagem de sucesso do comando.
+
 \## Regra de parada
 
 Se a solução exigir mudança de design, regra de negócio, banco, arquitetura ampla ou arquivos não relacionados, pare essa parte e informe antes de fazê-la.

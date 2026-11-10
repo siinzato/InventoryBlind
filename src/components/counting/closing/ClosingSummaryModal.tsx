@@ -3,7 +3,7 @@
 // relatório persistiu (ver closingReportService.ts), e exportar/gerar feedback são
 // leituras do mesmo modelo canônico (closingDocumentModel.ts).
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { CheckCircle2, ChevronDown, ChevronRight, ClipboardCheck, Copy, Download, FileText } from 'lucide-react';
 import { Modal, Button, Badge, Panel, PanelSection, Input, Textarea } from '../../ui';
 import type { ClosingReport, ClosingReportObservation } from '../../../lib/closingReports/closingReportTypes';
@@ -14,6 +14,8 @@ import {
 } from '../../../lib/closingReports/closingDocumentModel';
 import { downloadClosingReportPdf, downloadClosingReportWord } from '../../../lib/closingReports/closingReportExport';
 import { renderClosingFeedback } from '../../../lib/closingReports/closingFeedbackTemplate';
+import { listClosingCycleRecords } from '../../../lib/closingReports/closingReportService';
+import type { InventoryCountRecord } from '../../../lib/supabase';
 import { BrandMark } from '../../brandLogos/BrandMark';
 
 interface ClosingSummaryModalProps {
@@ -45,10 +47,21 @@ export function ClosingSummaryModal({
   const [feedbackText, setFeedbackText] = useState<string | null>(null);
   const [copied, setCopied] = useState(false);
 
+  // Contagens do ciclo, para a seção "Sessões de contagem" do arquivo exportado.
+  // Leitura pura e best-effort: se falhar, o documento sai sem a seção, como saía antes
+  // — exportar nunca pode depender desta consulta.
+  const [cycleRecords, setCycleRecords] = useState<InventoryCountRecord[]>([]);
+  useEffect(() => {
+    if (!open || !report) { setCycleRecords([]); return; }
+    let ativo = true;
+    listClosingCycleRecords(report).then(rows => { if (ativo) setCycleRecords(rows); });
+    return () => { ativo = false; };
+  }, [open, report]);
+
   // Modelo canônico: única fonte do PDF, do Word e do feedback.
   const doc = useMemo(
-    () => (report ? buildClosingReportDocument({ brandName, report, observations, brandLogo: brandLogoUrl ?? null }) : null),
-    [brandName, report, observations, brandLogoUrl]
+    () => (report ? buildClosingReportDocument({ brandName, report, observations, brandLogo: brandLogoUrl ?? null, records: cycleRecords }) : null),
+    [brandName, report, observations, brandLogoUrl, cycleRecords]
   );
 
   if (!report || !doc) return null;

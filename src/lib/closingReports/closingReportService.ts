@@ -7,7 +7,7 @@
 // (inventory_brands, inventory_count_records) — nunca recalculado aqui. Nenhuma
 // contagem, pendência ou divergência existente é alterada por este módulo.
 
-import { supabase } from '../supabase';
+import { supabase, type InventoryCountRecord } from '../supabase';
 import { logAuditEvent } from '../auditLogService';
 import { computeAccuracy } from '../blindAIAgentAlgorithm';
 import { classifyObservation } from './observationClassifier';
@@ -602,4 +602,32 @@ export async function generateClosingReport(
   }));
 
   return { status: 'generated', report: reportFromRow(reportRow), observations };
+}
+
+/**
+ * Contagens do ciclo que este fechamento resume — base da seção "Sessões de contagem"
+ * do relatório exportado.
+ *
+ * Usa a MESMA janela da geração (empresa + linha + created_at >= cycle_start, ver a
+ * query da etapa 2 acima), e NÃO `source_count_record_ids`: aquele campo é montado a
+ * partir das observações, então toda contagem que foi feita sem observação ficaria de
+ * fora — e sumir com uma sessão real do relatório é pior do que não ter a seção.
+ *
+ * Leitura pura: não grava nada e não recalcula indicador nenhum.
+ */
+export async function listClosingCycleRecords(report: ClosingReport): Promise<InventoryCountRecord[]> {
+  let query = supabase
+    .from('inventory_count_records')
+    .select('*')
+    .eq('company_id', report.companyId)
+    .eq('brand_id', report.brandId)
+    .order('created_at', { ascending: true });
+  if (report.cycleStart) query = query.gte('created_at', report.cycleStart);
+
+  const { data, error } = await query;
+  if (error) {
+    console.error('[ClosingReport] Error loading cycle records for export:', error);
+    return [];
+  }
+  return data ?? [];
 }

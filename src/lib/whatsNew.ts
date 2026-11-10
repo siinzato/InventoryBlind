@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-10-relatorio-fechamento-encorpado',
+    date: '2026-11-10',
+    category: 'melhoria',
+    title: 'Relatório de fechamento com marca, período e quem contou',
+    description: 'O relatório que sai ao finalizar um inventário mostrava só a linha, a data do fechamento, os seis indicadores e as observações — nada sobre quando a contagem aconteceu nem sobre quem a fez. Agora o arquivo traz a marca do InventoryBlind no cabeçalho e duas informações novas. “Período da linha” mostra o início da primeira contagem, o término da última, o tempo efetivamente contando e o universo de SKUs da linha. “Sessões de contagem” lista cada contagem do ciclo com a data, o operador, o horário de início e fim, a duração e os números daquela sessão — SKUs contados, divergências reais e acuracidade. Quando uma contagem antiga não tem horário gravado, o relatório diz isso em vez de deixar o campo em branco. Vale igual para a exportação em PDF e em Word.',
+  },
+  {
     id: '2026-11-10-plural-concordancia',
     date: '2026-11-10',
     category: 'melhoria',

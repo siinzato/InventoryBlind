@@ -97,6 +97,23 @@ html, body {
   --accent: 30 95 191;
   --accent-strong: 18 60 130;
 
+  /* Navy da AÇÃO primária — preenchimento do `Button variant="primary"`.
+     Mesma categoria de `--danger`: é SUPERFÍCIE de ação, não cor semântica, e
+     por isso reage ao tema (o valor que funciona sobre a página clara fica
+     ilegível sobre o fundo quase preto do dark).
+
+     Por que não continuar usando `--accent` aqui: o azul de ação estava ao
+     mesmo tempo no botão, no link e no estado ativo. Espalhado nos três, ele
+     deixava de sinalizar qualquer coisa — a §5 pede o contrário. Tirando o
+     preenchimento do botão, `--accent` volta a querer dizer "isto é clicável
+     ou está selecionado".
+
+     O valor não é novo no produto: é o `--rail` (#0A2647, enterprise-900), a
+     mesma navy da marca e da faixa lateral. Botão, logo e menu passam a ser a
+     mesma família — não é um azul de template. Branco por cima: 14,2:1. */
+  --action: 10 38 71;          /* #0A2647 */
+  --action-strong: 18 59 110;  /* #123B6E — hover/pressed: clareia de leve */
+
   /* Vermelho de AÇÃO destrutiva — par de `--accent`, não da escala semântica.
      A §5.1 decidiu, com razão, não promover Success/Warning/Error a custom
      property: um badge "Falta" é um ROTULO, e o vermelho de rótulo não deve
@@ -135,6 +152,13 @@ html, body {
   --fg-subtle: 100 108 122;
   --accent: 62 123 224;
   --accent-strong: 127 179 245;
+
+  /* A navy de ação clareia no dark pelo mesmo motivo que `--danger` clareia:
+     #0A2647 sobre o #12151C do painel não tem aresta nenhuma — o botão sumiria.
+     Continua mais escura e menos saturada que `--accent`, então as duas não se
+     confundem na mesma tela. Branco por cima: 7,7:1. */
+  --action: 28 74 133;         /* #1C4A85 */
+  --action-strong: 42 95 163;  /* #2A5FA3 */
 
   /* Clareia no dark, igual a `--accent`, e por isso `-strong` aqui é MAIS claro
      que o base — hover ilumina no escuro e escurece no claro. */

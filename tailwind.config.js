@@ -46,6 +46,11 @@ export default {
         'fg-subtle': 'rgb(var(--fg-subtle) / <alpha-value>)',
         accent: 'rgb(var(--accent) / <alpha-value>)',
         'accent-strong': 'rgb(var(--accent-strong) / <alpha-value>)',
+        // Navy da ação primária — preenchimento do `Button variant="primary"`.
+        // Superfície de ação como `danger`, não cor semântica. Ver §5.1 e o
+        // comentário em src/index.css.
+        action: 'rgb(var(--action) / <alpha-value>)',
+        'action-strong': 'rgb(var(--action-strong) / <alpha-value>)',
         // Par de `accent` para a ação destrutiva — superfície de ação, não a
         // cor semântica de rótulo (que segue em `red-*`). Ver §5.1 e o
         // comentário em src/index.css.

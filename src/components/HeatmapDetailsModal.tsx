@@ -463,7 +463,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
           <button
             onClick={handleSave}
             disabled={!hasChanges}
-            className="flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg hover:bg-accent-strong transition disabled:opacity-50 disabled:cursor-not-allowed"
+            className="flex items-center gap-2 px-4 py-2 bg-action text-white rounded-lg hover:bg-action-strong transition disabled:opacity-50 disabled:cursor-not-allowed"
           >
             <Save size={18} />
             Salvar alterações

@@ -13,10 +13,23 @@ interface ButtonProps extends NativeButtonProps {
 }
 
 const VARIANT = {
-  // Flat by default: the accent fill already carries the hierarchy, so no
-  // shadow competes with it (the project's shadow scale is control/panel/
-  // overlay — `shadow-sm` was stock Tailwind leaking in through this file).
-  primary: 'bg-accent hover:bg-accent-strong text-white',
+  // Flat by default: the fill already carries the hierarchy, so no shadow
+  // competes with it (the project's shadow scale is control/panel/overlay —
+  // `shadow-sm` was stock Tailwind leaking in through this file).
+  //
+  // `action`, não `accent`: a navy da marca (#0A2647, a mesma do rail e do
+  // símbolo) no lugar do azul claro. Dois motivos, nessa ordem:
+  //
+  // 1. Função. `accent` estava no botão, no link e no estado ativo ao mesmo
+  //    tempo. Uma cor em três papéis não sinaliza nenhum. Com o preenchimento
+  //    fora dela, `accent` volta a dizer "clicável/selecionado" — §5.
+  // 2. Identidade. Azul claro chapado em retângulo de 6px é a assinatura de
+  //    template. A navy é a cor que a logo e a faixa lateral já usam, então o
+  //    botão passa a pertencer ao produto em vez de a um gerador de UI.
+  //
+  // O botão NÃO ficou mais discreto: 14,2:1 sobre a barra clara, contra os
+  // 5,6:1 do azul anterior. Trocou-se o brilho, não o peso.
+  primary: 'bg-action hover:bg-action-strong text-white',
   // Contorno, não bloco. §10 lista borda e contraste de superfície como soluções
   // ALTERNATIVAS, em ordem de preferência — não para empilhar. Com preenchimento e
   // borda ao mesmo tempo, o secundário ganhava peso quase igual ao do primário, e
@@ -51,7 +64,7 @@ export function Button({ variant = 'primary', size = 'md', className = '', child
       //
       // O anel de foco cumpre a §5.4, que o exigia e que nem o componente nem o CSS
       // global implementavam: quem navegava por teclado não via onde estava.
-      className={`inline-flex items-center justify-center gap-2 rounded-control font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 disabled:pointer-events-none ${VARIANT[variant]} ${SIZE[size]} ${className}`}
+      className={`inline-flex items-center justify-center gap-2 rounded-control font-medium tracking-[0.01em] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:opacity-50 disabled:pointer-events-none ${VARIANT[variant]} ${SIZE[size]} ${className}`}
       {...rest}
     >
       {children}

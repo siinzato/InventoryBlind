@@ -96,7 +96,7 @@ const AgendaCard: React.FC<{
 
         {(op.status === 'preparing' || op.status === 'picking') && (
           <button onClick={() => onNavigate(op.id)}
-            className="flex items-center gap-1.5 px-3 py-1.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-xs font-semibold transition">
+            className="flex items-center gap-1.5 px-3 py-1.5 bg-action hover:bg-action-strong text-white rounded-lg text-xs font-semibold transition">
             <Package size={12} /> Separar
           </button>
         )}
@@ -277,7 +277,7 @@ const FullAgenda: React.FC<FullAgendaProps> = ({ onNavigateToPicking }) => {
             <RefreshCw size={15} />
           </button>
           <button onClick={() => setModal({ open: true, editing: null })}
-            className="flex items-center gap-2 px-4 py-2 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition">
+            className="flex items-center gap-2 px-4 py-2 bg-action hover:bg-action-strong text-white rounded-lg text-sm font-semibold transition">
             <Plus size={16} /> Novo Agendamento
           </button>
         </div>
@@ -298,7 +298,7 @@ const FullAgenda: React.FC<FullAgendaProps> = ({ onNavigateToPicking }) => {
           <Calendar size={48} className="mb-3 opacity-20" />
           <p className="text-sm font-medium">Nenhum agendamento encontrado.</p>
           <button onClick={() => setModal({ open: true, editing: null })}
-            className="mt-4 flex items-center gap-2 px-4 py-2 bg-accent text-white rounded-lg text-sm font-semibold hover:bg-accent-strong transition">
+            className="mt-4 flex items-center gap-2 px-4 py-2 bg-action text-white rounded-lg text-sm font-semibold hover:bg-action-strong transition">
             <Plus size={14} /> Criar primeiro agendamento
           </button>
         </div>

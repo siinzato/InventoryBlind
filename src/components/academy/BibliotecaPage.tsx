@@ -337,7 +337,7 @@ function EbookCard({ resource: r, coverFailed, onCoverError }: { resource: Libra
                   type="button"
                   onClick={() => void openReader()}
                   disabled={busy !== null}
-                  className="inline-flex items-center gap-2 rounded-control bg-accent hover:bg-accent-strong text-white text-sm font-semibold px-4 py-2 transition-colors disabled:opacity-60 disabled:pointer-events-none"
+                  className="inline-flex items-center gap-2 rounded-control bg-action hover:bg-action-strong text-white text-sm font-semibold px-4 py-2 transition-colors disabled:opacity-60 disabled:pointer-events-none"
                 >
                   {busy === 'read' ? <Loader2 size={15} className="animate-spin" /> : <BookOpen size={15} />}
                   Ler e-book

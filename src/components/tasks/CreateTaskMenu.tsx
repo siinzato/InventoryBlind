@@ -24,7 +24,7 @@ export const CreateTaskMenu: React.FC<CreateTaskMenuProps> = ({ role, onCreatePe
 
   return (
     <div className="relative">
-      <button onClick={() => setOpen(v => !v)} className="flex items-center gap-2 px-4 py-2.5 bg-accent hover:bg-accent-strong text-white rounded-lg text-sm font-semibold transition">
+      <button onClick={() => setOpen(v => !v)} className="flex items-center gap-2 px-4 py-2.5 bg-action hover:bg-action-strong text-white rounded-lg text-sm font-semibold transition">
         <Plus size={16} />Nova tarefa
       </button>
 

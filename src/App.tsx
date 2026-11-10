@@ -813,7 +813,7 @@ function AppContent() {
           <p className="mt-2 text-fg-muted">{error}</p>
           <button
             onClick={() => window.location.reload()}
-            className="mt-6 px-6 py-2 bg-accent text-white rounded-lg hover:bg-accent-strong transition"
+            className="mt-6 px-6 py-2 bg-action text-white rounded-lg hover:bg-action-strong transition"
           >
             Tentar novamente
           </button>
@@ -1747,7 +1747,7 @@ function AppContent() {
                           <button
                             type="submit"
                             disabled={aiLoading || !aiInput.trim()}
-                            className="bg-accent hover:bg-accent-strong text-white px-4 py-2 rounded-control transition disabled:opacity-50 disabled:cursor-not-allowed"
+                            className="bg-action hover:bg-action-strong text-white px-4 py-2 rounded-control transition disabled:opacity-50 disabled:cursor-not-allowed"
                           >
                             <Send size={18} />
                           </button>

@@ -243,7 +243,8 @@ variedade" a uma tela.
 | Secondary Text | Texto de apoio, labels | `--fg-muted` |
 | Tertiary Text | Texto de menor prioridade, placeholders, ícones inertes | `--fg-subtle` |
 | Separator | Linha divisória entre blocos, borda de Card/Panel/Table | `--edge` |
-| Accent | Ação primária, item ativo, foco | `--accent` / `--accent-strong` (hover/pressed) |
+| Accent | Link, item ativo/selecionado, anel de foco | `--accent` / `--accent-strong` (hover/pressed) |
+| Action (ação) | **Superfície** da ação primária — o preenchimento do `Button variant="primary"`. Navy da marca, a mesma do `--rail` e do símbolo. Separou-se de `--accent` porque uma cor em três papéis (botão + link + ativo) não sinaliza nenhum | `--action` / `--action-strong` (hover/pressed) |
 | Danger (ação) | **Superfície** de ação destrutiva — o preenchimento do `Button variant="danger"` | `--danger` / `--danger-strong` (hover/pressed) |
 | Success | Estado saudável, aprovado, concluído | `emerald-500/600` (semântico, não é token de tema — ver nota) |
 | Warning | Atenção, divergência moderada | `amber-500/600` |
@@ -638,7 +639,7 @@ na Sidebar, ou aumentar a altura para acomodar decoração.
 
 | Variante | Uso | Estilo |
 |---|---|---|
-| `primary` | Ação principal da tela/seção | `bg-accent hover:bg-accent-strong text-white shadow-sm` |
+| `primary` | Ação principal da tela/seção | `bg-action hover:bg-action-strong text-white` (navy da marca, sem sombra) |
 | `secondary` | Ação alternativa, igualmente válida mas não a principal | `bg-surface-3 hover:bg-edge text-fg border border-edge` |
 | `ghost` | Ação de baixa ênfase (ex.: "cancelar", ícone de utilidade) | `bg-transparent hover:bg-surface-3 text-fg-muted hover:text-fg` |
 | `danger` | Ação destrutiva | `bg-red-600 hover:bg-red-500 text-white` |

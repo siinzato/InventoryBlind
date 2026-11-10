@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-10-botao-principal-navy',
+    date: '2026-11-10',
+    category: 'melhoria',
+    title: 'O botão de ação principal agora usa o azul da marca',
+    description: 'O botão principal de cada tela — “Nova contagem”, “Salvar”, “Importar” — era de um azul claro que não era o azul do InventoryBlind: a logo e a faixa lateral do menu sempre usaram um azul-marinho bem mais fechado. Agora o botão usa essa mesma cor, então marca, menu e ação falam a mesma língua. Ele não ficou mais discreto; ao contrário, destaca-se mais do fundo claro do que antes. Junto com isso, o azul claro voltou a ter um papel só: indicar o que é link e o que está selecionado. Antes ele estava no botão, no link e no item ativo ao mesmo tempo, e por isso não distinguia mais nada. Nenhum botão mudou de lugar nem de função.',
+  },
+  {
     id: '2026-11-10-relatorio-fechamento-encorpado',
     date: '2026-11-10',
     category: 'melhoria',

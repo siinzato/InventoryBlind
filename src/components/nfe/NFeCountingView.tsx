@@ -372,7 +372,7 @@ function CountControls({ onIncrement, onSet }: { onIncrement: (delta: number) =>
       <button onClick={() => onIncrement(-1)} className="p-2 rounded-lg border border-edge text-fg-muted hover:bg-surface-3" aria-label="Diminuir">
         <Minus size={16} />
       </button>
-      <button onClick={() => onIncrement(1)} className="p-2 rounded-lg bg-accent hover:bg-accent-strong text-white" aria-label="Aumentar">
+      <button onClick={() => onIncrement(1)} className="p-2 rounded-lg bg-action hover:bg-action-strong text-white" aria-label="Aumentar">
         <Plus size={16} />
       </button>
       <div className="flex items-center gap-1.5 ml-auto">

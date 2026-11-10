@@ -145,7 +145,7 @@ export const InventoryFullPage: React.FC<InventoryFullPageProps> = ({ onBack }) 
             <div className="flex flex-wrap items-center gap-3 mt-6">
               <a
                 href="#baixar-inventoryfull"
-                className="inline-flex items-center gap-2 px-5 py-3 rounded-control bg-accent hover:bg-accent-strong text-white font-semibold text-sm transition-colors"
+                className="inline-flex items-center gap-2 px-5 py-3 rounded-control bg-action hover:bg-action-strong text-white font-semibold text-sm transition-colors"
               >
                 <Download size={16} />
                 Baixar InventoryFull para Windows

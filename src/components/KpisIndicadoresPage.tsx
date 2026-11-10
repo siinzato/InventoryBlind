@@ -6,7 +6,7 @@ import { Panel, PanelSection, Select } from './ui';
 import { resolvePeriodRange, type ReportPeriod } from '../lib/productivityService';
 import { getParetoSummary } from '../lib/rcaService';
 import { CAUSE_LABEL } from '../lib/rcaAlgorithm';
-import { pct, int } from '../lib/formatPtBr';
+import { pct, int, plural } from '../lib/formatPtBr';
 import {
   groupDailyProduction, averageDailyProduction, pendingRecount, forecastBusinessDays,
   groupOperatorPeriodStats, buildOperationalAlerts, type CountRecordForKpis,
@@ -154,13 +154,13 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
         <KpiCard
           title="Progresso do Inventário"
           value={pct(globais.progresso)}
-          context={`${globais.totalDone.toLocaleString('pt-BR')} de ${globais.totalSku.toLocaleString('pt-BR')} SKUs`}
+          context={`${globais.totalDone.toLocaleString('pt-BR')} de ${globais.totalSku.toLocaleString('pt-BR')} ${plural(globais.totalSku, 'SKU', 'SKUs')}`}
           trackPct={Math.min(100, globais.progresso)}
         />
         <KpiCard
           title="Ritmo Atual"
           value={<>{ritmoAtual.toFixed(1)}<span className="ml-1 text-sm font-normal text-fg-muted">SKUs/dia</span></>}
-          context={`Produtividade média no período (${periodDays} dias)`}
+          context={`Produtividade média no período (${periodDays} ${plural(periodDays, 'dia', 'dias')})`}
         />
         <KpiCard
           title="Acuracidade"
@@ -174,7 +174,7 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
         <KpiCard
           title="Previsão de Conclusão"
           value={previsaoDias === null ? '—' : <>{previsaoDias}<span className="ml-1 text-sm font-normal text-fg-muted">dias úteis</span></>}
-          context={previsaoDias === null ? 'Sem ritmo suficiente no período para estimar' : `${pendentesGlobal.toLocaleString('pt-BR')} SKUs pendentes no ritmo atual`}
+          context={previsaoDias === null ? 'Sem ritmo suficiente no período para estimar' : `${pendentesGlobal.toLocaleString('pt-BR')} ${plural(pendentesGlobal, 'SKU', 'SKUs')} pendentes no ritmo atual`}
         />
       </div>
 
@@ -192,14 +192,14 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
                 <div className="flex items-end gap-2 h-40 min-w-[480px]">
                   {dailyProduction.map(p => (
                     <div key={p.dateISO} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
-                      <div className="w-full rounded-t-sm bg-accent" style={{ height: `${(p.skus / maxDaily) * 100}%`, minHeight: p.skus > 0 ? 2 : 0 }} title={`${int(p.skus)} SKUs`} />
+                      <div className="w-full rounded-t-sm bg-accent" style={{ height: `${(p.skus / maxDaily) * 100}%`, minHeight: p.skus > 0 ? 2 : 0 }} title={`${int(p.skus)} ${plural(p.skus, 'SKU', 'SKUs')}`} />
                       <span className="text-[10px] text-fg-subtle whitespace-nowrap">{p.label}</span>
                     </div>
                   ))}
                 </div>
                 <div className="flex items-center gap-4 mt-3 text-xs text-fg-subtle">
                   <span className="flex items-center gap-1.5"><span className="w-2.5 h-2.5 rounded-sm bg-accent inline-block" />Realizado</span>
-                  <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed border-fg-subtle inline-block" />Meta diária ({ritmoAtual.toFixed(0)} SKUs/dia)</span>
+                  <span className="flex items-center gap-1.5"><span className="w-4 border-t-2 border-dashed border-fg-subtle inline-block" />Meta diária ({ritmoAtual.toFixed(0)} {plural(ritmoAtual, 'SKU', 'SKUs')}/dia)</span>
                 </div>
               </div>
             )}
@@ -251,7 +251,7 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
                 <span className="w-6 flex-shrink-0 text-xs font-semibold text-fg text-right">{b.count}</span>
               </div>
             ))}
-            {paretoTotal > 0 && <p className="text-xs text-fg-subtle pt-1">{paretoTotal} divergências classificadas no período.</p>}
+            {paretoTotal > 0 && <p className="text-xs text-fg-subtle pt-1">{paretoTotal} {plural(paretoTotal, 'divergência', 'divergências')} classificadas no período.</p>}
           </PanelSection>
         </Panel>
 

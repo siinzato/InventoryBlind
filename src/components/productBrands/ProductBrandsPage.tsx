@@ -17,6 +17,7 @@ import { BrandMark } from '../brandLogos/BrandMark';
 import { BrandLineFormModal } from './BrandLineFormModal';
 import { ImportedProductsPage, type ProductBrandLineFilter } from '../ImportedProductsPage';
 import { notifyTaxonomyChanged, requestActiveCycleSync } from '../../lib/productBrands/taxonomySync';
+import { plural } from '../../lib/formatPtBr';
 
 interface ProductBrandsPageProps {
   companyId: string;
@@ -197,7 +198,7 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
                       className="text-xs text-fg-subtle underline decoration-dotted hover:text-fg"
                       onClick={() => setProductFilter({ brandId: brand.id, contextTitle: `Produtos — ${brand.name}` })}
                     >
-                      {counts.brand.get(brand.id) ?? 0} produtos
+                      {counts.brand.get(brand.id) ?? 0} {plural(counts.brand.get(brand.id) ?? 0, 'produto', 'produtos')}
                     </button>
                     <Button variant="ghost" size="sm" onClick={() => setProductFilter({ brandId: brand.id, contextTitle: `Produtos — ${brand.name}` })}>
                       <Eye size={14} /> Ver produtos
@@ -223,7 +224,7 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
                         className="text-xs text-fg-subtle underline decoration-dotted hover:text-fg"
                         onClick={() => setProductFilter({ lineId: line.id, contextTitle: `Produtos — ${brand.name} / ${line.name}` })}
                       >
-                        {counts.line.get(line.id) ?? 0} produtos
+                        {counts.line.get(line.id) ?? 0} {plural(counts.line.get(line.id) ?? 0, 'produto', 'produtos')}
                       </button>
                       <Button variant="ghost" size="sm" onClick={() => setProductFilter({ lineId: line.id, contextTitle: `Produtos — ${brand.name} / ${line.name}` })}>
                         <Eye size={14} /> Ver produtos
@@ -248,7 +249,7 @@ export function ProductBrandsPage({ companyId }: ProductBrandsPageProps) {
                         className="text-xs text-fg-subtle underline decoration-dotted hover:text-fg"
                         onClick={() => setProductFilter({ brandId: brand.id, noLine: true, contextTitle: `Produtos — ${brand.name} / Sem linha` })}
                       >
-                        {counts.noLine.get(brand.id) ?? 0} produtos
+                        {counts.noLine.get(brand.id) ?? 0} {plural(counts.noLine.get(brand.id) ?? 0, 'produto', 'produtos')}
                       </button>
                       <Button variant="ghost" size="sm" onClick={() => setProductFilter({ brandId: brand.id, noLine: true, contextTitle: `Produtos — ${brand.name} / Sem linha` })}>
                         <Eye size={14} /> Ver produtos

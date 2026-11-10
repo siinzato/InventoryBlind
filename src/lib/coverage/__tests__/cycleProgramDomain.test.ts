@@ -315,9 +315,9 @@ describe('cycleSessionObservation', () => {
     const texto = cycleSessionObservation(lote, new Date(2026, 10, 3, 12, 0));
 
     expect(texto).toContain('03/11/2026');
-    expect(texto).toContain('2 SKU(s)');
+    expect(texto).toContain('2 SKUs');
     expect(texto).toContain('1 por cadência vencida');
-    expect(texto).toContain('1 nunca contado(s)');
+    expect(texto).toContain('1 nunca contado');
   });
 
   it('diz quantos vencidos ficaram de fora quando a capacidade não os cobre', () => {

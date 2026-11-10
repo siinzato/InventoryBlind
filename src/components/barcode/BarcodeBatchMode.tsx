@@ -15,6 +15,7 @@ import {
 import { BarcodeLabel } from './BarcodeLabel';
 import { BarcodeSettings } from './BarcodeSettings';
 import { BarcodeBatchImport } from './BarcodeBatchImport';
+import { plural } from '../../lib/formatPtBr';
 
 type ToastType = 'success' | 'error' | 'info';
 type BatchFilter = 'all' | 'valid' | 'invalid' | 'duplicate';
@@ -149,7 +150,7 @@ export const BarcodeBatchMode: React.FC<BarcodeBatchModeProps> = ({
         }
       }
       pdf.save(`barcode-lab-lote-${new Date().toISOString().slice(0, 10)}.pdf`);
-      toast(`PDF com ${page} etiqueta(s) gerado.`, 'success');
+      toast(`PDF com ${page} ${plural(page, 'etiqueta', 'etiquetas')} gerado.`, 'success');
     } catch (err) {
       console.error('[BarcodeLab] batch PDF error:', err);
       toast('Erro ao gerar PDF em lote.', 'error');
@@ -191,7 +192,7 @@ export const BarcodeBatchMode: React.FC<BarcodeBatchModeProps> = ({
       {summary && summary.valid > 0 && (
         <div className="bg-accent/10 rounded-container p-4 flex flex-wrap items-center justify-between gap-3">
           <p className="text-sm font-semibold text-accent">
-            {summary.valid} linha(s) válida(s) · {summary.totalLabels} etiqueta(s) · {summary.totalLabels} página(s) no PDF consolidado
+            {summary.valid} {plural(summary.valid, 'linha válida', 'linhas válidas')} · {summary.totalLabels} {plural(summary.totalLabels, 'etiqueta', 'etiquetas')} · {summary.totalLabels} {plural(summary.totalLabels, 'página', 'páginas')} no PDF consolidado
           </p>
           <div className="flex gap-2">
             <Button onClick={handleBatchPrint} disabled={generating} size="sm">

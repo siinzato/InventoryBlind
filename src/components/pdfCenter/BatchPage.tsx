@@ -16,6 +16,7 @@ import { buildOutputFilename } from '../../lib/pdfCenter/filenames';
 import { buildZip } from '../../lib/pdfCenter/zipExport';
 import { downloadBytes } from '../../lib/pdfCenter/downloadFile';
 import { ToastStack, useToasts } from '../ui';
+import { plural } from '../../lib/formatPtBr';
 
 type BatchOp = 'rotate' | 'thermal' | 'extract' | 'toImage' | 'optimize';
 type OutputMode = 'zip' | 'individual' | 'merged';
@@ -145,7 +146,7 @@ export function BatchPage({ onBack }: BatchPageProps) {
       downloadBytes(merged, 'lote-unido.pdf', 'application/pdf');
     }
 
-    toast(`Lote concluído: ${succeeded.length}/${files.length} processado(s).`, succeeded.length === files.length ? 'success' : 'info');
+    toast(`Lote concluído: ${succeeded.length}/${files.length} ${plural(files.length, 'processado', 'processados')}.`, succeeded.length === files.length ? 'success' : 'info');
   };
 
   const handleRetryFailed = () => {

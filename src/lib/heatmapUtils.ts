@@ -2,7 +2,7 @@
 
 import type { HeatmapArea, HeatmapStats, CriticalityLevel, HeatmapFilters, BrandData, RiskLevel, RiskDiagnosis } from './heatmapTypes';
 import type { BrandCountDetail } from './heatmapService';
-import { pct } from './formatPtBr';
+import { pct, plural } from './formatPtBr';
 
 // Calculate progress percentage
 export const calculateProgress = (concluidos: number, totalSku: number): number => {
@@ -122,7 +122,7 @@ export const generateDiagnosis = (area: HeatmapArea): RiskDiagnosis => {
   const riskLevel = getRiskLevel(score);
 
   if (riskLevel === 'critical') {
-    recommendation = `A área "${area.nome}" está em situação crítica. Ação imediata necessária: pare a contagem atual, investigue as causas das ${area.divergencias} divergências, realize recontagem completa e revise o processo de contagem com a equipe.`;
+    recommendation = `A área "${area.nome}" está em situação crítica. Ação imediata necessária: pare a contagem atual, investigue as causas das ${area.divergencias} ${plural(area.divergencias, 'divergência', 'divergências')}, realize recontagem completa e revise o processo de contagem com a equipe.`;
   } else if (riskLevel === 'high') {
     recommendation = `A área "${area.nome}" requer atenção prioritária. Recomenda-se: investigar as principais divergências, realizar recontagem seletiva dos itens com problemas e reforçar a equipe nesta área.`;
   } else if (riskLevel === 'medium') {

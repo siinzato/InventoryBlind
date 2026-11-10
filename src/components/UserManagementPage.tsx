@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import type { Profile } from '../lib/auth';
 import { Modal, Panel, PanelSection, Badge, Button, Table, Thead, Tr, Th, Td } from './ui';
+import { plural } from '../lib/formatPtBr';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -324,7 +325,7 @@ const UserManagementPage: React.FC<UserManagementPageProps> = ({ onBack }) => {
                 <Users size={18} className="text-emerald-600 dark:text-emerald-400" />
                 <h1 className="font-bold text-fg text-base">Usuários</h1>
               </div>
-              <p className="text-xs text-fg-subtle">{company?.name} · {users.length} membro(s)</p>
+              <p className="text-xs text-fg-subtle">{company?.name} · {users.length} {plural(users.length, 'membro', 'membros')}</p>
             </div>
           </div>
           {canManage && (

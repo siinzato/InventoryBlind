@@ -5,6 +5,7 @@ import {
   getOpenFiveWhysSessions, getFiveWhysAnswers, answerFiveWhys, completeFiveWhysSession,
 } from '../../lib/rcaService';
 import type { RcaFiveWhysSession, RcaFiveWhysAnswer } from '../../lib/supabase';
+import { plural } from '../../lib/formatPtBr';
 
 interface FiveWhysPanelProps {
   companyId: string;
@@ -52,7 +53,7 @@ function SessionCard({ session, companyId, userId, userEmail, canManage, onChang
           <p className="text-sm font-medium text-fg">
             {session.trigger_type === 'sku' ? `SKU ${session.trigger_key}` : `Causa: ${session.trigger_key}`} recorrente
           </p>
-          <p className="text-xs text-fg-subtle">{session.occurrence_count} ocorrências nos últimos {session.window_days} dias</p>
+          <p className="text-xs text-fg-subtle">{session.occurrence_count} ocorrências nos últimos {session.window_days} {plural(session.window_days, 'dia', 'dias')}</p>
         </div>
         {expanded ? <ChevronUp size={16} className="text-fg-subtle flex-shrink-0" /> : <ChevronDown size={16} className="text-fg-subtle flex-shrink-0" />}
       </button>

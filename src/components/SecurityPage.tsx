@@ -14,6 +14,7 @@ import type { AuditLog, SecurityLog } from '../lib/auditLogService';
 import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button, Stat, StatRow, StatCell, ListRow } from './ui';
 import AccessDeniedPage from './AccessDeniedPage';
 import { AdminSessionsPanel } from './security/AdminSessionsPanel';
+import { plural } from '../lib/formatPtBr';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -127,7 +128,7 @@ function HealthCheck({ companyId }: { companyId: string }) {
       base.push({
         label: 'Logs de auditoria ativos',
         status: 'ok',
-        detail: `${auditCount ?? 0} eventos registrados`,
+        detail: `${auditCount ?? 0} ${plural(auditCount ?? 0, 'evento', 'eventos')} registrados`,
       });
 
       // Check security_logs
@@ -139,7 +140,7 @@ function HealthCheck({ companyId }: { companyId: string }) {
       base.push({
         label: 'Logs de segurança ativos',
         status: 'ok',
-        detail: `${secCount ?? 0} eventos registrados`,
+        detail: `${secCount ?? 0} ${plural(secCount ?? 0, 'evento', 'eventos')} registrados`,
       });
 
       base.push(

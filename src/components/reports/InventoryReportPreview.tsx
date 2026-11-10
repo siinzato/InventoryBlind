@@ -12,6 +12,7 @@ import { Badge, Button, Panel, PanelSection } from '../ui';
 import { SafeDropdown } from '../SafeDropdown';
 import { paginateReportRows } from '../../lib/reports/inventoryReportAlgorithm';
 import type { BalanceSource, InventoryReportRow, ReportMeta } from '../../lib/reports/inventoryReportTypes';
+import { plural } from '../../lib/formatPtBr';
 import {
   InventoryReportDocument,
   REPORT_PREVIEW_CSS,
@@ -66,7 +67,7 @@ export function InventoryReportPreview({
           </div>
           <div className="flex flex-wrap items-center gap-2">
             <Badge variant="accent">{MODE_LABEL[meta.mode]}</Badge>
-            <Badge>{meta.productCount} produtos</Badge>
+            <Badge>{meta.productCount} {plural(meta.productCount, 'produto', 'produtos')}</Badge>
             <Badge>{meta.locationCount} locais</Badge>
           </div>
         </div>
@@ -103,7 +104,7 @@ export function InventoryReportPreview({
           />
           {removedCount > 0 && (
             <span className="text-xs text-fg-subtle">
-              {removedCount} linha(s) removida(s) desta emissão — o cadastro não foi alterado.
+              {removedCount} {plural(removedCount, 'linha removida', 'linhas removidas')} desta emissão — o cadastro não foi alterado.
             </span>
           )}
         </div>

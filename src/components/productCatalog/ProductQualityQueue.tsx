@@ -3,6 +3,7 @@ import { Download, Search, ShieldAlert } from 'lucide-react';
 import { Panel, PanelSection, Stat, Table, Thead, Tr, Th, Td, Button, Input } from '../ui';
 import { downloadFile } from '../../lib/productImportUtils';
 import { getProductOrigins, type ProductOrigin } from '../../lib/productCatalog/catalogHistoryService';
+import { plural } from '../../lib/formatPtBr';
 import {
   QUALITY_CATEGORY_LABEL, type QualityCategory, type QualityIssue,
   type CatalogQualitySnapshot,
@@ -276,7 +277,7 @@ export function ProductQualityQueue({ companyId, snapshot, loading, onOpenProduc
 
           {criticalCount > 0 && (
             <div className="pt-3 border-t border-edge">
-              <p className="text-xs text-fg-subtle mb-2">Corrija primeiro os {criticalCount} produtos que bloqueiam integração ou conferência.</p>
+              <p className="text-xs text-fg-subtle mb-2">Corrija primeiro os {criticalCount} {plural(criticalCount, 'produto', 'produtos')} que bloqueiam integração ou conferência.</p>
               <Button variant="secondary" size="sm" onClick={() => { setOnlyCritical(true); setCategory('all'); setPage(1); }} className="w-full">
                 Revisar críticos
               </Button>

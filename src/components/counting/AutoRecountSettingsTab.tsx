@@ -17,6 +17,7 @@ import {
   type RecountThresholdType,
 } from '../../lib/physicalCount/recountPolicy';
 import type { RecountEvent } from '../../lib/physicalCount/physicalCountTypes';
+import { plural } from '../../lib/formatPtBr';
 
 interface Props {
   /** Gravar a configuração: owner/admin/manager. A policy da 049 recusa os outros
@@ -256,7 +257,7 @@ function RecountEventsCard({
         <p className="mt-1 text-sm text-fg-muted">
           {events.length === 0
             ? 'Nenhum aviso pendente.'
-            : `${created.length} recontagem(ns) gerada(s)${failed.length > 0 ? ` e ${failed.length} falha(s)` : ''} aguardando ciência.`}
+            : `${created.length} ${plural(created.length, 'recontagem gerada', 'recontagens geradas')}${failed.length > 0 ? ` e ${failed.length} ${plural(failed.length, 'falha', 'falhas')}` : ''} aguardando ciência.`}
         </p>
       </div>
 
@@ -346,8 +347,7 @@ function RecountEventsCard({
         <div className="flex items-start gap-2 border-t border-edge bg-red-500/5 px-6 py-4">
           <AlertTriangle size={15} className="mt-0.5 flex-shrink-0 text-red-500" />
           <p className="text-sm leading-relaxed text-red-600 dark:text-red-400">
-            {failed.length === 1 ? 'Uma recontagem' : `${failed.length} recontagens`} deveria(m) ter
-            sido criada(s) e falhou(aram). A contagem original foi fechada normalmente — só a rodada
+            {failed.length === 1 ? 'Uma recontagem' : `${failed.length} recontagens`} {failed.length === 1 ? ' deveria ter sido criada e falhou.' : ' deveriam ter sido criadas e falharam.'} A contagem original foi fechada normalmente — só a rodada
             seguinte não foi gerada, e pode ser criada manualmente pelo resultado da contagem.
           </p>
         </div>

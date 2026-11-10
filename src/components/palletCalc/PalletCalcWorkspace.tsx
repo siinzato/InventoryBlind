@@ -13,6 +13,7 @@ import { PALLET_PRESETS } from '../../lib/palletCalc/palletPresets';
 import type { LengthUnit, WeightUnit } from '../../lib/palletCalc/units';
 import type { BoxSpec, PalletSpec } from '../../lib/palletCalc/types';
 import type { PalletCalcPrefs } from '../../lib/palletCalc/palletCalcPrefs';
+import { plural } from '../../lib/formatPtBr';
 
 const DEFAULT_BOX: BoxSpec = {
   lengthMm: 400, widthMm: 300, heightMm: 250, weightKg: 5, quantity: 120,
@@ -73,7 +74,7 @@ export function PalletCalcWorkspace({ initialViewMode, prefs, onPrefsChange, toa
       area.innerHTML = `
         <div style="font-family: sans-serif; padding: 12px;">
           <h1 style="font-size: 16px; margin-bottom: 8px;">Relatório de Paletização — ${box.sku ?? 'Produto'}</h1>
-          <p style="font-size: 11px; color: #555;">${activeAlt.pattern.label} — ${activeAlt.pattern.boxesPerLayer} caixas/camada × ${activeAlt.layers.layers} camadas = ${activeAlt.capacityPerPallet} caixas/palete</p>
+          <p style="font-size: 11px; color: #555;">${activeAlt.pattern.label} — ${activeAlt.pattern.boxesPerLayer} ${plural(activeAlt.pattern.boxesPerLayer, 'caixa', 'caixas')}/camada × ${activeAlt.layers.layers} camadas = ${activeAlt.capacityPerPallet} ${plural(activeAlt.capacityPerPallet, 'caixa', 'caixas')}/palete</p>
           ${diagramHtml}
           <p style="font-size: 9px; color: #777; margin-top: 8px;">Resultado geométrico estimado. Valide resistência das caixas, amarração e condições reais de transporte.</p>
         </div>`;

@@ -20,6 +20,7 @@ import {
 } from '../../lib/wms/pulmaoAnalytics';
 import { AGE_BUCKETS } from '../../lib/wms/stockInsights';
 import type { StockPlacement } from '../../lib/wms/stockInsights';
+import { plural } from '../../lib/formatPtBr';
 import {
   listMovementsForAnalytics, listPulmaoStock, searchProducts, type StorageBin,
 } from '../../lib/wms/wmsService';
@@ -164,7 +165,7 @@ export function WmsAnalytics({ bins }: { bins: StorageBin[] }) {
           <h3 className="text-title">Ocupação da capacidade</h3>
           {capacidade ? (
             <p className="text-caption mt-1">
-              Sobre as {capacidade.declaredBins} vaga(s) que declararam capacidade. As demais
+              Sobre as {capacidade.declaredBins} {plural(capacidade.declaredBins, 'vaga', 'vagas')} que declararam capacidade. As demais
               não entram na conta — não têm denominador.
             </p>
           ) : (
@@ -173,7 +174,7 @@ export function WmsAnalytics({ bins }: { bins: StorageBin[] }) {
               <Notice tone="neutral">
                 Nenhum endereço tem capacidade declarada, então não há base para calcular
                 percentual de ocupação por volume. Defina a capacidade das vagas no Mapa
-                para habilitar estes indicadores. Hoje há <strong>{totalCaixas} caixa(s)</strong> guardadas
+                para habilitar estes indicadores. Hoje há <strong>{totalCaixas} {plural(totalCaixas, 'caixa', 'caixas')}</strong> guardadas
                 no pulmão.
               </Notice>
             </div>

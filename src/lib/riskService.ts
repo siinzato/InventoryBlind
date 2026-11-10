@@ -9,6 +9,7 @@
 import { supabase, ProductRiskScore, RiskBand, CriticalityLevel } from './supabase';
 import { computeRiskScore, RiskInput, AbcClass } from './riskAlgorithm';
 import { logAuditEvent } from './auditLogService';
+import { plural } from '../lib/formatPtBr';
 
 export async function getCriticalityLevel(productId: string, companyId: string): Promise<CriticalityLevel> {
   const { data, error } = await supabase
@@ -451,7 +452,7 @@ export async function getRecentEvidenceForProduct(productId: string, companyId: 
       return { date: r.created_at, label: 'Ruptura de estoque', detail: `Saldo sistema ${r.saldo_sistema ?? '—'} · contado ${r.saldo_contado ?? '—'}` };
     }
     if (diff !== 0) {
-      return { date: r.created_at, label: 'Divergência de contagem', detail: `Diferença de ${diff > 0 ? '+' : ''}${diff} unidade(s)` };
+      return { date: r.created_at, label: 'Divergência de contagem', detail: `Diferença de ${diff > 0 ? '+' : ''}${diff} ${plural(diff, 'unidade', 'unidades')}` };
     }
     return { date: r.created_at, label: 'Contagem sem divergência', detail: `Saldo confirmado em ${r.saldo_contado ?? r.saldo_sistema ?? '—'}` };
   });

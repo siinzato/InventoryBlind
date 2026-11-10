@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-10-plural-concordancia',
+    date: '2026-11-10',
+    category: 'melhoria',
+    title: 'O sistema parou de escrever “produto(s)”',
+    description: 'Em mais de trezentos lugares o sistema escrevia “produto(s)”, “sessão(ões)”, “dia(s)”, ou colava o número num plural fixo e dizia “1 divergências”. O número já está ali do lado, então a forma certa da palavra sempre foi conhecida — era só o texto não estar escrito para ser lido. Agora a frase concorda: “venceu há 1 dia” e “venceu há 3 dias”, “2 linhas inválidas” e “1 linha inválida”, “3 aprovações pendentes” e “1 aprovação pendente”. Vale para avisos, resumos, relatórios, mensagens de importação e os alertas do BlindAI. Nenhum número mudou, nenhuma regra mudou: mudou a frase em volta.',
+  },
+  {
     id: '2026-11-10-percentuais-em-portugues',
     date: '2026-11-10',
     category: 'correcao',

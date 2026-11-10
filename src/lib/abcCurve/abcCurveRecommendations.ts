@@ -4,7 +4,7 @@
 
 import type { SkuSnapshot } from './abcCurveEngine';
 import type { AbcCommercialPolicy } from './abcCurvePolicy';
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 
 export type RecommendationCode =
   | 'PREJUIZO' | 'CORRIGIR_CUSTO' | 'COMPRA_URGENTE' | 'PROTEGER_DISPONIBILIDADE'
@@ -44,7 +44,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
       code: 'CORRIGIR_CUSTO',
       priority: 2,
       ruleApplied: 'venda no período sem custo cadastrado',
-      justification: `SKU ${s.sku} vendeu ${s.quantity} unidades sem custo cadastrado — não é possível calcular lucro/margem.`,
+      justification: `SKU ${s.sku} vendeu ${s.quantity} ${plural(s.quantity, 'unidade', 'unidades')} sem custo cadastrado — não é possível calcular lucro/margem.`,
     };
   }
 
@@ -54,7 +54,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
         code: 'COMPRA_URGENTE',
         priority: 3,
         ruleApplied: 'lucro classe A com ruptura ou baixa cobertura',
-        justification: `Classe A de lucro (R$ ${s.grossProfit?.toFixed(2)}) com cobertura de ${s.coverageDays?.toFixed(1) ?? '0'} dias (estoque ${s.stockAvailable}).`,
+        justification: `Classe A de lucro (R$ ${s.grossProfit?.toFixed(2)}) com cobertura de ${s.coverageDays?.toFixed(1) ?? '0'} ${plural(s.coverageDays ?? 0, 'dia', 'dias')} (estoque ${s.stockAvailable}).`,
       };
     }
     if (s.coverageDays !== null && s.coverageDays >= policy.healthyCoverageDays) {
@@ -62,7 +62,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
         code: 'PROTEGER_DISPONIBILIDADE',
         priority: 4,
         ruleApplied: 'lucro classe A com cobertura saudável',
-        justification: `Classe A de lucro (R$ ${s.grossProfit?.toFixed(2)}) com cobertura de ${s.coverageDays.toFixed(1)} dias — manter disponibilidade.`,
+        justification: `Classe A de lucro (R$ ${s.grossProfit?.toFixed(2)}) com cobertura de ${s.coverageDays.toFixed(1)} ${plural(s.coverageDays, 'dia', 'dias')} — manter disponibilidade.`,
       };
     }
   }
@@ -72,7 +72,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
       code: 'REVISAR_PRECO_CUSTO',
       priority: 5,
       ruleApplied: 'giro classe A com lucro classe B/C',
-      justification: `Alto giro (classe A, ${s.quantity} unidades) mas lucro em classe ${s.profitClass} — revisar preço ou custo.`,
+      justification: `Alto giro (classe A, ${s.quantity} ${plural(s.quantity, 'unidade', 'unidades')}) mas lucro em classe ${s.profitClass} — revisar preço ou custo.`,
     };
   }
 
@@ -99,7 +99,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
       code: 'REDUZIR_COMPRA_OU_LIQUIDAR',
       priority: 8,
       ruleApplied: 'lucro classe C com excesso de estoque',
-      justification: `Lucro em classe C com ${s.coverageDays.toFixed(1)} dias de cobertura — reduzir compra ou liquidar.`,
+      justification: `Lucro em classe C com ${s.coverageDays.toFixed(1)} ${plural(s.coverageDays, 'dia', 'dias')} de cobertura — reduzir compra ou liquidar.`,
     };
   }
 
@@ -108,7 +108,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
       code: 'ESTOQUE_PARADO',
       priority: 9,
       ruleApplied: 'sem venda no período com estoque disponível',
-      justification: `Nenhuma venda no período, mas ${s.stockAvailable} unidades em estoque.`,
+      justification: `Nenhuma venda no período, mas ${s.stockAvailable} ${plural(s.stockAvailable ?? 0, 'unidade', 'unidades')} em estoque.`,
     };
   }
 

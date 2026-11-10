@@ -2,6 +2,7 @@ import React from 'react';
 import { PlayCircle } from 'lucide-react';
 import { Button } from '../ui';
 import { ComparatorBaseState, KeyPartMapping, FieldMapping, ComparisonSettings } from '../../lib/spreadsheet-comparator/types';
+import { plural } from '../../lib/formatPtBr';
 
 interface ComparisonReviewProps {
   baseA: ComparatorBaseState;
@@ -37,7 +38,7 @@ export const ComparisonReview: React.FC<ComparisonReviewProps> = ({ baseA, baseB
         <Row label="Duplicados" value={settings.duplicateStrategy === 'aggregate' ? 'Agrupar e somar' : 'Linha a linha'} />
         <Row label="Texto" value={settings.defaultCaseSensitive ? 'Exata' : 'Ignora maiúsculas/minúsculas'} />
         <Row label="Tolerância padrão" value={`${settings.defaultToleranceAbsolute} (absoluta) · ${settings.defaultTolerancePercent}% (percentual)`} />
-        <Row label="Estimativa de registros processados" value={`até ${rowsCountA + rowsCountB} linha(s)`} />
+        <Row label="Estimativa de registros processados" value={`até ${rowsCountA + rowsCountB} ${plural(rowsCountA + rowsCountB, 'linha', 'linhas')}`} />
       </div>
 
       {!canProcess && (

@@ -31,7 +31,7 @@ import { AbcComparisonPanel } from './AbcComparisonPanel';
 import { AbcPolicySummary } from './AbcPolicySummary';
 import { AbcTinyTab } from './AbcTinyTab';
 import { AbcCurveImportWizard } from './AbcCurveImportWizard';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 interface AbcCurvePageProps {
   companyId: string;
@@ -488,7 +488,7 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
                     </Table>
                     {distribution.ineligibleCount > 0 && (
                       <PanelSection padding="sm" className="text-caption">
-                        {fmtInt(distribution.ineligibleCount)} SKUs não elegíveis nesta curva (sem valor na métrica) — ficam fora da distribuição em vez de entrar como classe C.
+                        {fmtInt(distribution.ineligibleCount)} {plural(distribution.ineligibleCount, 'SKU', 'SKUs')} não elegíveis nesta curva (sem valor na métrica) — ficam fora da distribuição em vez de entrar como classe C.
                       </PanelSection>
                     )}
                   </>
@@ -639,8 +639,8 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <p className="text-caption">
                     {filtersActive
-                      ? `${fmtInt(filtered.length)} de ${fmtInt(snapshots.length)} SKUs`
-                      : `${fmtInt(snapshots.length)} SKUs`}
+                      ? `${fmtInt(filtered.length)} de ${fmtInt(snapshots.length)} ${plural(snapshots.length, 'SKU', 'SKUs')}`
+                      : `${fmtInt(snapshots.length)} ${plural(snapshots.length, 'SKU', 'SKUs')}`}
                   </p>
                   {filtersActive && (
                     <Button variant="ghost" size="sm" onClick={() => { setFilters(EMPTY_PRODUCT_FILTERS); setPage(0); setExpandedSnapshotId(null); }}>
@@ -917,7 +917,7 @@ export function AbcCurvePage({ companyId }: AbcCurvePageProps) {
                   </p>
                   <p className="text-caption">
                     {tinyAvailable
-                      ? `Não participa do cálculo desta análise. ${fmtInt(tinyBatch.importedCount)} de ${fmtInt(tinyBatch.rowCount)} SKUs do arquivo têm correspondência aqui — veja em Comparativo Tiny.`
+                      ? `Não participa do cálculo desta análise. ${fmtInt(tinyBatch.importedCount)} de ${fmtInt(tinyBatch.rowCount)} ${plural(tinyBatch.rowCount, 'SKU', 'SKUs')} do arquivo têm correspondência aqui — veja em Comparativo Tiny.`
                       : 'Não participa do cálculo desta análise e nenhum SKU do arquivo teve correspondência, então não há comparativo.'}
                   </p>
                 </PanelSection>

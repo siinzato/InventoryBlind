@@ -7,7 +7,7 @@ import { useMemo, useState } from 'react';
 import { Target, Plus, Trash2, AlertTriangle, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import { Panel, PanelSection, Button, Badge, Select, Modal, Stat, StatRow, StatCell } from '../ui';
 import type { CustomKPI, InventorySnapshot } from '../../lib/supabase';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 import {
   computeAccuracyTrend, classifyAccuracyByTarget, isKpiStale, computeOperationalSummary, buildPriorityAlerts,
   ACCURACY_TARGET_PCT, ACCURACY_WARNING_FLOOR_PCT, ACCURACY_HISTORY_LIMIT,
@@ -155,7 +155,7 @@ export function KpisTab({ customKPIs, onAddKPI, onDeleteKPI, snapshots, onNaviga
 
         <PanelSection padding="sm" className="flex flex-wrap items-center gap-x-6 gap-y-2 border-t border-edge/60">
           <Badge variant={STATUS_META[summary.status].badge}>{STATUS_META[summary.status].label}</Badge>
-          <span className="text-xs text-fg-muted">{summary.criticos} crítico(s)</span>
+          <span className="text-xs text-fg-muted">{summary.criticos} {plural(summary.criticos, 'crítico', 'críticos')}</span>
           <span className="text-xs text-fg-muted">{summary.emAtencao} em atenção</span>
           <span className="text-xs text-fg-muted">{summary.semMeta} sem meta configurada</span>
           {summary.destaque && (
@@ -220,7 +220,7 @@ export function KpisTab({ customKPIs, onAddKPI, onDeleteKPI, snapshots, onNaviga
               aria-expanded={expandedExtras}
             >
               {expandedExtras ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
-              Mais {extraCustomKpis.length} indicador(es)
+              Mais {extraCustomKpis.length} {plural(extraCustomKpis.length, 'indicador', 'indicadores')}
             </button>
           </PanelSection>
           {expandedExtras && (

@@ -1,4 +1,4 @@
-import { pct } from './formatPtBr';
+import { pct, plural } from './formatPtBr';
 // Root Cause Analysis — catálogo de causas e funções puras de agregação.
 //
 // Sem I/O: recebe listas de RcaRecord/RcaCase já carregadas (pelo serviço) e calcula
@@ -482,7 +482,7 @@ export function computeTrend(records: RcaRecord[], dimension: RcaDimension, key:
   const pctLabel = pctChange !== null ? `${pctChange >= 0 ? 'aumento' : 'redução'} de ${pct(Math.abs(pctChange), 0)}` : 'volume estável';
   const summary = pctChange !== null
     ? `${label} apresentou ${pctLabel} nas divergências (${firstHalfCount} → ${secondHalfCount} ocorrências) — ${TREND_DIRECTION_LABEL[direction].toLowerCase()}.`
-    : `${label} tem ${filtered.length} divergência(s) registrada(s), volume insuficiente para comparar tendência.`;
+    : `${label} tem ${filtered.length} ${plural(filtered.length, 'divergência registrada', 'divergências registradas')}, volume insuficiente para comparar tendência.`;
 
   return { series, direction, pctChange, firstHalfCount, secondHalfCount, summary };
 }

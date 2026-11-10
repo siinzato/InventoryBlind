@@ -143,7 +143,7 @@ export function buildInventoryAlerts(metrics: InventoryMetrics): InventoryAlert[
       'discrepancies',
       'warning',
       count,
-      `${count} divergências entre ERP e InventoryBlind`,
+      `${count} ${plural(count, 'divergência', 'divergências')} entre ERP e InventoryBlind`,
       'Cada divergência é um saldo sobre o qual os dois sistemas discordam e ninguém decidiu qual está certo. Nada é sobrescrito automaticamente.',
       'Revisar e decidir a origem correta',
       'discrepancies'
@@ -173,7 +173,7 @@ export function buildInventoryAlerts(metrics: InventoryMetrics): InventoryAlert[
       'missing_ean',
       'info',
       count,
-      `${count} produtos sem EAN`,
+      `${count} ${plural(count, 'produto', 'produtos')} sem EAN`,
       'Sem EAN a conferência por leitor de código de barras e a associação por NF-e não funcionam para estes produtos.',
       'Ver produtos e completar o cadastro',
       'missing_ean'
@@ -189,7 +189,7 @@ export function buildInventoryAlerts(metrics: InventoryMetrics): InventoryAlert[
       'missing_warehouse',
       'info',
       count,
-      `${count} produtos sem depósito identificado`,
+      `${count} ${plural(count, 'produto', 'produtos')} sem depósito identificado`,
       'O provedor devolveu saldo sem informar o depósito, então estes produtos não entram em nenhuma análise por localização.',
       'Conferir o mapeamento de depósitos',
       'missing_warehouse'

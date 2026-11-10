@@ -1,7 +1,7 @@
 import React from 'react';
 import { Modal, Badge } from '../ui';
 import { ComparisonRecord, ComparisonStatus } from '../../lib/spreadsheet-comparator/types';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 interface ComparisonDetailsProps {
   record: ComparisonRecord | null;
@@ -42,9 +42,9 @@ export const ComparisonDetails: React.FC<ComparisonDetailsProps> = ({ record, la
           <Badge variant={STATUS_BADGE[record.status]}>{STATUS_LABEL[record.status]}</Badge>
           {(record.duplicateGroupSizeA > 1 || record.duplicateGroupSizeB > 1) && (
             <span className="text-xs text-fg-subtle">
-              {record.duplicateGroupSizeA > 1 && `${record.duplicateGroupSizeA} linha(s) em ${labelA}`}
+              {record.duplicateGroupSizeA > 1 && `${record.duplicateGroupSizeA} ${plural(record.duplicateGroupSizeA, 'linha', 'linhas')} em ${labelA}`}
               {record.duplicateGroupSizeA > 1 && record.duplicateGroupSizeB > 1 && ' · '}
-              {record.duplicateGroupSizeB > 1 && `${record.duplicateGroupSizeB} linha(s) em ${labelB}`}
+              {record.duplicateGroupSizeB > 1 && `${record.duplicateGroupSizeB} ${plural(record.duplicateGroupSizeB, 'linha', 'linhas')} em ${labelB}`}
             </span>
           )}
         </div>

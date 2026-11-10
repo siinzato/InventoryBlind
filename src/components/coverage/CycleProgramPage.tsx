@@ -6,6 +6,7 @@ import {
 } from '../ui';
 import { ABC_LABEL, type AbcBucket, type CoverageItem } from '../../lib/coverage/coverageDomain';
 import { fetchCoverageItems } from '../../lib/coverage/coverageService';
+import { plural } from '../../lib/formatPtBr';
 import {
   CADENCE_MAX, CADENCE_MIN, CAPACITY_MAX, CAPACITY_MIN, DEFAULT_CYCLE_CONFIG, ORIGIN_LABEL,
   SCHEDULE_HOUR_MAX, SCHEDULE_HOUR_MIN, WEEKDAY_LABEL, WEEKDAY_SHORT,
@@ -271,7 +272,7 @@ export function CycleProgramPage({ companyId, canManage, canCount, onNavigateToC
                         ? 'Parado: a capacidade do dia é toda consumida pelas recontagens'
                         : lote.backlogDaysToClear === 0
                           ? 'Catálogo inteiro já passou por contagem'
-                          : `Zera em ~${inteiro.format(lote.backlogDaysToClear)} dias no ritmo atual`
+                          : `Zera em ~${inteiro.format(lote.backlogDaysToClear)} ${plural(lote.backlogDaysToClear, 'dia', 'dias')} no ritmo atual`
                     }
                     valueTone={status.nunca > 0 ? 'warning' : 'positive'}
                   />

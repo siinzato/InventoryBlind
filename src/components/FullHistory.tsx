@@ -4,6 +4,7 @@ import { useAuth } from '../lib/auth';
 import { RefreshCw, ChevronDown, ChevronUp, Clock, Package, User } from 'lucide-react';
 import type { FullOperation, FullOperationItem } from '../lib/fullManagerTypes';
 import { STATUS_LABEL, STATUS_COLOR, ITEM_STATUS_LABEL, ITEM_STATUS_COLOR, formatFullDate } from '../lib/fullManagerTypes';
+import { plural } from '../lib/formatPtBr';
 
 // ── History row ───────────────────────────────────────────────────────────────
 
@@ -180,7 +181,7 @@ const FullHistory: React.FC = () => {
         </button>
       </div>
 
-      <p className="text-xs text-fg-subtle font-medium">{filtered.length} operação(ões) encontrada(s)</p>
+      <p className="text-xs text-fg-subtle font-medium">{filtered.length} {plural(filtered.length, 'operação encontrada', 'operações encontradas')}</p>
 
       {loading ? (
         <div className="flex items-center justify-center py-16 gap-2 text-fg-subtle">

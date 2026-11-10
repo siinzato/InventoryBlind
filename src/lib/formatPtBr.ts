@@ -27,3 +27,16 @@ export function dec(value: number, decimals = 1): string {
 export function int(value: number): string {
   return Math.round(value).toLocaleString('pt-BR');
 }
+
+/**
+ * Concordancia de numero. `plural(1, 'produto', 'produtos')` -> `"produto"`.
+ *
+ * O app escrevia `produto(s)`, `sessão(ões)`, `dia(s)` em 129 lugares. Isso e
+ * linguagem de mensagem de sistema, nao de produto: o numero ja esta na tela
+ * ao lado, entao a forma certa da palavra e sempre conhecida. Em pt-BR so o
+ * 1 exato leva singular — 0 e qualquer decimal levam plural ("0 produtos",
+ * "1,5 dias").
+ */
+export function plural(count: number, singular: string, pluralForm: string): string {
+  return count === 1 ? singular : pluralForm;
+}

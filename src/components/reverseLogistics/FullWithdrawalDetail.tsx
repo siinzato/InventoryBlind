@@ -3,6 +3,7 @@ import {
   ArrowLeft, RefreshCw, ExternalLink, Link2, AlertTriangle, Package, DollarSign, Building2, Boxes,
 } from 'lucide-react';
 import { Button, Input, Panel, PanelSection, Notice, Table, Thead, Tr, Th, Td } from '../ui';
+import { plural } from '../../lib/formatPtBr';
 import {
   getFullWithdrawalPlan, getFullWithdrawalItems, getFullWithdrawalEvents,
   advanceFullWithdrawalStatus, linkFullWithdrawalMl, conferFullWithdrawalItem, justifyFullWithdrawalDivergence,
@@ -336,7 +337,7 @@ export function FullWithdrawalDetail({ planId, onBack }: FullWithdrawalDetailPro
                 </tbody>
               </Table>
               <PanelSection padding="sm" className="text-caption">
-                {items.reduce((s, i) => s + i.plannedQuantity, 0)} unidades planejadas nesta retirada.
+                {items.reduce((s, i) => s + i.plannedQuantity, 0)} {plural(items.reduce((s, i) => s + i.plannedQuantity, 0), 'unidade', 'unidades')} planejadas nesta retirada.
               </PanelSection>
             </div>
           )}

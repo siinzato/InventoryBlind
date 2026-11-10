@@ -13,6 +13,7 @@ import { supabase } from '../lib/supabase';
 import type { ImportHistoryRecord, ColumnMapping } from '../lib/productImportTypes';
 import { formatDateTime, downloadFile } from '../lib/productImportUtils';
 import { Page, PageHeader, Panel, PanelSection, Badge, Button } from './ui';
+import { plural } from '../lib/formatPtBr';
 
 // A tabela guarda as colunas em snake_case e a tela le em camelCase. Sem esta
 // conversao, `data` entrava direto no estado e nome do arquivo, data, autor e
@@ -166,7 +167,7 @@ export const ImportHistoryPage: React.FC<ImportHistoryPageProps> = ({
                     <div className="flex flex-wrap gap-4 mt-3 text-sm">
                       <span className="text-fg-muted">
                         <Package size={14} className="inline mr-1" />
-                        {record.totalProducts} produtos
+                        {record.totalProducts} {plural(record.totalProducts, 'produto', 'produtos')}
                       </span>
                       <span className="text-emerald-600 dark:text-emerald-400">
                         +{record.newProducts} novos

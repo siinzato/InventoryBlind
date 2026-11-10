@@ -9,7 +9,7 @@
 
 import { useState } from 'react';
 import type { ParetoData, AbcMetric } from '../../lib/abcCurve/abcCurveAnalytics';
-import { pct, int } from '../../lib/formatPtBr';
+import { pct, int, plural } from '../../lib/formatPtBr';
 
 interface AbcParetoChartProps {
   data: ParetoData;
@@ -59,7 +59,7 @@ export function AbcParetoChart({ data, metric, thresholdA, thresholdB }: AbcPare
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 200 }} preserveAspectRatio="none" role="img"
-        aria-label={`Pareto de ${int(data.eligibleCount)} SKUs elegíveis com linha de acumulado percentual.`}>
+        aria-label={`Pareto de ${int(data.eligibleCount)} ${plural(data.eligibleCount, 'SKU', 'SKUs')} elegíveis com linha de acumulado percentual.`}>
         <line x1={0} x2={W} y1={yForPct(thresholdA)} y2={yForPct(thresholdA)} className="stroke-edge" strokeWidth="1" strokeDasharray="5 5" vectorEffect="non-scaling-stroke" />
         <line x1={0} x2={W} y1={yForPct(thresholdB)} y2={yForPct(thresholdB)} className="stroke-edge" strokeWidth="1" strokeDasharray="5 5" vectorEffect="non-scaling-stroke" />
 
@@ -128,7 +128,7 @@ export function AbcParetoChart({ data, metric, thresholdA, thresholdB }: AbcPare
           </span>
         </div>
         <p className="text-caption">
-          {data.eligibleCount.toLocaleString('pt-BR')} SKUs elegíveis
+          {data.eligibleCount.toLocaleString('pt-BR')} {plural(data.eligibleCount, 'SKU', 'SKUs')} elegíveis
           {data.grouped && ` · barras agrupadas em ${data.bins.length} faixas`}
         </p>
       </div>

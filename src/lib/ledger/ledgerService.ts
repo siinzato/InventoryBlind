@@ -16,6 +16,7 @@
 // Só SELECT. Este módulo não escreve em lugar nenhum.
 
 import { supabase } from '../supabase';
+import { plural } from '../../lib/formatPtBr';
 import {
   ADJUSTMENT_APPLIED, ADJUSTMENT_STATUS_LABEL, BIN_MOVEMENT_LABEL, COUNT_RESULT_LABEL,
   RESTOCK_MOVEMENT, RETURN_DESTINATION_LABEL, mergeLedger, type LedgerEntry,
@@ -300,7 +301,7 @@ async function lerEnderecos(companyId: string, productId: string): Promise<Ledge
     const caixas = numero(l.boxes);
     const porCaixa = numero(l.units_per_box);
     const partes: string[] = [];
-    if (caixas !== null && porCaixa !== null) partes.push(`${caixas} caixa(s) de ${porCaixa}`);
+    if (caixas !== null && porCaixa !== null) partes.push(`${caixas} ${plural(caixas, 'caixa', 'caixas')} de ${porCaixa}`);
     if (l.reason) partes.push(String(l.reason));
 
     return {

@@ -24,6 +24,7 @@
 
 import { parseBinCode } from './binCode';
 import type { StorageBin } from './wmsService';
+import { plural } from '../../lib/formatPtBr';
 
 /** O que já está guardado numa vaga, do ponto de vista de quem vai guardar mais. */
 export interface BinOccupancy {
@@ -130,7 +131,7 @@ export function suggestBins(input: SuggestionInput): BinSuggestion[] {
     const reasons: string[] = [];
     if (consolida) reasons.push(`Já tem este SKU (${occ.sameSkuBoxes} cx)`);
     else if (vazia) reasons.push('Vaga vazia');
-    else reasons.push(`Ocupada por ${occ.distinctSkus} outro(s) SKU(s)`);
+    else reasons.push(`Ocupada por ${occ.distinctSkus} ${plural(occ.distinctSkus, 'outro SKU', 'outros SKUs')}`);
 
     if (livre != null) reasons.push(`${livre} cx livres`);
     else reasons.push('Sem capacidade declarada');

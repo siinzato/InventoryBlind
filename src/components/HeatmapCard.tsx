@@ -15,7 +15,7 @@ import {
   getRiskGradient,
 } from '../lib/heatmapUtils';
 import { Badge } from './ui';
-import { pct } from '../lib/formatPtBr';
+import { pct, plural } from '../lib/formatPtBr';
 
 interface HeatmapCardProps {
   area: HeatmapArea;
@@ -265,7 +265,7 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
             </span>
             <span className={area.divergencias > 0 ? 'text-red-600 dark:text-red-400' : 'text-fg-subtle'}>
               <AlertTriangle size={14} className="inline mr-1" />
-              {area.divergencias} divergências
+              {area.divergencias} {plural(area.divergencias, 'divergência', 'divergências')}
             </span>
             <span className="text-fg-subtle">
               <Package size={14} className="inline mr-1" />

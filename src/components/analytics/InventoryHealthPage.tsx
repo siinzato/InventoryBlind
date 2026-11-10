@@ -22,6 +22,7 @@ import {
 import { listRecords as listRcaRecords } from '../../lib/rcaService';
 import { groupByDimension, type DimensionBucket } from '../../lib/rcaAlgorithm';
 import { listWithFilter, type ProductAbcXyzRow } from '../../lib/abcXyzService';
+import { plural } from '../../lib/formatPtBr';
 
 interface InventoryHealthPageProps {
   companyId: string;
@@ -304,7 +305,7 @@ export function InventoryHealthPage({ companyId, onNavigate }: InventoryHealthPa
                       }`}
                     >
                       {isAvailable(indicator.metric)
-                        ? `${indicator.metric.value.toLocaleString('pt-BR')} SKUs`
+                        ? `${indicator.metric.value.toLocaleString('pt-BR')} ${plural(indicator.metric.value, 'SKU', 'SKUs')}`
                         : '—'}
                     </p>
                     <p className="text-caption leading-relaxed">{indicator.detail}</p>
@@ -360,7 +361,7 @@ export function InventoryHealthPage({ companyId, onNavigate }: InventoryHealthPa
                   <div className="min-w-0">
                     <p className="text-section">Concentração por marca e linha</p>
                     <p className="text-caption mt-0.5">
-                      {segments.associatedProducts.toLocaleString('pt-BR')} de {segments.totalCatalog.toLocaleString('pt-BR')} produtos
+                      {segments.associatedProducts.toLocaleString('pt-BR')} de {segments.totalCatalog.toLocaleString('pt-BR')} {plural(segments.totalCatalog, 'produto', 'produtos')}
                       possuem marca associada ({segments.coveragePct}% do catálogo)
                       {segments.coveragePct < 100 ? ' — o quadro abaixo cobre apenas esses produtos.' : '.'}
                     </p>
@@ -473,7 +474,7 @@ export function InventoryHealthPage({ companyId, onNavigate }: InventoryHealthPa
                   <div>
                     <p className="text-overline">Associação de marca</p>
                     <p className="text-caption mt-1 leading-relaxed">
-                      {segments.associatedProducts.toLocaleString('pt-BR')} de {segments.totalCatalog.toLocaleString('pt-BR')} produtos
+                      {segments.associatedProducts.toLocaleString('pt-BR')} de {segments.totalCatalog.toLocaleString('pt-BR')} {plural(segments.totalCatalog, 'produto', 'produtos')}
                       com marca associada ({segments.coveragePct}%).
                     </p>
                   </div>
@@ -541,7 +542,7 @@ export function InventoryHealthPage({ companyId, onNavigate }: InventoryHealthPa
                       ) : (
                         <Td>
                           {row.weeksWithoutSale != null
-                            ? `${row.weeksWithoutSale} semana(s)`
+                            ? `${row.weeksWithoutSale} ${plural(row.weeksWithoutSale, 'semana', 'semanas')}`
                             : 'Sem movimentação no período'}
                         </Td>
                       )}

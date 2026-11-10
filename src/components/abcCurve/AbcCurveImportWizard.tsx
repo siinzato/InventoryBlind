@@ -18,7 +18,7 @@ import { evaluateSignals } from '../../lib/abcCurve/abcCurveSignals';
 import { normalizeTinyClass, type TinyFileValues } from '../../lib/abcCurve/abcCurveTiny';
 import { evaluateRecommendation, type Recommendation } from '../../lib/abcCurve/abcCurveRecommendations';
 import { findBatchesByFileHash, matchProductIds, publishAnalysis, type AbcFileKind, type AbcProvider } from '../../lib/abcCurve/abcCurveService';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 interface AbcCurveImportWizardProps {
   companyId: string;
@@ -183,7 +183,7 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
         });
       }
       if (tinyUnmatched > 0) {
-        warnings.push(`Curva ABC do Tiny: ${tinyUnmatched} SKUs do arquivo não existem nesta análise — ficam de fora do comparativo.`);
+        warnings.push(`Curva ABC do Tiny: ${tinyUnmatched} ${plural(tinyUnmatched, 'SKU', 'SKUs')} do arquivo não existem nesta análise — ficam de fora do comparativo.`);
       }
     }
 
@@ -279,7 +279,7 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
       {slot.file && (
         <>
           <div className="flex items-center justify-between text-sm">
-            <span className="text-fg">{slot.file.name} — {slot.headers.length} colunas, {slot.rawRows.length} linhas</span>
+            <span className="text-fg">{slot.file.name} — {slot.headers.length} colunas, {slot.rawRows.length} {plural(slot.rawRows.length, 'linha', 'linhas')}</span>
             <Button variant="ghost" size="sm" onClick={() => setSlot(emptySlot(fields))}><X size={14} /> Trocar arquivo</Button>
           </div>
           {slot.duplicateWarning && (

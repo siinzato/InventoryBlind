@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Plus, Copy, Check, Trash2, Send, RotateCw, History, Power, ChevronDown, ChevronRight, AlertTriangle } from 'lucide-react';
 import { Page, PageHeader, Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button, Modal, Input } from '../ui';
+import { plural } from '../../lib/formatPtBr';
 import {
   listWebhooks, listWebhookDeliveries, createWebhook, updateWebhook, deleteWebhook,
   setWebhookActive, rotateWebhookSecret, sendWebhookTest, WEBHOOK_MAX_ATTEMPTS,
@@ -237,7 +238,7 @@ export function WebhooksPage({ companyId, userId, userEmail }: WebhooksPageProps
                   <Tr key={w.id}>
                     <Td className="font-medium text-fg">{w.name}</Td>
                     <Td className="text-fg-muted text-xs font-mono truncate max-w-[16rem]">{w.url}</Td>
-                    <Td className="text-xs text-fg-subtle whitespace-nowrap">{w.events.length} evento(s)</Td>
+                    <Td className="text-xs text-fg-subtle whitespace-nowrap">{w.events.length} {plural(w.events.length, 'evento', 'eventos')}</Td>
                     <Td>{w.is_active ? <Badge variant="success">Ativo</Badge> : <Badge variant="neutral">Inativo</Badge>}</Td>
                     <Td className="text-fg-subtle text-xs whitespace-nowrap">{formatDate(w.created_at)}</Td>
                     <Td className="text-xs whitespace-nowrap">

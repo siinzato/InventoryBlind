@@ -20,6 +20,7 @@ import {
   EMPTY_OCCUPANCY, occupancyByProduct, previewTransfer, rejectionFor, suggestBins,
 } from '../../lib/wms/binSuggestion';
 import type { StockPlacement } from '../../lib/wms/stockInsights';
+import { plural } from '../../lib/formatPtBr';
 
 type Action = 'guardar' | 'retirar' | 'transferir';
 
@@ -211,11 +212,11 @@ export function WmsBinOperations({
         const upb = parseInt(unitsPerBox) || 0;
         if (upb <= 0) throw new Error('Informe quantas unidades tem a caixa.');
         await putaway({ binCode: code, productId: chosen.id, boxes: qty, unitsPerBox: upb });
-        setDone(`${qty} caixa(s) de ${chosen.sku} guardada(s) em ${code}.`);
+        setDone(`${qty} ${plural(qty, 'caixa', 'caixas')} de ${chosen.sku} ${plural(qty, 'guardada', 'guardadas')} em ${code}.`);
       } else if (action === 'retirar') {
         if (!targetProductId) throw new Error('Escolha o produto a retirar.');
         await pick({ binCode: code, productId: targetProductId, boxes: qty });
-        setDone(`${qty} caixa(s) retirada(s) de ${code}.`);
+        setDone(`${qty} ${plural(qty, 'caixa retirada', 'caixas retiradas')} de ${code}.`);
       } else {
         if (!targetProductId) throw new Error('Escolha o produto a transferir.');
         if (!destCode.trim()) throw new Error('Informe o endereço de destino.');
@@ -225,7 +226,7 @@ export function WmsBinOperations({
           productId: targetProductId,
           boxes: qty,
         });
-        setDone(`${qty} caixa(s) transferida(s) de ${code} para ${destCode.trim().toUpperCase()}.`);
+        setDone(`${qty} ${plural(qty, 'caixa transferida', 'caixas transferidas')} de ${code} para ${destCode.trim().toUpperCase()}.`);
       }
       reset();
       await loadContents(code);
@@ -529,7 +530,7 @@ export function WmsBinOperations({
             {action !== 'retirar' && activeProductId && qty > 0 && suggestions.length === 0 && (
               <div className="mt-4">
                 <Notice tone="warning">
-                  Nenhum endereço do pulmão comporta {qty} caixa(s) deste produto agora —
+                  Nenhum endereço do pulmão comporta {qty} {plural(qty, 'caixa', 'caixas')} deste produto agora —
                   todos estão bloqueados, sem espaço, ou já têm este SKU com outra quantidade
                   por caixa.
                 </Notice>
@@ -540,7 +541,7 @@ export function WmsBinOperations({
             {action !== 'guardar' && rowAtOrigin && qty > rowAtOrigin.boxes && (
               <div className="mt-3">
                 <Notice tone="danger">
-                  {bin?.code} tem {rowAtOrigin.boxes} caixa(s) deste produto. Não dá para
+                  {bin?.code} tem {rowAtOrigin.boxes} {plural(rowAtOrigin.boxes, 'caixa', 'caixas')} deste produto. Não dá para
                   {action === 'retirar' ? ' retirar ' : ' transferir '}{qty}.
                 </Notice>
               </div>

@@ -24,6 +24,7 @@ import {
   truncateProductName,
 } from './inventoryReportAlgorithm';
 import type { InventoryReportRow, ReportMeta } from './inventoryReportTypes';
+import { plural } from '../../lib/formatPtBr';
 
 export const REPORT_PRINT_AREA_ID = '_ib_inventory_report_print_area';
 const PRINT_STYLE_ID = '_ib_inventory_report_print_style';
@@ -124,7 +125,7 @@ export async function downloadInventoryReportPdf(
     doc.setFontSize(7.5);
     doc.setFont('helvetica', 'normal');
     doc.text(
-      `${meta.productCount} produtos  •  ${meta.locationCount} endereços`,
+      `${meta.productCount} ${plural(meta.productCount, 'produto', 'produtos')}  •  ${meta.locationCount} ${plural(meta.locationCount, 'endereço', 'endereços')}`,
       MARGIN_X + CONTENT_WIDTH,
       y,
       { align: 'right' }

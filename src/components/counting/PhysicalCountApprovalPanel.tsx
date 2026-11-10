@@ -7,6 +7,7 @@ import { approveSession, callErpSync } from '../../lib/physicalCount/physicalCou
 import { logAuditEvent } from '../../lib/auditLogService';
 import { useAuth } from '../../lib/auth';
 import type { ErpSyncReport, PhysicalCountItem } from '../../lib/physicalCount/physicalCountTypes';
+import { plural } from '../../lib/formatPtBr';
 
 interface PhysicalCountApprovalPanelProps {
   sessionId: string;
@@ -120,10 +121,10 @@ export function PhysicalCountApprovalPanel({ sessionId, companyId, divergentItem
             </p>
             {report.pending > 0 && (
               <p className="mt-1 text-amber-600 dark:text-amber-400">
-                {report.pending} pendente(s) — credenciais do ERP não configuradas nesta instância.
+                {report.pending} {plural(report.pending, 'pendente', 'pendentes')} — credenciais do ERP não configuradas nesta instância.
               </p>
             )}
-            {report.failed > 0 && <p className="mt-1 text-red-500">{report.failed} ajuste(s) precisam de atenção.</p>}
+            {report.failed > 0 && <p className="mt-1 text-red-500">{report.failed} {plural(report.failed, 'ajuste', 'ajustes')} precisam de atenção.</p>}
           </div>
         ) : (
           <div className="flex justify-end gap-2">

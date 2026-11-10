@@ -2,7 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, Eye, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { Table, Thead, Tr, Th, Td, Badge, Select, Input } from '../ui';
 import { ComparisonRecord, ComparisonStatus, FieldMapping } from '../../lib/spreadsheet-comparator/types';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 type TableFilter = ComparisonStatus | 'all' | 'duplicates-a' | 'duplicates-b';
 
@@ -196,7 +196,7 @@ export const ComparisonTable: React.FC<ComparisonTableProps> = ({ records, field
       </div>
 
       <div className="p-3 border-t border-edge flex items-center justify-between text-xs text-fg-subtle">
-        <span>{flatRows.length} linha(s) · página {currentPage + 1} de {totalPages}</span>
+        <span>{flatRows.length} {plural(flatRows.length, 'linha', 'linhas')} · página {currentPage + 1} de {totalPages}</span>
         <div className="flex gap-2">
           <button onClick={() => setPage(p => Math.max(0, p - 1))} disabled={currentPage === 0} className="p-1.5 border border-edge rounded disabled:opacity-40">
             <ChevronLeft size={14} />

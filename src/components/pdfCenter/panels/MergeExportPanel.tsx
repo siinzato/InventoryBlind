@@ -9,6 +9,7 @@ import { buildPdfFromPageRefs, buildThermalPdf } from '../../../lib/pdfCenter/pd
 import { buildOutputFilename } from '../../../lib/pdfCenter/filenames';
 import type { PanelBaseProps } from '../PdfCenterEditor';
 import type { PdfCenterPage, PdfCenterSource } from '../../../lib/pdfCenter/types';
+import { plural } from '../../../lib/formatPtBr';
 
 interface Props extends PanelBaseProps {
   pages: PdfCenterPage[];
@@ -65,8 +66,8 @@ export function MergeExportPanel({ pages, sourceBytes, prefs, onPrefsChange, bus
   return (
     <div className="space-y-4">
       <p className="text-xs text-fg-subtle">
-        {pages.length} página(s) de origem · {(totalOriginalBytes / 1024).toFixed(0)} KB no total
-        {selection.length > 0 && ` · ${selection.length} selecionada(s)`}
+        {pages.length} {plural(pages.length, 'página', 'páginas')} de origem · {(totalOriginalBytes / 1024).toFixed(0)} KB no total
+        {selection.length > 0 && ` · ${selection.length} ${plural(selection.length, 'selecionada', 'selecionadas')}`}
       </p>
 
       <label className="flex items-center gap-2 text-sm text-fg">

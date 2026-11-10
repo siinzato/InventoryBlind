@@ -5,6 +5,7 @@ import { TaskWithAssignees, TaskStatus, TaskPriority, TaskType, TeamMember } fro
 import { computeWorkloadByUser, TASK_STATUS_LABEL, TASK_PRIORITY_LABEL } from '../../lib/tasks/taskDomain';
 import { TeamTaskFilters } from '../../lib/tasks/taskService';
 import { TaskCard } from './TaskCard';
+import { plural } from '../../lib/formatPtBr';
 
 interface TeamViewProps {
   tasks: TaskWithAssignees[];
@@ -66,7 +67,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
 
       {overdueCount > 0 && (
         <div className="flex items-center gap-2 p-3 bg-red-500/10 text-red-700 dark:text-red-400 rounded-lg text-sm">
-          <AlertCircle size={16} />{overdueCount} tarefa(s) atrasada(s) na empresa.
+          <AlertCircle size={16} />{overdueCount} {plural(overdueCount, 'tarefa atrasada', 'tarefas atrasadas')} na empresa.
         </div>
       )}
 
@@ -82,7 +83,7 @@ export const TeamView: React.FC<TeamViewProps> = ({
             ) : workload.map(w => (
               <div key={w.userId} className="p-3 bg-surface-3 rounded-lg">
                 <p className="text-sm font-semibold text-fg truncate">{memberLabel(teamMembers, w.userId)}</p>
-                <p className="text-xs text-fg-subtle">{w.active} ativa(s){w.overdue > 0 && <span className="text-red-600 dark:text-red-400"> · {w.overdue} atrasada(s)</span>}</p>
+                <p className="text-xs text-fg-subtle">{w.active} {plural(w.active, 'ativa', 'ativas')}{w.overdue > 0 && <span className="text-red-600 dark:text-red-400"> · {w.overdue} {plural(w.overdue, 'atrasada', 'atrasadas')}</span>}</p>
               </div>
             ))}
           </div>

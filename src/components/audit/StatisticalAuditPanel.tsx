@@ -3,6 +3,7 @@ import { Panel, PanelSection, Badge, Button, Select, Stat, StatRow, StatCell } f
 import { listImportedCountRecords, getImportItems, drawSample, logStatisticalAuditRun } from '../../lib/statisticalAuditService';
 import { computeSamplingPlan, evaluateSample, INSPECTION_LEVEL_LABEL, COMMON_AQL_OPTIONS, type InspectionLevel } from '../../lib/statisticalAuditAlgorithm';
 import type { InventoryCountRecord, InventoryCountImportItem } from '../../lib/supabase';
+import { plural } from '../../lib/formatPtBr';
 
 interface StatisticalAuditPanelProps {
   companyId: string;
@@ -76,7 +77,7 @@ export function StatisticalAuditPanel({ companyId, userId, userEmail }: Statisti
           <div>
             <label className={labelClass}>Contagem importada</label>
             <Select value={selectedRecordId} onChange={e => setSelectedRecordId(e.target.value)} className="w-full">
-              {records.map(r => <option key={r.id} value={r.id}>{new Date(r.created_at).toLocaleDateString('pt-BR')} — {r.skus_contados} SKUs</option>)}
+              {records.map(r => <option key={r.id} value={r.id}>{new Date(r.created_at).toLocaleDateString('pt-BR')} — {r.skus_contados} {plural(r.skus_contados, 'SKU', 'SKUs')}</option>)}
             </Select>
           </div>
           <div>

@@ -7,6 +7,7 @@
 import { useMemo, useState } from 'react';
 import { Search } from 'lucide-react';
 import { Badge, Input, Panel, PanelSection, Select, Table, Thead, Tr, Th, Td, Stat, StatRow, StatCell, Button } from '../ui';
+import { plural } from '../../lib/formatPtBr';
 import {
   buildTinyComparison, filterTinyRows, tinyBasisIsValue,
   TINY_FILTER_OPTIONS, TINY_SITUATION_LABEL,
@@ -68,7 +69,7 @@ export function AbcTinyTab({ rows, fileRows, fileMatched, fileUnmatched }: AbcTi
 
       {fileRows !== null && (
         <PanelSection padding="sm" className="text-caption">
-          Arquivo do Tiny: {fmtInt(fileRows)} SKUs com código
+          Arquivo do Tiny: {fmtInt(fileRows)} {plural(fileRows, 'SKU', 'SKUs')} com código
           {fileMatched !== null && ` · ${fmtInt(fileMatched)} correspondentes nesta análise`}
           {fileUnmatched !== null && ` · ${fmtInt(fileUnmatched)} sem correspondência (não constam nesta análise e não foram criados)`}.
         </PanelSection>
@@ -93,7 +94,7 @@ export function AbcTinyTab({ rows, fileRows, fileMatched, fileUnmatched }: AbcTi
           </div>
         </div>
         <p className="text-caption">
-          {filtersActive ? `${fmtInt(filtered.length)} de ${fmtInt(comparisonRows.length)} SKUs` : `${fmtInt(comparisonRows.length)} SKUs`}
+          {filtersActive ? `${fmtInt(filtered.length)} de ${fmtInt(comparisonRows.length)} ${plural(comparisonRows.length, 'SKU', 'SKUs')}` : `${fmtInt(comparisonRows.length)} ${plural(comparisonRows.length, 'SKU', 'SKUs')}`}
         </p>
       </PanelSection>
 

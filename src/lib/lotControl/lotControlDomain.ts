@@ -1,3 +1,4 @@
+import { plural } from '../../lib/formatPtBr';
 // Lote e validade — as regras, sem nenhum acesso a dados.
 //
 // ── A chave é o recurso ─────────────────────────────────────────────────────
@@ -147,8 +148,8 @@ export function summarizeExpiry(lines: ExpiryLine[]): ExpirySummary {
 /** Texto curto do prazo, do ponto de vista de quem lê a lista. */
 export function describeDays(days: number | null): string {
   if (days === null) return '—';
-  if (days < 0) return `venceu há ${Math.abs(days)} dia(s)`;
+  if (days < 0) return `venceu há ${Math.abs(days)} ${plural(Math.abs(days), 'dia', 'dias')}`;
   if (days === 0) return 'vence hoje';
   if (days === 1) return 'vence amanhã';
-  return `em ${days} dia(s)`;
+  return `em ${days} ${plural(days, 'dia', 'dias')}`;
 }

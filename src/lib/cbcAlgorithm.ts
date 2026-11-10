@@ -17,6 +17,7 @@
 // pontuação e os RÓTULOS exibidos pelo CBC mudaram.
 
 import type { RiskLevel, ConfidenceFactorBreakdown } from './supabase';
+import { plural } from '../lib/formatPtBr';
 
 export type AbcClass = 'A' | 'B' | 'C' | null;
 
@@ -99,8 +100,8 @@ function accuracyHistoryScore(recentCounts: RecentCount[]): FactorBreakdown {
   return {
     score, max: 40, weight: 40,
     detail: divergent === 0
-      ? `${usable.length} contagem(ns) recente(s) sem divergência`
-      : `${divergent} de ${usable.length} contagem(ns) recente(s) com divergência`,
+      ? `${usable.length} ${plural(usable.length, 'contagem recente', 'contagens recentes')} sem divergência`
+      : `${divergent} de ${usable.length} ${plural(usable.length, 'contagem recente', 'contagens recentes')} com divergência`,
   };
 }
 
@@ -112,7 +113,7 @@ function recencyScore(daysSinceLastCount: number | null, targetIntervalDays: num
   const score = clamp(Math.round(25 * (1 - daysSinceLastCount / targetIntervalDays)), 0, 25);
   return {
     score, max: 25, weight: 25,
-    detail: `Última contagem há ${daysSinceLastCount} dia(s) · intervalo-alvo ${targetIntervalDays} dias`,
+    detail: `Última contagem há ${daysSinceLastCount} ${plural(daysSinceLastCount, 'dia', 'dias')} · intervalo-alvo ${targetIntervalDays} ${plural(targetIntervalDays, 'dia', 'dias')}`,
   };
 }
 
@@ -124,7 +125,7 @@ function stabilityScore(input: ConfidenceInput): FactorBreakdown {
   const notes: string[] = [];
   if (input.currentStockQuantity < 0) { score -= 8; notes.push('saldo negativo'); }
   else if (input.currentStockQuantity === 0) { score -= 5; notes.push('ruptura de estoque'); }
-  if (input.repeatOffenseCount >= 2) { score -= 5; notes.push(`${input.repeatOffenseCount} eventos de contagem com divergência`); }
+  if (input.repeatOffenseCount >= 2) { score -= 5; notes.push(`${input.repeatOffenseCount} ${plural(input.repeatOffenseCount, 'evento', 'eventos')} de contagem com divergência`); }
   if (input.picksPerMonth > 30) { score -= 3; notes.push('movimentação atípica'); }
   score = clamp(score, 0, 20);
   return {
@@ -245,13 +246,13 @@ export function buildWhyToCount(input: ConfidenceInput, confidence: ConfidenceRe
   if (daysSinceLastCount === null) {
     reasons.push('Nunca contado');
   } else if (daysSinceLastCount > targetIntervalDays) {
-    reasons.push(`Vencida há ${daysSinceLastCount - targetIntervalDays} dias`);
+    reasons.push(`Vencida há ${daysSinceLastCount - targetIntervalDays} ${plural(daysSinceLastCount - targetIntervalDays, 'dia', 'dias')}`);
   }
 
   const divergentRecent = input.recentCounts.slice(0, 5).filter(c =>
     c.systemQty != null && c.physicalQty != null && c.systemQty !== c.physicalQty
   ).length;
-  if (divergentRecent >= 2) reasons.push(`${divergentRecent} divergências recentes`);
+  if (divergentRecent >= 2) reasons.push(`${divergentRecent} ${plural(divergentRecent, 'divergência', 'divergências')} recentes`);
   else if (divergentRecent === 1) reasons.push('1 divergência recente');
 
   if (input.picksPerMonth > 30) reasons.push('Alta movimentação');

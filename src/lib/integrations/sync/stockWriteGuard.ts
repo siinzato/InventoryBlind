@@ -23,6 +23,7 @@
 // Pure module: no I/O, no clock. Fully testable.
 
 import type { StockWrite } from '../stockOperations.ts';
+import { plural } from '../../../lib/formatPtBr';
 
 /** Why a stock movement is happening. Reaches the provider as the movement note
  *  and is stored on the adjustment row, so an ERP audit months later can tell a
@@ -367,7 +368,7 @@ export function describeRejection(rejection: GuardRejection): string {
       return `Uma ${label} deve ${rejection.expected === 'increase' ? 'aumentar' : 'reduzir'} o saldo, e este lançamento faz o contrário. Verifique o sinal da quantidade.`;
     }
     case 'insufficient_source_balance':
-      return `A transferência pede ${rejection.requested} unidades, mas o depósito de origem tem ${rejection.available}. Sincronize o saldo e confirme se o depósito de Full está mapeado corretamente.`;
+      return `A transferência pede ${rejection.requested} ${plural(rejection.requested, 'unidade', 'unidades')}, mas o depósito de origem tem ${rejection.available}. Sincronize o saldo e confirme se o depósito de Full está mapeado corretamente.`;
     case 'same_warehouse_transfer':
       return `Origem e destino são o mesmo depósito (${rejection.warehouse}). Verifique o mapeamento dos depósitos desta conexão.`;
     case 'no_op':

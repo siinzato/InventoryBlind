@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Panel, PanelSection, Badge, Input, Select, Stat, StatRow, StatCell } from '../ui';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 import {
   listAuditableBrands, getHistoricalProductivity, getBrandAuditHistory,
   type AuditableBrand, type BrandAuditHistory,
@@ -43,7 +43,7 @@ function formatCurrency(value: number): string {
 }
 
 function formatDays(value: number): string {
-  return Number.isFinite(value) ? `${value.toFixed(1)} dia(s)` : '—';
+  return Number.isFinite(value) ? `${value.toFixed(1)} ${plural(value, 'dia', 'dias')}` : '—';
 }
 
 /** Simulador "what-if" antes de abrir uma contagem: usa SKUs reais da linha selecionada
@@ -123,7 +123,7 @@ export function InventorySimulationPanel({ companyId }: InventorySimulationPanel
             <div>
               <label className={labelClass}>Linha de inventário</label>
               <Select value={selectedBrandId} onChange={e => setSelectedBrandId(e.target.value)} className="w-full">
-                {brands.map(b => <option key={b.id} value={b.id}>{b.brand} ({b.total_sku} SKUs)</option>)}
+                {brands.map(b => <option key={b.id} value={b.id}>{b.brand} ({b.total_sku} {plural(b.total_sku, 'SKU', 'SKUs')})</option>)}
               </Select>
             </div>
             <div>
@@ -152,7 +152,7 @@ export function InventorySimulationPanel({ companyId }: InventorySimulationPanel
               <label className={labelClass}>Produtividade (SKUs/h por operador)</label>
               <Input type="number" min={1} value={productivity} onChange={e => setProductivity(Math.max(1, Number(e.target.value)))} />
               {historicalProductivity ? (
-                <p className="text-xs text-fg-subtle mt-1 truncate">Histórico: {historicalProductivity.value.toFixed(1)} SKUs/h</p>
+                <p className="text-xs text-fg-subtle mt-1 truncate">Histórico: {historicalProductivity.value.toFixed(1)} {plural(historicalProductivity.value, 'SKU', 'SKUs')}/h</p>
               ) : (
                 <p className="text-xs text-fg-subtle mt-1 truncate">Sem histórico — valor manual</p>
               )}
@@ -189,7 +189,7 @@ export function InventorySimulationPanel({ companyId }: InventorySimulationPanel
             </StatRow>
             <StatRow className="sm:grid-cols-3 mt-5">
               <StatCell><Stat label="Custo estimado" value={formatCurrency(estimate.estimatedCost)} /></StatCell>
-              <StatCell><Stat label="Produtividade média" value={`${estimate.productivityPerOperator.toFixed(0)} SKUs/h`} /></StatCell>
+              <StatCell><Stat label="Produtividade média" value={`${estimate.productivityPerOperator.toFixed(0)} ${plural(estimate.productivityPerOperator, 'SKU', 'SKUs')}/h`} /></StatCell>
               <StatCell><Stat label="Conclusão prevista" value={new Date(estimate.expectedCompletionDate).toLocaleDateString('pt-BR')} /></StatCell>
             </StatRow>
             {confidence && (

@@ -1,3 +1,4 @@
+import { plural } from '../../lib/formatPtBr';
 // Rankings — cálculos puros sobre registros de contagem já carregados
 // (inventory_count_records). Mesmo espírito de executiveKpis.ts/rcaAlgorithm.ts:
 // sem I/O — a página busca as linhas, estas funções só agregam/derivam.
@@ -201,7 +202,7 @@ export function buildAttentionRows(
     rows.push({
       id: `div_${top.id}`,
       title: top.name,
-      detail: `${top.divergencias} divergências · ${(top.divergenciasPor100 ?? 0).toFixed(1)} por 100 SKUs`,
+      detail: `${top.divergencias} ${plural(top.divergencias, 'divergência', 'divergências')} · ${(top.divergenciasPor100 ?? 0).toFixed(1)} por 100 SKUs`,
     });
   }
 
@@ -214,7 +215,7 @@ export function buildAttentionRows(
   if (noSample.length > 0) {
     rows.push({
       id: 'no_sample',
-      title: noSample.length === 1 ? noSample[0].name : `${noSample.length} linhas`,
+      title: noSample.length === 1 ? noSample[0].name : `${noSample.length} ${plural(noSample.length, 'linha', 'linhas')}`,
       detail: 'Sem amostra mínima',
     });
   }

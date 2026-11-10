@@ -14,7 +14,7 @@ import {
 } from 'lucide-react';
 import type { HeatmapStats } from '../lib/heatmapTypes';
 import { Panel, PanelSection } from './ui';
-import { pct, int } from '../lib/formatPtBr';
+import { pct, int, plural } from '../lib/formatPtBr';
 
 interface HeatmapStatsProps {
   stats: HeatmapStats;
@@ -118,7 +118,7 @@ export const HeatmapStatsComponent: React.FC<HeatmapStatsProps> = ({ stats }) =>
     {
       title: 'Total Áreas',
       value: stats.totalAreas,
-      subtitle: `${int(stats.totalDivergencias)} divergências`,
+      subtitle: `${int(stats.totalDivergencias)} ${plural(stats.totalDivergencias, 'divergência', 'divergências')}`,
       icon: Layers,
     },
     {

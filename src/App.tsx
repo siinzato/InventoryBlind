@@ -126,7 +126,7 @@ import { DashboardInventoryProgress } from './components/dashboard/DashboardInve
 import { DashboardIntegrationsHealth } from './components/dashboard/DashboardIntegrationsHealth';
 import { listConnections } from './lib/integrations/integrationService';
 import type { IntegrationConnection } from './lib/integrations/types';
-import { pct, int } from './lib/formatPtBr';
+import { pct, int, plural } from './lib/formatPtBr';
 
 // Code-split large page components for smaller initial bundle
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -1502,7 +1502,7 @@ function AppContent() {
                       {
                         label: 'Progresso Geral',
                         value: pct(globais.progresso),
-                        context: `${int(globais.totalDone)} de ${int(globais.totalSku)} SKUs`,
+                        context: `${int(globais.totalDone)} de ${int(globais.totalSku)} ${plural(globais.totalSku, 'SKU', 'SKUs')}`,
                       },
                       {
                         label: 'Acuracidade (IRA)',
@@ -1548,7 +1548,7 @@ function AppContent() {
                 <Panel className="flex flex-col">
                   <PanelSection padding="sm" className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2">
                     <h3 className="text-title">Controle por linha</h3>
-                    <span className="text-caption">Total: {globais.totalSku.toLocaleString('pt-BR')} SKUs</span>
+                    <span className="text-caption">Total: {globais.totalSku.toLocaleString('pt-BR')} {plural(globais.totalSku, 'SKU', 'SKUs')}</span>
                   </PanelSection>
 
                   <div className="overflow-x-auto flex-1">

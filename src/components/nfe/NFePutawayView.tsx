@@ -12,6 +12,7 @@ import {
 import { lastKnownPackSize } from '../../lib/wms/wmsService';
 import { useLotControl } from '../../lib/lotControl/hooks';
 import { Badge, Button, Card, Input } from '../ui';
+import { plural } from '../../lib/formatPtBr';
 
 interface Props {
   invoice: NfeInvoice;
@@ -134,7 +135,7 @@ export function NFePutawayView({ invoice, canPutaway, onBack }: Props) {
         expiryDate: chave.expiryEnabled ? validade : null,
       });
       setAviso(
-        `${inteiro.format(nCaixas * nPack)} unidade(s) de ${linha.item.snapshot_sku ?? linha.item.nfe_code ?? 'item'} em ${bin.trim().toUpperCase()}.`
+        `${inteiro.format(nCaixas * nPack)} ${plural(nCaixas * nPack, 'unidade', 'unidades')} de ${linha.item.snapshot_sku ?? linha.item.nfe_code ?? 'item'} em ${bin.trim().toUpperCase()}.`
       );
       setAberto(null);
       await load();
@@ -399,7 +400,7 @@ function LinhaItem({
 
               <p className="mt-2 text-xs text-fg-subtle">
                 {Number(caixas) > 0 && Number(pack) > 0
-                  ? `${inteiro.format(Number(caixas) * Number(pack))} unidade(s) de ${inteiro.format(linha.remaining)} restantes.`
+                  ? `${inteiro.format(Number(caixas) * Number(pack))} ${plural(Number(caixas) * Number(pack), 'unidade', 'unidades')} de ${inteiro.format(linha.remaining)} restantes.`
                   : 'Mercadoria solta vai com 1 unidade por caixa.'}
               </p>
             </div>

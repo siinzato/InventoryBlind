@@ -16,6 +16,7 @@ import type {
   PurchaseOrderStatus, PoColumnMapping, ClassifiedPoImportRow, PoItemComparison, PoProgressStatus,
 } from './poTypes';
 import type { NfeInvoiceItem } from '../nfe/nfeTypes';
+import { plural } from '../../lib/formatPtBr';
 
 // ── Mapeamento linha <-> domínio ─────────────────────────────────────────────
 
@@ -378,9 +379,9 @@ export async function importPurchaseOrder(
     await supabase.from('po_import_batches').insert({
       company_id: companyId, origin: input.origin, profile_id: input.profileId ?? null,
       file_name: input.fileName, file_hash: input.fileHash, row_count: input.rows.length,
-      status: 'failed', error_message: `${invalidRows.length} linha(s) inválida(s) — importação não gravada.`,
+      status: 'failed', error_message: `${invalidRows.length} ${plural(invalidRows.length, 'linha inválida', 'linhas inválidas')} — importação não gravada.`,
     });
-    throw new Error(`${invalidRows.length} linha(s) inválida(s) — corrija antes de importar.`);
+    throw new Error(`${invalidRows.length} ${plural(invalidRows.length, 'linha inválida', 'linhas inválidas')} — corrija antes de importar.`);
   }
 
   const { data: batchRow, error: batchError } = await supabase

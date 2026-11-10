@@ -9,6 +9,7 @@
 // the next invocation can make before spending a request.
 
 import type { RateLimitInfo } from '../result.ts';
+import { plural } from '../../../lib/formatPtBr';
 
 export interface RateLimitRow {
   connectionId: string;
@@ -260,7 +261,7 @@ export function detectAlerts(input: AlertInput): DetectedAlert[] {
     alerts.push({
       kind: 'pending_conflicts',
       severity: 'warning',
-      message: `${input.pendingConflicts} divergências de saldo aguardam revisão.`,
+      message: `${input.pendingConflicts} ${plural(input.pendingConflicts, 'divergência', 'divergências')} de saldo aguardam revisão.`,
       context: { pendingConflicts: input.pendingConflicts },
     });
   }
@@ -269,7 +270,7 @@ export function detectAlerts(input: AlertInput): DetectedAlert[] {
     alerts.push({
       kind: 'unmapped_deposits',
       severity: 'warning',
-      message: `${input.unmappedDeposits.length} depósito(s) do ERP ainda não foram classificados e estão fora dos totais.`,
+      message: `${input.unmappedDeposits.length} ${plural(input.unmappedDeposits.length, 'depósito', 'depósitos')} do ERP ainda não foram classificados e estão fora dos totais.`,
       // Deposit names are the customer's own labels, not sensitive, and naming them
       // is what makes the alert actionable.
       context: { deposits: input.unmappedDeposits.slice(0, 20) },

@@ -9,6 +9,7 @@ import {
   type ExpiryEntry, type ExpiryStatus,
 } from '../../lib/lotControl/lotControlDomain';
 import { listExpiring } from '../../lib/lotControl/lotControlService';
+import { plural } from '../../lib/formatPtBr';
 
 interface Props {
   companyId: string;
@@ -80,7 +81,7 @@ export function ExpiryPage({ companyId, alertDays }: Props) {
       <PageHeader
         eyebrow="Operações"
         title="Controle de validade"
-        description={`O que foi recebido com data de validade, do mais urgente para o mais distante. Vence em breve = nos próximos ${alertDays} dias.`}
+        description={`O que foi recebido com data de validade, do mais urgente para o mais distante. Vence em breve = nos próximos ${alertDays} ${plural(alertDays, 'dia', 'dias')}.`}
         actions={
           <Button variant="secondary" onClick={load} disabled={carregando}>
             <RefreshCw size={16} /> {carregando ? 'Atualizando…' : 'Atualizar'}
@@ -115,7 +116,7 @@ export function ExpiryPage({ companyId, alertDays }: Props) {
                   <Stat
                     label="Vencem em breve"
                     value={inteiro.format(resumo.criticos)}
-                    context={`Nos próximos ${alertDays} dias`}
+                    context={`Nos próximos ${alertDays} ${plural(alertDays, 'dia', 'dias')}`}
                     valueTone={resumo.criticos > 0 ? 'warning' : 'positive'}
                   />
                 </StatCell>
@@ -154,7 +155,7 @@ export function ExpiryPage({ companyId, alertDays }: Props) {
 
               {visiveis.length === 0 ? (
                 <Notice tone="success">
-                  Nada vencido nem perto de vencer. Há {inteiro.format(resumo.noPrazo)} entrada(s)
+                  Nada vencido nem perto de vencer. Há {inteiro.format(resumo.noPrazo)} {plural(resumo.noPrazo, 'entrada', 'entradas')}
                   com validade no prazo.
                 </Notice>
               ) : (

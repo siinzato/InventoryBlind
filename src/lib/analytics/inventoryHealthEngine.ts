@@ -17,7 +17,7 @@ import {
 import { topConcentration } from '../rcaAlgorithm';
 import type { AbcXyzUnclassifiedReason } from '../supabase';
 import { validationQualityFrom } from './blindScoreEngine';
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 import {
   available, unavailable, isAvailable,
   type HealthIndicator, type HealthSummary, type IndicatorStatus, type ValidationQuality,
@@ -88,7 +88,7 @@ export function computeHealthIndicators(
           status: worseWhenLower(accuracyStat.averageAccuracy, 95, 85),
           metric: available(Math.round(accuracyStat.averageAccuracy * 10) / 10),
           unit: '%',
-          detail: `Média de ${accuracyStat.sessionsConsidered} sessão(ões) de contagem.`,
+          detail: `Média de ${accuracyStat.sessionsConsidered} ${plural(accuracyStat.sessionsConsidered, 'sessão', 'sessões')} de contagem.`,
           navigateTo: 'audit',
           actionLabel: 'Abrir Auditoria',
         }
@@ -113,7 +113,7 @@ export function computeHealthIndicators(
           status: worseWhenHigher(divergenceStat.ratePct, 5, 15),
           metric: available(Math.round(divergenceStat.ratePct * 10) / 10),
           unit: '%',
-          detail: `${divergenceStat.totalDivergent} de ${divergenceStat.totalCounted} SKUs contados apresentaram divergência real.`,
+          detail: `${divergenceStat.totalDivergent} de ${divergenceStat.totalCounted} ${plural(divergenceStat.totalCounted, 'SKU', 'SKUs')} contados apresentaram divergência real.`,
           navigateTo: 'audit',
           actionLabel: 'Abrir Auditoria',
         }
@@ -143,7 +143,7 @@ export function computeHealthIndicators(
           status: VALIDATION_STATUS[validationQuality],
           metric: available(Math.round(raw.crossCheckSummary.reliabilityIndex)),
           unit: '%',
-          detail: `${sampleChains} de ${raw.crossCheckSummary.totalChains} contagens com recontagem, ${pct(raw.crossCheckSummary.pctAuditoriasIndependentes, 0)} delas independentes.`,
+          detail: `${sampleChains} de ${raw.crossCheckSummary.totalChains} ${plural(raw.crossCheckSummary.totalChains, 'contagem', 'contagens')} com recontagem, ${pct(raw.crossCheckSummary.pctAuditoriasIndependentes, 0)} delas independentes.`,
           navigateTo: 'audit',
           actionLabel: 'Abrir Auditoria',
         }
@@ -155,7 +155,7 @@ export function computeHealthIndicators(
           metric: unavailable('insufficient_data'),
           unit: '%',
           detail: raw.crossCheckSummary.totalChains > 0
-            ? `Nenhuma das ${raw.crossCheckSummary.totalChains} contagens registradas foi reconferida — sem recontagem não há como avaliar a independência e a qualidade do processo.`
+            ? `Nenhuma das ${raw.crossCheckSummary.totalChains} ${plural(raw.crossCheckSummary.totalChains, 'contagem', 'contagens')} registradas foi reconferida — sem recontagem não há como avaliar a independência e a qualidade do processo.`
             : 'Nenhuma reconferência disponível para avaliar a independência e a qualidade do processo.',
           navigateTo: 'audit',
           actionLabel: 'Abrir Auditoria',
@@ -171,7 +171,7 @@ export function computeHealthIndicators(
           status: 'informacao',
           metric: available(Math.round(raw.crossCheckSummary.pctAprovadas)),
           unit: '%',
-          detail: `${raw.crossCheckSummary.chainsApproved} de ${raw.crossCheckSummary.totalChains} contagens aprovadas.`,
+          detail: `${raw.crossCheckSummary.chainsApproved} de ${raw.crossCheckSummary.totalChains} ${plural(raw.crossCheckSummary.totalChains, 'contagem', 'contagens')} aprovadas.`,
           navigateTo: 'audit',
           actionLabel: 'Abrir Auditoria',
         }
@@ -201,7 +201,7 @@ export function computeHealthIndicators(
           status: worseWhenHigher(recurrenceStat.ratePct, 15, 35),
           metric: available(recurrenceStat.recurringSkus),
           unit: 'un',
-          detail: `${recurrenceStat.recurringSkus} de ${recurrenceStat.distinctSkus} SKUs já atingiram ${recurrenceStat.thresholdCount}+ divergências em ${recurrenceStat.windowDays} dias.`,
+          detail: `${recurrenceStat.recurringSkus} de ${recurrenceStat.distinctSkus} ${plural(recurrenceStat.distinctSkus, 'SKU', 'SKUs')} já atingiram ${recurrenceStat.thresholdCount}+ divergências em ${recurrenceStat.windowDays} ${plural(recurrenceStat.windowDays, 'dia', 'dias')}.`,
           drill: { kind: 'recurrence' },
           navigateTo: 'rca',
           actionLabel: 'Ver análise de RCA',
@@ -243,7 +243,7 @@ export function computeHealthIndicators(
           status: 'indisponivel',
           metric: unavailable('insufficient_data'),
           unit: '%',
-          detail: `Menos de ${MIN_LOCATION_SAMPLE} divergências com localização registrada — amostra insuficiente para apontar concentração.`,
+          detail: `Menos de ${MIN_LOCATION_SAMPLE} ${plural(MIN_LOCATION_SAMPLE, 'divergência', 'divergências')} com localização registrada — amostra insuficiente para apontar concentração.`,
         }
   );
 
@@ -263,7 +263,7 @@ export function computeHealthIndicators(
           status: riskStatus(risk.critico_count, risk.total_scored),
           metric: available(risk.critico_count),
           unit: 'un',
-          detail: `${risk.critico_count} crítico(s) e ${risk.alto_count} alto(s) entre ${risk.total_scored} SKUs avaliados${
+          detail: `${risk.critico_count} ${plural(risk.critico_count, 'crítico', 'críticos')} e ${risk.alto_count} ${plural(risk.alto_count, 'alto', 'altos')} entre ${risk.total_scored} ${plural(risk.total_scored, 'SKU', 'SKUs')} avaliados${
             risk.avg_risk != null ? ` · risco médio da empresa ${Math.round(risk.avg_risk)}` : ''
           }.`,
           navigateTo: 'risk',
@@ -294,7 +294,7 @@ export function computeHealthIndicators(
           status: 'informacao',
           metric: available(abcXyzStat.highRiskCount),
           unit: 'un',
-          detail: `${abcXyzStat.highRiskCount} de ${abcXyzStat.totalClassified} SKUs classificados estão em combinações de prioridade máxima/alta (${abcXyzStat.highRiskCombos.join(' · ')}).`,
+          detail: `${abcXyzStat.highRiskCount} de ${abcXyzStat.totalClassified} ${plural(abcXyzStat.totalClassified, 'SKU', 'SKUs')} classificados estão em combinações de prioridade máxima/alta (${abcXyzStat.highRiskCombos.join(' · ')}).`,
           drill: { kind: 'abcxyz_risk', combos: abcXyzStat.highRiskCombos },
           navigateTo: 'abcxyz',
           actionLabel: 'Abrir ABC/XYZ',
@@ -439,7 +439,7 @@ export function computeMovementEvidence(extra: InventoryHealthExtraData): Moveme
     totalCatalog,
     coveragePct,
     lastClassifiedAt: latest?.classificationDate ?? null,
-    note: `${views.length} de ${totalCatalog} produtos com movimentação mensurável${
+    note: `${views.length} de ${totalCatalog} ${plural(totalCatalog, 'produto', 'produtos')} com movimentação mensurável${
       latest ? ` na janela ${latest.period}` : ''}.${
       partial ? ' Cobertura parcial: a leitura representa apenas essa fração do catálogo.' : ''}`,
   };
@@ -515,7 +515,7 @@ function movementIndicators(extra: InventoryHealthExtraData, evidence: MovementE
       status: stockout.length > 0 ? 'critico' : 'saudavel',
       metric: available(stockout.length),
       unit: 'un',
-      detail: `${stockout.length} de ${withDemand.length} produtos com demanda observada estão sem saldo atual${janela}.`,
+      detail: `${stockout.length} de ${withDemand.length} ${plural(withDemand.length, 'produto', 'produtos')} com demanda observada estão sem saldo atual${janela}.`,
       drill: { kind: 'movement', view: 'stockout' },
     },
     {
@@ -526,9 +526,9 @@ function movementIndicators(extra: InventoryHealthExtraData, evidence: MovementE
       status: idle.length > 0 ? 'atencao' : 'saudavel',
       metric: available(idle.length),
       unit: 'un',
-      detail: `${idle.length} de ${withStock.length} produtos com saldo positivo não registraram venda${janela}.${
+      detail: `${idle.length} de ${withStock.length} ${plural(withStock.length, 'produto', 'produtos')} com saldo positivo não registraram venda${janela}.${
         priced.length > 0
-          ? ` Valor estimado em estoque parado: ${idleValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })} (estimativa por preço de venda, ${priced.length} de ${idle.length} itens com preço cadastrado).`
+          ? ` Valor estimado em estoque parado: ${idleValue.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL', maximumFractionDigits: 0 })} (estimativa por preço de venda, ${priced.length} de ${idle.length} ${plural(idle.length, 'item', 'itens')} com preço cadastrado).`
           : ''}`,
       drill: { kind: 'movement', view: 'idle' },
     },

@@ -13,7 +13,7 @@ import {
 import type { RiskBand } from '../../lib/supabase';
 import { RiskBadge } from './RiskBadge';
 import { RiskDetailDrawer } from './RiskDetailDrawer';
-import { int } from '../../lib/formatPtBr';
+import { int, plural } from '../../lib/formatPtBr';
 
 interface RiskDashboardPageProps {
   companyId: string;
@@ -254,7 +254,7 @@ export function RiskDashboardPage({ companyId, userId, userEmail, onNavigateToCo
               <PanelSection padding="sm" className="flex items-center justify-between gap-3">
                 <p className="text-sm text-fg-muted">
                   <MapPin size={13} className="inline mr-1 -mt-0.5" />
-                  Existem {topCluster.items.length} itens de risco no corredor {topCluster.corridor}. Inclua-os na mesma inspeção para reduzir deslocamento.
+                  Existem {topCluster.items.length} {plural(topCluster.items.length, 'item', 'itens')} de risco no corredor {topCluster.corridor}. Inclua-os na mesma inspeção para reduzir deslocamento.
                 </p>
                 <button onClick={() => setShowClusters(true)} className="text-sm font-medium text-accent hover:text-accent-strong whitespace-nowrap">
                   Ver clusters
@@ -390,7 +390,7 @@ export function RiskDashboardPage({ companyId, userId, userEmail, onNavigateToCo
                   {clusters.map(cluster => (
                     <div key={cluster.corridor} className="border border-edge rounded-md">
                       <div className="flex items-center justify-between px-4 py-2.5 border-b border-edge bg-surface-2">
-                        <p className="text-sm font-medium text-fg flex items-center gap-1.5"><MapPin size={13} /> Corredor {cluster.corridor} · {cluster.items.length} itens</p>
+                        <p className="text-sm font-medium text-fg flex items-center gap-1.5"><MapPin size={13} /> Corredor {cluster.corridor} · {cluster.items.length} {plural(cluster.items.length, 'item', 'itens')}</p>
                         <button
                           onClick={() => setRouteSelection(prev => {
                             const next = new Set(prev);
@@ -425,7 +425,7 @@ export function RiskDashboardPage({ companyId, userId, userEmail, onNavigateToCo
                   ))}
                   {routeSelection.size > 0 && (
                     <div className="flex items-center justify-between pt-2 border-t border-edge">
-                      <p className="text-sm text-fg-muted">{routeSelection.size} item(ns) selecionado(s) para a inspeção</p>
+                      <p className="text-sm text-fg-muted">{routeSelection.size} {plural(routeSelection.size, 'item selecionado', 'itens selecionados')} para a inspeção</p>
                       <Button onClick={() => onNavigateToCount?.()}>Iniciar contagem da rota</Button>
                     </div>
                   )}

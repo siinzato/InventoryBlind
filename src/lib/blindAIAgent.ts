@@ -9,7 +9,7 @@
 import { supabase } from './supabase';
 import { detectIntent, generateContextualSuggestions, type GlobalStats } from './blindAIAgentAlgorithm';
 import type { BlindAISituation, TopVenda } from './supabase';
-import { pct } from './formatPtBr';
+import { pct, plural } from './formatPtBr';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -23,7 +23,7 @@ function answerFastPath(intent: 'progress_status' | 'accuracy_status' | 'best_li
       return (
         `Progresso atual: ${pct(globais.progresso)} concluído.\n\n` +
         `- SKUs processados: ${globais.totalDone.toLocaleString('pt-BR')} de ${globais.totalSku.toLocaleString('pt-BR')}\n` +
-        `- Pendentes: ${pendentes.toLocaleString('pt-BR')} SKUs\n` +
+        `- Pendentes: ${pendentes.toLocaleString('pt-BR')} ${plural(pendentes, 'SKU', 'SKUs')}\n` +
         `- Linhas em andamento: ${globais.tabela.filter(l => l.status === 'ANDAMENTO').length}\n` +
         `- Linhas concluídas: ${globais.tabela.filter(l => l.status === 'CONCLUÍDO').length}`
       );
@@ -44,14 +44,14 @@ function answerFastPath(intent: 'progress_status' | 'accuracy_status' | 'best_li
         return 'Não tenho dados suficientes para recomendar isso com segurança. Falta: linhas concluídas com acuracidade apurada.';
       }
       const top5 = [...completed].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).slice(0, 5);
-      return `Top ${top5.length} linhas por acuracidade:\n\n${top5.map((l, i) => `${i + 1}. ${l.brand}: ${l.accuracy == null ? '—' : pct(l.accuracy)}`).join('\n')}`;
+      return `Top ${top5.length} ${plural(top5.length, 'linha', 'linhas')} por acuracidade:\n\n${top5.map((l, i) => `${i + 1}. ${l.brand}: ${l.accuracy == null ? '—' : pct(l.accuracy)}`).join('\n')}`;
     }
     case 'top_products': {
       if (topVendas.length === 0) {
         return 'Não tenho dados suficientes para recomendar isso com segurança. Falta: lista de produtos mais vendidos cadastrada no Dashboard.';
       }
       const top5 = topVendas.slice(0, 5);
-      return `Top ${top5.length} produtos mais vendidos:\n\n${top5.map((v, i) => `${i + 1}. ${v.produto} — SKU ${v.sku}, ${v.vendas} vendas`).join('\n')}`;
+      return `Top ${top5.length} ${plural(top5.length, 'produto', 'produtos')} mais vendidos:\n\n${top5.map((v, i) => `${i + 1}. ${v.produto} — SKU ${v.sku}, ${v.vendas} vendas`).join('\n')}`;
     }
   }
 }

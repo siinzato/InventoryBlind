@@ -4,6 +4,7 @@ import { Modal, Button, Input } from '../ui';
 import { supabase } from '../../lib/supabase';
 import { useAuth } from '../../lib/auth';
 import { logAuditEvent } from '../../lib/auditLogService';
+import { plural } from '../../lib/formatPtBr';
 
 interface BulkEditFieldsModalProps {
   productIds: string[];
@@ -27,7 +28,7 @@ export function BulkEditFieldsModal({ productIds, onClose, onSaved }: BulkEditFi
 
   const handleSave = async () => {
     if (!canSave) return;
-    if (!window.confirm(`Aplicar alteração a ${productIds.length} produto(s)?`)) return;
+    if (!window.confirm(`Aplicar alteração a ${productIds.length} ${plural(productIds.length, 'produto', 'produtos')}?`)) return;
     setSaving(true);
     setError(null);
     try {
@@ -41,7 +42,7 @@ export function BulkEditFieldsModal({ productIds, onClose, onSaved }: BulkEditFi
       if (companyId && profile) {
         await logAuditEvent({
           companyId, userId: profile.id, userEmail: profile.email ?? '', action: 'products.updated',
-          resourceType: 'product', description: `Edição em massa (${productIds.length} produtos)`,
+          resourceType: 'product', description: `Edição em massa (${productIds.length} ${plural(productIds.length, 'produto', 'produtos')})`,
           metadata: { productIds, fields: Object.keys(patch).filter(k => k !== 'updated_at') },
         });
       }

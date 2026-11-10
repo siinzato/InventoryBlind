@@ -12,6 +12,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Boxes, ChevronDown, ChevronRight, Lock, PackageSearch, Search } from 'lucide-react';
 import { Badge, Button, Input, Notice, Panel, PanelSection, Table, Td, Th, Thead, Tr } from '../ui';
 import { listPulmaoStock, searchPulmaoStock, type PulmaoStock } from '../../lib/wms/wmsService';
+import { plural } from '../../lib/formatPtBr';
 import {
   AGE_BUCKETS, countByBucket, summarize,
   type AgeBucket, type SkuSummary,
@@ -181,7 +182,7 @@ export function WmsStockInsights({ onOpenBin }: { onOpenBin: (code: string) => v
 
             <PanelSection padding="sm">
               <p className="text-caption">
-                {visiveis.length} produto(s) · {totalCaixas} caixa(s).
+                {visiveis.length} {plural(visiveis.length, 'produto', 'produtos')} · {totalCaixas} {plural(totalCaixas, 'caixa', 'caixas')}.
                 {' '}<strong>≤</strong> antes do tempo significa que a mercadoria entrou em mais de
                 uma data e já houve retirada parcial: a permanência real pode ser menor que a
                 indicada, nunca maior.

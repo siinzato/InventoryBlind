@@ -8,6 +8,7 @@ import {
 import { hashFileContent, findBatchesWithHash, importPurchaseOrder, listImportProfiles, upsertImportProfile } from '../../lib/purchaseOrders/poService';
 import { findPossibleDuplicatePos } from '../../lib/purchaseOrders/poNumberUtils';
 import type { PoColumnMapping, PoImportRow, ClassifiedPoImportRow, PoImportProfile, PoImportOrigin, PurchaseOrder } from '../../lib/purchaseOrders/poTypes';
+import { plural } from '../../lib/formatPtBr';
 
 interface PoImportWizardProps {
   companyId: string;
@@ -99,7 +100,7 @@ export function PoImportWizard({ companyId, existingOrders, onClose, onImported 
 
   const handleConfirmImport = async () => {
     if (saving || !file || !fileHash) return;
-    if (invalidRows.length > 0) { setError(`${invalidRows.length} linha(s) inválida(s) — corrija o mapeamento ou os dados antes de importar.`); return; }
+    if (invalidRows.length > 0) { setError(`${invalidRows.length} ${plural(invalidRows.length, 'linha inválida', 'linhas inválidas')} — corrija o mapeamento ou os dados antes de importar.`); return; }
     if (!supplierName.trim()) { setError('Informe o fornecedor.'); return; }
     if (!poNumberOverride.trim()) { setError('Informe o número da OC.'); return; }
     if (duplicateBatchInfo && !confirmReimport) { setError('Confirme a reimportação para prosseguir.'); return; }

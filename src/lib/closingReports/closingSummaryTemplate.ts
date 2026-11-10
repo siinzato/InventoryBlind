@@ -3,7 +3,7 @@
 // nunca texto gerado por IA/aleatório).
 
 import type { CategoryCountSnapshot } from './closingReportTypes';
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 
 export interface ClosingSummaryInput {
   brandName: string;
@@ -21,7 +21,7 @@ export function renderClosingSummary(input: ClosingSummaryInput): string {
   const lines: string[] = [];
   lines.push(`Resumo de fechamento — ${input.brandName}`);
   lines.push('');
-  lines.push(`Foram concluídos ${input.skusContados} SKUs. Durante as contagens, foram identificados:`);
+  lines.push(`Foram concluídos ${input.skusContados} ${plural(input.skusContados, 'SKU', 'SKUs')}. Durante as contagens, foram identificados:`);
   lines.push('');
 
   const categoryLines = input.categoryCounts

@@ -29,6 +29,7 @@ import {
   ALL_STATUSES, MARKETPLACES, formatFullDate,
 } from '../lib/fullManagerTypes';
 import { Panel, PanelSection, Table, Thead, Tr, Th, Td, Button, Modal } from './ui';
+import { plural } from '../lib/formatPtBr';
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -433,7 +434,7 @@ const FullAdminPanel: React.FC = () => {
   const deleteOperation = (op: FullOperation) => {
     setConfirmDialog({
       title: 'Excluir Permanentemente',
-      message: `Atenção: isso removerá o FULL #${op.full_number} e todos os seus ${op.total_sku} itens do banco de dados. Esta ação é irreversível.`,
+      message: `Atenção: isso removerá o FULL #${op.full_number} e todos os seus ${op.total_sku} ${plural(op.total_sku, 'item', 'itens')} do banco de dados. Esta ação é irreversível.`,
       confirmLabel: 'Excluir Definitivamente',
       danger: true,
       onConfirm: async () => {
@@ -594,7 +595,7 @@ const FullAdminPanel: React.FC = () => {
           </div>
           {(searchQuery || filterStatus !== 'all' || filterMarketplace !== 'all') && (
             <div className="mt-3 flex items-center gap-2">
-              <span className="text-xs text-fg-subtle">{filtered.length} de {operations.length} operações</span>
+              <span className="text-xs text-fg-subtle">{filtered.length} de {operations.length} {plural(operations.length, 'operação', 'operações')}</span>
               <button onClick={() => { setSearchQuery(''); setFilterStatus('all'); setFilterMarketplace('all'); }}
                 className="text-xs text-fg-subtle hover:text-fg flex items-center gap-1 underline underline-offset-2">
                 <X size={10} />Limpar filtros
@@ -736,9 +737,9 @@ const FullAdminPanel: React.FC = () => {
         </div>
         {!loading && filtered.length > 0 && (
           <PanelSection padding="sm" className="flex items-center justify-between text-xs text-fg-subtle bg-surface-3">
-            <span>{filtered.length} operação(ões) exibida(s)</span>
+            <span>{filtered.length} {plural(filtered.length, 'operação exibida', 'operações exibidas')}</span>
             <span>
-              {filtered.reduce((s, o) => s + o.total_sku, 0)} SKUs ·{' '}
+              {filtered.reduce((s, o) => s + o.total_sku, 0)} {plural(filtered.reduce((s, o) => s + o.total_sku, 0), 'SKU', 'SKUs')} ·{' '}
               {filtered.reduce((s, o) => s + o.total_pieces, 0)} peças no total
             </span>
           </PanelSection>

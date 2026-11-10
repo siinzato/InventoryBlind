@@ -89,7 +89,7 @@ export function PurchaseOrderDetailPage({ companyId, purchaseOrderId, onBack }: 
       setNotPredictedCount(result.nfeItemsNotPredictedCount);
       setProgress(result.progress);
     } catch (err) {
-      setReconciliationError(err instanceof Error ? err.message : 'Erro ao conciliar. O vínculo com a(s) NF-e(s) continua preservado — tente novamente.');
+      setReconciliationError(err instanceof Error ? err.message : 'Erro ao conciliar. O vínculo com as NF-e continua preservado — tente novamente.');
     } finally {
       setReconciling(false);
     }

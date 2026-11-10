@@ -6,7 +6,7 @@ import { Panel, PanelSection, Stat, StatRow, StatCell } from '../ui';
 import type { InventorySnapshot } from '../../lib/supabase';
 import { computeTopTen } from '../../lib/adminSales/salesTopTen';
 import { listImportBatches, listSalesRecordsForTopTen, type SalesImportBatch } from '../../lib/adminSales/salesService';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 interface OverviewTabProps {
   companyId: string;
@@ -79,7 +79,7 @@ export function OverviewTab({ companyId, companyName, companyCreatedAt, globais,
               <div className="space-y-1 text-sm">
                 <p className="font-medium text-fg truncate">{latestBatch.fileName}</p>
                 <p className="text-caption">{new Date(latestBatch.createdAt).toLocaleString('pt-BR')}</p>
-                <p className="text-fg-muted">{latestBatch.rowCount} linhas · {latestBatch.unmatchedCount} não associadas</p>
+                <p className="text-fg-muted">{latestBatch.rowCount} {plural(latestBatch.rowCount, 'linha', 'linhas')} · {latestBatch.unmatchedCount} não associadas</p>
               </div>
             ) : (
               <p className="text-sm text-fg-subtle">Nenhuma importação de vendas ainda.</p>

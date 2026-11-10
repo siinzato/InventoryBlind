@@ -20,6 +20,7 @@ import {
 } from '../../lib/analytics/auditsHistoryEngine';
 import { downloadBlob } from '../../lib/pdfCenter/downloadFile';
 import { AuditsSessionChart, type SessionMetric } from './AuditsSessionChart';
+import { plural } from '../../lib/formatPtBr';
 
 interface AuditsAnalyticsPageProps {
   companyId: string;
@@ -247,7 +248,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
               label="Acuracidade observada"
               caption={
                 data.summary.observedAccuracyPct !== null
-                  ? `${intFmt(data.summary.totalDivergent)} divergências em ${intFmt(data.summary.totalCounted)} SKUs contados`
+                  ? `${intFmt(data.summary.totalDivergent)} ${plural(data.summary.totalDivergent, 'divergência', 'divergências')} em ${intFmt(data.summary.totalCounted)} ${plural(data.summary.totalCounted, 'SKU', 'SKUs')} contados`
                   : 'Nenhum SKU contado ainda'
               }
             />
@@ -264,8 +265,8 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
             {section === 'historico' && sessions.length > 0 && (
               <p className="text-caption">
                 {filtered.length === sessions.length
-                  ? `${intFmt(sessions.length)} sessão(ões) no histórico`
-                  : `${intFmt(filtered.length)} de ${intFmt(sessions.length)} sessões`}
+                  ? `${intFmt(sessions.length)} ${plural(sessions.length, 'sessão', 'sessões')} no histórico`
+                  : `${intFmt(filtered.length)} de ${intFmt(sessions.length)} ${plural(sessions.length, 'sessão', 'sessões')}`}
               </p>
             )}
           </div>
@@ -413,7 +414,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                       label="Cobertura média das sessões"
                       caption={
                         performance.sessionsWithCoverage > 0
-                          ? `Base: ${intFmt(performance.sessionsWithCoverage)} de ${intFmt(performance.sessions)} sessões com universo previsto`
+                          ? `Base: ${intFmt(performance.sessionsWithCoverage)} de ${intFmt(performance.sessions)} ${plural(performance.sessions, 'sessão', 'sessões')} com universo previsto`
                           : 'Nenhuma sessão com universo previsto registrado'
                       }
                     />
@@ -422,7 +423,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                       label="Taxa de divergência observada"
                       caption={
                         performance.divergenceRatePct !== null
-                          ? `${intFmt(performance.totalDivergent)} divergências em ${intFmt(performance.totalCounted)} SKUs contados`
+                          ? `${intFmt(performance.totalDivergent)} ${plural(performance.totalDivergent, 'divergência', 'divergências')} em ${intFmt(performance.totalCounted)} ${plural(performance.totalCounted, 'SKU', 'SKUs')} contados`
                           : 'Nenhum SKU contado ainda'
                       }
                       className="lg:pl-6"
@@ -450,7 +451,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                       <p className="text-section">Evolução das auditorias</p>
                       <p className="text-caption mt-1">
                         {performance.observedAccuracyPct !== null
-                          ? `Acuracidade observada consolidada: ${pctFmt(performance.observedAccuracyPct)} — base de ${intFmt(performance.totalCounted)} SKUs contados em ${intFmt(performance.sessions)} sessões.`
+                          ? `Acuracidade observada consolidada: ${pctFmt(performance.observedAccuracyPct)} — base de ${intFmt(performance.totalCounted)} ${plural(performance.totalCounted, 'SKU', 'SKUs')} contados em ${intFmt(performance.sessions)} ${plural(performance.sessions, 'sessão', 'sessões')}.`
                           : 'Ainda não há SKUs contados para consolidar a acurácia observada.'}
                       </p>
                     </div>
@@ -507,7 +508,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                             <Td>
                               <span className="block text-fg">{o.operator}</span>
                               <span className="text-caption">
-                                {intFmt(o.sessions)} sessão(ões) · {intFmt(o.skusCounted)} SKUs contados
+                                {intFmt(o.sessions)} {plural(o.sessions, 'sessão', 'sessões')} · {intFmt(o.skusCounted)} {plural(o.skusCounted, 'SKU', 'SKUs')} contados
                               </span>
                             </Td>
                             <Td numeric>{intFmt(o.sessions)}</Td>
@@ -515,7 +516,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                             <Td numeric>
                               {o.coverageAvgPct !== null ? pctFmt(o.coverageAvgPct) : '—'}
                               <span className="block text-xs text-fg-subtle">
-                                {o.sessionsWithCoverage > 0 ? `base ${intFmt(o.sessionsWithCoverage)} sessão(ões)` : 'sem base'}
+                                {o.sessionsWithCoverage > 0 ? `base ${intFmt(o.sessionsWithCoverage)} ${plural(o.sessionsWithCoverage, 'sessão', 'sessões')}` : 'sem base'}
                               </span>
                             </Td>
                             <Td numeric>{o.observedAccuracyPct !== null ? pctFmt(o.observedAccuracyPct) : '—'}</Td>
@@ -599,7 +600,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                     <MetricCell
                       value={recurrence ? intFmt(recurrence.data.sessionsAnalyzed) : '—'}
                       label="Sessões analisadas"
-                      caption={`Janela de ${intFmt(data.rcaSettings.recurrence_window_days)} dias configurada em RCA`}
+                      caption={`Janela de ${intFmt(data.rcaSettings.recurrence_window_days)} ${plural(data.rcaSettings.recurrence_window_days, 'dia', 'dias')} configurada em RCA`}
                       className="lg:pl-6"
                     />
                   </div>
@@ -632,7 +633,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                           <p className="text-section">SKUs reincidentes</p>
                           <p className="text-caption mt-1">
                             Mesmo SKU com divergência em {MIN_RECURRENCE_SESSIONS} ou mais sessões distintas dentro da
-                            janela de {intFmt(data.rcaSettings.recurrence_window_days)} dias. Duas divergências da mesma
+                            janela de {intFmt(data.rcaSettings.recurrence_window_days)} {plural(data.rcaSettings.recurrence_window_days, 'dia', 'dias')}. Duas divergências da mesma
                             sessão contam como uma sessão.
                           </p>
                         </div>
@@ -866,7 +867,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
               ) : detail.totalItems === 0 ? (
                 <Notice tone="neutral">
                   {openSession.divergenciasReais > 0
-                    ? `Esta sessão registra ${intFmt(openSession.divergenciasReais)} divergência(s) no total, mas não há detalhamento item a item disponível para ela.`
+                    ? `Esta sessão registra ${intFmt(openSession.divergenciasReais)} ${plural(openSession.divergenciasReais, 'divergência', 'divergências')} no total, mas não há detalhamento item a item disponível para ela.`
                     : 'Esta sessão não possui registro item a item.'}
                 </Notice>
               ) : divergences.length === 0 ? (
@@ -989,7 +990,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
               ) : (
                 <div className="space-y-3">
                   <p className="text-sm text-fg-muted">
-                    {intFmt(detail.classifiedInRca)} de {intFmt(divergences.length)} divergência(s) desta sessão já
+                    {intFmt(detail.classifiedInRca)} de {intFmt(divergences.length)} {plural(divergences.length, 'divergência', 'divergências')} desta sessão já
                     têm classificação de causa registrada no Root Cause Analysis.
                   </p>
                   {onNavigate && (
@@ -1014,8 +1015,8 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
         {openSku && (
           <div className="space-y-3">
             <p className="text-sm text-fg-muted">
-              {intFmt(skuHistory.length)} divergência(s) em{' '}
-              {intFmt(new Set(skuHistory.map(i => i.sessionId)).size)} sessão(ões) distinta(s) na janela de{' '}
+              {intFmt(skuHistory.length)} {plural(skuHistory.length, 'divergência', 'divergências')} em{' '}
+              {intFmt(new Set(skuHistory.map(i => i.sessionId)).size)} {plural(new Set(skuHistory.map(i => i.sessionId)).size, 'sessão distinta', 'sessões distintas')} na janela de{' '}
               {intFmt(data?.rcaSettings.recurrence_window_days ?? 0)} dias.
             </p>
             <div className="max-h-[24rem] overflow-x-auto rounded-container border border-edge/60">

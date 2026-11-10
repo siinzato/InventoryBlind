@@ -44,7 +44,7 @@ describe('describeNodeDetails — resumo do node no canvas (§6)', () => {
 
   it('loop só mostra o máximo quando o campo já foi preenchido', () => {
     const withField: LoopNode = { id: 'l1', type: 'loop', field: 'trigger.webhook.body.itens', maxIterations: 5 };
-    expect(describeNodeDetails(withField, 'webhook.received')).toEqual(['Campo: trigger.webhook.body.itens', 'Máximo: 5 iteração(ões)']);
+    expect(describeNodeDetails(withField, 'webhook.received')).toEqual(['Campo: trigger.webhook.body.itens', 'Máximo: 5 iterações']);
 
     const withoutField: LoopNode = { id: 'l1', type: 'loop', field: '', maxIterations: 5 };
     expect(describeNodeDetails(withoutField, 'webhook.received')).toEqual([]);

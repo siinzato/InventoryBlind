@@ -8,6 +8,7 @@ import {
   type BlindScoreResult, type RiskSeverity,
 } from '../../lib/analytics/analyticsContracts';
 import { ScoreGauge, AccuracyTrendChart } from './AnalyticsCharts';
+import { plural } from '../../lib/formatPtBr';
 
 interface BlindScorePageProps {
   companyId: string;
@@ -111,7 +112,7 @@ export function BlindScorePage({ companyId, onNavigate }: BlindScorePageProps) {
               <Stat
                 label="Cobertura da análise"
                 value={`${Math.round(coverage.pct)}%`}
-                context={`${coverage.evaluated.toLocaleString('pt-BR')} de ${coverage.totalCatalog.toLocaleString('pt-BR')} produtos avaliados`}
+                context={`${coverage.evaluated.toLocaleString('pt-BR')} de ${coverage.totalCatalog.toLocaleString('pt-BR')} ${plural(coverage.totalCatalog, 'produto', 'produtos')} avaliados`}
               />
               <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-surface-3">
                 <div className="h-full rounded-full bg-accent" style={{ width: `${Math.min(100, Math.max(coverage.pct, coverage.evaluated > 0 ? 1 : 0))}%` }} />
@@ -152,8 +153,8 @@ export function BlindScorePage({ companyId, onNavigate }: BlindScorePageProps) {
                   {result.status === 'provisorio' ? 'Por que a leitura ainda é provisória' : 'Cobertura da leitura do catálogo'}
                 </p>
                 <p className="mt-1 text-sm text-fg-muted">
-                  {coverage.evaluated.toLocaleString('pt-BR')} produtos possuem evidência suficiente.
-                  {coverage.gap > 0 && ` Faltam ${coverage.gap.toLocaleString('pt-BR')} produtos para uma leitura completa do catálogo.`}
+                  {coverage.evaluated.toLocaleString('pt-BR')} {plural(coverage.evaluated, 'produto', 'produtos')} possuem evidência suficiente.
+                  {coverage.gap > 0 && ` Faltam ${coverage.gap.toLocaleString('pt-BR')} ${plural(coverage.gap, 'produto', 'produtos')} para uma leitura completa do catálogo.`}
                 </p>
                 {result.staleEvaluation && (
                   <p className="mt-1 text-sm text-amber-600 dark:text-amber-400">
@@ -176,7 +177,7 @@ export function BlindScorePage({ companyId, onNavigate }: BlindScorePageProps) {
           <p className="flex items-center gap-1.5 text-section"><ShieldCheck size={14} className="text-fg-subtle" /> O que sustenta sua confiança</p>
           {result.pillars.length > 0 && (
             <p className="text-caption">
-              Base: {result.pillarsBase.toLocaleString('pt-BR')} produtos avaliáveis · {Math.round(coverage.pct)}% do catálogo
+              Base: {result.pillarsBase.toLocaleString('pt-BR')} {plural(result.pillarsBase, 'produto', 'produtos')} avaliáveis · {Math.round(coverage.pct)}% do catálogo
             </p>
           )}
         </PanelSection>

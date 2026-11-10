@@ -2,7 +2,7 @@
 // Mirrors the patterns in productImportUtils.ts without modifying that file.
 
 import { parseCSV } from './productImportUtils';
-import { pct } from './formatPtBr';
+import { pct, plural } from './formatPtBr';
 
 export interface CountRow {
   [key: string]: string | number | undefined;
@@ -272,7 +272,7 @@ export const generateCountInsight = (metrics: CountMetrics, divergenciasReais: n
   }
 
   if (shouldRecommendThirdCount(divergenciasReais)) {
-    parts.push(`🔍 Recomenda-se auditoria física: ${divergenciasReais} divergências reais confirmadas, acima do limite de 10.`);
+    parts.push(`🔍 Recomenda-se auditoria física: ${divergenciasReais} ${plural(divergenciasReais, 'divergência', 'divergências')} reais confirmadas, acima do limite de 10.`);
   }
 
   if (metrics.accuracyFinal !== null) {

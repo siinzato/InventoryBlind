@@ -36,6 +36,7 @@ import ExcessLabel100x150, {
 } from './ExcessLabel100x150';
 import type { LabelProduct, ShelfFontSettings } from './ShelfLabel100x40';
 import type { ExcessFontSettings } from './ExcessLabel100x150';
+import { plural } from '../lib/formatPtBr';
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -394,7 +395,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
       window.addEventListener('afterprint', () => {
         root.unmount(); removePrintStyle();
         Promise.all(selected.map(p => logLabelGeneration(p.sku, batchLabelType, batchCopies)));
-        toast(`${allLabels.length} etiqueta(s) impressa(s).`, 'success');
+        toast(`${allLabels.length} ${plural(allLabels.length, 'etiqueta impressa', 'etiquetas impressas')}.`, 'success');
       }, { once: true });
     }, 250);
   }, [batchProducts, selectedIds, batchLabelType, batchCopies, batchExcessQty, shelfFonts, excessFonts, toast]);
@@ -418,7 +419,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
       }
       pdf.save(`etiquetas-lote-${new Date().toISOString().slice(0, 10)}.pdf`);
       await Promise.all(selected.map(p => logLabelGeneration(p.sku, batchLabelType, batchCopies)));
-      toast(`PDF com ${pg} etiqueta(s) gerado.`, 'success');
+      toast(`PDF com ${pg} ${plural(pg, 'etiqueta', 'etiquetas')} gerado.`, 'success');
     } catch (err: unknown) {
       console.error('[LabelGen] Batch PDF error:', err);
       toast('Erro ao gerar PDF em lote.', 'error');
@@ -760,7 +761,7 @@ export const LabelGeneratorPage: React.FC<LabelGeneratorPageProps> = ({ onBack }
             {selectedIds.size > 0 && (
               <div className="bg-accent/10 rounded-container p-4 flex flex-wrap items-center justify-between gap-3">
                 <p className="text-sm font-semibold text-accent">
-                  {selectedIds.size} produto(s) · {selectedIds.size * batchCopies} etiqueta(s)
+                  {selectedIds.size} {plural(selectedIds.size, 'produto', 'produtos')} · {selectedIds.size * batchCopies} {plural(selectedIds.size * batchCopies, 'etiqueta', 'etiquetas')}
                   <span className="ml-2 text-xs font-normal text-fg-muted">
                     (fontes: {batchLabelType === 'shelf' ? `Nome ${shelfFonts.nameSize}px · EAN ${shelfFonts.eanSize}px` : `Qtd ${excessFonts.qtySize}px`})
                   </span>

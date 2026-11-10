@@ -24,6 +24,7 @@ import { RcaCasesTable } from './RcaCasesTable';
 import { RcaCaseDetailPage } from './RcaCaseDetailPage';
 import { RcaTaxonomyModal } from './RcaTaxonomyModal';
 import { RcaClassificationModal, type PendingRcaItem } from './RcaClassificationModal';
+import { plural } from '../../lib/formatPtBr';
 
 interface RcaDashboardPageProps {
   companyId: string;
@@ -165,7 +166,7 @@ export function RcaDashboardPage({ companyId, userId, userEmail, role }: RcaDash
     }
     const highestImpactCase = [...cases].filter(c => c.financial_impact != null).sort((a, b) => (b.financial_impact ?? 0) - (a.financial_impact ?? 0))[0];
     if (highestImpactCase) items.push(`Caso RCA-${highestImpactCase.case_year}-${String(highestImpactCase.case_number).padStart(3, '0')} tem o maior impacto financeiro estimado.`);
-    if (overdueActions > 0) items.push(`${overdueActions} ação(ões) corretiva(s)/preventiva(s) com prazo vencido.`);
+    if (overdueActions > 0) items.push(`${overdueActions} ${plural(overdueActions, 'ação corretiva/preventiva', 'ações corretivas/preventivas')} com prazo vencido.`);
     return items.slice(0, 4);
   }, [pareto, topCause, recurrenceGroups, cases, overdueActions]);
 
@@ -297,7 +298,7 @@ export function RcaDashboardPage({ companyId, userId, userEmail, role }: RcaDash
               <p className="text-section mb-2">Cobertura da Classificação</p>
               <div className="flex items-center gap-4">
                 <p className="text-2xl font-display font-semibold tabular-nums">{coverage.coveragePct != null ? `${Math.round(coverage.coveragePct)}%` : '—'}</p>
-                <p className="text-xs text-fg-subtle">{coverage.classified} de {coverage.totalClosed} divergências encerradas classificadas</p>
+                <p className="text-xs text-fg-subtle">{coverage.classified} de {coverage.totalClosed} {plural(coverage.totalClosed, 'divergência', 'divergências')} encerradas classificadas</p>
               </div>
               {notClassifiedCount > 0 && (
                 <button type="button" className="text-xs text-accent hover:underline mt-1" onClick={() => setMainTab('casos')}>

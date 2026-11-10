@@ -141,10 +141,10 @@ describe('a lista', () => {
 
 describe('como o prazo é dito', () => {
   it('fala em português de quem lê a lista', () => {
-    expect(describeDays(-3)).toBe('venceu há 3 dia(s)');
+    expect(describeDays(-3)).toBe('venceu há 3 dias');
     expect(describeDays(0)).toBe('vence hoje');
     expect(describeDays(1)).toBe('vence amanhã');
-    expect(describeDays(12)).toBe('em 12 dia(s)');
+    expect(describeDays(12)).toBe('em 12 dias');
     expect(describeDays(null)).toBe('—');
   });
 });

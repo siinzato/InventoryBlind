@@ -5,7 +5,7 @@
 // exportUtils.ts (`buildAndDownloadPdfReport`) para as seções textuais.
 
 import type { PalletCalcResult } from './calculatePallet';
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 
 export async function captureDiagramToPng(el: HTMLElement): Promise<{ dataUrl: string; widthPx: number; heightPx: number }> {
   const html2canvas = (await import('html2canvas')).default;
@@ -59,7 +59,7 @@ export async function downloadPalletReportPdf({ result, diagramElement, filename
   line(`Caixas por palete: ${recommended.capacityPerPallet}`);
 
   heading('Quantidade de paletes');
-  line(`Paletes completos: ${recommended.palletsNeeded.fullPallets}    Último palete: ${recommended.palletsNeeded.lastPalletQty} caixas    Total: ${recommended.palletsNeeded.totalPallets}`);
+  line(`Paletes completos: ${recommended.palletsNeeded.fullPallets}    Último palete: ${recommended.palletsNeeded.lastPalletQty} ${plural(recommended.palletsNeeded.lastPalletQty, 'caixa', 'caixas')}    Total: ${recommended.palletsNeeded.totalPallets}`);
 
   heading('Peso e altura');
   line(`Peso líquido: ${recommended.netKg.toFixed(1)} kg    Tara: ${recommended.tareKg.toFixed(1)} kg    Peso bruto: ${recommended.grossKg.toFixed(1)} kg`);

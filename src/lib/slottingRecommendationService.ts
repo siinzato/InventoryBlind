@@ -10,6 +10,7 @@ import {
 } from './slottingEngine';
 import { getCells, getPickCountsByLocation, getCoOccurringSkuPairs } from './slottingLayoutService';
 import { logAuditEvent } from './auditLogService';
+import { plural } from '../lib/formatPtBr';
 
 interface DraftRecommendation {
   recommendation_type: 'mover_mais_perto' | 'aproximar_expedicao' | 'agrupar_frequentes' | 'redistribuir_fluxo';
@@ -98,7 +99,7 @@ async function buildGroupFrequentRecommendations(
       estimated_meters_saved: distanceMeters * count,
       estimated_time_saved_seconds: estimatePickingTimeSeconds(distanceMeters, count),
       estimated_productivity_gain_pct: 0,
-      reason: `SKUs ${locA} e ${locB} aparecem juntos em ${count} operação(ões) mas estão a ${Math.round(distanceMeters)}m de distância um do outro.`,
+      reason: `SKUs ${locA} e ${locB} aparecem juntos em ${count} ${plural(count, 'operação', 'operações')} mas estão a ${Math.round(distanceMeters)}m de distância um do outro.`,
     });
   }
   return drafts.slice(0, 10);

@@ -28,6 +28,7 @@ import { WmsBinOperations } from './WmsBinOperations';
 import { WmsAnalytics } from './WmsAnalytics';
 import { WmsStockInsights } from './WmsStockInsights';
 import { WmsStorageMap } from './WmsStorageMap';
+import { plural } from '../../lib/formatPtBr';
 import {
   boxesByBin, buildBinCodes, createBins, deleteBins, listBins, listMovements, setBinBlocked,
   type BinMovement, type BinStreetSpec, type StorageBin,
@@ -514,7 +515,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                           </label>
                           <span className="text-caption pb-2.5 min-w-[9rem]">
                             {valida
-                              ? `= ${quantas} endereço(s)`
+                              ? `= ${quantas} ${plural(quantas, 'endereço', 'endereços')}`
                               : 'Rua precisa ser letra'}
                           </span>
                           {streetRows.length > 1 && (
@@ -547,7 +548,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
 
                 <div className="flex flex-wrap items-center gap-3 mt-4">
                   <Button onClick={handleCreate} disabled={creating || preview.length === 0}>
-                    {creating ? 'Criando...' : `Criar ${preview.length} endereços`}
+                    {creating ? 'Criando...' : `Criar ${preview.length} ${plural(preview.length, 'endereço', 'endereços')}`}
                   </Button>
                   {preview.length > 0 && (
                     <span className="text-caption">
@@ -560,7 +561,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                   <p className="text-caption mt-3">
                     {created === 0
                       ? 'Nenhum endereço novo — todos já existiam.'
-                      : `${created} endereço(s) criado(s). Os que já existiam foram preservados.`}
+                      : `${created} ${plural(created, 'endereço criado', 'endereços criados')}. Os que já existiam foram preservados.`}
                   </p>
                 )}
               </PanelSection>
@@ -657,8 +658,8 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                 <p className="text-caption">
                   Etiqueta de <strong>{plan.labelWidthMm} × {plan.labelHeightMm} mm</strong>, QR de {plan.qrMm} mm
                   {' · '}
-                  {bins.length} endereço(s) em <strong>{sheets}</strong>{' '}
-                  {plan.perPage === 1 ? 'etiqueta(s)' : `folha(s) de ${plan.perPage}`}
+                  {bins.length} {plural(bins.length, 'endereço', 'endereços')} em <strong>{sheets}</strong>{' '}
+                  {plan.perPage === 1 ? plural(sheets, 'etiqueta', 'etiquetas') : `${plural(sheets, 'folha', 'folhas')} de ${plan.perPage}`}
                 </p>
                 <p className="text-caption">
                   A impressora é escolhida na janela de impressão do navegador, que abre em seguida.
@@ -701,7 +702,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                 <div>
                   <h3 className="text-title">Limpeza</h3>
                   <p className="text-caption mt-1">
-                    {emptyBins.length} endereço(s) sem nenhuma movimentação. Útil quando o padrão
+                    {emptyBins.length} {plural(emptyBins.length, 'endereço', 'endereços')} sem nenhuma movimentação. Útil quando o padrão
                     saiu errado e o lote gerou mais códigos do que você queria.
                   </p>
                 </div>

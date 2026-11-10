@@ -10,6 +10,7 @@ import {
 } from '../../lib/security/sessionManagementService';
 import { parseUserAgent } from '../../lib/security/userAgentParser';
 import { evaluateSuspiciousSessions } from '../../lib/security/suspiciousSessionHeuristic';
+import { plural } from '../../lib/formatPtBr';
 import {
   Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button, Modal, Input, Select, Textarea, Notice,
   Stat, StatRow, StatCell, useToasts, ToastStack,
@@ -132,13 +133,13 @@ export function AdminSessionsPanel() {
         toast('Sessão encerrada.', 'success');
       } else if (revokeTarget.kind === 'user') {
         const n = await revokeUserSessions(revokeTarget.userId, revokeReason);
-        toast(n > 0 ? `${n} sessão(ões) de ${revokeTarget.label} encerrada(s).` : 'Nenhuma outra sessão para encerrar.', 'success');
+        toast(n > 0 ? `${n} ${plural(n, 'sessão', 'sessões')} de ${revokeTarget.label} ${plural(n, 'encerrada', 'encerradas')}.` : 'Nenhuma outra sessão para encerrar.', 'success');
       } else {
         const result = await revokeCompanySessions(companyConfirmText, revokeReason);
         toast(
           result.skippedCount > 0
-            ? `${result.revokedCount} sessão(ões) encerrada(s). ${result.skippedCount} usuário(s) multiempresa ignorado(s).`
-            : `${result.revokedCount} sessão(ões) encerrada(s).`,
+            ? `${result.revokedCount} ${plural(result.revokedCount, 'sessão encerrada', 'sessões encerradas')}. ${result.skippedCount} ${plural(result.skippedCount, 'usuário multiempresa ignorado', 'usuários multiempresa ignorados')}.`
+            : `${result.revokedCount} ${plural(result.revokedCount, 'sessão encerrada', 'sessões encerradas')}.`,
           'success',
         );
       }

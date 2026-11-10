@@ -19,7 +19,7 @@ import { supabase } from '../lib/supabase';
 import { useAuth } from '../lib/auth';
 import { classifyCompanyProducts } from '../lib/productBrands/productBrandService';
 import { syncActiveCycleItems } from '../lib/inventoryCycle/inventoryCycleService';
-import { int } from '../lib/formatPtBr';
+import { int, plural } from '../lib/formatPtBr';
 
 /** A linha de `import_history` como esta tela a grava. Era `Record<string, any>`,
  *  o que aceitava qualquer chave: um nome de coluna errado so aparecia como erro do
@@ -472,7 +472,7 @@ export const ProductImportPage: React.FC<ProductImportPageProps> = ({
         total,
         percentage: Math.round((current / total) * 100),
         status: 'importing',
-        message: `Processando ${int(current)} de ${int(total)} produtos...`,
+        message: `Processando ${int(current)} de ${int(total)} ${plural(total, 'produto', 'produtos')}...`,
       });
 
       await new Promise(resolve => setTimeout(resolve, 100));

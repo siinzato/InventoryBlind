@@ -20,6 +20,7 @@ import { NFeReportView } from './NFeReportView';
 import { NFePutawayView } from './NFePutawayView';
 import { formatDate, formatDateTime } from './nfeUi';
 import { Button, Input, Notice, Panel, PanelSection, Select } from '../ui';
+import { plural } from '../../lib/formatPtBr';
 
 type View = 'list' | 'import' | 'prep' | 'counting' | 'report' | 'putaway';
 type ViewMode = 'supervision' | 'stages';
@@ -753,7 +754,7 @@ function DetailPanel({
       {progress && progress.totalLines > 0 && !invoice.finished_at && (
         <PanelSection className="space-y-2">
           <p className="text-label">Andamento</p>
-          <p className="text-sm text-fg">{progress.countedLines} de {progress.totalLines} linhas conferidas</p>
+          <p className="text-sm text-fg">{progress.countedLines} de {progress.totalLines} {plural(progress.totalLines, 'linha', 'linhas')} conferidas</p>
           <div className="h-1.5 rounded-full bg-surface-3">
             <div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.min(100, (progress.countedLines / progress.totalLines) * 100)}%` }} />
           </div>
@@ -894,7 +895,7 @@ function StageCard({ inv, onOpen, responsavel, progress, nowTick }: {
             <div className="h-1 rounded-full bg-surface-3">
               <div className="h-1 rounded-full bg-accent" style={{ width: `${Math.min(100, (progress.countedLines / progress.totalLines) * 100)}%` }} />
             </div>
-            <p className="text-[11px] text-fg-subtle">{progress.countedLines} de {progress.totalLines} linhas</p>
+            <p className="text-[11px] text-fg-subtle">{progress.countedLines} de {progress.totalLines} {plural(progress.totalLines, 'linha', 'linhas')}</p>
           </div>
         )}
 

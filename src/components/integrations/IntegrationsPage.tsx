@@ -38,6 +38,7 @@ import type { IntegrationConnection, IntegrationProvider } from '../../lib/integ
 import { useAuth } from '../../lib/auth';
 import { logAuditEvent } from '../../lib/auditLogService';
 import { FiscalEntitySelector } from '../fiscalEntities/FiscalEntitySelector';
+import { plural } from '../../lib/formatPtBr';
 
 type Tab = 'connection' | 'queue' | 'alerts';
 
@@ -603,7 +604,7 @@ function ConnectionPanel({
                 return {
                   tone: result.ok ? 'neutral' : 'danger',
                   text: result.ok
-                    ? `Simulação: ${result.updates ?? 0} saldo(s) mudariam, ${result.conflicts ?? 0} conflito(s). Nada foi gravado.`
+                    ? `Simulação: ${result.updates ?? 0} ${plural(result.updates ?? 0, 'saldo', 'saldos')} mudariam, ${result.conflicts ?? 0} ${plural(result.conflicts ?? 0, 'conflito', 'conflitos')}. Nada foi gravado.`
                     : result.message,
                 };
               })
@@ -699,9 +700,9 @@ function QueuePanel({ connection }: { connection: IntegrationConnection }) {
       {outcome && (
         <Notice tone={outcome.failed > 0 || outcome.refused > 0 ? 'warning' : 'success'}>
           {outcome.dryRun ? 'Simulação: ' : ''}
-          {outcome.sent} enviado(s), {outcome.refused} recusado(s), {outcome.failed} com falha
-          {outcome.deferred > 0 && `, ${outcome.deferred} adiado(s) por serem do mesmo produto`}
-          {outcome.notStarted > 0 && `, ${outcome.notStarted} não iniciado(s) nesta rodada`}.
+          {outcome.sent} {plural(outcome.sent, 'enviado', 'enviados')}, {outcome.refused} {plural(outcome.refused, 'recusado', 'recusados')}, {outcome.failed} com falha
+          {outcome.deferred > 0 && `, ${outcome.deferred} ${plural(outcome.deferred, 'adiado', 'adiados')} por serem do mesmo produto`}
+          {outcome.notStarted > 0 && `, ${outcome.notStarted} não ${plural(outcome.notStarted, 'iniciado', 'iniciados')} nesta rodada`}.
           {outcome.dryRun && ' Nada foi enviado ao provedor.'}
         </Notice>
       )}

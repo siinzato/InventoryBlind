@@ -14,6 +14,7 @@
 // SOMA, nunca um sim/não, e a tela mostra o que falta em vez de marcar "feito".
 
 import type { NfeInvoiceItem } from './nfeTypes';
+import { plural } from '../../lib/formatPtBr';
 
 export interface PutawayAssignment {
   id: string;
@@ -165,7 +166,7 @@ export function validatePlacement(
 
   const unidades = boxes * unitsPerBox;
   if (unidades > line.remaining) {
-    return `Isso são ${unidades} unidades e faltam apenas ${line.remaining} para endereçar.`;
+    return `Isso são ${unidades} ${plural(unidades, 'unidade', 'unidades')} e faltam apenas ${line.remaining} para endereçar.`;
   }
   return null;
 }

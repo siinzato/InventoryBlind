@@ -26,6 +26,7 @@
 // Módulo puro: sem I/O, sem relógio. `now` sempre entra por parâmetro.
 
 import { bucketOf, daysSince, type AbcBucket, type CoverageItem } from './coverageDomain';
+import { plural } from '../../lib/formatPtBr';
 
 /** Cadência por classe e tamanho do lote diário, por empresa.
  *
@@ -376,7 +377,7 @@ export function cycleSessionRange(now: Date): { from: string; to: string } {
 export function cycleSessionObservation(batch: DailyBatch, now: Date): string {
   const partes = [
     `Lote gerado pelo programa de ciclagem em ${cycleSessionDayLabel(now)}.`,
-    `${batch.entries.length} SKU(s): ${batch.dueTaken} por cadência vencida, ${batch.backlogTaken} nunca contado(s).`,
+    `${batch.entries.length} ${plural(batch.entries.length, 'SKU', 'SKUs')}: ${batch.dueTaken} por cadência vencida, ${batch.backlogTaken} nunca ${plural(batch.backlogTaken, 'contado', 'contados')}.`,
   ];
   if (batch.dueTotal > batch.dueTaken) {
     partes.push(`${batch.dueTotal - batch.dueTaken} com cadência vencida não couberam na capacidade do dia.`);

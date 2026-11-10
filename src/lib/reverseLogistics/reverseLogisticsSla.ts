@@ -1,3 +1,4 @@
+import { plural } from '../../lib/formatPtBr';
 // Logística Reversa — alertas de SLA. Função pura, computada sobre dados já carregados no
 // cliente — mesmo padrão de src/lib/intelligence/alertEngine.ts e
 // src/lib/adminKpis/kpiHealth.ts::buildPriorityAlerts. Sem tabela de notificação nova: nenhum
@@ -56,17 +57,17 @@ export function buildReturnSlaAlerts(
 
   const awaitingConference = returns.filter(r => r.status === 'received' && daysSince(r.receivedAt, now) > thresholds.conferenceDays);
   if (awaitingConference.length > 0) {
-    alerts.push({ type: 'awaiting_conference', title: `${awaitingConference.length} devolução(ões) aguardando conferência além do prazo`, count: awaitingConference.length, itemIds: awaitingConference.map(r => r.id) });
+    alerts.push({ type: 'awaiting_conference', title: `${awaitingConference.length} ${plural(awaitingConference.length, 'devolução', 'devoluções')} aguardando conferência além do prazo`, count: awaitingConference.length, itemIds: awaitingConference.map(r => r.id) });
   }
 
   const inspectionOverdue = returns.filter(r => r.status === 'in_inspection' && r.statusChangedAt && daysSince(r.statusChangedAt, now) > thresholds.inspectionDays);
   if (inspectionOverdue.length > 0) {
-    alerts.push({ type: 'inspection_overdue', title: `${inspectionOverdue.length} devolução(ões) com inspeção atrasada`, count: inspectionOverdue.length, itemIds: inspectionOverdue.map(r => r.id) });
+    alerts.push({ type: 'inspection_overdue', title: `${inspectionOverdue.length} ${plural(inspectionOverdue.length, 'devolução', 'devoluções')} com inspeção atrasada`, count: inspectionOverdue.length, itemIds: inspectionOverdue.map(r => r.id) });
   }
 
   const openHolds = quarantineHolds.filter(h => !h.releasedAt && daysSince(h.createdAt, now) > thresholds.quarantineDays);
   if (openHolds.length > 0) {
-    alerts.push({ type: 'quarantine_stalled', title: `${openHolds.length} item(ns) parado(s) em quarentena além do prazo`, count: openHolds.length, itemIds: openHolds.map(h => h.returnItemId) });
+    alerts.push({ type: 'quarantine_stalled', title: `${openHolds.length} ${plural(openHolds.length, 'item parado', 'itens parados')} em quarentena além do prazo`, count: openHolds.length, itemIds: openHolds.map(h => h.returnItemId) });
   }
 
   const overdueOrders = serviceOrders.filter(o =>
@@ -78,7 +79,7 @@ export function buildReturnSlaAlerts(
 
   const pendingApprovals = approvalRequests.filter(a => a.status === 'pending' && daysSince(a.requestedAt, now) > thresholds.approvalDays);
   if (pendingApprovals.length > 0) {
-    alerts.push({ type: 'approval_pending', title: `${pendingApprovals.length} aprovação(ões) pendente(s) além do prazo`, count: pendingApprovals.length, itemIds: pendingApprovals.map(a => a.returnItemId) });
+    alerts.push({ type: 'approval_pending', title: `${pendingApprovals.length} ${plural(pendingApprovals.length, 'aprovação pendente', 'aprovações pendentes')} além do prazo`, count: pendingApprovals.length, itemIds: pendingApprovals.map(a => a.returnItemId) });
   }
 
   const destinationNotExecuted = items.filter(i => {

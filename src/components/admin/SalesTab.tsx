@@ -18,6 +18,7 @@ import type { AbcCurveAnalysis } from '../../lib/abcCurve/abcCurveService';
 import { canAdministerRecords } from '../../lib/admin/recordAdmin';
 import { logAuditEvent } from '../../lib/auditLogService';
 import { SalesImportWizard } from './SalesImportWizard';
+import { plural } from '../../lib/formatPtBr';
 
 interface SalesTabProps {
   companyId: string;
@@ -275,8 +276,8 @@ export function SalesTab({ companyId, userId, userEmail, role }: SalesTabProps) 
                     </Table>
                     {automaticResult && (automaticResult.ignoredForNoCatalogMatch > 0 || automaticResult.ignoredForMissingMetric > 0) && (
                       <p className="text-xs text-fg-subtle mt-2">
-                        {automaticResult.ignoredForNoCatalogMatch > 0 && `${automaticResult.ignoredForNoCatalogMatch} produto(s) sem correspondência no catálogo foram ignorados. `}
-                        {automaticResult.ignoredForMissingMetric > 0 && `${automaticResult.ignoredForMissingMetric} produto(s) sem o critério selecionado foram ignorados.`}
+                        {automaticResult.ignoredForNoCatalogMatch > 0 && `${automaticResult.ignoredForNoCatalogMatch} ${plural(automaticResult.ignoredForNoCatalogMatch, 'produto', 'produtos')} sem correspondência no catálogo foram ignorados. `}
+                        {automaticResult.ignoredForMissingMetric > 0 && `${automaticResult.ignoredForMissingMetric} ${plural(automaticResult.ignoredForMissingMetric, 'produto', 'produtos')} sem o critério selecionado foram ignorados.`}
                       </p>
                     )}
                   </>
@@ -330,7 +331,7 @@ export function SalesTab({ companyId, userId, userEmail, role }: SalesTabProps) 
                   key={b.id}
                   value={
                     <div className="text-right">
-                      <p>{b.rowCount} linhas</p>
+                      <p>{b.rowCount} {plural(b.rowCount, 'linha', 'linhas')}</p>
                       {b.unmatchedCount > 0 && <p className="text-amber-600 dark:text-amber-400">{b.unmatchedCount} não associadas</p>}
                     </div>
                   }

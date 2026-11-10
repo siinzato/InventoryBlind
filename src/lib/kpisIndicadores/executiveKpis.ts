@@ -1,4 +1,4 @@
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 // KPIs Executivos ("KPIs e Indicadores") — cálculos puros sobre registros de
 // contagem já carregados (inventory_count_records). Sem I/O — mesmo espírito
 // de rcaAlgorithm.ts/blindAIAgentAlgorithm.ts: a camada de acesso a dados
@@ -150,7 +150,7 @@ export function buildOperationalAlerts(input: {
     alerts.push({
       id: 'ritmo_abaixo',
       title: `Ritmo ${pctBelow}% abaixo do necessário`,
-      detail: `Produção média ${input.ritmoAtual.toFixed(1)} vs meta ${input.ritmoNecessario.toFixed(1)} SKUs/dia.`,
+      detail: `Produção média ${input.ritmoAtual.toFixed(1)} vs meta ${input.ritmoNecessario.toFixed(1)} ${plural(input.ritmoNecessario, 'SKU', 'SKUs')}/dia.`,
       severity: 'critical',
     });
   }
@@ -167,7 +167,7 @@ export function buildOperationalAlerts(input: {
   if (input.divergenciasPendentes > 0) {
     alerts.push({
       id: 'divergencias_pendentes',
-      title: `${input.divergenciasPendentes} divergências aguardando recontagem`,
+      title: `${input.divergenciasPendentes} ${plural(input.divergenciasPendentes, 'divergência', 'divergências')} aguardando recontagem`,
       detail: 'Impactam diretamente a acuracidade.',
       severity: 'warning',
     });

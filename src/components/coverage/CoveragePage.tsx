@@ -9,6 +9,7 @@ import {
   type CoverageItem, type CoverageStatus,
 } from '../../lib/coverage/coverageDomain';
 import { fetchCoverageItems } from '../../lib/coverage/coverageService';
+import { plural } from '../../lib/formatPtBr';
 
 interface CoveragePageProps {
   companyId: string;
@@ -101,7 +102,7 @@ export function CoveragePage({ companyId }: CoveragePageProps) {
             label="Janela"
             value={String(janela)}
             onChange={v => setJanela(Number(v) as Janela)}
-            options={JANELAS.map(d => ({ value: String(d), label: `${d} dias` }))}
+            options={JANELAS.map(d => ({ value: String(d), label: `${d} ${plural(d, 'dia', 'dias')}` }))}
           />
 
           <Panel>
@@ -109,7 +110,7 @@ export function CoveragePage({ companyId }: CoveragePageProps) {
               <StatRow>
                 <StatCell>
                   <Stat
-                    label={`SKUs contados em ${janela} dias`}
+                    label={`SKUs contados em ${janela} ${plural(janela, 'dia', 'dias')}`}
                     value={umaCasa(totais.skusPct)}
                     context={`${inteiro.format(totais.skusCobertos)} de ${inteiro.format(totais.skus)}`}
                     valueTone={tone(totais.skusPct)}
@@ -126,14 +127,14 @@ export function CoveragePage({ companyId }: CoveragePageProps) {
                       fingir que mediu. */}
                   {totais.valor > 0 ? (
                     <Stat
-                      label={`Valor coberto em ${janela} dias`}
+                      label={`Valor coberto em ${janela} ${plural(janela, 'dia', 'dias')}`}
                       value={umaCasa(totais.valorPct)}
                       context={`${moeda.format(totais.valorCoberto)} de ${moeda.format(totais.valor)}`}
                       valueTone={tone(totais.valorPct)}
                     />
                   ) : (
                     <Stat
-                      label={`Valor coberto em ${janela} dias`}
+                      label={`Valor coberto em ${janela} ${plural(janela, 'dia', 'dias')}`}
                       value="—"
                       context="Sem saldo no catálogo nem na Fonte de Saldo, e sem saldo não há valor a medir"
                     />
@@ -156,7 +157,7 @@ export function CoveragePage({ companyId }: CoveragePageProps) {
                 <p className="mt-4 text-xs leading-relaxed text-fg-subtle">
                   {daFonte === 1
                     ? 'O valor de 1 produto vem do saldo da Fonte de Saldo'
-                    : `O valor de ${inteiro.format(daFonte)} produtos vem do saldo da Fonte de Saldo`}
+                    : `O valor de ${inteiro.format(daFonte)} ${plural(daFonte, 'produto', 'produtos')} vem do saldo da Fonte de Saldo`}
                   {' '}— a última importação de estoque — porque esses itens estão sem quantidade no catálogo.
                 </p>
               )}
@@ -188,7 +189,7 @@ export function CoveragePage({ companyId }: CoveragePageProps) {
                         <span className="font-medium">{ABC_LABEL[linha.bucket]}</span>
                         <span className="block text-xs text-fg-subtle">{ABC_HINT[linha.bucket]}</span>
                       </Td>
-                      <Td>a cada {linha.cadenceDays} dias</Td>
+                      <Td>a cada {linha.cadenceDays} {plural(linha.cadenceDays, 'dia', 'dias')}</Td>
                       <Td numeric>{inteiro.format(linha.total)}</Td>
                       <Td numeric>{inteiro.format(linha.emDia)}</Td>
                       <Td numeric>{inteiro.format(linha.atrasado)}</Td>

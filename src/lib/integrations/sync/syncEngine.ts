@@ -37,6 +37,7 @@ import {
 } from './syncTypes.ts';
 import type { StockWriteKind } from '../stockOperations.ts';
 import type { SyncTrigger } from '../types.ts';
+import { plural } from '../../../lib/formatPtBr';
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Ports
@@ -473,7 +474,7 @@ export class SyncEngine {
         updated: succeeded,
         failed,
         skipped: pending,
-        errorSummary: failed > 0 ? `${failed} de ${writes.length} registros recusados pelo provedor.` : null,
+        errorSummary: failed > 0 ? `${failed} de ${writes.length} ${plural(writes.length, 'registro', 'registros')} recusados pelo provedor.` : null,
         finishedAt: finishedAt.toISOString(),
         durationMs: finishedAt.getTime() - startedAt.getTime(),
       });
@@ -586,8 +587,8 @@ export class SyncEngine {
   ): string | null {
     const parts: string[] = [];
     if (error) parts.push(error.message);
-    if (failed > 0) parts.push(`${failed} registro(s) com erro.`);
-    if (conflicts > 0) parts.push(`${conflicts} divergência(s) aguardando revisão.`);
+    if (failed > 0) parts.push(`${failed} ${plural(failed, 'registro', 'registros')} com erro.`);
+    if (conflicts > 0) parts.push(`${conflicts} ${plural(conflicts, 'divergência', 'divergências')} aguardando revisão.`);
     return parts.length > 0 ? parts.join(' ') : null;
   }
 

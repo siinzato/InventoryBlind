@@ -10,6 +10,7 @@ import {
   canManageServiceOrders, canReleaseQuarantine, canSyncIntegrations,
 } from '../../lib/permissionService';
 import { runStockWrite } from '../../lib/integrations/integrationOperations';
+import { plural } from '../../lib/formatPtBr';
 import {
   getReturn, getReturnItems, listAuditEventsForReturn, updateReturnItemConference,
   transitionReturnStatus, setItemInspection, decideItemDestination,
@@ -138,7 +139,7 @@ function nextActionMessage(record: ReturnRecord, items: ReturnItem[], canFinaliz
   if (record.status === 'awaiting_destination') {
     const pending = items.filter(i => i.destinationStatus === 'pending' && !i.destination).length;
     if (pending > 0) return `Defina a destinação de ${pending} ${pending === 1 ? 'item' : 'itens'}.`;
-    if (openQuarantine > 0) return 'Resolva o(s) bloqueio(s) de quarentena.';
+    if (openQuarantine > 0) return `Resolva ${plural(openQuarantine, 'o bloqueio', 'os bloqueios')} de quarentena.`;
     if (canFinalize) return 'Todos os itens estão prontos para conclusão.';
   }
   if (record.status === 'received' || record.status === 'in_conference') return 'Confira os itens recebidos.';

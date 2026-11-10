@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { ACTIONS, findField, isKnownTrigger, OPERATORS, TRIGGERS, type ActionKey, type OperatorKey } from './registry';
 import type { AutomationNode, AutomationWorkflow, NodeType } from './types';
+import { plural } from '../../lib/formatPtBr';
 
 export interface NodeVisualMeta {
   icon: LucideIcon;
@@ -103,13 +104,13 @@ export function describeNode(node: AutomationNode): string {
         ? 'Nenhuma condição'
         : `${node.rules.length} ${node.rules.length === 1 ? 'condição' : 'condições'} (${node.logic})`;
     case 'delay':
-      return `${node.minutes} minuto(s)`;
+      return `${node.minutes} ${plural(node.minutes, 'minuto', 'minutos')}`;
     case 'switch':
       return node.cases.length === 0 ? 'Nenhum caso' : node.cases.map(c => c.value).join(' | ');
     case 'loop':
-      return `Até ${node.maxIterations} iteração(ões) sobre ${node.field || '(campo não definido)'}`;
+      return `Até ${node.maxIterations} ${plural(node.maxIterations, 'iteração', 'iterações')} sobre ${node.field || '(campo não definido)'}`;
     case 'webhook_wait':
-      return `Aguarda até ${node.timeoutMinutes} minuto(s)`;
+      return `Aguarda até ${node.timeoutMinutes} ${plural(node.timeoutMinutes, 'minuto', 'minutos')}`;
     case 'agent':
       return node.prompt.trim() === '' ? 'Sem instrução' : node.prompt.slice(0, 80);
     case 'action':
@@ -133,7 +134,7 @@ export function describeNodeDetails(node: AutomationNode, triggerType: string): 
         const valuePart = hasValue ? ` ${Array.isArray(rule.value) ? rule.value.join(', ') : rule.value}` : '';
         return `${fieldLabel} ${operator.label.toLowerCase()}${valuePart}`;
       });
-      if (node.rules.length > 2) lines.push(`+${node.rules.length - 2} condição(ões)`);
+      if (node.rules.length > 2) lines.push(`+${node.rules.length - 2} ${plural(node.rules.length - 2, 'condição', 'condições')}`);
       return lines;
     }
     case 'action': {
@@ -152,7 +153,7 @@ export function describeNodeDetails(node: AutomationNode, triggerType: string): 
         .slice(0, 3);
     }
     case 'loop':
-      return node.field ? [`Campo: ${node.field}`, `Máximo: ${node.maxIterations} iteração(ões)`] : [];
+      return node.field ? [`Campo: ${node.field}`, `Máximo: ${node.maxIterations} ${plural(node.maxIterations, 'iteração', 'iterações')}`] : [];
     default:
       return [];
   }

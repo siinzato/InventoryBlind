@@ -4,6 +4,7 @@
 import { useMemo, useState } from 'react';
 import { Upload, AlertTriangle, CheckCircle2, ArrowRight, Loader2 } from 'lucide-react';
 import { Modal, Button, Select, Badge } from '../ui';
+import { plural } from '../../lib/formatPtBr';
 import {
   detectSalesColumnMappings, suggestSalesMapping, applySalesColumnMapping, parseSalesFile,
   computeFileHash, validateAndBuildSalesRows, type SalesColumnMapping, type SalesRow,
@@ -141,7 +142,7 @@ export function SalesImportWizard({ companyId, userId, userEmail, onClose, onImp
                 <AlertTriangle size={16} /> {duplicateWarning}
               </div>
             )}
-            <p className="text-sm text-fg-muted">{headers.length} colunas detectadas, {rawRows.length} linhas. Confirme ou ajuste o mapeamento:</p>
+            <p className="text-sm text-fg-muted">{headers.length} colunas detectadas, {rawRows.length} {plural(rawRows.length, 'linha', 'linhas')}. Confirme ou ajuste o mapeamento:</p>
             <div className="grid grid-cols-2 gap-3">
               {(Object.keys(mapping) as (keyof SalesColumnMapping)[]).map(field => (
                 <div key={field}>
@@ -204,7 +205,7 @@ export function SalesImportWizard({ companyId, userId, userEmail, onClose, onImp
             <div className="flex justify-end gap-2 pt-2">
               <Button variant="secondary" onClick={() => setStep('mapping')}>Voltar</Button>
               <Button onClick={handleConfirmImport} disabled={preview.valid.length === 0}>
-                Confirmar importação ({preview.valid.length} linhas)
+                Confirmar importação ({preview.valid.length} {plural(preview.valid.length, 'linha', 'linhas')})
               </Button>
             </div>
           </div>

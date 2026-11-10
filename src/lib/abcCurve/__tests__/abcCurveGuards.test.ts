@@ -143,7 +143,7 @@ describe('página — sem recálculo na UI e sem dado de análise/workspace ante
   });
 
   it('o contador mostra "filtrados de total" quando há filtro', () => {
-    expect(PAGE).toContain('${fmtInt(filtered.length)} de ${fmtInt(snapshots.length)} SKUs');
+    expect(PAGE).toContain("${fmtInt(filtered.length)} de ${fmtInt(snapshots.length)} ${plural(snapshots.length, 'SKU', 'SKUs')}");
   });
 
   it('preserva as quatro visões de Produtos e os detalhes expansíveis', () => {

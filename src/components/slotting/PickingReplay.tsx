@@ -5,6 +5,7 @@ import { getReplayEvents, getRecentOperations, type RecentOperationSummary, type
 import { buildReplayTimeline, type PositionedReplayEvent, type ReplayEventType } from '../../lib/warehouseReplayEngine';
 import { FloorPlanBackground } from './FloorPlanBackground';
 import type { WarehouseLayout, WarehouseCell } from '../../lib/supabase';
+import { plural } from '../../lib/formatPtBr';
 
 interface PickingReplayProps {
   companyId: string;
@@ -119,7 +120,7 @@ export function PickingReplay({ companyId, layout, cells, onSelectPosition }: Pi
               <label className="block text-xs font-medium text-fg-muted mb-1">Operação</label>
               <Select value={operationId} onChange={e => setOperationId(e.target.value)} className="min-w-[180px]">
                 <option value="">Todas as operações</option>
-                {operations.map(op => <option key={op.id} value={op.id}>{op.fullNumber} ({op.itemCount} SKUs)</option>)}
+                {operations.map(op => <option key={op.id} value={op.id}>{op.fullNumber} ({op.itemCount} {plural(op.itemCount, 'SKU', 'SKUs')})</option>)}
               </Select>
             </div>
             <div>
@@ -136,7 +137,7 @@ export function PickingReplay({ companyId, layout, cells, onSelectPosition }: Pi
             </div>
           </div>
           <p className="text-xs text-fg-subtle">
-            {events.length} evento(s) · cobertura de posição {Math.round(coveragePct)}%
+            {events.length} {plural(events.length, 'evento', 'eventos')} · cobertura de posição {Math.round(coveragePct)}%
             {!layout.scale_confirmed && ' · escala não calibrada — distâncias indisponíveis'}
           </p>
         </PanelSection>
@@ -209,7 +210,7 @@ export function PickingReplay({ companyId, layout, cells, onSelectPosition }: Pi
               </div>
 
               {followOperator && current?.operatorId && (
-                <p className="text-xs text-fg-subtle">Seguindo {current.operatorName ?? current.operatorId} — {visibleEvents.length} evento(s) deste operador nos filtros atuais.</p>
+                <p className="text-xs text-fg-subtle">Seguindo {current.operatorName ?? current.operatorId} — {visibleEvents.length} {plural(visibleEvents.length, 'evento', 'eventos')} deste operador nos filtros atuais.</p>
               )}
             </PanelSection>
           </Panel>

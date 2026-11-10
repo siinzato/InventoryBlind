@@ -17,6 +17,7 @@ import type { ProductValidated, ImportSummary } from '../lib/productImportTypes'
 import { formatPrice, exportErrorsToCSV, downloadFile } from '../lib/productImportUtils';
 import type { ImportError } from '../lib/productImportTypes';
 import { Panel, PanelSection, Button } from './ui';
+import { plural } from '../lib/formatPtBr';
 
 interface ProductImportPreviewProps {
   products: ProductValidated[];
@@ -107,7 +108,7 @@ export const ProductImportPreview: React.FC<ProductImportPreviewProps> = ({
             <AlertTriangle size={20} className="text-red-600 dark:text-red-400 flex-shrink-0 mt-0.5" />
             <div className="flex-1">
               <h4 className="font-semibold text-red-700 dark:text-red-400">
-                Existem {summary.invalidProducts} linhas com erros que não serão importadas
+                Existem {summary.invalidProducts} {plural(summary.invalidProducts, 'linha', 'linhas')} com erros que não serão importadas
               </h4>
               <p className="text-sm text-fg-muted mt-1">
                 Corrija os erros na planilha e faça o upload novamente, ou prossiga apenas com os produtos válidos.
@@ -216,7 +217,7 @@ export const ProductImportPreview: React.FC<ProductImportPreviewProps> = ({
           ) : (
             <>
               <FileSpreadsheet size={18} />
-              Confirmar Importação ({summary.newProducts + summary.updateProducts} produtos)
+              Confirmar Importação ({summary.newProducts + summary.updateProducts} {plural(summary.newProducts + summary.updateProducts, 'produto', 'produtos')})
             </>
           )}
         </Button>

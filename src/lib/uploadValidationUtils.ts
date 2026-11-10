@@ -1,3 +1,4 @@
+import { plural } from '../lib/formatPtBr';
 export interface UploadValidationResult {
   valid: boolean;
   error?: string;
@@ -45,7 +46,7 @@ export function validateRowCount(count: number): UploadValidationResult {
   if (count > MAX_ROWS) {
     return {
       valid: false,
-      error: `Planilha contém ${count.toLocaleString()} linhas. Máximo permitido: ${MAX_ROWS.toLocaleString()}`,
+      error: `Planilha contém ${count.toLocaleString()} ${plural(count, 'linha', 'linhas')}. Máximo permitido: ${MAX_ROWS.toLocaleString()}`,
     };
   }
   return { valid: true };

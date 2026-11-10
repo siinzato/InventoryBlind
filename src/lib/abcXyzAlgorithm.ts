@@ -15,6 +15,7 @@
 // `unclassifiedReason` abaixo.
 
 import type { AbcClass, XyzClass, AbcXyzCombo, AbcXyzUnclassifiedReason } from './supabase';
+import { plural } from '../lib/formatPtBr';
 
 // ── XYZ — previsibilidade de demanda (coeficiente de variação semanal) ────────
 
@@ -62,7 +63,7 @@ export function classifyXYZ(input: XyzInput, thresholds: XyzThresholds = DEFAULT
       xyzClass: null, coefficientOfVariation: null, meanWeekly: null, stdDevWeekly: null,
       weeksWithData, weeksWithoutSale: input.weeklyQuantities.filter(q => q === 0).length,
       unclassifiedReason: 'historico_insuficiente',
-      detail: `Apenas ${weeksWithData} semana(s) completa(s) no período — mínimo de ${MIN_COMPLETE_WEEKS} exigido`,
+      detail: `Apenas ${weeksWithData} ${plural(weeksWithData, 'semana completa', 'semanas completas')} no período — mínimo de ${MIN_COMPLETE_WEEKS} exigido`,
     };
   }
 

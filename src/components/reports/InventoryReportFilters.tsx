@@ -9,6 +9,7 @@ import type { SegmentedOption } from '../ui';
 import { matchesProductSearch } from '../../lib/reports/inventoryReportAlgorithm';
 import type { ReportProduct, ReportSelectionMode } from '../../lib/reports/inventoryReportTypes';
 import type { ProductBrand, ProductLine } from '../../lib/productBrands/productBrandService';
+import { plural } from '../../lib/formatPtBr';
 
 const MODES: SegmentedOption<ReportSelectionMode>[] = [
   { value: 'location', label: 'Por Local', icon: MapPin },
@@ -285,7 +286,7 @@ export function InventoryReportFilters(props: InventoryReportFiltersProps) {
           {pageCount > 1 && (
             <div className="mt-3 flex items-center justify-between text-xs text-fg-subtle">
               <span>
-                {filteredManual.length} produtos • página {currentPage + 1} de {pageCount}
+                {filteredManual.length} {plural(filteredManual.length, 'produto', 'produtos')} • página {currentPage + 1} de {pageCount}
               </span>
               <div className="flex gap-2">
                 <Button
@@ -312,7 +313,7 @@ export function InventoryReportFilters(props: InventoryReportFiltersProps) {
 
       <PanelSection padding="sm">
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          <Badge>{matchedProducts} produtos encontrados</Badge>
+          <Badge>{matchedProducts} {plural(matchedProducts, 'produto', 'produtos')} encontrados</Badge>
           <Badge>{matchedLocations} locais encontrados</Badge>
         </div>
       </PanelSection>

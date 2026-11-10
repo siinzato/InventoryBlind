@@ -17,7 +17,7 @@ import { supabase } from '../lib/supabase';
 import type { UserProductivityStats } from '../lib/supabase';
 import { downloadFile } from '../lib/productImportUtils';
 import { resolvePeriodRange, type ReportPeriod } from '../lib/productivityService';
-import { pct, int } from '../lib/formatPtBr';
+import { pct, int, plural } from '../lib/formatPtBr';
 import {
   MIN_RANKING_SAMPLE, SITUACAO_LABEL, computeSituacao, pickDestaquesConsistentes,
   compareByQualityFirst, groupEntityPeriodStats, dailyStatsByEntity, summarizeTrend,
@@ -469,7 +469,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                       <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium text-fg truncate">{d.name}</p>
                         <p className="text-xs text-fg-subtle">
-                          {d.ritmoPerHour !== null ? `${d.ritmoPerHour.toFixed(1)} SKUs/h · ` : ''}{d.skus} SKUs
+                          {d.ritmoPerHour !== null ? `${d.ritmoPerHour.toFixed(1)} ${plural(d.ritmoPerHour, 'SKU', 'SKUs')}/h · ` : ''}{d.skus} {plural(d.skus, 'SKU', 'SKUs')}
                         </p>
                       </div>
                       <span className="text-sm font-semibold text-fg tabular-nums">{d.accuracy == null ? '—' : pct(d.accuracy)}</span>
@@ -593,7 +593,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
               </div>
 
               {totalPages > 1 && <Pagination page={page} totalPages={totalPages} setPage={setPage} currentCount={currentData.length} />}
-              <PanelSection padding="sm"><p className="text-caption">Comparável após {MIN_RANKING_SAMPLE} SKUs contabilizados.</p></PanelSection>
+              <PanelSection padding="sm"><p className="text-caption">Comparável após {MIN_RANKING_SAMPLE} {plural(MIN_RANKING_SAMPLE, 'SKU', 'SKUs')} contabilizados.</p></PanelSection>
             </Panel>
           </>
         )}
@@ -607,7 +607,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                     <Stat
                       label="Operadores Elegíveis"
                       value={`${operadoresElegiveis.length} de ${allOperatorPeriodStats.length}`}
-                      context={`Mínimo de ${MIN_RANKING_SAMPLE} SKUs`}
+                      context={`Mínimo de ${MIN_RANKING_SAMPLE} ${plural(MIN_RANKING_SAMPLE, 'SKU', 'SKUs')}`}
                       icon={<Users />}
                     />
                   </StatCell>
@@ -615,13 +615,13 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                     <Stat
                       label="Maior Acuracidade"
                       value={maiorAcuracidade?.accuracy != null ? pct(maiorAcuracidade.accuracy) : '—'}
-                      context={maiorAcuracidade ? `${maiorAcuracidade.name} · ${int(maiorAcuracidade.skus)} SKUs` : 'Nenhum operador elegível'}
+                      context={maiorAcuracidade ? `${maiorAcuracidade.name} · ${int(maiorAcuracidade.skus)} ${plural(maiorAcuracidade.skus, 'SKU', 'SKUs')}` : 'Nenhum operador elegível'}
                     />
                   </StatCell>
                   <StatCell>
                     <Stat
                       label="Melhor Ritmo com Qualidade"
-                      value={melhorRitmoComQualidade ? `${melhorRitmoComQualidade.ritmoPerHour?.toFixed(1)} SKUs/h` : '—'}
+                      value={melhorRitmoComQualidade ? `${melhorRitmoComQualidade.ritmoPerHour?.toFixed(1)} ${plural((melhorRitmoComQualidade.ritmoPerHour ?? 0), 'SKU', 'SKUs')}/h` : '—'}
                       context={melhorRitmoComQualidade ? `${melhorRitmoComQualidade.name} · ${melhorRitmoComQualidade.accuracy == null ? '—' : pct(melhorRitmoComQualidade.accuracy)}` : 'Nenhum operador elegível'}
                     />
                   </StatCell>
@@ -629,7 +629,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                     <Stat
                       label="Maior Risco de Retrabalho"
                       value={maiorRiscoRetrabalho?.name ?? '—'}
-                      context={maiorRiscoRetrabalho ? `${maiorRiscoRetrabalho.divergencias} divergências` : 'Nenhum operador elegível'}
+                      context={maiorRiscoRetrabalho ? `${maiorRiscoRetrabalho.divergencias} ${plural(maiorRiscoRetrabalho.divergencias, 'divergência', 'divergências')}` : 'Nenhum operador elegível'}
                       valueTone={maiorRiscoRetrabalho ? 'critical' : 'default'}
                     />
                   </StatCell>
@@ -729,7 +729,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                         <Td className="text-center">
                           {row.elegivel
                             ? <span className="text-xs text-fg-muted">Elegível</span>
-                            : <span className="text-xs text-fg-subtle">Não elegível (amostra &lt; {MIN_RANKING_SAMPLE} SKUs)</span>}
+                            : <span className="text-xs text-fg-subtle">Não elegível (amostra &lt; {MIN_RANKING_SAMPLE} {plural(MIN_RANKING_SAMPLE, 'SKU', 'SKUs')})</span>}
                         </Td>
                         <Td className="text-center"><SituacaoBadge situacao={row.situacao} /></Td>
                       </Tr>

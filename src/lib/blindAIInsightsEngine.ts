@@ -12,6 +12,7 @@ import { getMatrixCounts } from './abcXyzService';
 import { listRecords as listRcaRecords } from './rcaService';
 import { computeParetoBuckets, groupByDimension, CAUSE_LABEL } from './rcaAlgorithm';
 import type { BlindAISituation } from './supabase';
+import { plural } from '../lib/formatPtBr';
 
 /** Inteiro em pt-BR (separador de milhar) — só formatação de um valor já calculado. */
 function int(value: number): string {
@@ -64,7 +65,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
       icon: '⚠️',
       severity: worsened.length >= 10 ? 'critical' : 'warning',
       title: 'Piora de risco detectada',
-      evidence: `${worsened.length} produtos migraram para uma faixa de risco pior desde o último recômputo`,
+      evidence: `${worsened.length} ${plural(worsened.length, 'produto', 'produtos')} migraram para uma faixa de risco pior desde o último recômputo`,
       reasons: ['Comparação entre as duas últimas atualizações de risco de cada produto'],
       recommendation: 'Revisar os produtos que pioraram de faixa e priorizar recontagem.',
       module: 'risk',
@@ -112,7 +113,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
       icon: '📊',
       severity: azPct >= 15 ? 'critical' : 'warning',
       title: 'Itens de alto valor e baixa previsibilidade',
-      evidence: `${abcXyzMatrix.AZ.count} SKUs classificados como A/Z (alto valor, demanda instável) — ${azPct}% do catálogo classificado`,
+      evidence: `${abcXyzMatrix.AZ.count} ${plural(abcXyzMatrix.AZ.count, 'SKU', 'SKUs')} classificados como A/Z (alto valor, demanda instável) — ${azPct}% do catálogo classificado`,
       reasons: [
         'Alto valor movimentado combinado com maior variação de demanda',
         'Maior exposição a divergência e ruptura de estoque',
@@ -134,7 +135,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
         severity: top.pctOfTotal >= 45 ? 'critical' : 'warning',
         title: 'Padrão de divergência identificado',
         evidence: `${CAUSE_LABEL[top.category]} concentra ${Math.round(top.pctOfTotal)}% das divergências registradas nos últimos 90 dias`,
-        reasons: [`${top.count} de ${rcaRecords.length} registros de causa analisados`],
+        reasons: [`${top.count} de ${rcaRecords.length} ${plural(rcaRecords.length, 'registro', 'registros')} de causa analisados`],
         recommendation: 'Investigar a causa raiz predominante antes de agir sobre os demais casos.',
         module: 'rca',
         actionLabel: 'Ver Root Cause Analysis',
@@ -152,7 +153,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
         icon: '🔥',
         severity: topSkusPct >= 55 ? 'critical' : 'warning',
         title: 'Divergências concentradas em poucos SKUs',
-        evidence: `${topSkus.length} SKUs concentram ${topSkusPct}% das divergências registradas nos últimos 90 dias`,
+        evidence: `${topSkus.length} ${plural(topSkus.length, 'SKU', 'SKUs')} concentram ${topSkusPct}% das divergências registradas nos últimos 90 dias`,
         reasons: topSkus.slice(0, 3).map(b => `${b.label}: ${b.count} ocorrência${b.count === 1 ? '' : 's'}`),
         recommendation: 'Priorizar recontagem e investigação destes SKUs específicos.',
         module: 'rca',
@@ -174,7 +175,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
           icon: '📈',
           severity: increasePct >= 80 ? 'critical' : 'warning',
           title: 'Aumento de divergências na última semana',
-          evidence: `${last7} divergências nos últimos 7 dias, ${increasePct}% acima da semana anterior (${prev7})`,
+          evidence: `${last7} ${plural(last7, 'divergência', 'divergências')} nos últimos 7 dias, ${increasePct}% acima da semana anterior (${prev7})`,
           reasons: ['Comparação entre os registros de causa dos últimos 7 e dos 7 dias anteriores'],
           recommendation: 'Verificar se alguma mudança recente de processo ou operador explica o aumento.',
           module: 'rca',

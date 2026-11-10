@@ -13,7 +13,7 @@ import { RISK_LEVEL_LABEL } from '../../lib/cbcAlgorithm';
 import { downloadFile } from '../../lib/productImportUtils';
 import { ConfidenceDetailDrawer } from './ConfidenceDetailDrawer';
 import type { RiskLevel } from '../../lib/supabase';
-import { int } from '../../lib/formatPtBr';
+import { int, plural } from '../../lib/formatPtBr';
 
 interface CBCDashboardPageProps {
   companyId: string;
@@ -235,7 +235,7 @@ export function CBCDashboardPage({ companyId, userId, userEmail, onNavigateToCou
               <Stat
                 label="SKU-locais avaliados"
                 value={summary ? summary.total_scored.toLocaleString('pt-BR') : '—'}
-                context={summary ? `${summary.distinct_locations} local(is)` : undefined}
+                context={summary ? `${summary.distinct_locations} ${plural(summary.distinct_locations, 'local', 'locais')}` : undefined}
               />
             </StatCell>
             <StatCell>
@@ -306,7 +306,7 @@ export function CBCDashboardPage({ companyId, userId, userEmail, onNavigateToCou
             </div>
             {selected.size > 0 && (
               <div className="flex items-center gap-2">
-                <span className="text-xs text-fg-subtle">{selected.size} selecionado(s)</span>
+                <span className="text-xs text-fg-subtle">{selected.size} {plural(selected.size, 'selecionado', 'selecionados')}</span>
                 <Button size="sm" onClick={handleBulkSchedule}>Programar contagem</Button>
                 <Button size="sm" variant="secondary" onClick={handleExport}>Exportar</Button>
               </div>

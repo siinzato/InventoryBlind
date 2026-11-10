@@ -29,6 +29,7 @@ import {
   type CatalogQualitySnapshot,
 } from '../lib/productCatalog/catalogQuality';
 import { loadCatalogPrefs, saveCatalogPrefs, CATALOG_OPTIONAL_COLUMNS, type CatalogColumnKey } from '../lib/productCatalog/catalogPrefs';
+import { plural } from '../lib/formatPtBr';
 
 /** Filtro vindo de Linhas e Marcas — quando presente, a listagem é restrita à
  *  marca/linha/pendência escolhida via join no backend (nunca no navegador). */
@@ -305,7 +306,7 @@ export const ImportedProductsPage: FC<ImportedProductsPageProps> = ({
 
   const totalPages = Math.ceil(totalProducts / pageSize);
 
-  const headerDescription = `${totalProducts.toLocaleString('pt-BR')} produtos cadastrados`
+  const headerDescription = `${totalProducts.toLocaleString('pt-BR')} ${plural(totalProducts, 'produto', 'produtos')} cadastrados`
     + (qualitySnapshot?.lastUpdatedAt ? ` · Atualizado ${formatLastUpdated(qualitySnapshot.lastUpdatedAt)}` : '');
 
   return (
@@ -641,7 +642,7 @@ export const ImportedProductsPage: FC<ImportedProductsPageProps> = ({
 
                 <PanelSection padding="sm" className="flex flex-wrap items-center justify-between gap-3">
                   <p className="text-sm text-fg-subtle">
-                    Mostrando {(currentPage - 1) * pageSize + 1} a {Math.min(currentPage * pageSize, totalProducts)} de {totalProducts.toLocaleString('pt-BR')} produtos
+                    Mostrando {(currentPage - 1) * pageSize + 1} a {Math.min(currentPage * pageSize, totalProducts)} de {totalProducts.toLocaleString('pt-BR')} {plural(totalProducts, 'produto', 'produtos')}
                   </p>
                   <div className="flex items-center gap-3">
                     <Select value={pageSize} onChange={e => { setPageSize(Number(e.target.value)); setCurrentPage(1); }}>

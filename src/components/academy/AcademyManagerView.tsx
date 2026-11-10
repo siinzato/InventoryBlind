@@ -4,6 +4,7 @@ import { Panel, PanelSection, Badge, Button } from '../ui';
 import { getTeamAcademySummary } from '../../lib/academyService';
 import { PDIManagerModal } from './PDIManagerModal';
 import type { AcademyTeamSummaryRow } from '../../lib/supabase';
+import { plural } from '../../lib/formatPtBr';
 
 interface AcademyManagerViewProps {
   companyId: string;
@@ -66,7 +67,7 @@ export function AcademyManagerView({ companyId, currentUserId, currentUserEmail 
                   <div className="min-w-0">
                     <p className="text-sm font-medium text-fg truncate">{t.name ?? '—'}</p>
                     <p className="text-xs text-fg-subtle">
-                      {t.courses_completed} cursos · {t.hours_studied}h · {t.certificates_count} certificado(s)
+                      {t.courses_completed} cursos · {t.hours_studied}h · {t.certificates_count} {plural(t.certificates_count, 'certificado', 'certificados')}
                       {t.never_accessed && ' · nunca acessou'}
                     </p>
                   </div>

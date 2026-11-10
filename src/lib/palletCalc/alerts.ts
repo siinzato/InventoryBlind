@@ -3,7 +3,7 @@
 
 import type { AlertSeverity, BoxSpec, PalletAlert, PalletSpec } from './types';
 import type { LayerLimitsResult } from './layerEngine';
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 
 const LOW_OCCUPATION_THRESHOLD_PCT = 70;
 const LOW_LAST_PALLET_THRESHOLD_PCT = 50;
@@ -88,7 +88,7 @@ export function computeAlerts(input: AlertsInput): PalletAlert[] {
   if (input.capacityPerPallet > 0) {
     const lastPalletPct = (input.lastPalletQty / input.capacityPerPallet) * 100;
     if (input.lastPalletQty < input.capacityPerPallet && lastPalletPct < LOW_LAST_PALLET_THRESHOLD_PCT) {
-      alerts.push(alert('ultimo-palete-baixa-ocupacao', 'warning', `Último palete com baixa ocupação (${pct(lastPalletPct, 0)}, ${input.lastPalletQty} de ${input.capacityPerPallet} caixas).`));
+      alerts.push(alert('ultimo-palete-baixa-ocupacao', 'warning', `Último palete com baixa ocupação (${pct(lastPalletPct, 0)}, ${input.lastPalletQty} de ${input.capacityPerPallet} ${plural(input.capacityPerPallet, 'caixa', 'caixas')}).`));
     }
   }
 

@@ -3,6 +3,7 @@ import { Upload, X, AlertTriangle, FileSpreadsheet, RefreshCw } from 'lucide-rea
 import { ComparatorBaseState, createEmptyBaseState, CellValue } from '../../lib/spreadsheet-comparator/types';
 import { readSpreadsheetGrid, detectHeaderRowIndex, buildParsedSheet, validateFileBeforeParse } from '../../lib/spreadsheet-comparator/fileParser';
 import { SheetPreview } from './SheetPreview';
+import { plural } from '../../lib/formatPtBr';
 
 interface FileUploadPanelProps {
   base: ComparatorBaseState;
@@ -92,7 +93,7 @@ export const FileUploadPanel: React.FC<FileUploadPanelProps> = ({ base, onChange
             <div className="min-w-0">
               <p className="text-sm font-semibold text-fg truncate">{base.meta.name}</p>
               <p className="text-xs text-fg-subtle mt-0.5">
-                {formatBytes(base.meta.sizeBytes)} · {parsed.rows.length} linha(s) · {parsed.headers.length} coluna(s)
+                {formatBytes(base.meta.sizeBytes)} · {parsed.rows.length} {plural(parsed.rows.length, 'linha', 'linhas')} · {parsed.headers.length} {plural(parsed.headers.length, 'coluna', 'colunas')}
                 {base.truncated ? ' · arquivo cortado no limite de linhas' : ''}
               </p>
             </div>

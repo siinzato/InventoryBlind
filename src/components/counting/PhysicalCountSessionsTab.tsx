@@ -21,6 +21,7 @@ import { PhysicalCountSessionView } from './PhysicalCountSessionView';
 import { PhysicalCountResultPanel } from './PhysicalCountResultPanel';
 import { PhysicalCountApprovalPanel } from './PhysicalCountApprovalPanel';
 import type { PhysicalCountCandidateProduct, PhysicalCountItem, PhysicalCountSession, RecountEvent } from '../../lib/physicalCount/physicalCountTypes';
+import { plural } from '../../lib/formatPtBr';
 
 interface PhysicalCountSessionsTabProps {
   companyId: string;
@@ -394,7 +395,7 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
           )}
           {!loadError && scopeAvailability === 'no_locations' && (
             <p className="mt-3 text-sm text-amber-600 dark:text-amber-400">
-              Esta empresa tem {products.length} produto(s) cadastrado(s), mas nenhum com o campo Localização preenchido. Cadastre a localização dos produtos (edição do produto ou importação de planilha) antes de iniciar uma contagem física.
+              Esta empresa tem {products.length} {plural(products.length, 'produto cadastrado', 'produtos cadastrados')}, mas nenhum com o campo Localização preenchido. Cadastre a localização dos produtos (edição do produto ou importação de planilha) antes de iniciar uma contagem física.
             </p>
           )}
           {!loadError && scopeAvailability === 'ok' && (
@@ -415,7 +416,7 @@ export function PhysicalCountSessionsTab({ companyId }: PhysicalCountSessionsTab
                 )}
               </div>
               <div className="mt-3 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                <p className="text-xs text-fg-muted">{matched.length} produto(s) nesta faixa.</p>
+                <p className="text-xs text-fg-muted">{matched.length} {plural(matched.length, 'produto', 'produtos')} nesta faixa.</p>
                 <Button onClick={handleCreate} disabled={creating || matched.length === 0}>
                   <Plus size={16} /> {creating ? 'Criando…' : 'Iniciar Contagem Cega'}
                 </Button>

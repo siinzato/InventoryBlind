@@ -3,6 +3,7 @@
 // de warehouseInsightsEngine.ts/slottingEngine.ts).
 
 import type { WarehouseCell, WarehouseLayout, WarehouseZone } from './supabase';
+import { plural } from '../lib/formatPtBr';
 
 export type ValidationSeverity = 'error' | 'warning';
 
@@ -71,17 +72,17 @@ export function validateLayoutForPublish({ layout, cells, zones }: ValidateLayou
     issues.push({
       code: 'duplicate_addresses',
       severity: 'error',
-      message: `${duplicated.length} código(s) de endereço duplicado(s) entre posições: ${duplicated.join(', ')}.`,
+      message: `${duplicated.length} ${plural(duplicated.length, 'código de endereço duplicado', 'códigos de endereço duplicados')} entre posições: ${duplicated.join(', ')}.`,
     });
   }
 
   const outOfBounds = cells.filter(c => c.x < 0 || c.y < 0 || c.x >= layout.grid_width || c.y >= layout.grid_height);
   if (outOfBounds.length > 0) {
-    issues.push({ code: 'out_of_bounds', severity: 'error', message: `${outOfBounds.length} estrutura(s) fora dos limites da grade.` });
+    issues.push({ code: 'out_of_bounds', severity: 'error', message: `${outOfBounds.length} ${plural(outOfBounds.length, 'estrutura', 'estruturas')} fora dos limites da grade.` });
   }
   const zonesOutOfBounds = zones.filter(z => z.min_x < 0 || z.min_y < 0 || z.max_x >= layout.grid_width || z.max_y >= layout.grid_height);
   if (zonesOutOfBounds.length > 0) {
-    issues.push({ code: 'zones_out_of_bounds', severity: 'error', message: `${zonesOutOfBounds.length} zona(s) fora dos limites da grade.` });
+    issues.push({ code: 'zones_out_of_bounds', severity: 'error', message: `${zonesOutOfBounds.length} ${plural(zonesOutOfBounds.length, 'zona', 'zonas')} fora dos limites da grade.` });
   }
 
   const overlappingZonePairs: string[] = [];

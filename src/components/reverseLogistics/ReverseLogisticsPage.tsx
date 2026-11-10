@@ -21,7 +21,7 @@ import { ReturnConfigPanel } from './ReturnConfigPanel';
 import { FullWithdrawalsView } from './FullWithdrawalsView';
 import { PlanFullWithdrawalWizard } from './PlanFullWithdrawalWizard';
 import { FullWithdrawalDetail } from './FullWithdrawalDetail';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 type View = 'list' | 'full' | 'kpis' | 'config';
 type FullSubView = 'list' | 'wizard' | 'detail';
@@ -324,7 +324,7 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
 
             {canWrite && selectedReturnIds.size > 0 && (
               <PanelSection padding="md" className="flex flex-wrap items-center gap-2 bg-surface-3">
-                <span className="text-sm text-fg-subtle">{selectedReturnIds.size} devolução(ões) selecionada(s):</span>
+                <span className="text-sm text-fg-subtle">{selectedReturnIds.size} {plural(selectedReturnIds.size, 'devolução selecionada', 'devoluções selecionadas')}:</span>
                 <Button size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatchAction('move_to_conference')}>Mover para conferência</Button>
                 <Button size="sm" variant="secondary" disabled={batchBusy} onClick={() => runBatchAction('send_to_quarantine')}>Enviar para quarentena</Button>
                 <Button size="sm" variant="ghost" onClick={() => setSelectedReturnIds(new Set())}>Limpar seleção</Button>

@@ -17,6 +17,7 @@ import { ClassificationMatrix } from './ClassificationMatrix';
 import { ClassificationBadge } from './ClassificationBadge';
 import { AbcXyzDetailDrawer } from './AbcXyzDetailDrawer';
 import type { AbcClass, AbcXyzCombo } from '../../lib/supabase';
+import { plural } from '../../lib/formatPtBr';
 
 interface AbcXyzDashboardPageProps {
   companyId: string;
@@ -329,7 +330,7 @@ export function AbcXyzDashboardPage({ companyId, userId, userEmail, onOpenProduc
 
               {overview.unclassifiedCount > 0 && tab !== 'unclassified' && !selectedCombo && (
                 <p className="text-xs text-fg-subtle pt-2 border-t border-edge">
-                  {overview.unclassifiedCount} produto(s) não foram classificados por ausência de dado suficiente ·{' '}
+                  {overview.unclassifiedCount} {plural(overview.unclassifiedCount, 'produto', 'produtos')} não foram classificados por ausência de dado suficiente ·{' '}
                   <button onClick={() => setTab('unclassified')} className="text-accent hover:text-accent-strong font-medium">Revisar dados</button>
                 </p>
               )}

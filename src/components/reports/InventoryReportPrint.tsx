@@ -25,6 +25,7 @@ import {
   formatEmissionTimestamp,
 } from '../../lib/reports/inventoryReportOutput';
 import type { InventoryReportRow, ReportMeta } from '../../lib/reports/inventoryReportTypes';
+import { plural } from '../../lib/formatPtBr';
 
 /** Largura útil de uma A4 deitada com margem de 8mm: 297 - 16. */
 export const SHEET_CONTENT_WIDTH_MM = 281;
@@ -164,7 +165,7 @@ export function InventoryReportDocument({
                 <div className="ib-rep-head">
                   <h1 className="ib-rep-title">InventoryBlind - Relatório de Contagem</h1>
                   <span className="ib-rep-tally">
-                    {meta.productCount} produtos • {meta.locationCount} endereços
+                    {meta.productCount} {plural(meta.productCount, 'produto', 'produtos')} • {meta.locationCount} {plural(meta.locationCount, 'endereço', 'endereços')}
                   </span>
                 </div>
                 <p className="ib-rep-sub">

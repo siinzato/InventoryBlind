@@ -10,7 +10,7 @@ import { listCountRecords } from '../auditCrossCheckService';
 import { topConcentration } from '../rcaAlgorithm';
 import { computeAccuracyStat } from './analyticsMath';
 import type { BlindAISituation } from '../supabase';
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 
 /** Mesmo formato de BlindAISituation, mas com um destino de navegação a mais
  *  ('analytics-audit', a página nova de Auditorias) que o union original não previa — por
@@ -45,7 +45,7 @@ async function getLocationConcentrationInsight(companyId: string): Promise<Analy
     severity: top.pct >= 50 ? 'critical' : 'warning',
     title: 'Localização com concentração de divergências',
     evidence: `${top.label} concentra ${Math.round(top.pct)}% das divergências registradas nos últimos 90 dias`,
-    reasons: [`${records.length} divergência(s) com localização registrada no período`],
+    reasons: [`${records.length} ${plural(records.length, 'divergência', 'divergências')} com localização registrada no período`],
     recommendation: 'Investigar o processo dessa localização antes de agir sobre as demais.',
     module: 'rca',
     actionLabel: 'Ver Root Cause Analysis',
@@ -78,7 +78,7 @@ async function getAccuracyTrendInsight(companyId: string): Promise<AnalyticsInsi
     severity: improving ? 'info' : Math.abs(deltaPoints) >= 15 ? 'critical' : 'warning',
     title: improving ? 'Melhoria de acurácia detectada' : 'Deterioração de acurácia detectada',
     evidence: `Acuracidade média foi de ${pct(avgFirst)} para ${pct(avgSecond)} entre a primeira e a segunda metade das sessões de contagem registradas`,
-    reasons: [`${stat.sessionsConsidered} sessão(ões) de contagem com acurácia calculada`],
+    reasons: [`${stat.sessionsConsidered} ${plural(stat.sessionsConsidered, 'sessão', 'sessões')} de contagem com acurácia calculada`],
     recommendation: improving
       ? 'Manter o processo atual de contagem, que vem melhorando a acurácia.'
       : 'Investigar o que mudou no processo de contagem nas sessões mais recentes.',

@@ -5,6 +5,7 @@ import { getRecentOperations, getOperationLocations, RecentOperationSummary } fr
 import { computeRouteThroughStops, findExpeditionCell, estimatePickingTimeSeconds, GridPoint } from '../../lib/slottingEngine';
 import { FloorPlanBackground } from './FloorPlanBackground';
 import type { WarehouseLayout, WarehouseCell } from '../../lib/supabase';
+import { plural } from '../../lib/formatPtBr';
 
 interface PickingRouteViewerProps {
   companyId: string;
@@ -79,7 +80,7 @@ export function PickingRouteViewer({ companyId, layout, cells }: PickingRouteVie
           >
             <option value="">Selecione uma operação Full...</option>
             {operations.map(op => (
-              <option key={op.id} value={op.id}>{op.fullNumber} — {new Date(op.createdAt).toLocaleDateString('pt-BR')} ({op.itemCount} SKUs)</option>
+              <option key={op.id} value={op.id}>{op.fullNumber} — {new Date(op.createdAt).toLocaleDateString('pt-BR')} ({op.itemCount} {plural(op.itemCount, 'SKU', 'SKUs')})</option>
             ))}
           </select>
         </div>

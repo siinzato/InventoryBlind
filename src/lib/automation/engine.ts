@@ -36,6 +36,7 @@ import { interpolateConfig } from './interpolation.ts';
 import { ACTIONS, effectiveMaxAttempts, isKnownAction, type ActionKey } from './registry.ts';
 import { MAX_NODE_VISITS, findTriggerNode, nextNodeId, validateWorkflow } from './workflow.ts';
 import { SWITCH_BRANCH_PREFIX } from './types.ts';
+import { plural } from '../../lib/formatPtBr';
 import type {
   Automation,
   AutomationEvent,
@@ -605,7 +606,7 @@ export class AutomationEngine {
             truncated,
             ...(bodyStart == null ? { note: 'Nada ligado à saída do laço.' } : {}),
           },
-          errorMessage: truncated ? `Interrompido em ${iterations} de ${items.length} itens.` : null,
+          errorMessage: truncated ? `Interrompido em ${iterations} de ${items.length} ${plural(items.length, 'item', 'itens')}.` : null,
           attempts: 1,
           durationMs: this.clock.now() - nodeStarted,
         };

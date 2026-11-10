@@ -1,6 +1,7 @@
 import { Fragment } from 'react';
 import type { AbcClass, XyzClass, AbcXyzCombo } from '../../lib/supabase';
 import { combineAbcXyz } from '../../lib/abcXyzAlgorithm';
+import { plural } from '../../lib/formatPtBr';
 
 const ABC_ROWS: { value: AbcClass; label: string }[] = [
   { value: 'A', label: 'Maior impacto' },
@@ -51,7 +52,7 @@ export function ClassificationMatrix({ counts, selected, onSelect }: Classificat
                   }`}
                 >
                   <p className="text-sm font-semibold text-fg">{combo}</p>
-                  <p className="text-xs text-fg-muted mt-1">{cell.count.toLocaleString('pt-BR')} SKUs</p>
+                  <p className="text-xs text-fg-muted mt-1">{cell.count.toLocaleString('pt-BR')} {plural(cell.count, 'SKU', 'SKUs')}</p>
                   <p className="text-[11px] text-fg-subtle">
                     R$ {cell.value.toLocaleString('pt-BR', { maximumFractionDigits: 0 })}
                   </p>

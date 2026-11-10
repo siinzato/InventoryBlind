@@ -1,7 +1,7 @@
 import { AlertTriangle, XCircle } from 'lucide-react';
 import { Stat, StatRow, StatCell } from '../ui';
 import type { PalletCalcAlternative } from '../../lib/palletCalc/calculatePallet';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 interface PalletResultCardsProps {
   alt: PalletCalcAlternative;
@@ -17,7 +17,7 @@ export function PalletResultCards({ alt }: PalletResultCardsProps) {
         <StatCell><Stat label="Total de paletes" value={String(alt.palletsNeeded.totalPallets)} /></StatCell>
       </StatRow>
       <StatRow>
-        <StatCell><Stat label="Último palete" value={`${alt.palletsNeeded.lastPalletQty} caixas`} /></StatCell>
+        <StatCell><Stat label="Último palete" value={`${alt.palletsNeeded.lastPalletQty} ${plural(alt.palletsNeeded.lastPalletQty, 'caixa', 'caixas')}`} /></StatCell>
         <StatCell><Stat label="Ocupação da base" value={pct(alt.pattern.occupationPct, 0)} valueTone={alt.pattern.occupationPct < 70 ? 'warning' : 'default'} /></StatCell>
         <StatCell><Stat label="Altura total" value={`${alt.totalHeightMm.toFixed(0)} mm`} /></StatCell>
         <StatCell><Stat label="Peso bruto" value={`${alt.grossKg.toFixed(1)} kg`} /></StatCell>

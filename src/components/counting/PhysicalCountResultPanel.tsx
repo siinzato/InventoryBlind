@@ -5,6 +5,7 @@ import { computeSessionSummary, computeTotalFound, shouldRecommendRecount } from
 import { getRecountEventForSession, getSessionItems } from '../../lib/physicalCount/physicalCountService';
 import { formatMeasured, type RecountThresholdType } from '../../lib/physicalCount/recountPolicy';
 import type { PhysicalCountItem, RecountEvent } from '../../lib/physicalCount/physicalCountTypes';
+import { plural } from '../../lib/formatPtBr';
 
 interface PhysicalCountResultPanelProps {
   sessionId: string;
@@ -145,7 +146,7 @@ export function PhysicalCountResultPanel({ sessionId, countNumber, onCreateRecou
       {shouldRecommendRecount(summary) && countNumber < 3 && onCreateRecount && (
         <div className="flex items-center justify-between gap-3 rounded-lg border border-amber-500/30 bg-amber-500/10 px-4 py-3">
           <p className="text-sm text-fg">
-            {divergentCount} SKU(s) divergente(s) —{' '}
+            {divergentCount} {plural(divergentCount, 'SKU divergente', 'SKUs divergentes')} —{' '}
             {recountEvent?.status === 'created'
               ? 'a recontagem automática já foi gerada.'
               : 'recomenda-se reconferência.'}

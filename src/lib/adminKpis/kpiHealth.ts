@@ -1,4 +1,4 @@
-import { pct } from '../formatPtBr';
+import { pct, plural } from '../formatPtBr';
 // Regras puras, determinísticas e centralizadas para o resumo operacional e os alertas
 // prioritários do bloco "KPIs e Indicadores" (Painel Administrativo). Nenhuma IA, nenhum motor
 // de recomendação — só limiares fixos e documentados sobre dados já existentes:
@@ -182,8 +182,8 @@ export function buildPriorityAlerts(input: {
       id: 'stale-kpis',
       severity: 'atencao',
       description: staleKpiNames.length === 1
-        ? `"${staleKpiNames[0]}" está sem atualização há mais de ${STALE_KPI_DAYS} dias.`
-        : `${staleKpiNames.length} indicadores sem atualização há mais de ${STALE_KPI_DAYS} dias.`,
+        ? `"${staleKpiNames[0]}" está sem atualização há mais de ${STALE_KPI_DAYS} ${plural(STALE_KPI_DAYS, 'dia', 'dias')}.`
+        : `${staleKpiNames.length} indicadores sem atualização há mais de ${STALE_KPI_DAYS} ${plural(STALE_KPI_DAYS, 'dia', 'dias')}.`,
       evidence: staleKpiNames.slice(0, 3).join(', '),
       actionKey: 'manage-kpis',
       actionLabel: 'Gerenciar indicadores',

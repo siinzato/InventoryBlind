@@ -1,4 +1,4 @@
-import { int } from '../../lib/formatPtBr';
+import { int, plural } from '../../lib/formatPtBr';
 // Curva ABC — agregações puras de leitura para a Visão geral, Produtos e Matriz de decisão.
 // Nada aqui recalcula classificação ou recomendação: as classes e os códigos já foram
 // calculados e persistidos no momento da publicação, e são a fonte de verdade. Este arquivo
@@ -150,7 +150,7 @@ export function buildPareto(rows: AbcRow[], metric: AbcMetric, maxBins = 60): Pa
       value,
       individualPct: (value / total) * 100,
       cumulativePct: (cumulative / total) * 100,
-      label: items.length === 1 ? (items[0].product_name ?? items[0].sku) : `${int(items.length)} SKUs`,
+      label: items.length === 1 ? (items[0].product_name ?? items[0].sku) : `${int(items.length)} ${plural(items.length, 'SKU', 'SKUs')}`,
       sublabel: items.length === 1 ? items[0].sku : null,
       cls: uniqueClass,
     });

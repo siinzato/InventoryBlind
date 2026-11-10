@@ -1,3 +1,4 @@
+import { plural } from '../../lib/formatPtBr';
 // Lógica pura de intercalação (A1,B1,A2,B2... / A1,B1,C1,A2,B2,C2... / blocos
 // como "2 páginas de A para 1 de B"). Não sabe nada de PDF — recebe só
 // contagens de página por documento e devolve a ordem final como pares
@@ -40,7 +41,7 @@ export function computeInterleaveOrder(docs: InterleaveDocInput[], config: Inter
 
   const missing = config.order.filter(key => !byKey.has(key));
   if (missing.length > 0) {
-    return { sequence: [], warnings: [`Documento(s) não encontrados no padrão: ${missing.join(', ')}.`] };
+    return { sequence: [], warnings: [`${plural(missing.length, 'Documento não encontrado', 'Documentos não encontrados')} no padrão: ${missing.join(', ')}.`] };
   }
   if (config.order.length === 0) {
     return { sequence: [], warnings: ['Nenhum documento no padrão de intercalação.'] };
@@ -98,7 +99,7 @@ export function computeInterleaveOrder(docs: InterleaveDocInput[], config: Inter
     const droppedDocs = rotatedOrder.filter(key => remaining(key) > 0);
     if (droppedDocs.length > 0) {
       const totalDropped = droppedDocs.reduce((sum, key) => sum + remaining(key), 0);
-      warnings.push(`${totalDropped} página(s) restante(s) em ${droppedDocs.join(', ')} não foram incluídas (parar junto ao menor documento).`);
+      warnings.push(`${totalDropped} ${plural(totalDropped, 'página restante', 'páginas restantes')} em ${droppedDocs.join(', ')} não foram incluídas (parar junto ao menor documento).`);
     }
   }
 

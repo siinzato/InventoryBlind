@@ -7,6 +7,7 @@
 // aumentá-la — sem somar divergência + acuracidade de novo (o CBC já incorpora isso) e sem deixar
 // ABC/XYZ derrubar a nota (é exposição operacional, não prova de saldo incorreto).
 import type { AnalyticsRawData } from './analyticsDataService';
+import { plural } from '../../lib/formatPtBr';
 import {
   computeAccuracyStat, computeAbcXyzRiskStat, computeRecurrenceStat,
   computePillarAverages, pillarEligibleCount,
@@ -172,7 +173,7 @@ export function computeBlindScore(raw: AnalyticsRawData): BlindScoreResult {
     reducingFactors.push({
       key: 'rca_recurrence',
       label: 'SKUs com divergência reincidente',
-      detail: `Ocorrências nos últimos ${recurrenceStat.windowDays} dias.`,
+      detail: `Ocorrências nos últimos ${recurrenceStat.windowDays} ${plural(recurrenceStat.windowDays, 'dia', 'dias')}.`,
       count: recurrenceStat.recurringSkus,
       unit: 'SKUs',
       severity: 'alta',
@@ -202,7 +203,7 @@ export function computeBlindScore(raw: AnalyticsRawData): BlindScoreResult {
     recommendations.push({
       key: 'expand_coverage',
       title: 'Amplie a cobertura da análise',
-      detail: `${coverageGap.toLocaleString('pt-BR')} produtos ainda não possuem evidência suficiente para entrar na leitura.`,
+      detail: `${coverageGap.toLocaleString('pt-BR')} ${plural(coverageGap, 'produto', 'produtos')} ainda não possuem evidência suficiente para entrar na leitura.`,
       navigateTo: 'cbc',
       actionLabel: 'Abrir Confidence Score',
     });
@@ -211,7 +212,7 @@ export function computeBlindScore(raw: AnalyticsRawData): BlindScoreResult {
     recommendations.push({
       key: 'recalculate_confidence',
       title: 'Recalcule o Confidence Score',
-      detail: `Os ${evaluated.toLocaleString('pt-BR')} produtos avaliados foram pontuados por uma versão anterior do cálculo e precisam ser recalculados.`,
+      detail: `Os ${evaluated.toLocaleString('pt-BR')} ${plural(evaluated, 'produto', 'produtos')} avaliados foram pontuados por uma versão anterior do cálculo e precisam ser recalculados.`,
       navigateTo: 'cbc',
       actionLabel: 'Abrir Confidence Score',
     });
@@ -238,7 +239,7 @@ export function computeBlindScore(raw: AnalyticsRawData): BlindScoreResult {
     recommendations.push({
       key: 'investigate_recurrence',
       title: 'Investigue as divergências reincidentes',
-      detail: `${recurrenceStat.recurringSkus} SKUs bateram o limiar de reincidência nos últimos ${recurrenceStat.windowDays} dias.`,
+      detail: `${recurrenceStat.recurringSkus} ${plural(recurrenceStat.recurringSkus, 'SKU', 'SKUs')} bateram o limiar de reincidência nos últimos ${recurrenceStat.windowDays} ${plural(recurrenceStat.windowDays, 'dia', 'dias')}.`,
       navigateTo: 'rca',
       actionLabel: 'Investigar RCA',
     });
@@ -247,7 +248,7 @@ export function computeBlindScore(raw: AnalyticsRawData): BlindScoreResult {
     recommendations.push({
       key: 'run_recounts',
       title: 'Execute reconferências independentes',
-      detail: `Nenhuma das ${raw.crossCheckChainCount} contagens registradas tem recontagem, então a qualidade da validação não pode ser avaliada.`,
+      detail: `Nenhuma das ${raw.crossCheckChainCount} ${plural(raw.crossCheckChainCount, 'contagem', 'contagens')} registradas tem recontagem, então a qualidade da validação não pode ser avaliada.`,
       navigateTo: 'audit',
       actionLabel: 'Abrir Auditoria',
     });

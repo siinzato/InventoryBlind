@@ -1,7 +1,7 @@
 // Produtividade — leitura de indicadores (view user_productivity_stats_v, sem tabela de cache)
 
 import { supabase, UserProductivityStats } from './supabase';
-import { pct } from './formatPtBr';
+import { pct, plural } from './formatPtBr';
 
 export async function getMyProductivity(userId: string): Promise<UserProductivityStats | null> {
   const { data, error } = await supabase
@@ -152,13 +152,13 @@ export function generateExecutiveSummary(stats: UserProductivityStats): string {
     }
   }
 
-  parts.push(`📦 ${stats.skus_contados} SKUs contados em ${stats.contagens} contagens (${stats.recontagens} recontagens).`);
+  parts.push(`📦 ${stats.skus_contados} ${plural(stats.skus_contados, 'SKU', 'SKUs')} contados em ${stats.contagens} ${plural(stats.contagens, 'contagem', 'contagens')} (${stats.recontagens} recontagens).`);
 
   if (stats.fulls_realizados > 0) {
-    parts.push(`⚡ ${stats.fulls_realizados} operações Full concluídas, ${stats.itens_separados} itens separados.`);
+    parts.push(`⚡ ${stats.fulls_realizados} ${plural(stats.fulls_realizados, 'operação', 'operações')} Full concluídas, ${stats.itens_separados} ${plural(stats.itens_separados, 'item', 'itens')} separados.`);
   }
   if (stats.etiquetas_geradas > 0) {
-    parts.push(`🏷️ ${stats.etiquetas_geradas} etiquetas geradas.`);
+    parts.push(`🏷️ ${stats.etiquetas_geradas} ${plural(stats.etiquetas_geradas, 'etiqueta', 'etiquetas')} geradas.`);
   }
 
   return parts.join(' ');

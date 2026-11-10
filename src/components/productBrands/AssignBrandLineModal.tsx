@@ -3,6 +3,7 @@ import { Save } from 'lucide-react';
 import { Modal, Button, Select } from '../ui';
 import { useAuth } from '../../lib/auth';
 import { bulkAssignProductAssociation, type ProductBrand, type ProductLine } from '../../lib/productBrands/productBrandService';
+import { plural } from '../../lib/formatPtBr';
 
 interface AssignBrandLineModalProps {
   companyId: string;
@@ -24,7 +25,7 @@ export function AssignBrandLineModal({ companyId, productIds, brands, lines, onC
   const linesForBrand = lines.filter(l => l.brandId === brandId);
 
   const handleSave = async () => {
-    if (saving || !window.confirm(`Confirmar marca/linha para ${productIds.length} produto(s)?`)) return;
+    if (saving || !window.confirm(`Confirmar marca/linha para ${productIds.length} ${plural(productIds.length, 'produto', 'produtos')}?`)) return;
     setSaving(true);
     setError(null);
     try {

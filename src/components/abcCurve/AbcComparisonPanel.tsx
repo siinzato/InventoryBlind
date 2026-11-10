@@ -12,6 +12,7 @@ import { useMemo, useState } from 'react';
 import { ChevronRight } from 'lucide-react';
 import { Badge, Button, Modal, Panel, PanelSection, Select, Table, Thead, Tr, Th, Td, SegmentedControl } from '../ui';
 import { ABC_METRIC_OPTIONS, ABC_METRIC_LABEL, type AbcMetric, type AbcRow } from '../../lib/abcCurve/abcCurveAnalytics';
+import { plural } from '../../lib/formatPtBr';
 import {
   buildAnalysisComparison, buildClassCountDeltas, buildClassTransitions,
   TRANSITION_BUCKET_LABEL, type ComparableAnalysis, type MetricDelta, type TransitionBucket,
@@ -136,7 +137,7 @@ export function AbcComparisonPanel({
         <>
           {!comparison.sameDuration && (
             <PanelSection padding="sm" className="text-caption">
-              Períodos com durações diferentes ({fmtInt(comparison.currentDays)} dias contra {fmtInt(comparison.baselineDays)}).
+              Períodos com durações diferentes ({fmtInt(comparison.currentDays)} {plural(comparison.currentDays, 'dia', 'dias')} contra {fmtInt(comparison.baselineDays)}).
               A leitura principal abaixo é por dia; os totais do período continuam visíveis, mas não são diretamente equivalentes.
             </PanelSection>
           )}
@@ -171,7 +172,7 @@ export function AbcComparisonPanel({
               <ComparedValue label="SKUs analisados" value={fmtInt(comparison.skuCount.current)} delta={comparison.skuCount} format={fmtInt} />
             </div>
             <div className="min-w-0 lg:flex-1 lg:px-5 lg:first:pl-0 lg:last:pr-0">
-              <ComparedValue label="Classe A por faturamento" value={fmtInt(comparison.classAByRevenue.current)} delta={comparison.classAByRevenue} format={fmtInt} context={`de ${fmtInt(comparison.classAByRevenue.baseline)} SKUs`} />
+              <ComparedValue label="Classe A por faturamento" value={fmtInt(comparison.classAByRevenue.current)} delta={comparison.classAByRevenue} format={fmtInt} context={`de ${fmtInt(comparison.classAByRevenue.baseline)} ${plural(comparison.classAByRevenue.baseline, 'SKU', 'SKUs')}`} />
             </div>
           </PanelSection>
 
@@ -247,7 +248,7 @@ export function AbcComparisonPanel({
             <PanelSection padding="md">
               <p className="text-section">Movimentações relevantes</p>
               <p className="text-caption mt-0.5 mb-3">
-                Curva de {ABC_METRIC_LABEL[metric].toLowerCase()}, casando SKU a SKU — {fmtInt(transitions.matchedCount)} SKUs
+                Curva de {ABC_METRIC_LABEL[metric].toLowerCase()}, casando SKU a SKU — {fmtInt(transitions.matchedCount)} {plural(transitions.matchedCount, 'SKU', 'SKUs')}
                 aparecem nas duas análises. &quot;Novo&quot; e &quot;ausente&quot; dizem respeito à presença nos arquivos comparados,
                 não a cadastro de produto.
               </p>

@@ -23,6 +23,7 @@
 // Função pura, sem I/O — riskService.ts busca os dados e persiste o resultado.
 
 import type { RiskBand, CriticalityLevel, ConfidenceFactorBreakdown } from './supabase';
+import { plural } from '../lib/formatPtBr';
 
 export type AbcClass = 'A' | 'B' | 'C' | null;
 
@@ -101,7 +102,7 @@ function recurrenceScore(repeatOffenseCount: number): RiskFactor {
     score: clamp(repeatOffenseCount * 20),
     max: 100,
     weight: PROBABILITY_WEIGHTS.recurrence,
-    detail: repeatOffenseCount === 0 ? 'Sem reincidência de erros' : `Divergiu em ${repeatOffenseCount} evento(s) de contagem distintos`,
+    detail: repeatOffenseCount === 0 ? 'Sem reincidência de erros' : `Divergiu em ${repeatOffenseCount} ${plural(repeatOffenseCount, 'evento', 'eventos')} de contagem distintos`,
   };
 }
 
@@ -110,7 +111,7 @@ function recencyScore(daysSinceLastCount: number): RiskFactor {
     score: clamp(Math.round(daysSinceLastCount / 2)),
     max: 100,
     weight: PROBABILITY_WEIGHTS.recency,
-    detail: `${daysSinceLastCount} dia(s) desde a última contagem`,
+    detail: `${daysSinceLastCount} ${plural(daysSinceLastCount, 'dia', 'dias')} desde a última contagem`,
   };
 }
 
@@ -119,7 +120,7 @@ function stockoutsScore(stockoutCount: number): RiskFactor {
     score: clamp(stockoutCount * 25),
     max: 100,
     weight: PROBABILITY_WEIGHTS.stockouts,
-    detail: stockoutCount === 0 ? 'Sem rupturas de estoque registradas' : `${stockoutCount} ruptura(s) de estoque registrada(s)`,
+    detail: stockoutCount === 0 ? 'Sem rupturas de estoque registradas' : `${stockoutCount} ${plural(stockoutCount, 'ruptura de estoque registrada', 'rupturas de estoque registradas')}`,
   };
 }
 
@@ -178,7 +179,7 @@ function demandScore(quantityMovedPerMonth: number, weight: number): RiskFactor 
     score: clamp(Math.round(quantityMovedPerMonth / 5)),
     max: 100,
     weight,
-    detail: `Demanda média de ${quantityMovedPerMonth.toFixed(1)} unidade(s)/mês`,
+    detail: `Demanda média de ${quantityMovedPerMonth.toFixed(1)} ${plural(quantityMovedPerMonth, 'unidade', 'unidades')}/mês`,
   };
 }
 
@@ -192,7 +193,7 @@ function coverageScore(currentStockQuantity: number, quantityMovedPerMonth: numb
     score: clamp(Math.round(100 - coverageDays)),
     max: 100,
     weight,
-    detail: `Cobertura estimada de ${coverageDays.toFixed(1)} dia(s) de estoque`,
+    detail: `Cobertura estimada de ${coverageDays.toFixed(1)} ${plural(coverageDays, 'dia', 'dias')} de estoque`,
   };
 }
 

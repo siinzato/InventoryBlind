@@ -13,7 +13,7 @@
 //    porque é puro: nenhuma dependência de ambiente impede reuso em Deno.
 
 import type { BlindAILineRanking, BlindAIPriority, BrandData } from './domainTypes';
-import { pct } from './formatPtBr';
+import { pct, plural } from './formatPtBr';
 
 export type BlindAIIntent = 'progress_status' | 'accuracy_status' | 'best_lines' | 'top_products' | 'llm';
 
@@ -171,7 +171,7 @@ export function rankLinesByPriority(lines: LineData[]): BlindAILineRanking[] {
     } else {
       reasons.push('Nenhum SKU contado ainda — sem sinal de divergência disponível');
     }
-    reasons.push(`${pendingSku} de ${l.totalSku} SKUs ainda não contados`);
+    reasons.push(`${pendingSku} de ${l.totalSku} ${plural(l.totalSku, 'SKU', 'SKUs')} ainda não contados`);
 
     return { brand: l.brand, score, pendingSku, divergences: l.divergences, accuracy: l.accuracy, reasons };
   });

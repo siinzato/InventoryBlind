@@ -7,6 +7,7 @@ import {
 import { Page, PageHeader, Panel, PanelSection, Badge, Input } from '../ui';
 import { KB_CATEGORIES, PRODUCT_FAQ, ABOUT_CONTENT, type KbArticle } from '../../lib/knowledgeBaseContent';
 import { PILARES, KNOWLEDGE_FAQ, type KnowledgeEntry } from '../../lib/academyContent';
+import { plural } from '../../lib/formatPtBr';
 
 interface KnowledgeCenterPageProps {
   onNavigateToAcademy: () => void;
@@ -128,7 +129,7 @@ export function KnowledgeCenterPage({ onNavigateToAcademy }: KnowledgeCenterPage
       {searchResults ? (
         <div className="space-y-4">
           <p className="text-xs text-fg-subtle uppercase tracking-wide font-semibold">
-            {searchResults.articles.length + searchResults.faq.length} resultado(s) para "{search}"
+            {searchResults.articles.length + searchResults.faq.length} {plural(searchResults.articles.length + searchResults.faq.length, 'resultado', 'resultados')} para "{search}"
           </p>
           {searchResults.articles.length === 0 && searchResults.faq.length === 0 && (
             <Panel><PanelSection padding="lg" className="text-center text-fg-subtle text-sm">Nenhum resultado. Tente outra palavra-chave ou navegue pelas categorias abaixo.</PanelSection></Panel>

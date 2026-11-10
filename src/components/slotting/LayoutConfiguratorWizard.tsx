@@ -20,6 +20,7 @@ import { classifyAddressRows, parseAddressCsv, ADDRESS_CSV_TEMPLATE_HEADER, type
 import { downloadFile } from '../../lib/productImportUtils';
 import { FloorPlanBackground } from './FloorPlanBackground';
 import type { WarehouseCell, WarehouseCellType, WarehouseLayout, WarehouseZone } from '../../lib/supabase';
+import { plural } from '../../lib/formatPtBr';
 
 interface LayoutConfiguratorWizardProps {
   companyId: string;
@@ -649,7 +650,7 @@ function StepEnderecos({ companyId, userId, userEmail, draft, cells, onSaved }: 
                 </table>
               </div>
               <Button size="sm" onClick={handleConfirmImport} disabled={importing || csvTotals.linked === 0}>
-                {importing ? 'Importando...' : `Importar ${csvTotals.linked} endereço(s) vinculado(s)`}
+                {importing ? 'Importando...' : `Importar ${csvTotals.linked} ${plural(csvTotals.linked, 'endereço vinculado', 'endereços vinculados')}`}
               </Button>
             </>
           )}

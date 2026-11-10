@@ -15,6 +15,7 @@ import { logAuditEvent } from '../../lib/auditLogService';
 import { recomputeForProducts } from '../../lib/cbcService';
 import { recomputeRiskForProducts } from '../../lib/riskService';
 import { recomputeAbcXyzForCompany } from '../../lib/abcXyzService';
+import { plural } from '../../lib/formatPtBr';
 
 type BlindItem = {
   id: string;
@@ -221,7 +222,7 @@ export function PhysicalCountSessionView({ sessionId, companyId, onDone }: Physi
         </div>
         {pending > 0 && (
           <div className="flex items-center gap-1.5 text-xs text-amber-600 dark:text-amber-400">
-            <CloudOff size={14} /> {pending} pendente(s) de sincronização
+            <CloudOff size={14} /> {pending} {plural(pending, 'pendente', 'pendentes')} de sincronização
           </div>
         )}
       </div>

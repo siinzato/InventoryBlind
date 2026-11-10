@@ -30,6 +30,7 @@ import { buildParsedSheet } from '../lib/spreadsheet-comparator/fileParser';
 import { runComparison } from '../lib/spreadsheet-comparator/comparisonEngine';
 import { buildResultCSV, downloadTextFile, downloadResultWorkbook, buildAndDownloadPdfReport, ComparisonConfigSnapshot } from '../lib/spreadsheet-comparator/exportUtils';
 import { loadComparatorPrefs, saveComparatorPrefs } from '../lib/spreadsheet-comparator/prefs';
+import { plural } from '../lib/formatPtBr';
 
 type Step = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
@@ -281,7 +282,7 @@ export const SpreadsheetComparatorPage: React.FC<SpreadsheetComparatorPageProps>
           <div className="bg-surface-2 rounded-container border border-edge p-10 flex flex-col items-center gap-4">
             <RefreshCw size={32} className="animate-spin text-accent" />
             <p className="text-sm text-fg-muted">
-              {progress.total > 0 ? `Processando ${progress.done} de ${progress.total} chave(s)...` : 'Processando...'}
+              {progress.total > 0 ? `Processando ${progress.done} de ${progress.total} ${plural(progress.total, 'chave', 'chaves')}...` : 'Processando...'}
             </p>
             <Button variant="secondary" size="sm" onClick={handleCancel} disabled={!processing}>
               <StopCircle size={14} />Cancelar

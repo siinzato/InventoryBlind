@@ -58,6 +58,7 @@ import type { ProductBrand, ProductLine } from '../../lib/productBrands/productB
 import { InventoryReportFilters } from './InventoryReportFilters';
 import { InventoryReportPreview } from './InventoryReportPreview';
 import { InventoryReportPrint } from './InventoryReportPrint';
+import { plural } from '../../lib/formatPtBr';
 
 const BALANCE_SOURCES: SegmentedOption<BalanceSource>[] = [
   { value: 'blank', label: 'Saldo em branco' },
@@ -262,7 +263,7 @@ export function InventoryReportPage({ companyId, onBack }: InventoryReportPagePr
         ? `Linha/Marca: ${groupNames.join(', ')}`
         : 'Linha/Marca: nenhuma selecionada';
     }
-    return `Seleção manual de ${rows.length} produtos`;
+    return `Seleção manual de ${rows.length} ${plural(rows.length, 'produto', 'produtos')}`;
   }, [mode, locationFrom, locationTo, groupNames, rows.length]);
 
   const meta: ReportMeta = useMemo(
@@ -360,7 +361,7 @@ export function InventoryReportPage({ companyId, onBack }: InventoryReportPagePr
       {loadError && <Notice tone="danger">{loadError}</Notice>}
       {truncated && (
         <Notice tone="warning">
-          Este workspace tem mais de {MAX_REPORT_PRODUCTS.toLocaleString('pt-BR')} produtos. A
+          Este workspace tem mais de {MAX_REPORT_PRODUCTS.toLocaleString('pt-BR')} {plural(MAX_REPORT_PRODUCTS, 'produto', 'produtos')}. A
           ferramenta trabalha com os primeiros {MAX_REPORT_PRODUCTS.toLocaleString('pt-BR')} —
           use a seleção por local ou por linha/marca para recortar o que precisa contar.
         </Notice>

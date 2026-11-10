@@ -12,7 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { resolvePeriodRange } from '../../lib/productivityService';
 import { groupDailyProduction, averageDailyProduction, forecastBusinessDays } from '../../lib/kpisIndicadores/executiveKpis';
 import type { GlobalStats } from '../../lib/blindAIAgentAlgorithm';
-import { pct } from '../../lib/formatPtBr';
+import { pct, plural } from '../../lib/formatPtBr';
 
 interface DashboardInventoryProgressProps {
   companyId: string | null;
@@ -71,13 +71,13 @@ export function DashboardInventoryProgress({ companyId, globais, onOpenKpis }: D
         <div>
           <p className="text-label">Produtividade</p>
           <p className="mt-0.5 text-sm font-semibold text-fg tabular-nums">
-            {ritmoAtual != null ? `${ritmoAtual.toFixed(0)} SKUs/dia` : '—'}
+            {ritmoAtual != null ? `${ritmoAtual.toFixed(0)} ${plural(ritmoAtual, 'SKU', 'SKUs')}/dia` : '—'}
           </p>
         </div>
         <div>
           <p className="text-label">Projeção</p>
           <p className="mt-0.5 text-sm font-semibold text-fg tabular-nums">
-            {previsaoDias != null ? `${previsaoDias} dias úteis` : '—'}
+            {previsaoDias != null ? `${previsaoDias} ${plural(previsaoDias, 'dia', 'dias')} úteis` : '—'}
           </p>
         </div>
         <div>

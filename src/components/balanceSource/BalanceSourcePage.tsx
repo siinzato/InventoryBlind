@@ -58,6 +58,7 @@ import {
   readTinyStockSheet,
 } from '../../lib/integrations/stockSheet/stockSheetSourceService';
 import type { StockSheetImportResult } from '../../lib/integrations/stockSheet/stockSheetSourceService';
+import { plural } from '../../lib/formatPtBr';
 
 const SAMPLE_LIMIT = 8;
 
@@ -425,7 +426,7 @@ export function BalanceSourcePage({ onBack }: { onBack: () => void }) {
 
               <PanelSection padding="sm">
                 <p className="text-label mb-3">
-                  Primeiras {Math.min(SAMPLE_LIMIT, sheet.records.length)} linhas lidas
+                  Primeiras {Math.min(SAMPLE_LIMIT, sheet.records.length)} {plural(Math.min(SAMPLE_LIMIT, sheet.records.length), 'linha', 'linhas')} lidas
                 </p>
                 <div className="overflow-x-auto">
                   <Table>

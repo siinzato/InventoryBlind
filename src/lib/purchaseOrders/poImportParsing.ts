@@ -12,6 +12,7 @@
 import { parseCSV } from '../productImportUtils';
 import type { PoColumnMapping, PoImportRow, ClassifiedPoImportRow } from './poTypes';
 import { normalizeEan } from '../nfe/nfeEanUtils';
+import { plural } from '../../lib/formatPtBr';
 
 // Nenhum outro importador do projeto documenta um teto explícito de linhas; adoto
 // 5.000 como limite seguro para uma OC (uma planilha de pedido de compra real não
@@ -137,7 +138,7 @@ export async function parsePoImportFile(file: File): Promise<{ headers: string[]
     const content = await file.text();
     const { headers, rows } = parseCSV(content);
     if (rows.length > MAX_PO_IMPORT_ROWS) {
-      throw new Error(`O arquivo tem ${rows.length} linhas — o limite para importação de OC é ${MAX_PO_IMPORT_ROWS}.`);
+      throw new Error(`O arquivo tem ${rows.length} ${plural(rows.length, 'linha', 'linhas')} — o limite para importação de OC é ${MAX_PO_IMPORT_ROWS}.`);
     }
     return { headers, rows: rows as PoImportRow[] };
   }
@@ -155,7 +156,7 @@ export async function parsePoImportFile(file: File): Promise<{ headers: string[]
   const headers = (jsonData[0] as string[]).map(String);
   const dataRows = jsonData.slice(1) as unknown[][];
   if (dataRows.length > MAX_PO_IMPORT_ROWS) {
-    throw new Error(`O arquivo tem ${dataRows.length} linhas — o limite para importação de OC é ${MAX_PO_IMPORT_ROWS}.`);
+    throw new Error(`O arquivo tem ${dataRows.length} ${plural(dataRows.length, 'linha', 'linhas')} — o limite para importação de OC é ${MAX_PO_IMPORT_ROWS}.`);
   }
 
   const rows: PoImportRow[] = dataRows.map(row => {

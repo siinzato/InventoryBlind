@@ -6,6 +6,7 @@ import { setRememberedWorkspaceDevice } from '../lib/workspacePrefs';
 import { signWorkspaceLogoPaths } from '../lib/workspace/workspaceService';
 import { Panel, Button } from './ui';
 import { LogoMark } from './landing/landingUi';
+import { plural } from '../lib/formatPtBr';
 
 const formatLastAccess = (iso: string | null): string => {
   if (!iso) return 'Nunca acessado';
@@ -14,7 +15,7 @@ const formatLastAccess = (iso: string | null): string => {
   const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
   if (diffDays <= 0) return 'Acessado hoje';
   if (diffDays === 1) return 'Acessado ontem';
-  if (diffDays < 30) return `Acessado há ${diffDays} dias`;
+  if (diffDays < 30) return `Acessado há ${diffDays} ${plural(diffDays, 'dia', 'dias')}`;
   return `Acessado em ${date.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: 'numeric' })}`;
 };
 

@@ -2,6 +2,7 @@ import { Panel } from '@xyflow/react';
 import { AlertTriangle, Check } from 'lucide-react';
 import type { AutomationWorkflow } from '../../../lib/automation/types';
 import type { ValidationProblem } from '../../../lib/automation/workflow';
+import { plural } from '../../../lib/formatPtBr';
 
 interface Props {
   workflow: AutomationWorkflow;
@@ -28,10 +29,10 @@ export function FlowStatusBar({ workflow, problems, valid }: Props) {
         </span>
         <span className="h-3 w-px bg-edge" />
         <span>{triggers} gatilho{triggers === 1 ? '' : 's'}</span>
-        <span>{conditions} condição(ões)</span>
-        <span>{actions} ação(ões)</span>
+        <span>{conditions} {plural(conditions, 'condição', 'condições')}</span>
+        <span>{actions} {plural(actions, 'ação', 'ações')}</span>
         {errors > 0 && <span className="text-red-600 dark:text-red-400">{errors} erro{errors === 1 ? '' : 's'}</span>}
-        {warnings > 0 && <span className="text-amber-600 dark:text-amber-400">{warnings} aviso(s)</span>}
+        {warnings > 0 && <span className="text-amber-600 dark:text-amber-400">{warnings} {plural(warnings, 'aviso', 'avisos')}</span>}
       </div>
     </Panel>
   );

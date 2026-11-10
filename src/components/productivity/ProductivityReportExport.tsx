@@ -6,6 +6,7 @@ import { downloadFile } from '../../lib/productImportUtils';
 import { UserProductivityStats } from '../../lib/supabase';
 import { ReportPeriod, resolvePeriodRange, getProductivityForPeriod, generateExecutiveSummary } from '../../lib/productivityService';
 import { logAuditEvent } from '../../lib/auditLogService';
+import { pct } from '../../lib/formatPtBr';
 
 interface ProductivityReportExportProps {
   employeeName: string;
@@ -36,7 +37,7 @@ export function ProductivityReportExport({ employeeName, userId, companyId, user
       ['Recontagens', String(periodStats.recontagens)],
       ['Divergências Encontradas', String(periodStats.divergencias_encontradas)],
       ['Divergências Reais', String(periodStats.divergencias_reais)],
-      ['Acuracidade Média', periodStats.acuracidade_media !== null ? `${periodStats.acuracidade_media.toFixed(1)}%` : '—'],
+      ['Acuracidade Média', periodStats.acuracidade_media !== null ? pct(periodStats.acuracidade_media) : '—'],
       ['Ranking Interno', rank ? `#${rank}` : '—'],
       ['Resumo', generateExecutiveSummary(stats)],
     ];

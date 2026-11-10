@@ -9,6 +9,7 @@
 
 import { useState } from 'react';
 import type { ParetoData, AbcMetric } from '../../lib/abcCurve/abcCurveAnalytics';
+import { pct, int } from '../../lib/formatPtBr';
 
 interface AbcParetoChartProps {
   data: ParetoData;
@@ -58,7 +59,7 @@ export function AbcParetoChart({ data, metric, thresholdA, thresholdB }: AbcPare
   return (
     <div className="relative">
       <svg viewBox={`0 0 ${W} ${H}`} className="w-full" style={{ height: 200 }} preserveAspectRatio="none" role="img"
-        aria-label={`Pareto de ${data.eligibleCount} SKUs elegíveis com linha de acumulado percentual.`}>
+        aria-label={`Pareto de ${int(data.eligibleCount)} SKUs elegíveis com linha de acumulado percentual.`}>
         <line x1={0} x2={W} y1={yForPct(thresholdA)} y2={yForPct(thresholdA)} className="stroke-edge" strokeWidth="1" strokeDasharray="5 5" vectorEffect="non-scaling-stroke" />
         <line x1={0} x2={W} y1={yForPct(thresholdB)} y2={yForPct(thresholdB)} className="stroke-edge" strokeWidth="1" strokeDasharray="5 5" vectorEffect="non-scaling-stroke" />
 
@@ -87,7 +88,7 @@ export function AbcParetoChart({ data, metric, thresholdA, thresholdB }: AbcPare
             onMouseLeave={() => setHovered(prev => (prev === b.index ? null : prev))}
           >
             <title>
-              {`${b.label}${b.sublabel ? ` (${b.sublabel})` : ''} · ${fmtValue(b.value)} · ${b.individualPct.toFixed(1)}% individual · ${b.cumulativePct.toFixed(1)}% acumulado${b.cls ? ` · classe ${b.cls}` : ''}`}
+              {`${b.label}${b.sublabel ? ` (${b.sublabel})` : ''} · ${fmtValue(b.value)} · ${pct(b.individualPct)} individual · ${pct(b.cumulativePct)} acumulado${b.cls ? ` · classe ${b.cls}` : ''}`}
             </title>
           </rect>
         ))}
@@ -102,8 +103,8 @@ export function AbcParetoChart({ data, metric, thresholdA, thresholdB }: AbcPare
           {active.sublabel && <p className="truncate text-[11px] text-fg-subtle">{active.sublabel}</p>}
           <dl className="mt-1.5 space-y-0.5 text-[11px]">
             <div className="flex justify-between gap-2"><dt className="text-fg-muted">Valor</dt><dd className="tabular-nums text-fg">{fmtValue(active.value)}</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-fg-muted">Individual</dt><dd className="tabular-nums text-fg">{active.individualPct.toFixed(1)}%</dd></div>
-            <div className="flex justify-between gap-2"><dt className="text-fg-muted">Acumulado</dt><dd className="tabular-nums text-fg">{active.cumulativePct.toFixed(1)}%</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-fg-muted">Individual</dt><dd className="tabular-nums text-fg">{pct(active.individualPct)}</dd></div>
+            <div className="flex justify-between gap-2"><dt className="text-fg-muted">Acumulado</dt><dd className="tabular-nums text-fg">{pct(active.cumulativePct)}</dd></div>
             <div className="flex justify-between gap-2"><dt className="text-fg-muted">Classe</dt><dd className="text-fg">{active.cls ?? 'Mistas'}</dd></div>
           </dl>
         </div>

@@ -19,6 +19,7 @@ import { HeatmapCard } from './HeatmapCard';
 import { HeatmapDetailsModal } from './HeatmapDetailsModal';
 import { HeatmapStatsComponent } from './HeatmapStats';
 import { Badge, Button, Card, Panel, PanelSection } from './ui';
+import { pct } from '../lib/formatPtBr';
 
 interface HeatmapEstoqueProps {
   brandsData: Array<{
@@ -168,8 +169,8 @@ Total de SKUs: ${area.totalSku}
 SKUs Contados: ${area.concluidos}
 Pendentes: ${area.totalSku - area.concluidos}
 Divergências: ${area.divergencias}
-Progresso: ${area.progresso.toFixed(1)}%
-Acuracidade: ${area.acuracidade.toFixed(1)}%
+Progresso: ${pct(area.progresso)}
+Acuracidade: ${pct(area.acuracidade)}
 
 SCORE DE RISCO: ${riskScore}
 ${

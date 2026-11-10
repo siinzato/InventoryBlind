@@ -1,6 +1,7 @@
 // Produtividade — leitura de indicadores (view user_productivity_stats_v, sem tabela de cache)
 
 import { supabase, UserProductivityStats } from './supabase';
+import { pct } from './formatPtBr';
 
 export async function getMyProductivity(userId: string): Promise<UserProductivityStats | null> {
   const { data, error } = await supabase
@@ -143,11 +144,11 @@ export function generateExecutiveSummary(stats: UserProductivityStats): string {
 
   if (stats.acuracidade_media !== null) {
     if (stats.acuracidade_media >= 97) {
-      parts.push(`✅ Excelente acuracidade média: ${stats.acuracidade_media.toFixed(1)}%.`);
+      parts.push(`✅ Excelente acuracidade média: ${pct(stats.acuracidade_media)}.`);
     } else if (stats.acuracidade_media >= 90) {
-      parts.push(`📊 Boa acuracidade média: ${stats.acuracidade_media.toFixed(1)}%.`);
+      parts.push(`📊 Boa acuracidade média: ${pct(stats.acuracidade_media)}.`);
     } else {
-      parts.push(`⚠️ Acuracidade média abaixo do esperado: ${stats.acuracidade_media.toFixed(1)}% — pode indicar necessidade de suporte ou treinamento.`);
+      parts.push(`⚠️ Acuracidade média abaixo do esperado: ${pct(stats.acuracidade_media)} — pode indicar necessidade de suporte ou treinamento.`);
     }
   }
 

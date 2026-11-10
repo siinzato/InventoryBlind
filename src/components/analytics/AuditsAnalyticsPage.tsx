@@ -244,7 +244,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
             />
             <KpiCard
               value={data.summary.observedAccuracyPct !== null ? pctFmt(data.summary.observedAccuracyPct) : '—'}
-              label="Acurácia observada"
+              label="Acuracidade observada"
               caption={
                 data.summary.observedAccuracyPct !== null
                   ? `${intFmt(data.summary.totalDivergent)} divergências em ${intFmt(data.summary.totalCounted)} SKUs contados`
@@ -352,7 +352,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                         <Th className="text-right">SKUs contados</Th>
                         <Th className="text-right">Cobertura</Th>
                         <Th className="text-right">Divergências</Th>
-                        <Th className="text-right">Acurácia</Th>
+                        <Th className="text-right">Acuracidade</Th>
                         <Th>Operador</Th>
                         <Th title="A aprovação registra a validação/encerramento da sessão na Auditoria Cruzada — não é uma avaliação da acurácia.">
                           Aprovada
@@ -450,14 +450,14 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                       <p className="text-section">Evolução das auditorias</p>
                       <p className="text-caption mt-1">
                         {performance.observedAccuracyPct !== null
-                          ? `Acurácia observada consolidada: ${pctFmt(performance.observedAccuracyPct)} — base de ${intFmt(performance.totalCounted)} SKUs contados em ${intFmt(performance.sessions)} sessões.`
+                          ? `Acuracidade observada consolidada: ${pctFmt(performance.observedAccuracyPct)} — base de ${intFmt(performance.totalCounted)} SKUs contados em ${intFmt(performance.sessions)} sessões.`
                           : 'Ainda não há SKUs contados para consolidar a acurácia observada.'}
                       </p>
                     </div>
                     <SegmentedControl
                       label="Métrica da série"
                       options={[
-                        { value: 'accuracy', label: 'Acurácia' },
+                        { value: 'accuracy', label: 'Acuracidade' },
                         { value: 'coverage', label: 'Cobertura' },
                         { value: 'divergence', label: 'Divergência' },
                       ]}
@@ -495,7 +495,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                           <Th className="text-right">Sessões</Th>
                           <Th className="text-right">SKUs contados</Th>
                           <Th className="text-right">Cobertura média</Th>
-                          <Th className="text-right">Acurácia observada</Th>
+                          <Th className="text-right">Acuracidade observada</Th>
                           <Th className="text-right">Divergências</Th>
                           <Th className="text-right">Recontagens</Th>
                           <Th className="text-right">Aprovadas</Th>
@@ -851,7 +851,7 @@ export function AuditsAnalyticsPage({ companyId, onNavigate }: AuditsAnalyticsPa
                   label="Taxa de divergência"
                   value={openSession.divergenceRatePct !== null ? pctFmt(openSession.divergenceRatePct) : 'Nenhum SKU contado'}
                 />
-                <DetailRow label="Acurácia" value={openSession.accuracy !== null ? pctFmt(openSession.accuracy) : '—'} />
+                <DetailRow label="Acuracidade" value={openSession.accuracy !== null ? pctFmt(openSession.accuracy) : '—'} />
                 {openSession.approvedAt && (
                   <DetailRow label="Aprovada em" value={`${dateFmt(openSession.approvedAt)} • ${timeFmt(openSession.approvedAt)}`} />
                 )}

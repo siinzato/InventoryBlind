@@ -13,6 +13,7 @@ import {
 import type { RiskBand } from '../../lib/supabase';
 import { RiskBadge } from './RiskBadge';
 import { RiskDetailDrawer } from './RiskDetailDrawer';
+import { int } from '../../lib/formatPtBr';
 
 interface RiskDashboardPageProps {
   companyId: string;
@@ -139,7 +140,7 @@ export function RiskDashboardPage({ companyId, userId, userEmail, onNavigateToCo
     setRecomputeMessage(null);
     try {
       const { updated, insufficient } = await recomputeAllRiskForCompany(companyId, userId, userEmail);
-      setRecomputeMessage(`${updated} SKU-locais recalculados · ${insufficient} sem dados suficientes.`);
+      setRecomputeMessage(`${int(updated)} SKU-locais recalculados · ${int(insufficient)} sem dados suficientes.`);
       loadOverview();
       if (!showClusters) loadRows();
     } catch (err) {

@@ -11,6 +11,7 @@ import { OverviewTab } from './OverviewTab';
 import { SalesTab } from './SalesTab';
 import { KpisTab } from './KpisTab';
 import { DangerZoneSection } from './DangerZoneSection';
+import { pct } from '../../lib/formatPtBr';
 
 type AdminTab = 'overview' | 'sales' | 'kpis' | 'inventories';
 
@@ -105,8 +106,8 @@ export function AdminDashboardPage({
                         <p className="font-semibold text-fg text-sm">{snapshot.name}</p>
                         <p className="text-caption mt-1">{new Date(snapshot.end_date).toLocaleDateString('pt-BR', { day: '2-digit', month: 'long', year: 'numeric' })}</p>
                         <div className="flex gap-4 mt-1 text-xs text-fg-muted">
-                          <span>Progresso: <span className="font-semibold text-fg">{snapshot.progress.toFixed(1)}%</span></span>
-                          <span>Acuracidade: <span className="font-semibold text-fg">{snapshot.accuracy.toFixed(1)}%</span></span>
+                          <span>Progresso: <span className="font-semibold text-fg">{pct(snapshot.progress)}</span></span>
+                          <span>Acuracidade: <span className="font-semibold text-fg">{pct(snapshot.accuracy)}</span></span>
                         </div>
                       </ListRow>
                     ))}

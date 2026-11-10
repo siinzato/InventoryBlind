@@ -8,7 +8,7 @@ import { countNumberLabel } from '../../lib/analytics/auditsHistoryEngine';
 export type SessionMetric = 'accuracy' | 'coverage' | 'divergence';
 
 const SESSION_METRIC_LABEL: Record<SessionMetric, string> = {
-  accuracy: 'Acurácia por sessão',
+  accuracy: 'Acuracidade por sessão',
   coverage: 'Cobertura por sessão',
   divergence: 'Taxa de divergência por sessão',
 };
@@ -89,7 +89,7 @@ export function AuditsSessionChart({ sessions, metric, onSelect }: AuditsSession
             `SKUs contados: ${int(s.skusContados)} de ${int(s.totalSku)}`,
             `Cobertura: ${s.coveragePct !== null ? pct(s.coveragePct) : 'sem universo previsto'}`,
             `Divergências: ${int(s.divergenciasReais)}${s.divergenceRatePct !== null ? ` (${pct(s.divergenceRatePct)})` : ''}`,
-            `Acurácia: ${s.accuracy !== null ? pct(s.accuracy) : 'não calculada'}`,
+            `Acuracidade: ${s.accuracy !== null ? pct(s.accuracy) : 'não calculada'}`,
           ].join('\n');
           return (
             <g key={s.id} className={onSelect ? 'cursor-pointer' : undefined} onClick={() => onSelect?.(s)}>

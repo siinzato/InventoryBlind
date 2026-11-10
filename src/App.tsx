@@ -126,6 +126,7 @@ import { DashboardInventoryProgress } from './components/dashboard/DashboardInve
 import { DashboardIntegrationsHealth } from './components/dashboard/DashboardIntegrationsHealth';
 import { listConnections } from './lib/integrations/integrationService';
 import type { IntegrationConnection } from './lib/integrations/types';
+import { pct, int } from './lib/formatPtBr';
 
 // Code-split large page components for smaller initial bundle
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -1500,12 +1501,12 @@ function AppContent() {
                     return ([
                       {
                         label: 'Progresso Geral',
-                        value: `${globais.progresso.toFixed(1)}%`,
-                        context: `${globais.totalDone} de ${globais.totalSku} SKUs`,
+                        value: pct(globais.progresso),
+                        context: `${int(globais.totalDone)} de ${int(globais.totalSku)} SKUs`,
                       },
                       {
                         label: 'Acuracidade (IRA)',
-                        value: `${globais.acuracidade.toFixed(1)}%`,
+                        value: pct(globais.acuracidade),
                         context: `Meta ${ACCURACY_TARGET}% · ${globais.acuracidade >= ACCURACY_TARGET ? 'dentro da meta' : 'abaixo da meta'}`,
                         // The only figure here whose level is a condition, so the
                         // only one allowed to carry colour.
@@ -1517,7 +1518,7 @@ function AppContent() {
                         label: 'Linhas em andamento',
                         value: `${inProgressRows.length} de ${globais.tabela.length}`,
                         context: topInProgress
-                          ? `${topInProgress.brand} · ${topInProgress.progress.toFixed(1)}%`
+                          ? `${topInProgress.brand} · ${pct(topInProgress.progress)}`
                           : 'Nenhuma linha em andamento',
                       },
                     ] satisfies StatProps[]);
@@ -1570,10 +1571,10 @@ function AppContent() {
                         {globaisCadastro.tabela.slice(0, 5).map((row) => (
                           <tr key={row.id} className="border-b border-edge/60 last:border-0 hover:bg-surface-3/40 transition-colors">
                             <td className="px-6 py-3.5 font-medium text-fg">{row.brand}</td>
-                            <td className="px-3 py-3.5 text-center text-fg-muted text-numeric text-xs">{row.progress.toFixed(1)}%</td>
+                            <td className="px-3 py-3.5 text-center text-fg-muted text-numeric text-xs">{pct(row.progress)}</td>
                             <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">{row.doneSku}</td>
                             <td className="px-3 py-3.5 text-center font-semibold text-fg text-numeric">
-                              {row.accuracy !== null ? `${row.accuracy.toFixed(1)}%` : '—'}
+                              {row.accuracy !== null ? pct(row.accuracy) : '—'}
                             </td>
                             <td className="px-6 py-3.5 text-center">
                               <span className="text-xs font-medium text-fg-subtle">
@@ -2357,11 +2358,11 @@ function AppContent() {
                   </div>
                   <div className="text-center px-2">
                     <p className="text-caption">Progresso</p>
-                    <p className="text-title text-emerald-600 dark:text-emerald-400 mt-1">{selectedSnapshot.progress.toFixed(1)}%</p>
+                    <p className="text-title text-emerald-600 dark:text-emerald-400 mt-1">{pct(selectedSnapshot.progress)}</p>
                   </div>
                   <div className="text-center px-2">
                     <p className="text-caption">Acuracidade</p>
-                    <p className="text-title text-accent mt-1">{selectedSnapshot.accuracy.toFixed(1)}%</p>
+                    <p className="text-title text-accent mt-1">{pct(selectedSnapshot.accuracy)}</p>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 divide-x divide-edge mt-4 pt-4 border-t border-edge">
@@ -2413,12 +2414,12 @@ function AppContent() {
                         <td className="px-3 py-2.5 text-center font-semibold text-fg">{brand.done_sku}</td>
                         <td className="px-3 py-2.5 text-center text-red-600 dark:text-red-400 font-semibold">{brand.divergences}</td>
                         <td className="px-3 py-2.5 text-center">
-                          <span className="text-xs text-fg-muted font-mono">{brand.progress.toFixed(1)}%</span>
+                          <span className="text-xs text-fg-muted font-mono">{pct(brand.progress)}</span>
                         </td>
                         <td className="px-3 py-2.5 text-center font-semibold">
                           {brand.accuracy !== null ? (
                             <span className={brand.accuracy >= 80 ? 'text-emerald-600 dark:text-emerald-400' : brand.accuracy >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}>
-                              {brand.accuracy.toFixed(1)}%
+                              {pct(brand.accuracy)}
                             </span>
                           ) : '-'}
                         </td>

@@ -4,6 +4,7 @@ import { FileText, FileSpreadsheet } from 'lucide-react';
 import { PanelSection, Button } from '../ui';
 import { UserProductivityStats } from '../../lib/supabase';
 import { logAuditEvent } from '../../lib/auditLogService';
+import { pct } from '../../lib/formatPtBr';
 
 interface TeamProductivityReportProps {
   companyId: string;
@@ -17,14 +18,14 @@ export function TeamProductivityReport({ companyId, team, userId, userEmail }: T
 
   const destaques = team.filter(t => (t.acuracidade_media ?? 0) >= 95 && t.skus_contados >= 500);
   const emAtencao = team.filter(t => t.contagens > 0 && ((t.acuracidade_media ?? 100) < 85 || t.skus_contados < 300));
-  const recomendacoes = emAtencao.map(t => `${t.name ?? 'Colaborador'}: recomenda-se acompanhamento próximo (acuracidade ${(t.acuracidade_media ?? 0).toFixed(1)}%, ${t.skus_contados} SKUs).`);
+  const recomendacoes = emAtencao.map(t => `${t.name ?? 'Colaborador'}: recomenda-se acompanhamento próximo (acuracidade ${pct(t.acuracidade_media ?? 0)}, ${t.skus_contados} SKUs).`);
   const resumo = `Equipe com ${team.length} colaboradores, ${destaques.length} em destaque e ${emAtencao.length} precisando de atenção.`;
 
   const buildRows = (): string[][] => {
     const header = ['Nome', 'Cargo', 'SKUs', 'Acuracidade', 'Divergências', 'Fulls', 'Etiquetas'];
     const rows = team.map(t => [
       t.name ?? '—', t.role, String(t.skus_contados),
-      t.acuracidade_media !== null ? `${t.acuracidade_media.toFixed(1)}%` : '—',
+      t.acuracidade_media !== null ? pct(t.acuracidade_media) : '—',
       String(t.divergencias_reais), String(t.fulls_realizados), String(t.etiquetas_geradas),
     ]);
     return [header, ...rows];

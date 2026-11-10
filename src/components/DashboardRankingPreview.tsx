@@ -4,6 +4,7 @@
 import React from 'react';
 import { Target, AlertTriangle, Clock, ArrowRight } from 'lucide-react';
 import { PanelSection } from './ui';
+import { pct } from '../lib/formatPtBr';
 
 interface BrandRow {
   id: string;
@@ -92,7 +93,7 @@ export const DashboardRankingPreview: React.FC<DashboardRankingPreviewProps> = (
           </p>
           <div className="mt-1 divide-y divide-edge/60">
             {top5Progress.map((b) => (
-              <RankRow key={b.id} label={b.brand} value={`${b.progress.toFixed(1)}%`} />
+              <RankRow key={b.id} label={b.brand} value={pct(b.progress)} />
             ))}
           </div>
         </PanelSection>

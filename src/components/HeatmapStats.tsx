@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import type { HeatmapStats } from '../lib/heatmapTypes';
 import { Panel, PanelSection } from './ui';
+import { pct, int } from '../lib/formatPtBr';
 
 interface HeatmapStatsProps {
   stats: HeatmapStats;
@@ -117,12 +118,12 @@ export const HeatmapStatsComponent: React.FC<HeatmapStatsProps> = ({ stats }) =>
     {
       title: 'Total Áreas',
       value: stats.totalAreas,
-      subtitle: `${stats.totalDivergencias} divergências`,
+      subtitle: `${int(stats.totalDivergencias)} divergências`,
       icon: Layers,
     },
     {
       title: 'Média Acuracidade',
-      value: `${stats.mediaAcuracidade.toFixed(1)}%`,
+      value: pct(stats.mediaAcuracidade),
       subtitle: 'Média geral',
       icon: Target,
       valueClassName: accuracyColor,

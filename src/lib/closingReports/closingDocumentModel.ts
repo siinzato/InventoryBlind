@@ -4,6 +4,7 @@
 // (a classificação vive em observationClassifier.ts e roda apenas na geração).
 
 import type { ClosingReport, ClosingReportObservation } from './closingReportTypes';
+import { pct } from '../formatPtBr';
 
 export interface ClosingDocumentCategory {
   categoryId: string;
@@ -45,7 +46,7 @@ export function formatClosingDateTime(iso: string): string {
 }
 
 export function formatAccuracy(value: number | null): string {
-  return value !== null ? `${value.toFixed(1)}%` : '—';
+  return value !== null ? pct(value) : '—';
 }
 
 export interface BuildClosingDocumentInput {

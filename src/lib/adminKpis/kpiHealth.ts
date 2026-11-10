@@ -1,3 +1,4 @@
+import { pct } from '../formatPtBr';
 // Regras puras, determinísticas e centralizadas para o resumo operacional e os alertas
 // prioritários do bloco "KPIs e Indicadores" (Painel Administrativo). Nenhuma IA, nenhum motor
 // de recomendação — só limiares fixos e documentados sobre dados já existentes:
@@ -151,7 +152,7 @@ export function buildPriorityAlerts(input: {
       description: accuracyStatus === 'critico'
         ? `Acuracidade abaixo do piso de ${ACCURACY_WARNING_FLOOR_PCT}%.`
         : `Acuracidade abaixo da meta de ${ACCURACY_TARGET_PCT}%.`,
-      evidence: accuracyTrend.latest ? `${accuracyTrend.latest.accuracy.toFixed(1)}% (meta: ${ACCURACY_TARGET_PCT}%)` : `Meta: ${ACCURACY_TARGET_PCT}%`,
+      evidence: accuracyTrend.latest ? `${pct(accuracyTrend.latest.accuracy)} (meta: ${ACCURACY_TARGET_PCT}%)` : `Meta: ${ACCURACY_TARGET_PCT}%`,
       actionKey: 'open-inventories',
       actionLabel: 'Ver inventários',
     });
@@ -162,7 +163,7 @@ export function buildPriorityAlerts(input: {
       severity: accuracyTrend.trend === 'piora_relevante' ? 'atencao' : 'info',
       description: 'Acuracidade piorou em relação ao inventário anterior, mesmo dentro da meta.',
       evidence: accuracyTrend.latest && accuracyTrend.previous && accuracyTrend.deltaPoints !== null
-        ? `${accuracyTrend.previous.accuracy.toFixed(1)}% → ${accuracyTrend.latest.accuracy.toFixed(1)}% (${accuracyTrend.deltaPoints.toFixed(1)} p.p.)`
+        ? `${pct(accuracyTrend.previous.accuracy)} → ${pct(accuracyTrend.latest.accuracy)} (${accuracyTrend.deltaPoints.toFixed(1)} p.p.)`
         : '—',
       actionKey: 'open-inventories',
       actionLabel: 'Ver inventários',

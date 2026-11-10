@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Panel, PanelSection, Badge } from '../ui';
 import { formatFriendlyDuration } from '../../lib/countManagementUtils';
+import { pct } from '../../lib/formatPtBr';
 
 export interface LiveCountStats {
   linha: string;
@@ -97,7 +98,7 @@ export function CountSidePanel({ stats, resetKey }: CountSidePanelProps) {
         </div>
         <div>
           <p className="text-xs text-fg-subtle">Acuracidade</p>
-          <p className="text-base font-semibold text-fg">{stats.acuracidade !== null ? `${stats.acuracidade.toFixed(1)}%` : '—'}</p>
+          <p className="text-base font-semibold text-fg">{stats.acuracidade !== null ? pct(stats.acuracidade) : '—'}</p>
         </div>
         {isRangeMode ? (
           <>

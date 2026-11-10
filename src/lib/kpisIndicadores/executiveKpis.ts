@@ -1,3 +1,4 @@
+import { pct } from '../formatPtBr';
 // KPIs Executivos ("KPIs e Indicadores") — cálculos puros sobre registros de
 // contagem já carregados (inventory_count_records). Sem I/O — mesmo espírito
 // de rcaAlgorithm.ts/blindAIAgentAlgorithm.ts: a camada de acesso a dados
@@ -158,7 +159,7 @@ export function buildOperationalAlerts(input: {
     alerts.push({
       id: 'acuracidade_critica',
       title: 'Acuracidade abaixo da meta',
-      detail: `${input.acuracidade.toFixed(1)}% abaixo da meta de ${input.metaAcuracidade}%.`,
+      detail: `${pct(input.acuracidade)} abaixo da meta de ${input.metaAcuracidade}%.`,
       severity: 'critical',
     });
   }

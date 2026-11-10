@@ -29,6 +29,7 @@ import {
   generateDiagnosis,
 } from '../lib/heatmapUtils';
 import { Modal, Panel, PanelSection, Badge, Button, Stat } from './ui';
+import { pct } from '../lib/formatPtBr';
 
 interface HeatmapDetailsModalProps {
   area: HeatmapArea | null;
@@ -273,7 +274,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-fg-subtle">Progresso</span>
-                    <span className="font-bold text-fg">{area.progresso.toFixed(1)}%</span>
+                    <span className="font-bold text-fg">{pct(area.progresso)}</span>
                   </div>
                   <div className="h-3 bg-edge rounded-full overflow-hidden">
                     <div
@@ -285,7 +286,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                 <div>
                   <div className="flex justify-between text-sm mb-1">
                     <span className="text-fg-subtle">Acuracidade</span>
-                    <span className={`font-bold ${textClass}`}>{area.acuracidade.toFixed(1)}%</span>
+                    <span className={`font-bold ${textClass}`}>{pct(area.acuracidade)}</span>
                   </div>
                   <div className="h-3 bg-edge rounded-full overflow-hidden">
                     <div

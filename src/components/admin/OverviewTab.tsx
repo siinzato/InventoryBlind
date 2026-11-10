@@ -6,6 +6,7 @@ import { Panel, PanelSection, Stat, StatRow, StatCell } from '../ui';
 import type { InventorySnapshot } from '../../lib/supabase';
 import { computeTopTen } from '../../lib/adminSales/salesTopTen';
 import { listImportBatches, listSalesRecordsForTopTen, type SalesImportBatch } from '../../lib/adminSales/salesService';
+import { pct } from '../../lib/formatPtBr';
 
 interface OverviewTabProps {
   companyId: string;
@@ -43,7 +44,7 @@ export function OverviewTab({ companyId, companyName, companyCreatedAt, globais,
           <StatRow className="md:grid-cols-4">
             <StatCell><Stat label="Empresa" value={companyName ?? '—'} /></StatCell>
             <StatCell><Stat label="Total SKUs" value={globais.totalSku} /></StatCell>
-            <StatCell><Stat label="Acuracidade" value={`${globais.acuracidade.toFixed(1)}%`} /></StatCell>
+            <StatCell><Stat label="Acuracidade" value={pct(globais.acuracidade)} /></StatCell>
             <StatCell><Stat label="Ativa desde" value={companyCreatedAt ? new Date(companyCreatedAt).toLocaleDateString('pt-BR') : '—'} /></StatCell>
           </StatRow>
         </PanelSection>
@@ -59,7 +60,7 @@ export function OverviewTab({ companyId, companyName, companyCreatedAt, globais,
               <div className="space-y-1 text-sm">
                 <p className="font-medium text-fg">{latestSnapshot.name}</p>
                 <p className="text-caption">{new Date(latestSnapshot.end_date).toLocaleDateString('pt-BR')}</p>
-                <p className="text-fg-muted">Progresso: <strong className="text-fg">{latestSnapshot.progress.toFixed(1)}%</strong> · Acuracidade: <strong className="text-fg">{latestSnapshot.accuracy.toFixed(1)}%</strong></p>
+                <p className="text-fg-muted">Progresso: <strong className="text-fg">{pct(latestSnapshot.progress)}</strong> · Acuracidade: <strong className="text-fg">{pct(latestSnapshot.accuracy)}</strong></p>
               </div>
             ) : (
               <p className="text-sm text-fg-subtle flex items-center gap-2"><AlertTriangle size={14} /> Nenhum inventário arquivado ainda.</p>

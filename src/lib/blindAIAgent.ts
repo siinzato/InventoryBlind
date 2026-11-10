@@ -9,6 +9,7 @@
 import { supabase } from './supabase';
 import { detectIntent, generateContextualSuggestions, type GlobalStats } from './blindAIAgentAlgorithm';
 import type { BlindAISituation, TopVenda } from './supabase';
+import { pct } from './formatPtBr';
 
 export interface ChatMessage {
   role: 'user' | 'assistant';
@@ -20,7 +21,7 @@ function answerFastPath(intent: 'progress_status' | 'accuracy_status' | 'best_li
     case 'progress_status': {
       const pendentes = globais.totalSku - globais.totalDone;
       return (
-        `Progresso atual: ${globais.progresso.toFixed(1)}% concluído.\n\n` +
+        `Progresso atual: ${pct(globais.progresso)} concluído.\n\n` +
         `- SKUs processados: ${globais.totalDone.toLocaleString('pt-BR')} de ${globais.totalSku.toLocaleString('pt-BR')}\n` +
         `- Pendentes: ${pendentes.toLocaleString('pt-BR')} SKUs\n` +
         `- Linhas em andamento: ${globais.tabela.filter(l => l.status === 'ANDAMENTO').length}\n` +
@@ -31,9 +32,9 @@ function answerFastPath(intent: 'progress_status' | 'accuracy_status' | 'best_li
       const taxaDivergencia = globais.totalDone > 0 ? (globais.totalDiv / globais.totalDone) * 100 : 0;
       const status = globais.acuracidade >= 80 ? 'Boa' : globais.acuracidade >= 50 ? 'Mediana, requer atenção' : 'Crítica, ação imediata recomendada';
       return (
-        `Acuracidade geral: ${globais.acuracidade.toFixed(1)}%.\n\n` +
+        `Acuracidade geral: ${pct(globais.acuracidade)}.\n\n` +
         `- Total de divergências: ${globais.totalDiv}\n` +
-        `- Taxa de divergência: ${taxaDivergencia.toFixed(2)}%\n` +
+        `- Taxa de divergência: ${pct(taxaDivergencia, 2)}\n` +
         `- Status: ${status}`
       );
     }
@@ -43,7 +44,7 @@ function answerFastPath(intent: 'progress_status' | 'accuracy_status' | 'best_li
         return 'Não tenho dados suficientes para recomendar isso com segurança. Falta: linhas concluídas com acuracidade apurada.';
       }
       const top5 = [...completed].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0)).slice(0, 5);
-      return `Top ${top5.length} linhas por acuracidade:\n\n${top5.map((l, i) => `${i + 1}. ${l.brand}: ${l.accuracy?.toFixed(1)}%`).join('\n')}`;
+      return `Top ${top5.length} linhas por acuracidade:\n\n${top5.map((l, i) => `${i + 1}. ${l.brand}: ${l.accuracy == null ? '—' : pct(l.accuracy)}`).join('\n')}`;
     }
     case 'top_products': {
       if (topVendas.length === 0) {

@@ -31,6 +31,7 @@ import { AbcComparisonPanel } from './AbcComparisonPanel';
 import { AbcPolicySummary } from './AbcPolicySummary';
 import { AbcTinyTab } from './AbcTinyTab';
 import { AbcCurveImportWizard } from './AbcCurveImportWizard';
+import { pct } from '../../lib/formatPtBr';
 
 interface AbcCurvePageProps {
   companyId: string;
@@ -99,8 +100,8 @@ const classBadgeVariant = (cls: string | null): 'success' | 'warning' | 'danger'
 };
 
 const fmtMoney = (value: number | null) => value === null ? '—' : value.toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-const fmtPct = (value: number | null) => value === null ? '—' : `${(value * 100).toFixed(1)}%`;
-const fmtSharePct = (value: number) => `${value.toFixed(1)}%`;
+const fmtPct = (value: number | null) => value === null ? '—' : pct(value * 100);
+const fmtSharePct = (value: number) => pct(value);
 const fmtMultiplier = (value: number | null) => value === null ? '—' : `${value.toFixed(2)}x`;
 const fmtQty = (value: number | null) => value === null ? '—' : value.toLocaleString('pt-BR');
 const fmtCoverage = (value: number | null) => value === null ? '—' : `${value.toFixed(0)}d`;

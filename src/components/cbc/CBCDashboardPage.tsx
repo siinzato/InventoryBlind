@@ -13,6 +13,7 @@ import { RISK_LEVEL_LABEL } from '../../lib/cbcAlgorithm';
 import { downloadFile } from '../../lib/productImportUtils';
 import { ConfidenceDetailDrawer } from './ConfidenceDetailDrawer';
 import type { RiskLevel } from '../../lib/supabase';
+import { int } from '../../lib/formatPtBr';
 
 interface CBCDashboardPageProps {
   companyId: string;
@@ -144,7 +145,7 @@ export function CBCDashboardPage({ companyId, userId, userEmail, onNavigateToCou
     setRecomputeMessage(null);
     try {
       const { updated, insufficient } = await recomputeAllForCompany(companyId, userId, userEmail);
-      setRecomputeMessage(`${updated} SKU-locais atualizados · ${insufficient} sem dados suficientes.`);
+      setRecomputeMessage(`${int(updated)} SKU-locais atualizados · ${int(insufficient)} sem dados suficientes.`);
       loadOverview();
       loadRows();
     } catch (err) {

@@ -1,4 +1,5 @@
 import type { BlindScoreStatus } from '../../lib/analytics/analyticsContracts';
+import { pct } from '../../lib/formatPtBr';
 
 // SVG à mão, mesmo espírito de ParetoChart.tsx/TrendSparkline (RcaDashboardPage) — não há
 // lib de gráficos no projeto e o pedido não justifica adicionar uma para 2 componentes.
@@ -88,7 +89,7 @@ export function AccuracyTrendChart({ points, target = 85, minimum = 60 }: Accura
         <polyline points={linePoints} fill="none" className="stroke-accent" strokeWidth="2" vectorEffect="non-scaling-stroke" />
         {coords.map((c, i) => (
           <circle key={i} cx={c.x} cy={c.y} r={3} className="fill-accent">
-            <title>{`${new Date(c.period).toLocaleDateString('pt-BR')} · ${c.value.toFixed(1)}%`}</title>
+            <title>{`${new Date(c.period).toLocaleDateString('pt-BR')} · ${pct(c.value)}`}</title>
           </circle>
         ))}
       </svg>

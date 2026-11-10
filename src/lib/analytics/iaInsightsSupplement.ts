@@ -10,6 +10,7 @@ import { listCountRecords } from '../auditCrossCheckService';
 import { topConcentration } from '../rcaAlgorithm';
 import { computeAccuracyStat } from './analyticsMath';
 import type { BlindAISituation } from '../supabase';
+import { pct } from '../formatPtBr';
 
 /** Mesmo formato de BlindAISituation, mas com um destino de navegação a mais
  *  ('analytics-audit', a página nova de Auditorias) que o union original não previa — por
@@ -76,7 +77,7 @@ async function getAccuracyTrendInsight(companyId: string): Promise<AnalyticsInsi
     icon: improving ? '📈' : '⚠️',
     severity: improving ? 'info' : Math.abs(deltaPoints) >= 15 ? 'critical' : 'warning',
     title: improving ? 'Melhoria de acurácia detectada' : 'Deterioração de acurácia detectada',
-    evidence: `Acurácia média foi de ${avgFirst.toFixed(1)}% para ${avgSecond.toFixed(1)}% entre a primeira e a segunda metade das sessões de contagem registradas`,
+    evidence: `Acuracidade média foi de ${pct(avgFirst)} para ${pct(avgSecond)} entre a primeira e a segunda metade das sessões de contagem registradas`,
     reasons: [`${stat.sessionsConsidered} sessão(ões) de contagem com acurácia calculada`],
     recommendation: improving
       ? 'Manter o processo atual de contagem, que vem melhorando a acurácia.'
@@ -87,7 +88,7 @@ async function getAccuracyTrendInsight(companyId: string): Promise<AnalyticsInsi
     // apresentação poder comparar as duas metades na escala fixa de 0 a 100%.
     hero: {
       value: pctBr(avgSecond),
-      caption: 'Acurácia média na segunda metade das sessões',
+      caption: 'Acuracidade média na segunda metade das sessões',
       delta: { value: ppBr(deltaPoints), intent: improving ? ('positive' as const) : ('negative' as const) },
     },
     comparison: [

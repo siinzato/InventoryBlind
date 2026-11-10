@@ -79,7 +79,7 @@ export async function getBlindAISituations(companyId: string): Promise<BlindAISi
       icon: '🎯',
       severity: cbcSummary.overdue_count >= 10 ? 'critical' : 'warning',
       title: 'Contagens em atraso',
-      evidence: `${cbcSummary.overdue_count} produto${cbcSummary.overdue_count === 1 ? '' : 's'} passaram da data recomendada de próxima contagem`,
+      evidence: `${int(cbcSummary.overdue_count)} produto${cbcSummary.overdue_count === 1 ? '' : 's'} passaram da data recomendada de próxima contagem`,
       reasons: [
         ...(cbcSummary.avg_confidence != null ? [`Confiança média da empresa: ${Math.round(cbcSummary.avg_confidence)}`] : []),
         `${cbcSummary.critico_count} produto${cbcSummary.critico_count === 1 ? '' : 's'} em confiança crítica`,

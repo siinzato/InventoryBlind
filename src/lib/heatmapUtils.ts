@@ -2,6 +2,7 @@
 
 import type { HeatmapArea, HeatmapStats, CriticalityLevel, HeatmapFilters, BrandData, RiskLevel, RiskDiagnosis } from './heatmapTypes';
 import type { BrandCountDetail } from './heatmapService';
+import { pct } from './formatPtBr';
 
 // Calculate progress percentage
 export const calculateProgress = (concluidos: number, totalSku: number): number => {
@@ -89,12 +90,12 @@ export const generateDiagnosis = (area: HeatmapArea): RiskDiagnosis => {
   // Check accuracy
   if (area.acuracidade < 50) {
     issues.push('Acuracidade crítica');
-    factors.push({ name: 'Acuracidade', impact: 'alta', value: `${area.acuracidade.toFixed(1)}%` });
+    factors.push({ name: 'Acuracidade', impact: 'alta', value: pct(area.acuracidade) });
   } else if (area.acuracidade < 70) {
     issues.push('Acuracidade abaixo do ideal');
-    factors.push({ name: 'Acuracidade', impact: 'média', value: `${area.acuracidade.toFixed(1)}%` });
+    factors.push({ name: 'Acuracidade', impact: 'média', value: pct(area.acuracidade) });
   } else if (area.acuracidade < 90) {
-    factors.push({ name: 'Acuracidade', impact: 'baixa', value: `${area.acuracidade.toFixed(1)}%` });
+    factors.push({ name: 'Acuracidade', impact: 'baixa', value: pct(area.acuracidade) });
   }
 
   // Check divergences
@@ -111,9 +112,9 @@ export const generateDiagnosis = (area: HeatmapArea): RiskDiagnosis => {
   // Check progress
   if (area.progresso < 30 && area.progresso > 0) {
     issues.push('Progresso lento');
-    factors.push({ name: 'Progresso', impact: 'média', value: `${area.progresso.toFixed(1)}%` });
+    factors.push({ name: 'Progresso', impact: 'média', value: pct(area.progresso) });
   } else if (area.progresso < 70 && area.progresso >= 30) {
-    factors.push({ name: 'Progresso', impact: 'baixa', value: `${area.progresso.toFixed(1)}%` });
+    factors.push({ name: 'Progresso', impact: 'baixa', value: pct(area.progresso) });
   }
 
   // Generate recommendation

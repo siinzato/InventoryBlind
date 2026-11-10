@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Minus, Plus, CheckCircle2, AlertTriangle } from 'lucide-react';
 import { Panel, PanelSection, Badge, Input, Select, Stat, StatRow, StatCell } from '../ui';
+import { pct } from '../../lib/formatPtBr';
 import {
   listAuditableBrands, getHistoricalProductivity, getBrandAuditHistory,
   type AuditableBrand, type BrandAuditHistory,
@@ -170,7 +171,7 @@ export function InventorySimulationPanel({ companyId }: InventorySimulationPanel
             <div className="flex flex-wrap items-center gap-2 mt-4 pt-4 border-t border-edge">
               <Badge variant="neutral">{brandHistory.previousAudits} inventário{brandHistory.previousAudits === 1 ? '' : 's'} anterior{brandHistory.previousAudits === 1 ? '' : 'es'}</Badge>
               {brandHistory.recountRatePercent !== null && (
-                <Badge variant="neutral">Recontagem estimada {brandHistory.recountRatePercent.toFixed(0)}%</Badge>
+                <Badge variant="neutral">Recontagem estimada {pct(brandHistory.recountRatePercent, 0)}</Badge>
               )}
             </div>
           )}

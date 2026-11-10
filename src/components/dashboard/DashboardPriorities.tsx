@@ -7,6 +7,7 @@
 import { AlertTriangle, Plug, PlayCircle, ArrowRight } from 'lucide-react';
 import { Panel, PanelSection, Button } from '../ui';
 import type { GlobalStats } from '../../lib/blindAIAgentAlgorithm';
+import { pct, int } from '../../lib/formatPtBr';
 
 interface DashboardPrioritiesProps {
   globais: GlobalStats;
@@ -48,7 +49,7 @@ export function DashboardPriorities({
       icon: AlertTriangle,
       tone: 'critical',
       title: `${globais.totalDiv.toLocaleString('pt-BR')} divergências aguardam recontagem`,
-      context: worst ? `Maior concentração: ${worst.brand} · ${worst.divergences} unidades` : 'Aguardando recontagem',
+      context: worst ? `Maior concentração: ${worst.brand} · ${int(worst.divergences)} unidades` : 'Aguardando recontagem',
       actionLabel: 'Recontar',
       onAction: onRecount,
     });
@@ -61,7 +62,7 @@ export function DashboardPriorities({
       icon: PlayCircle,
       tone: 'default',
       title: `Continuar contagem da linha ${inProgress.brand}`,
-      context: `${inProgress.doneSku} de ${inProgress.totalSku} SKUs · ${inProgress.progress.toFixed(1)}%`,
+      context: `${int(inProgress.doneSku)} de ${int(inProgress.totalSku)} SKUs · ${pct(inProgress.progress)}`,
       actionLabel: 'Continuar',
       onAction: onContinueCounting,
     });

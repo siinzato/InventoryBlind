@@ -7,6 +7,7 @@ import { ChevronDown, ChevronRight, ShieldAlert, Archive, Loader2 } from 'lucide
 import { Panel, PanelSection, Button, Textarea, Stat, StatRow, StatCell } from '../ui';
 import { canAccessDangerZone, validateDangerZoneForm, RESET_CONFIRMATION_PHRASE } from '../../lib/adminSales/dangerZone';
 import { resetInventoryTransactional } from '../../lib/adminSales/salesService';
+import { pct } from '../../lib/formatPtBr';
 
 interface DangerZoneSectionProps {
   role: string | null | undefined;
@@ -74,7 +75,7 @@ export function DangerZoneSection({ role, totalSku, totalDone, totalDivergences,
             <StatCell><Stat label="Total SKUs" value={totalSku} /></StatCell>
             <StatCell><Stat label="Contabilizados" value={totalDone} /></StatCell>
             <StatCell><Stat label="Divergências" value={totalDivergences} /></StatCell>
-            <StatCell><Stat label="Acuracidade" value={`${accuracy.toFixed(1)}%`} /></StatCell>
+            <StatCell><Stat label="Acuracidade" value={pct(accuracy)} /></StatCell>
           </StatRow>
 
           <form onSubmit={handleSubmit} className="space-y-4">

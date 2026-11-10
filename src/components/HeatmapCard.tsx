@@ -15,6 +15,7 @@ import {
   getRiskGradient,
 } from '../lib/heatmapUtils';
 import { Badge } from './ui';
+import { pct } from '../lib/formatPtBr';
 
 interface HeatmapCardProps {
   area: HeatmapArea;
@@ -124,7 +125,7 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
         <div className="mb-2">
           <div className="flex justify-between text-xs mb-1">
             <span className="text-fg-subtle">Progresso</span>
-            <span className={`font-medium ${textClass}`}>{progress.toFixed(1)}%</span>
+            <span className={`font-medium ${textClass}`}>{pct(progress)}</span>
           </div>
           <div className="h-2 bg-surface-2/70 rounded-full overflow-hidden">
             <div
@@ -208,11 +209,11 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
           </div>
           <div className="text-center">
             <p className="text-xs text-fg-subtle">Progresso</p>
-            <p className={`font-bold ${textClass}`}>{progress.toFixed(1)}%</p>
+            <p className={`font-bold ${textClass}`}>{pct(progress)}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-fg-subtle">Acuracidade</p>
-            <p className={`font-bold ${textClass}`}>{accuracy.toFixed(1)}%</p>
+            <p className={`font-bold ${textClass}`}>{pct(accuracy)}</p>
           </div>
           <div className="text-center">
             <p className="text-xs text-fg-subtle">Divergências</p>
@@ -260,7 +261,7 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
             </span>
             <span className={textClass}>
               <TrendingUp size={14} className="inline mr-1" />
-              Acuracidade: {accuracy.toFixed(1)}%
+              Acuracidade: {pct(accuracy)}
             </span>
             <span className={area.divergencias > 0 ? 'text-red-600 dark:text-red-400' : 'text-fg-subtle'}>
               <AlertTriangle size={14} className="inline mr-1" />

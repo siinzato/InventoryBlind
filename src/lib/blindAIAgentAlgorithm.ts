@@ -13,6 +13,7 @@
 //    porque é puro: nenhuma dependência de ambiente impede reuso em Deno.
 
 import type { BlindAILineRanking, BlindAIPriority, BrandData } from './domainTypes';
+import { pct } from './formatPtBr';
 
 export type BlindAIIntent = 'progress_status' | 'accuracy_status' | 'best_lines' | 'top_products' | 'llm';
 
@@ -108,8 +109,8 @@ export function computeGlobalStats(brands: BrandData[]): GlobalStats {
   const concluidas = dataProcessada.filter(b => b.status === 'CONCLUÍDO' && b.accuracy !== null);
   const concluidasOrdenadas = [...concluidas].sort((a, b) => (b.accuracy ?? 0) - (a.accuracy ?? 0));
 
-  const melhores = concluidasOrdenadas.slice(0, 10).map(b => ({ nome: b.brand, valor: `${b.accuracy?.toFixed(1)}%` }));
-  const piores = [...concluidasOrdenadas].reverse().map(b => ({ nome: b.brand, valor: `${b.accuracy?.toFixed(2)}%` }));
+  const melhores = concluidasOrdenadas.slice(0, 10).map(b => ({ nome: b.brand, valor: b.accuracy == null ? '—' : pct(b.accuracy) }));
+  const piores = [...concluidasOrdenadas].reverse().map(b => ({ nome: b.brand, valor: b.accuracy == null ? '—' : pct(b.accuracy, 2) }));
 
   return {
     tabela: dataProcessada,
@@ -164,9 +165,9 @@ export function rankLinesByPriority(lines: LineData[]): BlindAILineRanking[] {
     const reasons: string[] = [];
     if (l.doneSku > 0) {
       reasons.push(
-        `${l.divergences} divergência${l.divergences === 1 ? '' : 's'} em ${l.doneSku} SKU${l.doneSku === 1 ? '' : 's'} contado${l.doneSku === 1 ? '' : 's'} (taxa de ${(divergenceRate * 100).toFixed(0)}%)`
+        `${l.divergences} divergência${l.divergences === 1 ? '' : 's'} em ${l.doneSku} SKU${l.doneSku === 1 ? '' : 's'} contado${l.doneSku === 1 ? '' : 's'} (taxa de ${pct(divergenceRate * 100, 0)})`
       );
-      if (l.accuracy !== null) reasons.push(`Acuracidade apurada: ${l.accuracy.toFixed(1)}%`);
+      if (l.accuracy !== null) reasons.push(`Acuracidade apurada: ${pct(l.accuracy)}`);
     } else {
       reasons.push('Nenhum SKU contado ainda — sem sinal de divergência disponível');
     }

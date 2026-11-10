@@ -21,6 +21,7 @@ import { ReturnConfigPanel } from './ReturnConfigPanel';
 import { FullWithdrawalsView } from './FullWithdrawalsView';
 import { PlanFullWithdrawalWizard } from './PlanFullWithdrawalWizard';
 import { FullWithdrawalDetail } from './FullWithdrawalDetail';
+import { pct } from '../../lib/formatPtBr';
 
 type View = 'list' | 'full' | 'kpis' | 'config';
 type FullSubView = 'list' | 'wizard' | 'detail';
@@ -257,9 +258,9 @@ export function ReverseLogisticsPage({ companyId }: ReverseLogisticsPageProps) {
               <StatRow>
                 <StatCell><Stat label="Devoluções recebidas" value={kpis.receivedCount} context="No período selecionado" /></StatCell>
                 <StatCell><Stat label="Tempo médio de processamento" value={kpis.averageProcessingDays != null ? `${kpis.averageProcessingDays.toFixed(1)}d` : '—'} context="Recebimento → finalização" /></StatCell>
-                <StatCell><Stat label="% recuperado para venda" value={kpis.recoveredPct != null ? `${kpis.recoveredPct.toFixed(0)}%` : '—'} context="Itens com destinação restock" /></StatCell>
-                <StatCell><Stat label="% enviado à assistência" value={kpis.assistancePct != null ? `${kpis.assistancePct.toFixed(0)}%` : '—'} context="Assistência técnica + recondicionamento" /></StatCell>
-                <StatCell><Stat label="% descartado" value={kpis.discardedPct != null ? `${kpis.discardedPct.toFixed(0)}%` : '—'} context="Itens com destinação discard" /></StatCell>
+                <StatCell><Stat label="% recuperado para venda" value={kpis.recoveredPct != null ? pct(kpis.recoveredPct, 0) : '—'} context="Itens com destinação restock" /></StatCell>
+                <StatCell><Stat label="% enviado à assistência" value={kpis.assistancePct != null ? pct(kpis.assistancePct, 0) : '—'} context="Assistência técnica + recondicionamento" /></StatCell>
+                <StatCell><Stat label="% descartado" value={kpis.discardedPct != null ? pct(kpis.discardedPct, 0) : '—'} context="Itens com destinação discard" /></StatCell>
               </StatRow>
             </PanelSection>
             <PanelSection padding="md">

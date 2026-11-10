@@ -7,6 +7,7 @@ import { useMemo, useState } from 'react';
 import { Target, Plus, Trash2, AlertTriangle, Info, ChevronDown, ChevronRight } from 'lucide-react';
 import { Panel, PanelSection, Button, Badge, Select, Modal, Stat, StatRow, StatCell } from '../ui';
 import type { CustomKPI, InventorySnapshot } from '../../lib/supabase';
+import { pct } from '../../lib/formatPtBr';
 import {
   computeAccuracyTrend, classifyAccuracyByTarget, isKpiStale, computeOperationalSummary, buildPriorityAlerts,
   ACCURACY_TARGET_PCT, ACCURACY_WARNING_FLOOR_PCT, ACCURACY_HISTORY_LIMIT,
@@ -63,7 +64,7 @@ function AccuracySparkbars({ points, targetPct }: { points: AccuracyPoint[]; tar
               <div
                 className={`w-full rounded-t ${p.accuracy >= targetPct ? 'bg-emerald-500/70' : p.accuracy >= ACCURACY_WARNING_FLOOR_PCT ? 'bg-amber-500/70' : 'bg-red-500/70'}`}
                 style={{ height: `${Math.max(0, Math.min(100, p.accuracy))}%`, minHeight: 2 }}
-                title={`${new Date(p.date).toLocaleDateString('pt-BR')}: ${p.accuracy.toFixed(1)}%`}
+                title={`${new Date(p.date).toLocaleDateString('pt-BR')}: ${pct(p.accuracy)}`}
               />
               <p className="text-[10px] text-fg-subtle truncate w-full text-center">
                 {new Date(p.date).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
@@ -172,7 +173,7 @@ export function KpisTab({ customKPIs, onAddKPI, onDeleteKPI, snapshots, onNaviga
               </div>
               <Stat
                 label="Acuracidade"
-                value={latestSnapshot ? `${latestSnapshot.accuracy.toFixed(1)}%` : '—'}
+                value={latestSnapshot ? pct(latestSnapshot.accuracy) : '—'}
                 context={`Meta: ${ACCURACY_TARGET_PCT}%`}
                 valueTone={VALUE_TONE[accuracyStatus]}
                 trend={

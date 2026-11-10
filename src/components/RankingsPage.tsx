@@ -17,6 +17,7 @@ import { supabase } from '../lib/supabase';
 import type { UserProductivityStats } from '../lib/supabase';
 import { downloadFile } from '../lib/productImportUtils';
 import { resolvePeriodRange, type ReportPeriod } from '../lib/productivityService';
+import { pct, int } from '../lib/formatPtBr';
 import {
   MIN_RANKING_SAMPLE, SITUACAO_LABEL, computeSituacao, pickDestaquesConsistentes,
   compareByQualityFirst, groupEntityPeriodStats, dailyStatsByEntity, summarizeTrend,
@@ -377,7 +378,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
     if (activeTab === 'linhas') {
       header = 'Linha/Marca;Volume;Progresso;Acuracidade;Divergencias por 100;Situacao';
       rows = linhasFiltered.map(r =>
-        `${r.name};${r.volume};${r.progress.toFixed(1)}%;${r.accuracy !== null ? r.accuracy.toFixed(1) + '%' : ''};${r.divergenciasPor100 !== null ? r.divergenciasPor100.toFixed(1) : ''};${SITUACAO_LABEL[r.situacao]}`);
+        `${r.name};${r.volume};${pct(r.progress)};${r.accuracy !== null ? r.accuracy.toFixed(1) + '%' : ''};${r.divergenciasPor100 !== null ? r.divergenciasPor100.toFixed(1) : ''};${SITUACAO_LABEL[r.situacao]}`);
     } else if (activeTab === 'operadores') {
       header = 'Operador;SKUs;Ritmo (SKUs por h);Acuracidade;Divergencias por 100;Elegibilidade;Situacao';
       rows = operadoresFiltered.map(r =>
@@ -471,7 +472,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                           {d.ritmoPerHour !== null ? `${d.ritmoPerHour.toFixed(1)} SKUs/h · ` : ''}{d.skus} SKUs
                         </p>
                       </div>
-                      <span className="text-sm font-semibold text-fg tabular-nums">{d.accuracy?.toFixed(1)}%</span>
+                      <span className="text-sm font-semibold text-fg tabular-nums">{d.accuracy == null ? '—' : pct(d.accuracy)}</span>
                     </div>
                   ))}
                 </PanelSection>
@@ -541,12 +542,12 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                               <div className="h-1.5 w-20 rounded-full bg-surface-3">
                                 <div className="h-1.5 rounded-full bg-accent" style={{ width: `${Math.min(100, row.progress)}%` }} />
                               </div>
-                              <span className="w-12 text-right font-mono text-xs tabular-nums text-fg-muted">{row.progress.toFixed(1)}%</span>
+                              <span className="w-12 text-right font-mono text-xs tabular-nums text-fg-muted">{pct(row.progress)}</span>
                             </div>
                           </Td>
                           <Td numeric>
                             {row.accuracy !== null
-                              ? <span className={`font-semibold ${row.situacao === 'risco' ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>{row.accuracy.toFixed(1)}%</span>
+                              ? <span className={`font-semibold ${row.situacao === 'risco' ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>{pct(row.accuracy)}</span>
                               : <span className="text-fg-subtle">—</span>}
                           </Td>
                           <Td numeric className="text-fg-muted">{row.ritmoPerHour !== null ? `${row.ritmoPerHour.toFixed(1)}/h` : '—'}</Td>
@@ -579,7 +580,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                               <p className="text-xs font-medium text-fg-subtle mb-1.5">Acuracidade diária — últimos 7 dias</p>
                               <div className="flex flex-wrap gap-x-4 gap-y-1 text-xs text-fg-muted">
                                 {row.trend.points.map(p => (
-                                  <span key={p.dateISO}>{p.dateISO.slice(8, 10)}/{p.dateISO.slice(5, 7)}: {p.accuracy.toFixed(1)}%</span>
+                                  <span key={p.dateISO}>{p.dateISO.slice(8, 10)}/{p.dateISO.slice(5, 7)}: {pct(p.accuracy)}</span>
                                 ))}
                               </div>
                             </td>
@@ -613,15 +614,15 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                   <StatCell>
                     <Stat
                       label="Maior Acuracidade"
-                      value={maiorAcuracidade ? `${maiorAcuracidade.accuracy?.toFixed(1)}%` : '—'}
-                      context={maiorAcuracidade ? `${maiorAcuracidade.name} · ${maiorAcuracidade.skus} SKUs` : 'Nenhum operador elegível'}
+                      value={maiorAcuracidade?.accuracy != null ? pct(maiorAcuracidade.accuracy) : '—'}
+                      context={maiorAcuracidade ? `${maiorAcuracidade.name} · ${int(maiorAcuracidade.skus)} SKUs` : 'Nenhum operador elegível'}
                     />
                   </StatCell>
                   <StatCell>
                     <Stat
                       label="Melhor Ritmo com Qualidade"
                       value={melhorRitmoComQualidade ? `${melhorRitmoComQualidade.ritmoPerHour?.toFixed(1)} SKUs/h` : '—'}
-                      context={melhorRitmoComQualidade ? `${melhorRitmoComQualidade.name} · ${melhorRitmoComQualidade.accuracy?.toFixed(1)}%` : 'Nenhum operador elegível'}
+                      context={melhorRitmoComQualidade ? `${melhorRitmoComQualidade.name} · ${melhorRitmoComQualidade.accuracy == null ? '—' : pct(melhorRitmoComQualidade.accuracy)}` : 'Nenhum operador elegível'}
                     />
                   </StatCell>
                   <StatCell>
@@ -663,7 +664,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                         return (
                           <Tr key={o.id}>
                             <Td className="font-medium">{o.name}</Td>
-                            <Td numeric>{trend.avgAccuracy !== null ? `${trend.avgAccuracy.toFixed(1)}%` : '—'}</Td>
+                            <Td numeric>{trend.avgAccuracy !== null ? pct(trend.avgAccuracy) : '—'}</Td>
                             <Td numeric>{trend.varianceP !== null ? `${trend.varianceP >= 0 ? '+' : ''}${trend.varianceP.toFixed(1)} p.p.` : '—'}</Td>
                             <Td numeric className="text-fg-muted">{trend.totalSkus}</Td>
                             <Td className="text-center">
@@ -714,7 +715,7 @@ export const RankingsPage: React.FC<RankingsPageProps> = ({ onBack, companyId, b
                         <Td numeric className="text-fg-muted">{row.ritmoPerHour !== null ? `${row.ritmoPerHour.toFixed(1)}/h` : '—'}</Td>
                         <Td numeric>
                           {row.accuracy !== null
-                            ? <span className={`font-semibold ${row.situacao === 'risco' ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>{row.accuracy.toFixed(1)}%</span>
+                            ? <span className={`font-semibold ${row.situacao === 'risco' ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>{pct(row.accuracy)}</span>
                             : <span className="text-fg-subtle">—</span>}
                         </Td>
                         <Td numeric className={row.situacao === 'risco' ? 'text-red-600 dark:text-red-400 font-semibold' : 'text-fg-muted'}>

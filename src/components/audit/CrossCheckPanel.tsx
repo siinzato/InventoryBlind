@@ -3,6 +3,7 @@ import { AlertTriangle } from 'lucide-react';
 import { Panel, PanelSection, Badge, Button, Stat, StatRow, StatCell } from '../ui';
 import { getCrossCheckData, approveCount } from '../../lib/auditCrossCheckService';
 import type { CountChain, CrossCheckSummary } from '../../lib/auditCrossCheckAlgorithm';
+import { pct } from '../../lib/formatPtBr';
 
 interface CrossCheckPanelProps {
   companyId: string;
@@ -52,9 +53,9 @@ export function CrossCheckPanel({ companyId, userId, userEmail, canEdit }: Cross
       <Panel>
         <PanelSection padding="md">
           <StatRow>
-            <StatCell><Stat label="% Recontagens" value={`${summary.pctRecontagens.toFixed(0)}%`} /></StatCell>
-            <StatCell><Stat label="% Auditorias independentes" value={`${summary.pctAuditoriasIndependentes.toFixed(0)}%`} /></StatCell>
-            <StatCell><Stat label="% Aprovadas" value={`${summary.pctAprovadas.toFixed(0)}%`} /></StatCell>
+            <StatCell><Stat label="% Recontagens" value={pct(summary.pctRecontagens, 0)} /></StatCell>
+            <StatCell><Stat label="% Auditorias independentes" value={pct(summary.pctAuditoriasIndependentes, 0)} /></StatCell>
+            <StatCell><Stat label="% Aprovadas" value={pct(summary.pctAprovadas, 0)} /></StatCell>
             <StatCell>
               <Stat
                 label="Índice de confiabilidade"

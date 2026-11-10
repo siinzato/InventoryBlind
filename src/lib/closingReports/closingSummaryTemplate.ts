@@ -3,6 +3,7 @@
 // nunca texto gerado por IA/aleatório).
 
 import type { CategoryCountSnapshot } from './closingReportTypes';
+import { pct } from '../formatPtBr';
 
 export interface ClosingSummaryInput {
   brandName: string;
@@ -39,7 +40,7 @@ export function renderClosingSummary(input: ClosingSummaryInput): string {
   lines.push('');
   lines.push(
     `Divergências reais confirmadas: ${input.divergenciasReais}. ` +
-      (input.accuracyFinal !== null ? `Acuracidade final: ${input.accuracyFinal.toFixed(1)}%.` : 'Acuracidade final: —.')
+      (input.accuracyFinal !== null ? `Acuracidade final: ${pct(input.accuracyFinal)}.` : 'Acuracidade final: —.')
   );
 
   return lines.join('\n');

@@ -160,7 +160,7 @@ const CheckingForm: React.FC<{
               <Stat label="Peças coletadas" value={totalPicked} />
             </StatCell>
             <StatCell>
-              <Stat label="Acurácia" value={`${accuracy}%`} valueTone={accuracy >= 90 ? 'positive' : 'warning'} />
+              <Stat label="Acuracidade" value={`${accuracy}%`} valueTone={accuracy >= 90 ? 'positive' : 'warning'} />
             </StatCell>
           </StatRow>
         </PanelSection>

@@ -1,6 +1,7 @@
 import React from 'react';
 import { Modal, Badge } from '../ui';
 import { ComparisonRecord, ComparisonStatus } from '../../lib/spreadsheet-comparator/types';
+import { pct } from '../../lib/formatPtBr';
 
 interface ComparisonDetailsProps {
   record: ComparisonRecord | null;
@@ -78,7 +79,7 @@ export const ComparisonDetails: React.FC<ComparisonDetailsProps> = ({ record, la
                     <div><span className="text-fg-subtle">Normalizado {labelA}:</span> <span className="font-mono">{String(f.normalizedA ?? '—')}</span></div>
                     <div><span className="text-fg-subtle">Normalizado {labelB}:</span> <span className="font-mono">{String(f.normalizedB ?? '—')}</span></div>
                     {f.difference !== null && <div><span className="text-fg-subtle">Diferença:</span> <span className="font-mono">{f.difference.toLocaleString('pt-BR', { maximumFractionDigits: 2 })}</span></div>}
-                    {f.differencePercent !== null && <div><span className="text-fg-subtle">Diferença %:</span> <span className="font-mono">{f.differencePercent.toFixed(2)}%</span></div>}
+                    {f.differencePercent !== null && <div><span className="text-fg-subtle">Diferença %:</span> <span className="font-mono">{pct(f.differencePercent, 2)}</span></div>}
                     {(f.toleranceAbsolute !== null || f.tolerancePercent !== null) && (
                       <div className="col-span-2"><span className="text-fg-subtle">Tolerância aplicada:</span> <span className="font-mono">{f.toleranceAbsolute ?? 0} abs. / {f.tolerancePercent ?? 0}%</span></div>
                     )}

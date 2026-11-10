@@ -12,6 +12,7 @@ import { supabase } from '../../lib/supabase';
 import { resolvePeriodRange } from '../../lib/productivityService';
 import { groupDailyProduction, averageDailyProduction, forecastBusinessDays } from '../../lib/kpisIndicadores/executiveKpis';
 import type { GlobalStats } from '../../lib/blindAIAgentAlgorithm';
+import { pct } from '../../lib/formatPtBr';
 
 interface DashboardInventoryProgressProps {
   companyId: string | null;
@@ -52,7 +53,7 @@ export function DashboardInventoryProgress({ companyId, globais, onOpenKpis }: D
 
       <PanelSection padding="sm">
         <p className="font-display text-3xl font-semibold tabular-nums tracking-tight text-fg">
-          {globais.progresso.toFixed(1)}%
+          {pct(globais.progresso)}
         </p>
         <div className="mt-2 h-1.5 w-full rounded-full bg-surface-3 overflow-hidden">
           <div

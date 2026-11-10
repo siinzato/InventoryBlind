@@ -4,7 +4,7 @@ import { isAccuracyStale, buildClosingResults, type ClosingResultRow } from '../
 import type { ClosingReport } from '../closingReportTypes';
 
 describe('computeAccuracy — fonte única de acuracidade final (dashboard + relatório)', () => {
-  it('caso Nillkin: 195 SKUs contados e 110 divergências ficam em ~43.589743, exibido como 43.6% com uma casa decimal', () => {
+  it('caso Nillkin: 195 SKUs contados e 110 divergências ficam em ~43.589743, exibido como 43,6% com uma casa decimal', () => {
     const result = computeAccuracy(195, 110);
     expect(result).not.toBeNull();
     expect(result as number).toBeCloseTo(43.589743, 5);

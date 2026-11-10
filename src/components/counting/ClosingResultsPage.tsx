@@ -39,6 +39,7 @@ import { loadLineLogoUrlMap } from '../../lib/brandLogos/brandLogoService';
 import { lineLogoUrl } from '../../lib/brandLogos/brandLogoAlgorithm';
 import { BrandMark } from '../brandLogos/BrandMark';
 import { ClosingSummaryModal } from './closing/ClosingSummaryModal';
+import { pct } from '../../lib/formatPtBr';
 
 interface ClosingResultsPageProps {
   companyId: string;
@@ -56,7 +57,7 @@ const formatDateTime = (iso: string | null): string => {
   }
 };
 
-const formatAccuracy = (value: number | null): string => (value !== null ? `${value.toFixed(1)}%` : '—');
+const formatAccuracy = (value: number | null): string => (value !== null ? pct(value) : '—');
 
 export function ClosingResultsPage({ companyId, brandsData, userId, userEmail }: ClosingResultsPageProps) {
   const [scope, setScope] = useState<ClosingScope>('current');

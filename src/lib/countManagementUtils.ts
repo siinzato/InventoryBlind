@@ -2,6 +2,7 @@
 // Mirrors the patterns in productImportUtils.ts without modifying that file.
 
 import { parseCSV } from './productImportUtils';
+import { pct } from './formatPtBr';
 
 export interface CountRow {
   [key: string]: string | number | undefined;
@@ -262,11 +263,11 @@ export const generateCountInsight = (metrics: CountMetrics, divergenciasReais: n
 
   if (metrics.percentReduction !== null) {
     if (metrics.percentReduction >= 70) {
-      parts.push(`✅ Excelente resultado${linha}: redução de ${metrics.percentReduction.toFixed(0)}% das divergências após a recontagem.`);
+      parts.push(`✅ Excelente resultado${linha}: redução de ${pct(metrics.percentReduction, 0)} das divergências após a recontagem.`);
     } else if (metrics.percentReduction >= 30) {
-      parts.push(`📊 Redução moderada${linha}: ${metrics.percentReduction.toFixed(0)}% das divergências eliminadas após a recontagem.`);
+      parts.push(`📊 Redução moderada${linha}: ${pct(metrics.percentReduction, 0)} das divergências eliminadas após a recontagem.`);
     } else {
-      parts.push(`⚠️ Baixa redução de divergências${linha} (${metrics.percentReduction.toFixed(0)}%) — a maioria das divergências encontradas se confirmou real.`);
+      parts.push(`⚠️ Baixa redução de divergências${linha} (${pct(metrics.percentReduction, 0)}) — a maioria das divergências encontradas se confirmou real.`);
     }
   }
 
@@ -275,7 +276,7 @@ export const generateCountInsight = (metrics: CountMetrics, divergenciasReais: n
   }
 
   if (metrics.accuracyFinal !== null) {
-    parts.push(`🎯 Acuracidade final: ${metrics.accuracyFinal.toFixed(1)}%.`);
+    parts.push(`🎯 Acuracidade final: ${pct(metrics.accuracyFinal)}.`);
   }
 
   return parts.length > 0 ? parts.join(' ') : 'Contagem registrada sem divergências relevantes a destacar.';

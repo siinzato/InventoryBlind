@@ -17,6 +17,7 @@ import { generateClosingReport } from '../../lib/closingReports/closingReportSer
 import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
 import { CountClosingSummaryModal } from './closing/CountClosingSummaryModal';
 import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
+import { pct } from '../../lib/formatPtBr';
 
 interface ManualCountTabProps {
   brandsData: BrandData[];
@@ -422,11 +423,11 @@ export function ManualCountTab({ brandsData, countingUniverse, universeReconcile
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 rounded-lg border border-edge divide-x divide-edge overflow-hidden">
               <div className="p-3 text-center">
                 <p className="text-xs text-fg-subtle">Acuracidade inicial</p>
-                <p className="text-sm font-semibold text-fg">{metrics.accuracyInitial !== null ? `${metrics.accuracyInitial.toFixed(1)}%` : '—'}</p>
+                <p className="text-sm font-semibold text-fg">{metrics.accuracyInitial !== null ? pct(metrics.accuracyInitial) : '—'}</p>
               </div>
               <div className="p-3 text-center">
                 <p className="text-xs text-fg-subtle">Acuracidade final</p>
-                <p className="text-sm font-semibold text-fg">{metrics.accuracyFinal !== null ? `${metrics.accuracyFinal.toFixed(1)}%` : '—'}</p>
+                <p className="text-sm font-semibold text-fg">{metrics.accuracyFinal !== null ? pct(metrics.accuracyFinal) : '—'}</p>
               </div>
               <div className="p-3 text-center">
                 <p className="text-xs text-fg-subtle">Elim. divergências</p>
@@ -434,7 +435,7 @@ export function ManualCountTab({ brandsData, countingUniverse, universeReconcile
               </div>
               <div className="p-3 text-center">
                 <p className="text-xs text-fg-subtle">% redução</p>
-                <p className="text-sm font-semibold text-fg">{metrics.percentReduction !== null ? `${metrics.percentReduction.toFixed(0)}%` : '—'}</p>
+                <p className="text-sm font-semibold text-fg">{metrics.percentReduction !== null ? pct(metrics.percentReduction, 0) : '—'}</p>
               </div>
             </div>
           )}

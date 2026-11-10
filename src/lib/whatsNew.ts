@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-10-percentuais-em-portugues',
+    date: '2026-11-10',
+    category: 'correcao',
+    title: 'Percentuais no formato brasileiro em todo o sistema',
+    description: 'Em praticamente toda tela com dado, o percentual aparecia com ponto no lugar da vírgula — “72.1%” logo ao lado de “R$ 4.002.857,37”, na mesma tela, com dois padrões de número diferentes. Agora todo percentual segue o padrão brasileiro: 72,1%. A mudança vale também para os relatórios de fechamento exportados em PDF, Word e texto, para o resumo enviado ao responsável e para as análises do BlindAI. Junto com isso, lugares que mostravam o texto “undefined%” quando a acuracidade ainda não tinha sido calculada passam a mostrar um traço, e as telas de Auditorias e Full Checking agora dizem “Acuracidade”, o mesmo termo usado no resto do sistema, em vez de alternar com “Acurácia”. No Dashboard também havia contagens grandes sem separador de milhar — “0 de 4628 SKUs” logo acima de “Total: 4.628 SKUs”, e “1000 produtos em atraso”; agora aparecem como 4.628 e 1.000, igual ao resto do sistema. Nenhum cálculo mudou: apenas como o número é escrito.',
+  },
+  {
     id: '2026-11-09-telas-mais-claras',
     date: '2026-11-09',
     category: 'correcao',

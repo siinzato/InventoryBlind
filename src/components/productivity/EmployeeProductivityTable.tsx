@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { Table, Thead, Tr, Th, Td, Badge } from '../ui';
 import { UserProductivityStats } from '../../lib/supabase';
 import { getRoleLabel } from '../../lib/permissionService';
+import { pct } from '../../lib/formatPtBr';
 
 interface EmployeeProductivityTableProps {
   team: UserProductivityStats[];
@@ -98,7 +99,7 @@ export function EmployeeProductivityTable({ team, achievementCounts, onSelectEmp
                 <Td><Badge variant="neutral">{getRoleLabel(t.role)}</Badge></Td>
                 <Td>{t.skus_contados.toLocaleString('pt-BR')}</Td>
                 <Td>{t.contagens.toLocaleString('pt-BR')}</Td>
-                <Td>{t.acuracidade_media !== null ? `${t.acuracidade_media.toFixed(1)}%` : '—'}</Td>
+                <Td>{t.acuracidade_media !== null ? pct(t.acuracidade_media) : '—'}</Td>
                 <Td>{t.divergencias_reais.toLocaleString('pt-BR')}</Td>
                 <Td>{t.fulls_realizados.toLocaleString('pt-BR')}</Td>
                 <Td>{t.etiquetas_geradas.toLocaleString('pt-BR')}</Td>

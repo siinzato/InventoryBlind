@@ -7,6 +7,7 @@ import { generateClosingReport } from '../../lib/closingReports/closingReportSer
 import type { ClosingReport, ClosingReportObservation } from '../../lib/closingReports/closingReportTypes';
 import { CountClosingSummaryModal } from './closing/CountClosingSummaryModal';
 import { ClosingCategoriesModal } from './closing/ClosingCategoriesModal';
+import { pct } from '../../lib/formatPtBr';
 
 interface CountHistorySectionProps {
   companyId: string;
@@ -157,7 +158,7 @@ export function CountHistorySection({ companyId, brandsById, brandsData, refresh
                 <p className="text-xs text-fg-muted mt-1.5">{rec.operator_1 || 'Operador não informado'}</p>
                 <p className="text-xs text-fg-subtle">
                   {rec.skus_contados} contados · {rec.divergencias_reais} divergências reais
-                  {rec.accuracy_final !== null ? ` · ${rec.accuracy_final.toFixed(1)}% acuracidade` : ''}
+                  {rec.accuracy_final !== null ? ` · ${pct(rec.accuracy_final)} acuracidade` : ''}
                 </p>
               </div>
             ))}

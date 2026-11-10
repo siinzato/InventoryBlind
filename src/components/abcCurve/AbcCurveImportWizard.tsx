@@ -18,6 +18,7 @@ import { evaluateSignals } from '../../lib/abcCurve/abcCurveSignals';
 import { normalizeTinyClass, type TinyFileValues } from '../../lib/abcCurve/abcCurveTiny';
 import { evaluateRecommendation, type Recommendation } from '../../lib/abcCurve/abcCurveRecommendations';
 import { findBatchesByFileHash, matchProductIds, publishAnalysis, type AbcFileKind, type AbcProvider } from '../../lib/abcCurve/abcCurveService';
+import { pct } from '../../lib/formatPtBr';
 
 interface AbcCurveImportWizardProps {
   companyId: string;
@@ -481,7 +482,7 @@ export function AbcCurveImportWizard({ companyId, userId, userEmail, onClose, on
                   <dl className="grid grid-cols-2 divide-x divide-edge">
                     <div className="p-3">
                       <dt className="text-label">Cobertura de custo</dt>
-                      <dd className="text-sm tabular-nums text-fg mt-0.5">{preview.costCoveragePct !== null ? `${preview.costCoveragePct.toFixed(1)}%` : '—'}</dd>
+                      <dd className="text-sm tabular-nums text-fg mt-0.5">{preview.costCoveragePct !== null ? pct(preview.costCoveragePct) : '—'}</dd>
                     </div>
                     <div className="p-3">
                       <dt className="text-label">Cobertura de estoque</dt>

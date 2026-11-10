@@ -17,6 +17,7 @@ import {
 import { topConcentration } from '../rcaAlgorithm';
 import type { AbcXyzUnclassifiedReason } from '../supabase';
 import { validationQualityFrom } from './blindScoreEngine';
+import { pct } from '../formatPtBr';
 import {
   available, unavailable, isAvailable,
   type HealthIndicator, type HealthSummary, type IndicatorStatus, type ValidationQuality,
@@ -142,7 +143,7 @@ export function computeHealthIndicators(
           status: VALIDATION_STATUS[validationQuality],
           metric: available(Math.round(raw.crossCheckSummary.reliabilityIndex)),
           unit: '%',
-          detail: `${sampleChains} de ${raw.crossCheckSummary.totalChains} contagens com recontagem, ${raw.crossCheckSummary.pctAuditoriasIndependentes.toFixed(0)}% delas independentes.`,
+          detail: `${sampleChains} de ${raw.crossCheckSummary.totalChains} contagens com recontagem, ${pct(raw.crossCheckSummary.pctAuditoriasIndependentes, 0)} delas independentes.`,
           navigateTo: 'audit',
           actionLabel: 'Abrir Auditoria',
         }
@@ -230,7 +231,7 @@ export function computeHealthIndicators(
           status: worseWhenHigher(topLocation.pct, 25, 45),
           metric: available(Math.round(topLocation.pct * 10) / 10),
           unit: '%',
-          detail: `${topLocation.label} concentra ${topLocation.pct.toFixed(0)}% das divergências localizadas.`,
+          detail: `${topLocation.label} concentra ${pct(topLocation.pct, 0)} das divergências localizadas.`,
           drill: { kind: 'location', location: topLocation.label },
           navigateTo: 'rca',
           actionLabel: 'Ver por localização',

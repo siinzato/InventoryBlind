@@ -4,6 +4,7 @@
 
 import type { SkuSnapshot } from './abcCurveEngine';
 import type { AbcCommercialPolicy } from './abcCurvePolicy';
+import { pct } from '../formatPtBr';
 
 export type RecommendationCode =
   | 'PREJUIZO' | 'CORRIGIR_CUSTO' | 'COMPRA_URGENTE' | 'PROTEGER_DISPONIBILIDADE'
@@ -80,7 +81,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
       code: 'RENEGOCIAR_CUSTO_OU_PRECO',
       priority: 6,
       ruleApplied: 'faturamento classe A com margem baixa',
-      justification: `Faturamento em classe A (R$ ${s.revenue.toFixed(2)}) com margem de ${(s.grossMargin * 100).toFixed(1)}% — abaixo do saudável.`,
+      justification: `Faturamento em classe A (R$ ${s.revenue.toFixed(2)}) com margem de ${pct(s.grossMargin * 100)} — abaixo do saudável.`,
     };
   }
 
@@ -89,7 +90,7 @@ export const evaluateRecommendation = (s: SkuSnapshot, policy: AbcCommercialPoli
       code: 'PROMOVER',
       priority: 7,
       ruleApplied: 'lucro classe A/B, margem forte e giro baixo',
-      justification: `Margem de ${(s.grossMargin * 100).toFixed(1)}% e lucro classe ${s.profitClass}, mas giro em classe C — potencial de promoção.`,
+      justification: `Margem de ${pct(s.grossMargin * 100)} e lucro classe ${s.profitClass}, mas giro em classe C — potencial de promoção.`,
     };
   }
 

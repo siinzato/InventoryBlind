@@ -216,7 +216,7 @@ describe('modelo canônico do documento', () => {
     expect(html).toContain('Relatório de Fechamento de Inventário');
     expect(html).toContain('Nillkin');
     expect(html).toContain('195');
-    expect(html).toContain('43.6%');
+    expect(html).toContain('43,6%');
     expect(html).toContain('Saldo em excesso');
     expect(closingExportFilename(doc, 'pdf')).toBe('fechamento-nillkin-2026-08-31.pdf');
     expect(closingExportFilename(doc, 'doc')).toBe('fechamento-nillkin-2026-08-31.doc');
@@ -255,7 +255,7 @@ describe('feedback ao responsável', () => {
     expect(text).toContain('Cargo/Função: Conferente');
     expect(text).toContain('Linha/Marca: Nillkin');
     expect(text).toContain('SKUs contados: 195');
-    expect(text).toContain('Acuracidade final: 43.6%');
+    expect(text).toContain('Acuracidade final: 43,6%');
     expect(text).toContain('Saldo em excesso — 4 registros');
     expect(text).toContain('OBSERVAÇÃO DO GESTOR');
     expect(text).toContain('CONCLUSÃO');

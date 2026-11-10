@@ -1,5 +1,6 @@
 import { Panel, PanelSection, Stat, type StatProps } from '../ui';
 import { UserProductivityStats } from '../../lib/supabase';
+import { pct } from '../../lib/formatPtBr';
 
 interface ProductivityCardsProps {
   stats: UserProductivityStats;
@@ -42,7 +43,7 @@ export function ProductivityCards({ stats, rank, totalPeers }: ProductivityCards
           : `de ${stats.divergencias_encontradas.toLocaleString('pt-BR')} encontradas`,
       valueTone: stats.divergencias_reais > stats.divergencias_encontradas ? 'warning' : 'default',
     },
-    { label: 'Acuracidade Média', value: stats.acuracidade_media !== null ? `${stats.acuracidade_media.toFixed(1)}%` : '—' },
+    { label: 'Acuracidade Média', value: stats.acuracidade_media !== null ? pct(stats.acuracidade_media) : '—' },
     { label: 'Tempo Médio/Contagem', value: formatSeconds(stats.tempo_medio_segundos) },
     { label: 'Fulls Realizados', value: stats.fulls_realizados.toLocaleString('pt-BR') },
     { label: 'Itens Separados', value: stats.itens_separados.toLocaleString('pt-BR') },

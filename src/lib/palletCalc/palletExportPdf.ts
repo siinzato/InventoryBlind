@@ -5,6 +5,7 @@
 // exportUtils.ts (`buildAndDownloadPdfReport`) para as seções textuais.
 
 import type { PalletCalcResult } from './calculatePallet';
+import { pct } from '../formatPtBr';
 
 export async function captureDiagramToPng(el: HTMLElement): Promise<{ dataUrl: string; widthPx: number; heightPx: number }> {
   const html2canvas = (await import('html2canvas')).default;
@@ -53,7 +54,7 @@ export async function downloadPalletReportPdf({ result, diagramElement, filename
   line(`Carga máxima: ${pallet.maxLoadKg.toFixed(0)} kg    Altura total máxima: ${pallet.maxTotalHeightMm.toFixed(0)} mm`);
 
   heading(`Padrão selecionado: ${recommended.pattern.label}`);
-  line(`Caixas por camada: ${recommended.pattern.boxesPerLayer}    Ocupação da base: ${recommended.pattern.occupationPct.toFixed(1)}%`);
+  line(`Caixas por camada: ${recommended.pattern.boxesPerLayer}    Ocupação da base: ${pct(recommended.pattern.occupationPct)}`);
   line(`Camadas: ${recommended.layers.layers} (limitado por: ${recommended.layers.limitingFactor})`);
   line(`Caixas por palete: ${recommended.capacityPerPallet}`);
 

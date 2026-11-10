@@ -3,6 +3,7 @@
 
 import type { AlertSeverity, BoxSpec, PalletAlert, PalletSpec } from './types';
 import type { LayerLimitsResult } from './layerEngine';
+import { pct } from '../formatPtBr';
 
 const LOW_OCCUPATION_THRESHOLD_PCT = 70;
 const LOW_LAST_PALLET_THRESHOLD_PCT = 50;
@@ -73,21 +74,21 @@ export function computeAlerts(input: AlertsInput): PalletAlert[] {
   }
 
   if (input.actualSupportPct != null && pallet.minSupportPct != null && input.actualSupportPct < pallet.minSupportPct) {
-    alerts.push(alert('apoio-insuficiente', 'error', `Apoio entre camadas (${input.actualSupportPct.toFixed(0)}%) abaixo do mínimo configurado (${pallet.minSupportPct}%).`));
+    alerts.push(alert('apoio-insuficiente', 'error', `Apoio entre camadas (${pct(input.actualSupportPct, 0)}) abaixo do mínimo configurado (${pallet.minSupportPct}%).`));
   }
 
   if (input.centerOffsetPct > CENTER_IMBALANCE_THRESHOLD_PCT) {
-    alerts.push(alert('centro-desequilibrado', 'warning', `Centro da carga desviado ${input.centerOffsetPct.toFixed(0)}% do centro do palete — carga pode ficar desequilibrada.`));
+    alerts.push(alert('centro-desequilibrado', 'warning', `Centro da carga desviado ${pct(input.centerOffsetPct, 0)} do centro do palete — carga pode ficar desequilibrada.`));
   }
 
   if (input.occupationPct < LOW_OCCUPATION_THRESHOLD_PCT) {
-    alerts.push(alert('ociosidade-alta', 'warning', `Ocupação da base é baixa (${input.occupationPct.toFixed(0)}%) — considere outro arranjo ou tamanho de caixa.`));
+    alerts.push(alert('ociosidade-alta', 'warning', `Ocupação da base é baixa (${pct(input.occupationPct, 0)}) — considere outro arranjo ou tamanho de caixa.`));
   }
 
   if (input.capacityPerPallet > 0) {
     const lastPalletPct = (input.lastPalletQty / input.capacityPerPallet) * 100;
     if (input.lastPalletQty < input.capacityPerPallet && lastPalletPct < LOW_LAST_PALLET_THRESHOLD_PCT) {
-      alerts.push(alert('ultimo-palete-baixa-ocupacao', 'warning', `Último palete com baixa ocupação (${lastPalletPct.toFixed(0)}%, ${input.lastPalletQty} de ${input.capacityPerPallet} caixas).`));
+      alerts.push(alert('ultimo-palete-baixa-ocupacao', 'warning', `Último palete com baixa ocupação (${pct(lastPalletPct, 0)}, ${input.lastPalletQty} de ${input.capacityPerPallet} caixas).`));
     }
   }
 

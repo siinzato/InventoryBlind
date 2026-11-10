@@ -4,6 +4,7 @@ import { Panel, PanelSection, Badge, ListRow, SegmentedControl } from '../ui';
 import { listRecords } from '../../lib/rcaService';
 import { groupByDimension, computeTrend, topConcentration, type RcaDimension, type TrendDirection } from '../../lib/rcaAlgorithm';
 import type { RcaRecord } from '../../lib/supabase';
+import { pct } from '../../lib/formatPtBr';
 
 interface TrendAnalysisPanelProps {
   companyId: string;
@@ -89,7 +90,7 @@ export function TrendAnalysisPanel({ companyId }: TrendAnalysisPanelProps) {
           </div>
           {concentration && (
             <p className="text-sm text-fg-muted mb-3">
-              <span className="font-medium text-fg">{concentration.label}</span> concentra {concentration.pct.toFixed(0)}% das divergências classificadas.
+              <span className="font-medium text-fg">{concentration.label}</span> concentra {pct(concentration.pct, 0)} das divergências classificadas.
             </p>
           )}
           <div>

@@ -2,6 +2,7 @@ import React, { useMemo, useState } from 'react';
 import { Search, Eye, ChevronLeft, ChevronRight, SlidersHorizontal } from 'lucide-react';
 import { Table, Thead, Tr, Th, Td, Badge, Select, Input } from '../ui';
 import { ComparisonRecord, ComparisonStatus, FieldMapping } from '../../lib/spreadsheet-comparator/types';
+import { pct } from '../../lib/formatPtBr';
 
 type TableFilter = ComparisonStatus | 'all' | 'duplicates-a' | 'duplicates-b';
 
@@ -181,7 +182,7 @@ export const ComparisonTable: React.FC<ComparisonTableProps> = ({ records, field
                 {col('valueA') && <Td className="text-xs font-mono">{row.valueA}</Td>}
                 {col('valueB') && <Td className="text-xs font-mono">{row.valueB}</Td>}
                 {col('diff') && <Td className="text-xs font-mono">{row.difference !== null ? row.difference.toLocaleString('pt-BR', { maximumFractionDigits: 2 }) : '—'}</Td>}
-                {col('diffPercent') && <Td className="text-xs font-mono">{row.differencePercent !== null ? `${row.differencePercent.toFixed(1)}%` : '—'}</Td>}
+                {col('diffPercent') && <Td className="text-xs font-mono">{row.differencePercent !== null ? pct(row.differencePercent) : '—'}</Td>}
                 {col('sourceRows') && <Td className="text-xs text-fg-subtle">A: {row.record.sourceRowsA.join(', ') || '—'} · B: {row.record.sourceRowsB.join(', ') || '—'}</Td>}
                 <Td>
                   <button onClick={() => onOpenDetails(row.record)} className="p-1.5 text-fg-subtle hover:text-accent" title="Ver detalhes">

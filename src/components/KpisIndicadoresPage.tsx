@@ -6,6 +6,7 @@ import { Panel, PanelSection, Select } from './ui';
 import { resolvePeriodRange, type ReportPeriod } from '../lib/productivityService';
 import { getParetoSummary } from '../lib/rcaService';
 import { CAUSE_LABEL } from '../lib/rcaAlgorithm';
+import { pct, int } from '../lib/formatPtBr';
 import {
   groupDailyProduction, averageDailyProduction, pendingRecount, forecastBusinessDays,
   groupOperatorPeriodStats, buildOperationalAlerts, type CountRecordForKpis,
@@ -152,7 +153,7 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
         <KpiCard
           title="Progresso do Inventário"
-          value={`${globais.progresso.toFixed(1)}%`}
+          value={pct(globais.progresso)}
           context={`${globais.totalDone.toLocaleString('pt-BR')} de ${globais.totalSku.toLocaleString('pt-BR')} SKUs`}
           trackPct={Math.min(100, globais.progresso)}
         />
@@ -163,7 +164,7 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
         />
         <KpiCard
           title="Acuracidade"
-          value={`${globais.acuracidade.toFixed(1)}%`}
+          value={pct(globais.acuracidade)}
           context={`Meta: ${ACCURACY_TARGET}%`}
           trackPct={Math.min(100, (globais.acuracidade / ACCURACY_TARGET) * 100)}
           targetPct={100}
@@ -191,7 +192,7 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
                 <div className="flex items-end gap-2 h-40 min-w-[480px]">
                   {dailyProduction.map(p => (
                     <div key={p.dateISO} className="flex-1 flex flex-col items-center justify-end h-full gap-1">
-                      <div className="w-full rounded-t-sm bg-accent" style={{ height: `${(p.skus / maxDaily) * 100}%`, minHeight: p.skus > 0 ? 2 : 0 }} title={`${p.skus} SKUs`} />
+                      <div className="w-full rounded-t-sm bg-accent" style={{ height: `${(p.skus / maxDaily) * 100}%`, minHeight: p.skus > 0 ? 2 : 0 }} title={`${int(p.skus)} SKUs`} />
                       <span className="text-[10px] text-fg-subtle whitespace-nowrap">{p.label}</span>
                     </div>
                   ))}
@@ -234,7 +235,7 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
             <h3 className="text-title">Qualidade e Divergências</h3>
             {paretoRecords.length > 0 && (
               <span className="text-xs text-fg-subtle">
-                {paretoRecords.slice(0, 2).reduce((s, b) => s + b.pctOfTotal, 0).toFixed(0)}% das divergências vêm de {Math.min(2, paretoRecords.length)} causas
+                {pct(paretoRecords.slice(0, 2).reduce((s, b) => s + b.pctOfTotal, 0), 0)} das divergências vêm de {Math.min(2, paretoRecords.length)} causas
               </span>
             )}
           </PanelSection>
@@ -279,7 +280,7 @@ export function KpisIndicadoresPage({ companyId, globais, operatorStats }: KpisI
                     <td className="p-3 text-center text-fg-muted">{op.ritmoPerDay.toFixed(1)}/dia</td>
                     <td className="p-3 text-center">
                       <span className={`font-semibold ${op.accuracy === null ? 'text-fg-subtle' : op.accuracy < ACCURACY_TARGET ? 'text-red-600 dark:text-red-400' : 'text-fg'}`}>
-                        {op.accuracy !== null ? `${op.accuracy.toFixed(1)}%` : '—'}
+                        {op.accuracy !== null ? pct(op.accuracy) : '—'}
                       </span>
                     </td>
                     <td className="p-3 text-center text-fg-muted">{op.divergencias}</td>

@@ -9,6 +9,7 @@ import { EmployeeProductivityTable } from './EmployeeProductivityTable';
 import { EmployeeProfile } from './EmployeeProfile';
 import { TeamProductivityReport } from './TeamProductivityReport';
 import { AcademyManagerView } from '../academy/AcademyManagerView';
+import { pct } from '../../lib/formatPtBr';
 
 interface ManagerProductivityViewProps {
   companyId: string;
@@ -55,7 +56,7 @@ export function ManagerProductivityView({ companyId, currentUserId, currentUserE
 
   const cards = [
     { label: 'Colaboradores Ativos', value: active.length, icon: Users },
-    { label: 'Melhor Acuracidade', value: bestAccuracy ? `${(bestAccuracy.acuracidade_media ?? 0).toFixed(1)}% (${bestAccuracy.name ?? '—'})` : '—', icon: Target },
+    { label: 'Melhor Acuracidade', value: bestAccuracy ? `${pct(bestAccuracy.acuracidade_media ?? 0)} (${bestAccuracy.name ?? '—'})` : '—', icon: Target },
     { label: 'Maior Produtividade', value: mostProductive?.name ?? '—', icon: TrendingUp },
     { label: 'Mais SKUs Contados', value: mostSkus ? mostSkus.skus_contados.toLocaleString('pt-BR') : '0', icon: Package },
     { label: 'Mais Fulls', value: mostFulls ? `${mostFulls.fulls_realizados} (${mostFulls.name ?? '—'})` : '—', icon: ClipboardCheck },

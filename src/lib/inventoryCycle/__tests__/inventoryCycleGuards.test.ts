@@ -159,7 +159,7 @@ describe('Dashboard principal: um único inventário', () => {
     expect(app).toContain('globaisCadastro.tabela.slice(0, 5)');
     expect(app.includes('globais.tabela.slice(0, 5)')).toBe(false);
     expect(app).toContain('{globais.totalSku.toLocaleString(\'pt-BR\')}');
-    expect(app).toContain('value: `${globais.progresso.toFixed(1)}%`');
+    expect(app).toContain('value: pct(globais.progresso),');
   });
 });
 

@@ -1,6 +1,7 @@
 // Vendas — camada de I/O. Vendas são exclusivamente analíticas: este arquivo nunca lê nem escreve
 // products/inventory_*/physical_count_* — só sales_import_profiles/sales_import_batches/sales_records.
 
+import { fetchAllPages } from '../supabasePagination';
 import { supabase } from '../supabase';
 import { logAuditEvent } from '../auditLogService';
 import type { ValidatedSalesRow } from './salesImportUtils';
@@ -178,12 +179,15 @@ export async function importSalesFile(params: ImportSalesFileParams): Promise<Sa
 }
 
 export async function listSalesRecordsForTopTen(companyId: string): Promise<SalesRecordInput[]> {
-  const { data, error } = await supabase
-    .from('sales_records')
-    .select('sale_date, sku, product_name, quantity, total_value')
-    .eq('company_id', companyId);
+  // O Top 10 soma o histórico inteiro: com 3.574 registros, sem `.range()` ele
+  // era calculado sobre 1.000 e o ranking saía errado sem nenhum sinal de erro.
+  const { rows, error } = await fetchAllPages<{ sale_date: string; sku: string; product_name: string; quantity: number; total_value: number }>(
+    'Sales/topTen',
+    (from, to) => supabase.from('sales_records')
+      .select('sale_date, sku, product_name, quantity, total_value')
+      .eq('company_id', companyId).order('id').range(from, to));
   if (error) throw error;
-  return (data ?? []).map(r => ({
+  return rows.map(r => ({
     saleDate: r.sale_date, sku: r.sku, productName: r.product_name,
     quantity: Number(r.quantity), totalValue: Number(r.total_value),
   }));

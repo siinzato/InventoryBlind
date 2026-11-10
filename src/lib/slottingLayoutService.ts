@@ -1,6 +1,7 @@
 // Slotting Intelligence — CRUD do layout (grade + células) e leitura de dados de movimento
 // (picks do Full Manager) que alimentam o motor puro em slottingEngine.ts.
 
+import { fetchAllPages } from './supabasePagination';
 import { supabase, WarehouseLayout, WarehouseCell, WarehouseCellType, WarehouseZone, WarehouseZoneKind } from './supabase';
 import { logAuditEvent } from './auditLogService';
 import type { ClassifiedAddressRow } from './warehouseAddressImport';
@@ -238,16 +239,24 @@ export async function confirmLayoutScale(layoutId: string, companyId: string, ce
  *  cadastrada mesmo que hoje vazia). O CSV de importação só pode vincular a um destes —
  *  nunca cria um endereço novo do zero. */
 export async function getKnownAddressCodes(companyId: string): Promise<Set<string>> {
-  const [{ data: products, error: productsError }, { data: cells, error: cellsError }] = await Promise.all([
-    supabase.from('products').select('location').eq('company_id', companyId).not('location', 'is', null),
-    supabase.from('warehouse_cells').select('location_code').eq('company_id', companyId).not('location_code', 'is', null),
+  // Paginado, e aqui o corte não era cosmético: esta lista decide quais endereços
+  // o CSV pode usar. Com 1.000 dos 4.628 produtos, endereços reais eram recusados
+  // na importação como se não existissem. `warehouse_cells` tem 600 linhas hoje —
+  // abaixo do teto, mas pagina junto para não repetir o mesmo bug quando crescer.
+  const [{ rows: products, error: productsError }, { rows: cells, error: cellsError }] = await Promise.all([
+    fetchAllPages<{ location: string | null }>('Slotting/productLocations', (from, to) =>
+      supabase.from('products').select('location').eq('company_id', companyId)
+        .not('location', 'is', null).order('id').range(from, to)),
+    fetchAllPages<{ location_code: string | null }>('Slotting/cellCodes', (from, to) =>
+      supabase.from('warehouse_cells').select('location_code').eq('company_id', companyId)
+        .not('location_code', 'is', null).order('id').range(from, to)),
   ]);
   if (productsError) console.error('[Slotting] Error loading product locations:', productsError);
   if (cellsError) console.error('[Slotting] Error loading known cell locations:', cellsError);
 
   const codes = new Set<string>();
-  for (const row of products ?? []) if (row.location) codes.add(row.location as string);
-  for (const row of cells ?? []) if (row.location_code) codes.add(row.location_code as string);
+  for (const row of products) if (row.location) codes.add(row.location as string);
+  for (const row of cells) if (row.location_code) codes.add(row.location_code as string);
   return codes;
 }
 

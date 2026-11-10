@@ -7,6 +7,7 @@
 // contagens usadas no cálculo são filtradas pelo local atual do produto, igual ao CBC.
 
 import { supabase, ProductRiskScore, RiskBand, CriticalityLevel } from './supabase';
+import { fetchAllPages } from './supabasePagination';
 import { computeRiskScore, RiskInput, AbcClass } from './riskAlgorithm';
 import { logAuditEvent } from './auditLogService';
 import { plural } from '../lib/formatPtBr';
@@ -152,9 +153,12 @@ export async function recomputeRiskForProducts(
 }
 
 export async function recomputeAllRiskForCompany(companyId: string, userId: string, userEmail: string): Promise<RecomputeSummary> {
-  const { data, error } = await supabase.from('products').select('id').eq('company_id', companyId);
-  if (error || !data) { console.error('[Risk] Error loading products for full recompute:', error); return { updated: 0, insufficient: 0 }; }
-  return recomputeRiskForProducts(data.map(p => p.id), companyId, userId, userEmail);
+  // Paginado: sem `.range()` vinham 1.000 dos 4.628 produtos, sem erro, e o
+  // recálculo GRAVAVA só esses — daí `product_risk_scores` ter exatamente 1.000.
+  const { rows, error } = await fetchAllPages<{ id: string }>('Risk/products', (from, to) =>
+    supabase.from('products').select('id').eq('company_id', companyId).order('id').range(from, to));
+  if (error) { console.error('[Risk] Error loading products for full recompute:', error); return { updated: 0, insufficient: 0 }; }
+  return recomputeRiskForProducts(rows.map(p => p.id), companyId, userId, userEmail);
 }
 
 export async function getProductRisk(productId: string, companyId: string): Promise<ProductRiskScore | null> {
@@ -276,34 +280,48 @@ export async function listByTab(
 }
 
 export async function listLocations(companyId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('products').select('location').eq('company_id', companyId).not('location', 'is', null);
+  // Cortado em 1.000 produtos, corredores inteiros ficavam fora do filtro.
+  const { rows, error } = await fetchAllPages<{ location: string | null }>('Risk/locations', (from, to) =>
+    supabase.from('products').select('location').eq('company_id', companyId)
+      .not('location', 'is', null).order('id').range(from, to));
   if (error) { console.error('[Risk] Error listing locations:', error); return []; }
-  const set = new Set((data ?? []).map(r => r.location).filter((l): l is string => !!l && l.trim() !== ''));
+  const set = new Set(rows.map(r => r.location).filter((l): l is string => !!l && l.trim() !== ''));
   return Array.from(set).sort();
 }
 
 export async function listCauses(companyId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('product_risk_scores').select('risk_reason').eq('company_id', companyId).eq('has_sufficient_data', true);
+  // Esta tabela tinha exatamente 1.000 linhas por causa do bug acima; depois de
+  // paginar o recálculo ela passa dos 4.000, e esta leitura também precisa ir até o fim.
+  const { rows, error } = await fetchAllPages<{ risk_reason: string | null }>('Risk/causes', (from, to) =>
+    supabase.from('product_risk_scores').select('risk_reason').eq('company_id', companyId)
+      .eq('has_sufficient_data', true).order('product_id').range(from, to));
   if (error) { console.error('[Risk] Error listing causes:', error); return []; }
-  const set = new Set((data ?? []).map(r => r.risk_reason).filter((c): c is string => !!c && c.trim() !== ''));
+  const set = new Set(rows.map(r => r.risk_reason).filter((c): c is string => !!c && c.trim() !== ''));
   return Array.from(set).sort();
 }
 
 /** Todas as linhas com dado suficiente, sem paginação — usado para montar clusters
  *  de inspeção (precisa enxergar tudo para agrupar por corredor). */
 async function listAllScoredRows(companyId: string): Promise<ProductRiskRow[]> {
-  const { data, error } = await supabase
-    .from('product_risk_scores')
-    .select('*, products!inner(name, sku, location)')
-    .eq('company_id', companyId)
-    .eq('has_sufficient_data', true)
-    .in('risk_level', ['critico', 'alto'])
-    .order('risk_score', { ascending: false })
-    .limit(2000);
+  // O teto de 2.000 era intenção, não efeito: o servidor cortava em 1.000 antes
+  // de o `.limit()` valer. Paginado, os 2.000 passam a ser 2.000 de verdade.
+  // O desempate por `product_id` é obrigatório — sem ele, linhas com o mesmo
+  // `risk_score` repetem ou somem na virada do bloco.
+  const { rows: data, error } = await fetchAllPages<ProductRiskScore & { products: { name: string; sku: string; location: string | null } | null }>(
+    'Risk/clusters',
+    (from, to) => supabase
+      .from('product_risk_scores')
+      .select('*, products!inner(name, sku, location)')
+      .eq('company_id', companyId)
+      .eq('has_sufficient_data', true)
+      .in('risk_level', ['critico', 'alto'])
+      .order('risk_score', { ascending: false })
+      .order('product_id', { ascending: true })
+      .range(from, to),
+    2000
+  );
   if (error) { console.error('[Risk] Error loading rows for clustering:', error); return []; }
-  return (data ?? []).map((row) => {
+  return data.map((row) => {
     const r = row as ProductRiskScore & { products: { name: string; sku: string; location: string | null } | null };
     return {
       ...r,

@@ -11,6 +11,7 @@
 //    RLS derives the tenant from the JWT; a company_id in a filter here would be
 //    a convenience, never the barrier.
 
+import { fetchAllPages } from '../supabasePagination';
 import { supabase } from '../supabase';
 import { isSheetSourceProvider } from './sheetSources';
 import type {
@@ -268,16 +269,22 @@ export async function listEntityLinks(
   connectionId: string,
   entityType: EntityType
 ): Promise<EntityLink[]> {
-  const { data, error } = await supabase
-    .from('integration_entity_links')
-    .select('id, connection_id, entity_type, internal_id, external_id, external_sku, external_ean, external_name, match_source, last_synced_at')
-    .eq('connection_id', connectionId)
-    .eq('entity_type', entityType)
-    .order('external_id');
+  // 2.995 vínculos nesta base. Sem `.range()` a tela de integração mostrava
+  // 1.000 e dava a entender que o resto não estava vinculado.
+  const { rows: data, error } = await fetchAllPages<Record<string, unknown>>(
+    'Integrations/entityLinks',
+    (from, to) => supabase
+      .from('integration_entity_links')
+      .select('id, connection_id, entity_type, internal_id, external_id, external_sku, external_ean, external_name, match_source, last_synced_at')
+      .eq('connection_id', connectionId)
+      .eq('entity_type', entityType)
+      .order('external_id')
+      .order('id')
+      .range(from, to));
 
   if (error) throw error;
 
-  return (data ?? []).map(row => ({
+  return data.map(row => ({
     id: row.id as string,
     connectionId: row.connection_id as string,
     entityType: row.entity_type as EntityType,

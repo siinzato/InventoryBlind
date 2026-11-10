@@ -3,6 +3,7 @@
 // recomendação pedidas a partir dos números REAIS do motor de grade (slottingEngine.ts),
 // e o fluxo de decisão aprovar/rejeitar/adiar.
 
+import { fetchAllPages } from './supabasePagination';
 import { supabase, WarehouseSlottingRecommendation, SlottingRecommendationStatus } from './supabase';
 import {
   findExpeditionCell, findShortestPath, computeSkuDistances, computeCorridorTraffic,
@@ -158,8 +159,14 @@ export async function generateRecommendations(companyId: string, layoutId: strin
   await supabase.from('warehouse_slotting_recommendations').delete().eq('layout_id', layoutId).eq('status', 'pendente');
   if (drafts.length === 0) return 0;
 
-  const { data: products } = await supabase.from('products').select('id, location').eq('company_id', companyId);
-  const productIdByLocation = new Map((products ?? []).filter(p => p.location).map(p => [p.location as string, p.id as string]));
+  // Paginado: este mapa vira o `product_id` das recomendações GRAVADAS abaixo.
+  // Cortado em 1.000, todo endereço fora dessa fatia virava recomendação com
+  // produto nulo — dado errado persistido, não só exibido.
+  const { rows: products } = await fetchAllPages<{ id: string; location: string | null }>(
+    'Slotting/recommendations',
+    (from, to) => supabase.from('products').select('id, location')
+      .eq('company_id', companyId).order('id').range(from, to));
+  const productIdByLocation = new Map(products.filter(p => p.location).map(p => [p.location as string, p.id as string]));
 
   const rows = drafts.map(d => ({
     company_id: companyId,

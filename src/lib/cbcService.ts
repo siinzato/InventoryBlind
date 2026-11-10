@@ -10,6 +10,7 @@
 // pela localização atual do produto (quando ele tem uma).
 
 import { supabase, ProductConfidenceScore, RiskLevel } from './supabase';
+import { fetchAllPages } from './supabasePagination';
 import { computeConfidenceScore, computePriority, buildWhyToCount, ConfidenceInput, AbcClass } from './cbcAlgorithm';
 import { validateProductEan } from './productCatalog/catalogQuality';
 import { logAuditEvent } from './auditLogService';
@@ -190,9 +191,13 @@ export async function recomputeAllForCompany(companyId: string, userId: string, 
   }
   recomputingCompanies.add(companyId);
   try {
-    const { data, error } = await supabase.from('products').select('id').eq('company_id', companyId);
-    if (error || !data) { console.error('[CBC] Error loading products for full recompute:', error); return { updated: 0, insufficient: 0 }; }
-    return await recomputeForProducts(data.map(p => p.id), companyId, userId, userEmail);
+    // Paginado: sem `.range()` esta leitura voltava 1.000 dos 4.628 produtos sem
+    // erro nenhum, e o recálculo GRAVAVA só esses — por isso
+    // `product_confidence_scores` tinha exatamente 1.000 linhas.
+    const { rows, error } = await fetchAllPages<{ id: string }>('CBC/products', (from, to) =>
+      supabase.from('products').select('id').eq('company_id', companyId).order('id').range(from, to));
+    if (error) { console.error('[CBC] Error loading products for full recompute:', error); return { updated: 0, insufficient: 0 }; }
+    return await recomputeForProducts(rows.map(p => p.id), companyId, userId, userEmail);
   } finally {
     recomputingCompanies.delete(companyId);
   }
@@ -319,10 +324,13 @@ export async function listByTab(
 }
 
 export async function listLocations(companyId: string): Promise<string[]> {
-  const { data, error } = await supabase
-    .from('products').select('location').eq('company_id', companyId).not('location', 'is', null);
+  // O filtro de endereço precisa listar TODOS os endereços do catálogo: cortado
+  // em 1.000 produtos, corredores inteiros nunca apareciam na lista.
+  const { rows, error } = await fetchAllPages<{ location: string | null }>('CBC/locations', (from, to) =>
+    supabase.from('products').select('location').eq('company_id', companyId)
+      .not('location', 'is', null).order('id').range(from, to));
   if (error) { console.error('[CBC] Error listing locations:', error); return []; }
-  const set = new Set((data ?? []).map(r => r.location).filter((l): l is string => !!l && l.trim() !== ''));
+  const set = new Set(rows.map(r => r.location).filter((l): l is string => !!l && l.trim() !== ''));
   return Array.from(set).sort();
 }
 

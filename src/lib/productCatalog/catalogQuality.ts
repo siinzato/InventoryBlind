@@ -7,6 +7,7 @@
 // campo de produto solto (sem symbology fixa de etiqueta).
 
 import { supabase } from '../supabase';
+import { fetchAllPages } from '../supabasePagination';
 import { normalizeEan } from '../nfe/nfeEanUtils';
 import { computeGs1Mod10CheckDigit } from '../barcode/barcodeValidation';
 
@@ -122,17 +123,26 @@ export interface CatalogQualitySnapshot {
  *  estatísticas de empresa (a classificação ABC/XYZ também exige olhar todos os
  *  produtos de uma vez). Roda uma vez ao abrir a tela, não a cada tecla digitada. */
 export async function fetchCatalogQualitySnapshot(companyId: string): Promise<CatalogQualitySnapshot> {
-  const [{ data: productRows, error: productsError }, { data: assocRows, error: assocError }, { data: classRows, error: classError }] = await Promise.all([
-    supabase.from('products').select('id, name, sku, ean, price, location, updated_at'),
-    supabase.from('product_brand_associations').select('product_id, brand_id, line_id').eq('company_id', companyId),
-    supabase.from('product_abc_xyz_classifications').select('product_id').eq('company_id', companyId),
+  // "da empresa inteira" era a intenção, não o resultado: as três tabelas têm
+  // 4.628 linhas cada e as três consultas voltavam 1.000, sem erro. O diagnóstico
+  // de qualidade do catálogo rodava sobre 21,6% dele e se apresentava como total.
+  const [{ rows: productRows, error: productsError }, { rows: assocRows, error: assocError }, { rows: classRows, error: classError }] = await Promise.all([
+    fetchAllPages<{ id: string; name: string; sku: string; ean: string | null; price: number | null; location: string | null; updated_at: string }>(
+      'CatalogQuality/products',
+      (from, to) => supabase.from('products').select('id, name, sku, ean, price, location, updated_at').order('id').range(from, to)),
+    fetchAllPages<{ product_id: string; brand_id: string | null; line_id: string | null }>(
+      'CatalogQuality/associations',
+      (from, to) => supabase.from('product_brand_associations').select('product_id, brand_id, line_id').eq('company_id', companyId).order('product_id').range(from, to)),
+    fetchAllPages<{ product_id: string }>(
+      'CatalogQuality/classifications',
+      (from, to) => supabase.from('product_abc_xyz_classifications').select('product_id').eq('company_id', companyId).order('product_id').range(from, to)),
   ]);
   if (productsError) console.error('[CatalogQuality] products', productsError.message);
   if (assocError) console.error('[CatalogQuality] product_brand_associations', assocError.message);
   if (classError) console.error('[CatalogQuality] product_abc_xyz_classifications', classError.message);
 
-  const assocByProduct = new Map((assocRows ?? []).map(r => [r.product_id, r]));
-  const classifiedIds = new Set((classRows ?? []).map(r => r.product_id));
+  const assocByProduct = new Map(assocRows.map(r => [r.product_id, r]));
+  const classifiedIds = new Set(classRows.map(r => r.product_id));
 
   const products: LiteCatalogProduct[] = (productRows ?? []).map(p => ({
     id: p.id, name: p.name, sku: p.sku, ean: p.ean, price: p.price, location: p.location, updatedAt: p.updated_at,

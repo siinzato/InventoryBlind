@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-10-leitura-catalogo-completo',
+    date: '2026-11-10',
+    category: 'correcao',
+    title: 'Telas que liam só os primeiros 1.000 produtos agora leem o catálogo inteiro',
+    description: 'Várias telas calculavam sobre no máximo 1.000 produtos, mesmo quando o catálogo tinha muito mais, e mostravam o resultado como se fosse o total. Não havia aviso nem erro — o número simplesmente saía menor. Isso afetava o Confidence Score, o Risco por Produto, a Qualidade do Catálogo, o Top 10 de vendas, a lista de vínculos da integração, o filtro de endereços e as recomendações de endereçamento. Dois casos eram mais sérios: o CSV de endereçamento recusava endereços reais por não enxergá-los, e os recálculos de Confidence Score e de Risco gravavam a avaliação de apenas parte dos produtos. Agora todas essas leituras percorrem o catálogo até o fim. Importante: os indicadores já gravados continuam com os números antigos até você rodar um novo recálculo em cada módulo — e, quando rodar, espere ver números maiores, porque pela primeira vez eles vão considerar todos os produtos.',
+  },
+  {
     id: '2026-11-10-botao-principal-navy',
     date: '2026-11-10',
     category: 'melhoria',

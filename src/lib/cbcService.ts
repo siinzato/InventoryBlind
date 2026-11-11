@@ -25,80 +25,158 @@ interface RawCountRow {
   created_at: string;
 }
 
-async function gatherInputForProduct(productId: string, companyId: string): Promise<{
+
+// ── Coleta EM LOTE ────────────────────────────────────────────────────────────────────
+//
+// A versão anterior coletava os dados de UM produto por vez: 6 idas ao banco por produto,
+// em série. Para os 4.628 produtos desta base isso dava ~30 mil requisições e uma taxa
+// MEDIDA de 1,09 produto por segundo — cerca de 70 minutos, com o recálculo rodando no
+// NAVEGADOR: fechar a aba no meio deixa metade do catálogo com score novo e metade com
+// o antigo, que foi exatamente o que aconteceu numa execução interrompida.
+//
+// Esta versão busca os mesmos dados em blocos de 300 produtos e monta os mesmos
+// `ConfidenceInput`. O algoritmo não foi tocado: `computeConfidenceScore`,
+// `computePriority` e `buildWhyToCount` recebem exatamente o que recebiam antes, então os
+// scores saem idênticos — muda só o número de requisições.
+
+const BATCH = 300;
+
+function emBlocos<T>(itens: T[], tamanho = BATCH): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < itens.length; i += tamanho) out.push(itens.slice(i, i + tamanho));
+  return out;
+}
+
+interface GatheredInput {
   input: ConfidenceInput;
   location: string | null;
   lastCountDate: string | null;
-  rawCounts: RawCountRow[];
-} | null> {
-  const [{ data: product, error: productError }, { data: assoc }, { data: abcRow }] = await Promise.all([
-    supabase.from('products').select('sku, ean, stock_quantity, location').eq('id', productId).eq('company_id', companyId).maybeSingle(),
-    supabase.from('product_brand_associations').select('brand_id, line_id').eq('product_id', productId).eq('company_id', companyId).maybeSingle(),
-    supabase.from('product_abc_xyz_classifications').select('abc_class').eq('product_id', productId).eq('company_id', companyId).maybeSingle(),
-  ]);
-  if (productError || !product) {
-    if (productError) console.error('[CBC] Error loading product:', productError);
-    return null;
+}
+
+async function gatherInputsForProducts(
+  productIds: string[],
+  companyId: string
+): Promise<Map<string, GatheredInput>> {
+  const resultado = new Map<string, GatheredInput>();
+  if (productIds.length === 0) return resultado;
+
+  const produtos = new Map<string, { sku: string; ean: string | null; stock_quantity: number | null; location: string | null }>();
+  const assoc = new Map<string, boolean>();
+  const abc = new Map<string, AbcClass | null>();
+  const contagens = new Map<string, RawCountRow[]>();
+  const picksPorSku = new Map<string, number>();
+  // Apontamentos de divergência da contagem MANUAL, normalizados para o mesmo formato das
+  // contagens importadas. Sem isto o CBC fica inerte nesta base: `inventory_count_import_items`
+  // tem zero linhas porque todas as contagens são manuais, e o recálculo completo devolveu
+  // "sem dados suficientes" para os 4.628 produtos.
+  const apontamentos = new Map<string, RawCountRow[]>();
+
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString();
+
+  for (const bloco of emBlocos(productIds)) {
+    const [prodRes, assocRes, abcRes, countRes] = await Promise.all([
+      supabase.from('products').select('id, sku, ean, stock_quantity, location').eq('company_id', companyId).in('id', bloco),
+      supabase.from('product_brand_associations').select('product_id, brand_id, line_id').eq('company_id', companyId).in('product_id', bloco),
+      supabase.from('product_abc_xyz_classifications').select('product_id, abc_class').eq('company_id', companyId).in('product_id', bloco),
+      supabase.from('inventory_count_import_items')
+        .select('product_id, count_record_id, status, saldo_sistema, saldo_contado, local, responsavel, created_at')
+        .eq('company_id', companyId).in('product_id', bloco)
+        .order('created_at', { ascending: false }),
+    ]);
+    if (prodRes.error) { console.error('[CBC] Error loading products batch:', prodRes.error); continue; }
+    for (const p of prodRes.data ?? []) produtos.set(p.id as string, p as never);
+    for (const a of assocRes.data ?? []) assoc.set(a.product_id as string, !!(a.brand_id || a.line_id));
+    for (const c of abcRes.data ?? []) abc.set(c.product_id as string, (c.abc_class as AbcClass | null) ?? null);
+    // Já vem ordenado do mais recente para o mais antigo, como a consulta por produto vinha.
+    for (const row of (countRes.data ?? []) as (RawCountRow & { product_id: string })[]) {
+      const lista = contagens.get(row.product_id);
+      if (lista) lista.push(row); else contagens.set(row.product_id, [row]);
+    }
+
+    // Apontamentos do fechamento da linha. `status` é derivado: o algoritmo só distingue
+    // 'correct' de qualquer outra coisa, e aqui divergente é contado <> esperado.
+    const { data: apontRows, error: apontErro } = await supabase
+      .from('inventory_items')
+      .select('id, product_id, expected_quantity, counted_quantity, location, counted_by_name, updated_at')
+      .eq('company_id', companyId).in('product_id', bloco)
+      .not('counted_quantity', 'is', null)
+      .order('updated_at', { ascending: false });
+    if (apontErro) { console.error('[CBC] Error loading manual divergence batch:', apontErro); }
+    for (const row of (apontRows ?? []) as Record<string, unknown>[]) {
+      const esperado = row.expected_quantity === null ? null : Number(row.expected_quantity);
+      const contado = row.counted_quantity === null ? null : Number(row.counted_quantity);
+      const normalizado: RawCountRow = {
+        // O id do item faz o papel de `count_record_id` na contagem de reincidência:
+        // um apontamento por produto por ciclo, que é a mesma granularidade.
+        count_record_id: row.id as string,
+        status: contado !== null && contado !== esperado ? 'divergent' : 'correct',
+        saldo_sistema: esperado,
+        saldo_contado: contado,
+        local: (row.location as string | null) ?? null,
+        responsavel: (row.counted_by_name as string | null) ?? null,
+        created_at: (row.updated_at as string) ?? new Date().toISOString(),
+      };
+      const pid = row.product_id as string;
+      const lista = apontamentos.get(pid);
+      if (lista) lista.push(normalizado); else apontamentos.set(pid, [normalizado]);
+    }
   }
 
-  const location = product.location && product.location.trim() ? product.location.trim() : null;
+  // Picks do Full Manager, por SKU — uma consulta por bloco de SKUs em vez de por produto.
+  const skus = Array.from(new Set(Array.from(produtos.values()).map(p => p.sku).filter(Boolean)));
+  for (const bloco of emBlocos(skus)) {
+    const { data, error } = await supabase
+      .from('full_operation_items').select('sku')
+      .eq('company_id', companyId).in('sku', bloco).gte('picked_at', sixtyDaysAgo);
+    if (error) { console.error('[CBC] Error loading Full Manager picks batch:', error); continue; }
+    for (const row of (data ?? []) as { sku: string }[]) {
+      picksPorSku.set(row.sku, (picksPorSku.get(row.sku) ?? 0) + 1);
+    }
+  }
 
-  let countQuery = supabase
-    .from('inventory_count_import_items')
-    .select('count_record_id, status, saldo_sistema, saldo_contado, local, responsavel, created_at')
-    .eq('product_id', productId)
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false })
-    .limit(20); // buffer extra para o filtro por local; só as 5 mais recentes entram no cálculo
+  for (const productId of productIds) {
+    const product = produtos.get(productId);
+    if (!product) continue;
 
-  // Não misturar históricos de localizações diferentes: se o produto tem uma localização
-  // cadastrada hoje, só contam as contagens registradas NAQUELE local.
-  if (location) countQuery = countQuery.eq('local', location);
+    const location = product.location && product.location.trim() ? product.location.trim() : null;
 
-  const { data: countRows, error: countError } = await countQuery;
-  if (countError) console.error('[CBC] Error loading count items:', countError);
+    // Mesmo recorte da versão por produto: só o mesmo local quando o produto tem local,
+    // 20 de buffer e as 5 mais recentes entrando no cálculo.
+    // Contagem importada e apontamento manual entram na MESMA linha do tempo, ordenados
+    // por data: o algoritmo pergunta "as 5 últimas vezes que este SKU foi conferido",
+    // e a origem da conferência não muda a resposta.
+    const todas = [...(contagens.get(productId) ?? []), ...(apontamentos.get(productId) ?? [])]
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+    const rawCounts = (location ? todas.filter(r => r.local === location) : todas).slice(0, 20);
+    const relevantCounts = rawCounts.slice(0, 5);
 
-  const rawCounts = (countRows ?? []) as RawCountRow[];
-  const relevantCounts = rawCounts.slice(0, 5);
+    const now = Date.now();
+    const daysSince = (iso: string) => Math.floor((now - new Date(iso).getTime()) / 86400000);
 
-  const now = Date.now();
-  const daysSince = (iso: string) => Math.floor((now - new Date(iso).getTime()) / 86400000);
+    const divergentAmongRecent = relevantCounts.filter(r => r.status && r.status !== 'correct');
+    const eanCheck = validateProductEan(product.ean);
 
-  const recentCounts = relevantCounts.map(r => ({
-    daysAgo: daysSince(r.created_at),
-    systemQty: r.saldo_sistema,
-    physicalQty: r.saldo_contado,
-  }));
+    resultado.set(productId, {
+      location,
+      lastCountDate: relevantCounts[0]?.created_at ?? null,
+      input: {
+        abcClass: abc.get(productId) ?? null,
+        recentCounts: relevantCounts.map(r => ({
+          daysAgo: daysSince(r.created_at),
+          systemQty: r.saldo_sistema,
+          physicalQty: r.saldo_contado,
+        })),
+        repeatOffenseCount: new Set(divergentAmongRecent.map(r => r.count_record_id)).size,
+        currentStockQuantity: product.stock_quantity ?? 0,
+        picksPerMonth: (picksPorSku.get(product.sku) ?? 0) / 2, // janela de 60 dias = 2 meses
+        hasBrandOrLine: assoc.get(productId) ?? false,
+        hasLocation: !!location,
+        eanValid: eanCheck.present ? eanCheck.ok : null,
+      },
+    });
+  }
 
-  const divergentAmongRecent = relevantCounts.filter(r => r.status && r.status !== 'correct');
-  const repeatOffenseCount = new Set(divergentAmongRecent.map(r => r.count_record_id)).size;
-
-  const sixtyDaysAgo = new Date(now - 60 * 86400000).toISOString();
-  const { data: picks, error: picksError } = await supabase
-    .from('full_operation_items')
-    .select('quantity_picked, picked_at')
-    .eq('company_id', companyId)
-    .eq('sku', product.sku)
-    .gte('picked_at', sixtyDaysAgo);
-  if (picksError) console.error('[CBC] Error loading Full Manager picks:', picksError);
-
-  const picksPerMonth = (picks ?? []).length / 2; // janela de 60 dias = 2 meses
-
-  const abcClass = (abcRow?.abc_class as AbcClass | undefined) ?? null;
-  const eanCheck = validateProductEan(product.ean);
-
-  const input: ConfidenceInput = {
-    abcClass,
-    recentCounts,
-    repeatOffenseCount,
-    currentStockQuantity: product.stock_quantity ?? 0,
-    picksPerMonth,
-    hasBrandOrLine: !!(assoc?.brand_id || assoc?.line_id),
-    hasLocation: !!location,
-    eanValid: eanCheck.present ? eanCheck.ok : null,
-  };
-
-  return { input, location, lastCountDate: relevantCounts[0]?.created_at ?? null, rawCounts };
+  return resultado;
 }
 
 // Guarda simples contra clique duplo em "Recalcular scores" — um recálculo por empresa
@@ -124,8 +202,15 @@ export async function recomputeForProducts(
   let updated = 0;
   let insufficient = 0;
 
+  // Uma coleta em lote para todos, no lugar de 6 consultas por produto.
+  const coletados = await gatherInputsForProducts(uniqueIds, companyId);
+
+  // As gravações também vão em bloco: um upsert por produto eram outras 4.628 requisições.
+  const paraGravar: Record<string, unknown>[] = [];
+  const paraHistorico: Record<string, unknown>[] = [];
+
   for (const productId of uniqueIds) {
-    const gathered = await gatherInputForProduct(productId, companyId);
+    const gathered = coletados.get(productId);
     if (!gathered) continue;
     const { input, lastCountDate } = gathered;
 
@@ -138,8 +223,7 @@ export async function recomputeForProducts(
       ? new Date(new Date(lastCountDate).getTime() + confidence.targetIntervalDays * 86400000)
       : new Date(); // nunca contado — precisa de uma primeira contagem já
 
-    const { error: upsertError } = await supabase.from('product_confidence_scores').upsert(
-      {
+    paraGravar.push({
         company_id: companyId,
         product_id: productId,
         confidence_score: confidence.confidenceScore,
@@ -159,23 +243,31 @@ export async function recomputeForProducts(
         why_to_count: whyToCount,
         last_algorithm_run: nowIso,
         updated_at: nowIso,
-      },
-      { onConflict: 'product_id' }
-    );
-    if (upsertError) { console.error('[CBC] Error upserting confidence score:', upsertError); continue; }
+    });
 
     updated += 1;
     if (!confidence.hasSufficientData) insufficient += 1;
 
+    // Mesma regra de antes: histórico só recebe snapshot com dado real.
     if (confidence.hasSufficientData && confidence.confidenceScore != null && confidence.riskLevel) {
-      const { error: historyError } = await supabase.from('product_confidence_history').insert({
+      paraHistorico.push({
         company_id: companyId,
         product_id: productId,
         confidence_score: confidence.confidenceScore,
         risk_level: confidence.riskLevel,
       });
-      if (historyError) console.error('[CBC] Error inserting confidence history:', historyError);
     }
+  }
+
+  for (const bloco of emBlocos(paraGravar, 500)) {
+    const { error } = await supabase.from('product_confidence_scores').upsert(bloco, { onConflict: 'product_id' });
+    // Bloco que falha não derruba o recálculo inteiro, mas também não é contado como
+    // sucesso silencioso: o erro aparece e o total gravado é corrigido.
+    if (error) { console.error('[CBC] Error upserting confidence scores batch:', error); updated -= bloco.length; }
+  }
+  for (const bloco of emBlocos(paraHistorico, 500)) {
+    const { error } = await supabase.from('product_confidence_history').insert(bloco);
+    if (error) console.error('[CBC] Error inserting confidence history batch:', error);
   }
 
   if (userId && userEmail && uniqueIds.length > 0) {

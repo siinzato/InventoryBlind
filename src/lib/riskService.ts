@@ -24,71 +24,134 @@ interface GatheredInput {
   location: string | null;
 }
 
-async function gatherInputForProduct(productId: string, companyId: string): Promise<GatheredInput | null> {
-  const [{ data: product, error: productError }, { data: abcRow }] = await Promise.all([
-    supabase.from('products').select('sku, price, stock_quantity, location').eq('id', productId).eq('company_id', companyId).maybeSingle(),
-    supabase.from('product_abc_xyz_classifications').select('abc_class').eq('product_id', productId).eq('company_id', companyId).maybeSingle(),
-  ]);
-  if (productError || !product) {
-    if (productError) console.error('[Risk] Error loading product:', productError);
-    return null;
+
+// ── Coleta EM LOTE ────────────────────────────────────────────────────────────────────
+//
+// Mesma razão da versão do CBC: a coleta por produto fazia 5 idas ao banco cada, em série,
+// e para 4.628 produtos isso media ~1 produto por segundo. Aqui os mesmos dados vêm em
+// blocos de 300 e o `RiskInput` montado é idêntico — `computeRiskScore` não foi tocado.
+//
+// A novidade em relação à versão anterior é a FONTE: além de `inventory_count_import_items`
+// (zero linhas nesta base), entram os apontamentos de divergência do fechamento da linha,
+// gravados em `inventory_items`. Sem eles o Risco pontua sobre tabela vazia.
+
+const BATCH = 300;
+
+function emBlocos<T>(itens: T[], tamanho = BATCH): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < itens.length; i += tamanho) out.push(itens.slice(i, i + tamanho));
+  return out;
+}
+
+interface CountLike {
+  count_record_id: string;
+  status: string | null;
+  diferenca: number | null;
+  saldo_sistema: number | null;
+  saldo_contado: number | null;
+  local: string | null;
+  created_at: string;
+}
+
+async function gatherRiskInputsForProducts(
+  productIds: string[],
+  companyId: string
+): Promise<Map<string, GatheredInput>> {
+  const resultado = new Map<string, GatheredInput>();
+  if (productIds.length === 0) return resultado;
+
+  const produtos = new Map<string, { sku: string; price: number | null; stock_quantity: number | null; location: string | null }>();
+  const abc = new Map<string, AbcClass | null>();
+  const criticidade = new Map<string, CriticalityLevel>();
+  const contagens = new Map<string, CountLike[]>();
+  const movimentoPorSku = new Map<string, number>();
+
+  const sixtyDaysAgo = new Date(Date.now() - 60 * 86400000).toISOString();
+
+  for (const bloco of emBlocos(productIds)) {
+    const [prodRes, abcRes, critRes, countRes, apontRes] = await Promise.all([
+      supabase.from('products').select('id, sku, price, stock_quantity, location').eq('company_id', companyId).in('id', bloco),
+      supabase.from('product_abc_xyz_classifications').select('product_id, abc_class').eq('company_id', companyId).in('product_id', bloco),
+      supabase.from('product_criticality_overrides').select('product_id, criticality_level').eq('company_id', companyId).in('product_id', bloco),
+      supabase.from('inventory_count_import_items')
+        .select('product_id, count_record_id, status, diferenca, saldo_sistema, saldo_contado, local, created_at')
+        .eq('company_id', companyId).in('product_id', bloco).order('created_at', { ascending: false }),
+      supabase.from('inventory_items')
+        .select('id, product_id, expected_quantity, counted_quantity, location, updated_at')
+        .eq('company_id', companyId).in('product_id', bloco)
+        .not('counted_quantity', 'is', null).order('updated_at', { ascending: false }),
+    ]);
+    if (prodRes.error) { console.error('[Risk] Error loading products batch:', prodRes.error); continue; }
+    for (const p of prodRes.data ?? []) produtos.set(p.id as string, p as never);
+    for (const c of abcRes.data ?? []) abc.set(c.product_id as string, (c.abc_class as AbcClass | null) ?? null);
+    for (const c of critRes.data ?? []) criticidade.set(c.product_id as string, (c.criticality_level as CriticalityLevel) ?? 'normal');
+    for (const row of (countRes.data ?? []) as (CountLike & { product_id: string })[]) {
+      const lista = contagens.get(row.product_id);
+      if (lista) lista.push(row); else contagens.set(row.product_id, [row]);
+    }
+    for (const row of (apontRes.data ?? []) as Record<string, unknown>[]) {
+      const esperado = row.expected_quantity === null ? null : Number(row.expected_quantity);
+      const contado = row.counted_quantity === null ? null : Number(row.counted_quantity);
+      const diferenca = contado !== null && esperado !== null ? contado - esperado : 0;
+      const normalizado: CountLike = {
+        count_record_id: row.id as string,
+        status: diferenca !== 0 ? 'divergent' : 'correct',
+        diferenca,
+        saldo_sistema: esperado,
+        saldo_contado: contado,
+        local: (row.location as string | null) ?? null,
+        created_at: (row.updated_at as string) ?? new Date().toISOString(),
+      };
+      const pid = row.product_id as string;
+      const lista = contagens.get(pid);
+      if (lista) lista.push(normalizado); else contagens.set(pid, [normalizado]);
+    }
   }
 
-  const location = product.location && product.location.trim() ? product.location.trim() : null;
-  const abcClass = (abcRow?.abc_class as AbcClass | undefined) ?? null;
-
-  // Só entram na conta as contagens registradas NAQUELE local, para nunca misturar
-  // o histórico de uma localização anterior do produto.
-  let countQuery = supabase
-    .from('inventory_count_import_items')
-    .select('count_record_id, status, diferenca, saldo_sistema, saldo_contado, local, created_at')
-    .eq('product_id', productId)
-    .eq('company_id', companyId)
-    .order('created_at', { ascending: false });
-  if (location) countQuery = countQuery.eq('local', location);
-
-  const { data: countItems, error: countError } = await countQuery;
-  if (countError) console.error('[Risk] Error loading count items:', countError);
-
-  const items = countItems ?? [];
-  const divergentItems = items.filter(i => i.status && i.status !== 'correct');
-  const repeatOffenseCount = new Set(divergentItems.map(i => i.count_record_id)).size;
-  const adjustmentCount = items.filter(i => (i.diferenca ?? 0) !== 0).length;
-  const stockoutCount = items.filter(i => (i.saldo_sistema ?? 1) <= 0 || (i.saldo_contado ?? 1) <= 0).length;
+  const skus = Array.from(new Set(Array.from(produtos.values()).map(p => p.sku).filter(Boolean)));
+  for (const bloco of emBlocos(skus)) {
+    const { data, error } = await supabase
+      .from('full_operation_items').select('sku, quantity_picked')
+      .eq('company_id', companyId).in('sku', bloco).gte('picked_at', sixtyDaysAgo);
+    if (error) { console.error('[Risk] Error loading Full Manager picks batch:', error); continue; }
+    for (const row of (data ?? []) as { sku: string; quantity_picked: number | null }[]) {
+      movimentoPorSku.set(row.sku, (movimentoPorSku.get(row.sku) ?? 0) + (row.quantity_picked ?? 0));
+    }
+  }
 
   const now = Date.now();
-  const daysSinceLastCount = items.length > 0 ? Math.floor((now - new Date(items[0].created_at).getTime()) / 86400000) : null;
+  for (const productId of productIds) {
+    const product = produtos.get(productId);
+    if (!product) continue;
+    const location = product.location && product.location.trim() ? product.location.trim() : null;
 
-  const sixtyDaysAgo = new Date(now - 60 * 86400000).toISOString();
-  const { data: picks, error: picksError } = await supabase
-    .from('full_operation_items')
-    .select('quantity_picked, picked_at')
-    .eq('company_id', companyId)
-    .eq('sku', product.sku)
-    .gte('picked_at', sixtyDaysAgo);
-  if (picksError) console.error('[Risk] Error loading Full Manager picks:', picksError);
+    // Mesmo recorte de antes: só o mesmo local quando o produto tem local cadastrado,
+    // para nunca misturar o histórico de uma localização anterior.
+    const todas = (contagens.get(productId) ?? [])
+      .sort((a, b) => (a.created_at < b.created_at ? 1 : a.created_at > b.created_at ? -1 : 0));
+    const items = location ? todas.filter(i => i.local === location) : todas;
 
-  const pickRows = picks ?? [];
-  const quantityMovedPerMonth = pickRows.reduce((sum, p) => sum + (p.quantity_picked ?? 0), 0) / 2;
+    const divergentItems = items.filter(i => i.status && i.status !== 'correct');
 
-  const criticalityLevel = await getCriticalityLevel(productId, companyId);
+    resultado.set(productId, {
+      location,
+      input: {
+        totalCounts: items.length,
+        divergentCounts: divergentItems.length,
+        repeatOffenseCount: new Set(divergentItems.map(i => i.count_record_id)).size,
+        daysSinceLastCount: items.length > 0 ? Math.floor((now - new Date(items[0].created_at).getTime()) / 86400000) : null,
+        stockoutCount: items.filter(i => (i.saldo_sistema ?? 1) <= 0 || (i.saldo_contado ?? 1) <= 0).length,
+        adjustmentCount: items.filter(i => (i.diferenca ?? 0) !== 0).length,
+        abcClass: abc.get(productId) ?? null,
+        unitPrice: product.price ?? 0,
+        currentStockQuantity: product.stock_quantity ?? 0,
+        quantityMovedPerMonth: (movimentoPorSku.get(product.sku) ?? 0) / 2,
+        criticalityLevel: criticidade.get(productId) ?? 'normal',
+      },
+    });
+  }
 
-  return {
-    location,
-    input: {
-      totalCounts: items.length,
-      divergentCounts: divergentItems.length,
-      repeatOffenseCount,
-      daysSinceLastCount,
-      stockoutCount,
-      adjustmentCount,
-      abcClass,
-      unitPrice: product.price ?? 0,
-      currentStockQuantity: product.stock_quantity ?? 0,
-      quantityMovedPerMonth,
-      criticalityLevel,
-    },
-  };
+  return resultado;
 }
 
 export interface RecomputeSummary {
@@ -105,16 +168,20 @@ export async function recomputeRiskForProducts(
   const uniqueIds = Array.from(new Set(productIds));
   let insufficient = 0;
 
+  // Uma coleta em lote no lugar de 5 consultas por produto.
+  const coletados = await gatherRiskInputsForProducts(uniqueIds, companyId);
+  const paraGravar = [];
+  const paraHistorico = [];
+
   for (const productId of uniqueIds) {
-    const gathered = await gatherInputForProduct(productId, companyId);
+    const gathered = coletados.get(productId);
     if (!gathered) continue;
 
     const result = computeRiskScore(gathered.input);
     if (!result.hasSufficientData) insufficient += 1;
     const nowIso = new Date().toISOString();
 
-    const { error: upsertError } = await supabase.from('product_risk_scores').upsert(
-      {
+    paraGravar.push({
         company_id: companyId,
         product_id: productId,
         risk_score: result.riskScore,
@@ -127,22 +194,27 @@ export async function recomputeRiskForProducts(
         factors: { probability: result.probabilityFactors, impact: result.impactFactors },
         last_risk_update: nowIso,
         updated_at: nowIso,
-      },
-      { onConflict: 'product_id' }
-    );
-    if (upsertError) { console.error('[Risk] Error upserting risk score:', upsertError); continue; }
+    });
 
     // Histórico só grava snapshots com dado real — nunca um valor fabricado para
     // "preencher" a evolução (regra explícita do escopo desta tarefa).
     if (result.hasSufficientData && result.riskScore != null && result.riskLevel) {
-      const { error: historyError } = await supabase.from('product_risk_history').insert({
+      paraHistorico.push({
         company_id: companyId,
         product_id: productId,
         risk_score: result.riskScore,
         risk_level: result.riskLevel,
       });
-      if (historyError) console.error('[Risk] Error inserting risk history:', historyError);
     }
+  }
+
+  for (const bloco of emBlocos(paraGravar, 500)) {
+    const { error } = await supabase.from('product_risk_scores').upsert(bloco, { onConflict: 'product_id' });
+    if (error) console.error('[Risk] Error upserting risk scores batch:', error);
+  }
+  for (const bloco of emBlocos(paraHistorico, 500)) {
+    const { error } = await supabase.from('product_risk_history').insert(bloco);
+    if (error) console.error('[Risk] Error inserting risk history batch:', error);
   }
 
   if (userId && userEmail && uniqueIds.length > 0) {

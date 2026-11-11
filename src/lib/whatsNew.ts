@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-11-confianca-e-risco-com-divergencias',
+    date: '2026-11-11',
+    category: 'melhoria',
+    title: 'Confiança e Risco agora usam as divergências apontadas — e recalculam em minutos',
+    description: 'Os módulos de Contagem por Confiança e de Inventário por Risco avaliavam os produtos sem enxergar as divergências das contagens manuais, porque liam apenas o histórico de contagens importadas. Agora eles também leem os produtos que você aponta no fechamento da linha, então um produto que divergiu passa a pesar na confiança do saldo e no risco dele. Junto com isso, o recálculo ficou muito mais rápido: antes processava um produto por vez e levava mais de uma hora para o catálogo inteiro, com o risco de parar no meio se a aba fosse fechada; agora busca e grava em blocos e termina em poucos minutos. Importante: ao recalcular, espere ver menos produtos classificados do que antes. Os números anteriores vinham de um cálculo antigo e desatualizado; agora o sistema só atribui confiança e risco a produtos que realmente têm histórico de conferência, e diz claramente quando não tem. A forma de calcular a nota não mudou — mudou o que o cálculo enxerga e a velocidade.',
+  },
+  {
     id: '2026-11-11-divergencias-no-relatorio-e-no-historico',
     date: '2026-11-11',
     category: 'melhoria',

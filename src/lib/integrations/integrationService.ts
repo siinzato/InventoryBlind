@@ -269,8 +269,9 @@ export async function listEntityLinks(
   connectionId: string,
   entityType: EntityType
 ): Promise<EntityLink[]> {
-  // 2.995 vínculos nesta base. Sem `.range()` a tela de integração mostrava
-  // 1.000 e dava a entender que o resto não estava vinculado.
+  // 2.995 vínculos nesta base. Sem `.range()` esta leitura devolveria 1.000 e
+  // daria a entender que o resto não estava vinculado. Hoje a função não tem
+  // chamador — a paginação fica para quando alguma tela voltar a consumi-la.
   const { rows: data, error } = await fetchAllPages<Record<string, unknown>>(
     'Integrations/entityLinks',
     (from, to) => supabase

@@ -177,6 +177,28 @@ function bandForScore(score: number): RiskLevel {
   return 'critico';                    // "Crítica"
 }
 
+// Aperto do intervalo de contagem por faixa de confiança. Um produto mal avaliado volta
+// à fila antes do prazo da própria classe ABC; um produto estável segue o prazo da classe.
+// O teto existe porque o multiplicador sozinho não resolve item sem classe ABC: metade do
+// padrão de 90 dias ainda são 45, e um saldo com perda grande não espera um mês e meio.
+const APERTO_POR_FAIXA: Record<RiskLevel, { multiplicador: number; tetoDias: number | null }> = {
+  critico:   { multiplicador: 0.25, tetoDias: 10 },
+  medio:     { multiplicador: 0.5, tetoDias: 21 },
+  bom:       { multiplicador: 1, tetoDias: null },
+  excelente: { multiplicador: 1, tetoDias: null },
+};
+
+/** Dias até a próxima contagem: o intervalo da classe ABC, encurtado quando a confiança
+ *  está baixa. Sem confiança disponível, devolve o intervalo da classe sem alteração. */
+export function intervaloEfetivoDias(confidence: ConfidenceResult): number {
+  const base = confidence.targetIntervalDays;
+  if (!confidence.hasSufficientData || confidence.riskLevel == null) return base;
+  const aperto = APERTO_POR_FAIXA[confidence.riskLevel];
+  const comMultiplicador = base * aperto.multiplicador;
+  const dias = aperto.tetoDias == null ? comMultiplicador : Math.min(comMultiplicador, aperto.tetoDias);
+  return Math.max(1, Math.round(dias));
+}
+
 export function computeConfidenceScore(input: ConfidenceInput): ConfidenceResult {
   const targetIntervalDays = targetIntervalFor(input.abcClass);
   const usableCounts = input.recentCounts.filter(c => c.systemQty != null && c.physicalQty != null);

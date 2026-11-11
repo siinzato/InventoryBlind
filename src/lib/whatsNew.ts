@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-11-confianca-antecipa-proxima-contagem',
+    date: '2026-11-11',
+    category: 'melhoria',
+    title: 'Produto com confiança baixa volta para a fila de contagem mais cedo',
+    description: 'A data da próxima contagem era calculada apenas pelo prazo da classe do produto, sem olhar a nota de confiança. Na prática isso criava uma situação ruim: um produto que apareceu com 26 peças a menos, mas que não tinha classificação, era reagendado para daqui a três meses, enquanto produtos sem problema voltavam em um mês. Agora a confiança encurta o prazo. Produto na faixa de atenção volta em no máximo 21 dias, e produto na faixa crítica em no máximo 10, mesmo que o prazo da classe dele seja bem maior. Produto estável continua seguindo o prazo normal da classe, sem mudança nenhuma. O efeito é que a fila passa a trazer primeiro o que realmente precisa de conferência.',
+  },
+  {
     id: '2026-11-11-confianca-pesa-tamanho-da-divergencia',
     date: '2026-11-11',
     category: 'melhoria',

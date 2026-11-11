@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeConfidenceScore, computePriority, buildWhyToCount, type ConfidenceInput } from '../cbcAlgorithm';
+import { computeConfidenceScore, computePriority, buildWhyToCount, intervaloEfetivoDias, type ConfidenceInput } from '../cbcAlgorithm';
 
 function input(overrides: Partial<ConfidenceInput> = {}): ConfidenceInput {
   return {
@@ -148,5 +148,34 @@ describe('buildWhyToCount — motivos reais, nunca genéricos e iguais para todo
     expect(reasonOverdue).not.toBe(reasonStable);
     expect(reasonOverdue).toContain('Vencida há');
     expect(reasonStable).toBe('Saldo consistente');
+  });
+});
+
+describe('intervaloEfetivoDias — confiança baixa antecipa a próxima contagem', () => {
+  it('item sem classe ABC e em atenção respeita o teto de 21 dias, não os 90 da classe', () => {
+    // Caso real: saldo 109, contado 83 (falta 26), sem classe ABC. Pelo prazo da classe
+    // a recontagem cairia 90 dias depois; a confiança em atenção puxa para o teto.
+    const confidence = computeConfidenceScore(input({
+      abcClass: null,
+      currentStockQuantity: 0,
+      recentCounts: [{ daysAgo: 0, systemQty: 109, physicalQty: 83 }],
+    }));
+    expect(confidence.riskLevel).toBe('medio');
+    expect(confidence.targetIntervalDays).toBe(90);
+    expect(intervaloEfetivoDias(confidence)).toBe(21);
+  });
+
+  it('item estável mantém o prazo da própria classe', () => {
+    const confidence = computeConfidenceScore(input({
+      abcClass: 'B',
+      recentCounts: [{ daysAgo: 0, systemQty: 50, physicalQty: 50 }],
+    }));
+    expect(intervaloEfetivoDias(confidence)).toBe(confidence.targetIntervalDays);
+  });
+
+  it('sem dados suficientes o prazo da classe fica intacto', () => {
+    const confidence = computeConfidenceScore(input({ abcClass: 'C', recentCounts: [] }));
+    expect(confidence.hasSufficientData).toBe(false);
+    expect(intervaloEfetivoDias(confidence)).toBe(60);
   });
 });

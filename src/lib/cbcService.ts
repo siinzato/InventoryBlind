@@ -11,7 +11,7 @@
 
 import { supabase, ProductConfidenceScore, RiskLevel } from './supabase';
 import { fetchAllPages } from './supabasePagination';
-import { computeConfidenceScore, computePriority, buildWhyToCount, ConfidenceInput, AbcClass } from './cbcAlgorithm';
+import { computeConfidenceScore, computePriority, buildWhyToCount, intervaloEfetivoDias, ConfidenceInput, AbcClass } from './cbcAlgorithm';
 import { validateProductEan } from './productCatalog/catalogQuality';
 import { logAuditEvent } from './auditLogService';
 
@@ -219,8 +219,10 @@ export async function recomputeForProducts(
     const whyToCount = buildWhyToCount(input, confidence);
     const nowIso = new Date().toISOString();
 
+    // O intervalo sai de intervaloEfetivoDias, não direto da classe ABC: confiança baixa
+    // antecipa a próxima contagem em vez de esperar o prazo cheio da classe.
     const nextCountDate = lastCountDate
-      ? new Date(new Date(lastCountDate).getTime() + confidence.targetIntervalDays * 86400000)
+      ? new Date(new Date(lastCountDate).getTime() + intervaloEfetivoDias(confidence) * 86400000)
       : new Date(); // nunca contado — precisa de uma primeira contagem já
 
     paraGravar.push({

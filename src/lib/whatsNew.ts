@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-11-sobra-grande-deixa-de-ter-desconto',
+    date: '2026-11-11',
+    category: 'melhoria',
+    title: 'Sobra grande deixa de ser tratada como registro atrasado',
+    description: 'A nota de confiança passou a tratar sobra com menos peso que falta, porque sobrar uma ou duas peças quase sempre é registro que ainda não entrou no sistema. Só que esse desconto valia para qualquer tamanho de sobra, e isso deixava passar casos claramente errados: um produto com saldo de 6 que apareceu com 254 na contagem continuava classificado como estável. Agora o desconto só vale enquanto a sobra é pequena e vai desaparecendo conforme ela cresce. Sobra de uma ou duas peças segue praticamente igual; sobra de dezenas passa a derrubar a confiança do produto e a antecipar a recontagem dele, que é o tratamento que uma diferença desse tamanho merece.',
+  },
+  {
     id: '2026-11-11-confianca-antecipa-proxima-contagem',
     date: '2026-11-11',
     category: 'melhoria',

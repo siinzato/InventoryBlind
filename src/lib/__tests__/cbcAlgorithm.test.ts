@@ -92,6 +92,23 @@ describe('computeConfidenceScore — históricos diferentes geram scores diferen
       .toBeLessThan(sobraPequena.factors.accuracyHistory.score);
   });
 
+  it('sobra grande perde o desconto — 248 a mais nao pontua como registro atrasado', () => {
+    // Caso real: esperado 6, contado 254. Com o desconto cheio da sobra isso pontuava
+    // na faixa estavel; uma diferenca desse tamanho nao e registro atrasado.
+    const sobraEnorme = computeConfidenceScore(input({
+      currentStockQuantity: 0,
+      recentCounts: [{ daysAgo: 0, systemQty: 6, physicalQty: 254 }],
+    }));
+    const sobraPequena = computeConfidenceScore(input({
+      currentStockQuantity: 0,
+      recentCounts: [{ daysAgo: 0, systemQty: 6, physicalQty: 7 }],
+    }));
+    expect(sobraEnorme.factors.accuracyHistory.score).toBe(0);
+    expect(sobraEnorme.factors.accuracyHistory.score)
+      .toBeLessThan(sobraPequena.factors.accuracyHistory.score);
+    expect(sobraEnorme.riskLevel).toBe('medio');
+  });
+
   it('falta pesa mais que sobra do mesmo tamanho', () => {
     const falta = computeConfidenceScore(input({
       recentCounts: [{ daysAgo: 1, systemQty: 50, physicalQty: 40 }],

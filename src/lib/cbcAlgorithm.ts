@@ -81,6 +81,9 @@ function targetIntervalFor(abcClass: AbcClass): number {
 const TOLERANCIA_UNIDADES = 20;
 
 // Sobra pesa menos que falta: falta é perda, sobra costuma ser registro atrasado.
+// O desconto vale para sobra PEQUENA. Uma sobra do tamanho da tolerância já não é
+// registro atrasado — 248 peças onde se esperava 6 é erro de contagem, endereço trocado
+// ou entrada não lançada —, então o desconto some conforme a sobra cresce.
 const PESO_SOBRA = 0.6;
 
 // Quanto do erro vem da proporção; o resto vem do tamanho em unidades.
@@ -107,7 +110,10 @@ function accuracyHistoryScore(recentCounts: RecentCount[]): FactorBreakdown {
     const erroRelativo = Math.min(modulo / Math.max(Math.abs(system), 1), 1);
     const erroAbsoluto = Math.min(modulo / TOLERANCIA_UNIDADES, 1);
     let erro = PESO_ERRO_RELATIVO * erroRelativo + (1 - PESO_ERRO_RELATIVO) * erroAbsoluto;
-    if (diferenca > 0) erro *= PESO_SOBRA;
+    if (diferenca > 0) {
+      const proporcaoGrande = Math.min(modulo / TOLERANCIA_UNIDADES, 1);
+      erro *= PESO_SOBRA + (1 - PESO_SOBRA) * proporcaoGrande;
+    }
     const accuracy = 1 - clamp(erro, 0, 1);
     if (Math.abs(physical - system) > 0) divergent += 1;
     const w = weights[i] ?? 1;

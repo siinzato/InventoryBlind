@@ -9,6 +9,7 @@
 // inventory_count_import_items / full_operation_items / nfe_invoice_items, três tabelas de
 // módulos que já funcionam e não devem ser alteradas por este módulo.
 
+import { fetchAllPages } from './supabasePagination';
 import { supabase } from './supabase';
 import type {
   RcaRecord, RcaEvidence, RcaEvidenceType, RcaFiveWhysSession, RcaFiveWhysAnswer, RcaSettings,
@@ -636,6 +637,28 @@ export async function getLegacyUnclassifiedDivergences(companyId: string): Promi
   for (const item of countItems ?? []) {
     if (classifiedCount.has(item.id)) continue;
     results.push({ sourceModule: 'import_count', sourceItemId: item.id, sku: item.sku, productName: item.produto_nome, location: item.local, divergenceQty: item.diferenca ?? 0, occurredAt: item.created_at });
+  }
+
+  // Contagem manual: o detalhe por produto vive em `inventory_items`, apontado no
+  // fechamento da linha. Divergência é DERIVADA (contado <> esperado) — a coluna
+  // `divergence` continua sendo a do painel e não é escrita por este caminho.
+  const { rows: cycleItems, error: cycleError } = await fetchAllPages<{
+    id: string; sku: string | null; product_name: string | null; location: string | null;
+    expected_quantity: number | null; counted_quantity: number | null; updated_at: string | null;
+  }>('RCA/manualCount', (from, to) =>
+    supabase.from('inventory_items')
+      .select('id, sku, product_name, location, expected_quantity, counted_quantity, updated_at')
+      .eq('company_id', companyId)
+      .not('counted_quantity', 'is', null)
+      .order('id')
+      .range(from, to));
+  if (cycleError) console.error('[RCA] Error scanning manual count divergences:', cycleError.message);
+  const classifiedManual = classifiedByModule.get('manual_count') ?? new Set();
+  for (const item of cycleItems) {
+    const diferenca = (item.counted_quantity ?? 0) - (item.expected_quantity ?? 0);
+    if (diferenca === 0) continue;
+    if (classifiedManual.has(item.id)) continue;
+    results.push({ sourceModule: 'manual_count', sourceItemId: item.id, sku: item.sku, productName: item.product_name, location: item.location, divergenceQty: diferenca, occurredAt: item.updated_at ?? new Date().toISOString() });
   }
 
   const { data: fullItems, error: fullError } = await supabase

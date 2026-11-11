@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-11-apontar-produtos-divergentes',
+    date: '2026-11-11',
+    category: 'novidade',
+    title: 'Agora dá para dizer quais produtos deram divergência',
+    description: 'Até hoje a contagem manual registrava quantas divergências deram, nunca em quais produtos — e sem isso a Análise de Causa Raiz, o mapa de calor e a reincidência por SKU ficavam sem base para trabalhar. No fechamento da linha apareceu um bloco novo com os produtos daquela linha: você busca por SKU, nome ou endereço, informa a quantidade que encontrou, e o sistema mostra sozinho se foi falta ou sobra e de quanto. O saldo do sistema vem da Fonte de Saldo, então você não precisa fazer conta nem consultar outra tela. No topo do bloco fica a conferência: quantas divergências foram declaradas na contagem e quantas já foram apontadas. Dá para salvar com menos do que foi declarado — o que ficar sem apontamento continua na fila de pendências. O número de divergências que você digita na contagem não muda por aqui, e nenhum saldo de estoque é alterado. Quando a Fonte de Saldo não cobre um produto, o sistema diz isso em vez de supor que o saldo é zero.',
+  },
+  {
     id: '2026-11-10-leitura-catalogo-completo',
     date: '2026-11-10',
     category: 'correcao',

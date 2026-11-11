@@ -410,3 +410,120 @@ export async function countItem(input: CountItemInput): Promise<InventoryItem> {
   if (error) throw error;
   return itemFromRow(data as unknown as ItemRow);
 }
+
+// ── Detalhe de divergência da contagem manual ─────────────────────────────────────────
+//
+// A contagem manual grava só o agregado em `inventory_count_records` — quantas
+// divergências deram, nunca em quais produtos. Resultado: 349 divergências
+// declaradas nesta base e zero produtos identificados, o que deixa o RCA, o mapa
+// de calor e a reincidência por SKU sem matéria-prima.
+//
+// O detalhe mora AQUI porque `inventory_items` já é a tabela por SKU do ciclo, já
+// tem `expected_quantity` dos 4.628 produtos e já separa por `brand_id`/`line_id`.
+// Criar tabela nova duplicaria isso.
+//
+// POR QUE NÃO ESCREVEMOS `status` NEM `divergence`:
+// `inventory_cycle_line_summary_v` conta `status = 'counted'` como progresso e a
+// coluna `divergence` como divergência, e `mergeCurrentCycleCounts` SOMA a isso o
+// agregado da contagem manual. Marcar as duas colunas faria o painel exibir o dobro
+// — 4 divergências viram 8 na Malas. Gravamos apenas as colunas que a view ignora,
+// e a divergência é DERIVADA por `isDivergentItem`. Nenhum número de tela muda.
+//
+// A escrita herda o gatilho da migration 113: ciclo encerrado recusa alteração.
+
+/** Divergiu? Contado diferente do esperado. Derivado, nunca persistido num terceiro
+ *  campo que pudesse discordar do próprio par de números que o origina. */
+export function isDivergentItem(item: Pick<InventoryItem, 'countedQuantity' | 'expectedQuantity'>): boolean {
+  if (item.countedQuantity === null) return false;
+  return item.countedQuantity !== (item.expectedQuantity ?? 0);
+}
+
+/** Diferença com sinal: negativo falta, positivo sobra. `null` quando não foi contado. */
+export function itemDifference(item: Pick<InventoryItem, 'countedQuantity' | 'expectedQuantity'>): number | null {
+  if (item.countedQuantity === null) return null;
+  return item.countedQuantity - (item.expectedQuantity ?? 0);
+}
+
+/**
+ * Itens do ciclo de uma linha de contagem, resolvidos PELO RÓTULO.
+ *
+ * Não é escolha de estilo: a linha de contagem (`inventory_count_records.brand_id`
+ * -> `inventory_brands`) e o agrupamento do ciclo (`inventory_items.line_id` /
+ * `brand_id`) são taxonomias SEPARADAS. Verificado no banco: nenhum dos 16
+ * `brand_id` usados em contagens existe como `line_id` ou `brand_id` de item.
+ * `mergeCurrentCycleCounts` já resolve isso por nome, e esta função usa a mesma
+ * regra para não criar uma terceira forma de casar as duas pontas.
+ *
+ * Devolve lista VAZIA quando o rótulo não tem par — hoje 13 das 16 linhas casam,
+ * e 3 não ("Linha Joy GC", "Térmicos GC", "Linha Tote Moon GC"). Quem chama
+ * precisa dizer isso na tela em vez de mostrar uma lista vazia como se a linha
+ * não tivesse produto.
+ *
+ * Paginado: Nillkin tem 833 SKUs.
+ */
+export async function listCycleItemsByLabel(cycleId: string, label: string): Promise<InventoryItem[]> {
+  const alvo = label.trim();
+  if (alvo === '') return [];
+  // Aspas em volta do valor: rótulo com vírgula ou parêntese quebraria o filtro do
+  // PostgREST, que usa esses caracteres como sintaxe.
+  const valor = `"${alvo.replace(/"/g, '')}"`;
+  const rows: ItemRow[] = [];
+  for (let from = 0; ; from += FETCH_PAGE) {
+    const { data, error } = await supabase
+      .from('inventory_items')
+      .select(ITEM_COLUMNS)
+      .eq('cycle_id', cycleId)
+      // Mesma precedência da view: a linha manda quando existe; sem linha, a marca.
+      .or(`line_name.ilike.${valor},and(line_name.is.null,brand_name.ilike.${valor})`)
+      .order('sku', { ascending: true })
+      .order('id', { ascending: true })
+      .range(from, from + FETCH_PAGE - 1);
+    if (error) throw error;
+    const page = (data ?? []) as unknown as ItemRow[];
+    rows.push(...page);
+    if (page.length < FETCH_PAGE) break;
+  }
+  return rows.map(itemFromRow);
+}
+
+export interface DivergenceDetailInput {
+  itemId: string;
+  /** Quantidade física encontrada. `null` desfaz o apontamento do item. */
+  countedQuantity: number | null;
+  /**
+   * Saldo do sistema no instante do apontamento, vindo da Fonte de Saldo.
+   *
+   * Precisa ser GRAVADO, não só exibido: `expected_quantity` nasce de
+   * `products.stock_quantity`, que nesta base está ZERADO nos 4.628 produtos —
+   * o saldo real vive só na Fonte de Saldo, que por decisão de produto não
+   * escreve no catálogo. Sem fixar o saldo aqui, a diferença derivada sairia
+   * "contado menos zero", ou seja, toda contagem viraria sobra.
+   *
+   * Gravar aqui também congela a foto: a Fonte é SUBSTITUÍDA a cada importação
+   * diária, então o saldo de hoje não estaria mais lá amanhã para reconferir.
+   *
+   * A view do painel não lê esta coluna (só `status` e `divergence`), então
+   * escrevê-la não mexe em nenhum número de tela.
+   */
+  expectedQuantity?: number | null;
+  observation?: string | null;
+}
+
+/** Grava o detalhe de divergência de um item. Nunca `status` nem `divergence`
+ *  — ver o bloco acima. */
+export async function saveItemDivergenceDetail(input: DivergenceDetailInput): Promise<InventoryItem> {
+  const patch: Record<string, unknown> = {
+    counted_quantity: input.countedQuantity,
+    observation: input.observation ?? null,
+    updated_at: new Date().toISOString(),
+  };
+  if (input.expectedQuantity !== undefined) patch.expected_quantity = input.expectedQuantity;
+  const { data, error } = await supabase
+    .from('inventory_items')
+    .update(patch)
+    .eq('id', input.itemId)
+    .select(ITEM_COLUMNS)
+    .single();
+  if (error) throw error;
+  return itemFromRow(data as unknown as ItemRow);
+}

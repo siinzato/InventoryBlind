@@ -17,6 +17,7 @@ import { renderClosingFeedback } from '../../../lib/closingReports/closingFeedba
 import { listClosingCycleRecords } from '../../../lib/closingReports/closingReportService';
 import type { InventoryCountRecord } from '../../../lib/supabase';
 import { BrandMark } from '../../brandLogos/BrandMark';
+import { ClosingDivergenceSection } from './ClosingDivergenceSection';
 
 interface ClosingSummaryModalProps {
   open: boolean;
@@ -191,6 +192,14 @@ export function ClosingSummaryModal({
             )}
           </div>
         )}
+
+        {/* Apontamento de quais produtos divergiram. Fica ACIMA do feedback porque é o
+            dado bruto do fechamento; o feedback é o que se escreve depois dele. */}
+        <ClosingDivergenceSection
+          companyId={report.companyId}
+          brandName={brandName}
+          declared={report.divergenciasReais}
+        />
 
         <div className="border-t border-edge pt-4">
           <p className="text-sm font-semibold text-fg">Preparar feedback ao responsável</p>

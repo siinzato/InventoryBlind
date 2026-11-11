@@ -20,7 +20,7 @@ export interface BrandData {
 }
 
 // Root Cause Analysis (RCA) Types
-export type RcaSourceModule = 'import_count' | 'full_operation' | 'nfe_receiving';
+export type RcaSourceModule = 'import_count' | 'manual_count' | 'full_operation' | 'nfe_receiving';
 
 /** Processo onde a divergência ocorreu — fixo (não configurável por workspace,
  *  diferente de categoria de causa), separado da causa em si desde a reformulação. */

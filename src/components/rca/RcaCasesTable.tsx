@@ -143,5 +143,8 @@ export function RcaCasesTable({ cases, caseDivergenceCounts, members, pendingQue
 }
 
 const SOURCE_LABEL: Record<RcaSourceModule, string> = {
-  import_count: 'Contagem', full_operation: 'Full', nfe_receiving: 'Recebimento NF-e',
+  // "Contagem" virou ambíguo quando a contagem manual passou a ser origem: as duas
+  // são contagem. O rótulo antigo ganhou o qualificador em vez de a nova herdar um nome pior.
+  import_count: 'Contagem importada', manual_count: 'Contagem manual',
+  full_operation: 'Full', nfe_receiving: 'Recebimento NF-e',
 };

@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-11-confianca-pesa-tamanho-da-divergencia',
+    date: '2026-11-11',
+    category: 'melhoria',
+    title: 'A confiança agora pesa o tamanho da divergência, não só a porcentagem',
+    description: 'A nota de confiança media só a proporção do erro, e isso levava a um resultado estranho: um produto com saldo de 109 que apareceu com 83 na contagem — 26 peças a menos — era considerado mais confiável do que um produto de saldo 1 em que apareceu 1 peça a mais, porque 26 em 109 representa um erro menor em porcentagem. Na prática, perder 26 peças é muito mais grave. Agora o cálculo olha as duas coisas: o quanto o erro representa em porcentagem e o tamanho dele em unidades. Além disso, falta passou a pesar mais que sobra, porque falta é mercadoria que sumiu e sobra normalmente é registro atrasado. O efeito direto é na fila de contagem: produtos com perdas grandes passam a ser recontados antes, e não depois, de produtos com diferenças de uma ou duas peças.',
+  },
+  {
     id: '2026-11-11-confianca-e-risco-com-divergencias',
     date: '2026-11-11',
     category: 'melhoria',

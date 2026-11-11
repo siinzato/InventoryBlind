@@ -76,6 +76,16 @@ function targetIntervalFor(abcClass: AbcClass): number {
   return TARGET_INTERVAL_DAYS[abcClass ?? 'none'];
 }
 
+// Tolerância, em UNIDADES, para o erro absoluto da acuracidade. Errar 20 peças ou
+// mais zera a parcela absoluta, independente do tamanho do saldo.
+const TOLERANCIA_UNIDADES = 20;
+
+// Sobra pesa menos que falta: falta é perda, sobra costuma ser registro atrasado.
+const PESO_SOBRA = 0.6;
+
+// Quanto do erro vem da proporção; o resto vem do tamanho em unidades.
+const PESO_ERRO_RELATIVO = 0.4;
+
 // A. Histórico de acuracidade — 0 a 40 pontos, pesando mais as contagens recentes.
 function accuracyHistoryScore(recentCounts: RecentCount[]): FactorBreakdown {
   const usable = recentCounts.filter(c => c.systemQty != null && c.physicalQty != null);
@@ -89,7 +99,16 @@ function accuracyHistoryScore(recentCounts: RecentCount[]): FactorBreakdown {
   usable.slice(0, 5).forEach((c, i) => {
     const system = c.systemQty as number;
     const physical = c.physicalQty as number;
-    const accuracy = 1 - Math.min(Math.abs(physical - system) / Math.max(Math.abs(system), 1), 1);
+    // Duas visões do mesmo erro. Só a proporção fazia um item de saldo alto parecer
+    // saudável ao perder dezenas de peças (109 -> 83 era "24% de erro"), enquanto 1
+    // peça a mais num item de saldo 1 era "100%". A parcela absoluta corrige isso.
+    const diferenca = physical - system;
+    const modulo = Math.abs(diferenca);
+    const erroRelativo = Math.min(modulo / Math.max(Math.abs(system), 1), 1);
+    const erroAbsoluto = Math.min(modulo / TOLERANCIA_UNIDADES, 1);
+    let erro = PESO_ERRO_RELATIVO * erroRelativo + (1 - PESO_ERRO_RELATIVO) * erroAbsoluto;
+    if (diferenca > 0) erro *= PESO_SOBRA;
+    const accuracy = 1 - clamp(erro, 0, 1);
     if (Math.abs(physical - system) > 0) divergent += 1;
     const w = weights[i] ?? 1;
     weightedSum += accuracy * w;

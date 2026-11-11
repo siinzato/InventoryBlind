@@ -79,6 +79,30 @@ describe('computeConfidenceScore — históricos diferentes geram scores diferen
     expect(withDivergence.factors.accuracyHistory.score).toBeLessThan(withoutDivergence.factors.accuracyHistory.score);
   });
 
+  it('perda grande pesa mais que sobra pequena — 26 a menos é pior que 1 a mais', () => {
+    // Só com erro relativo, perder 26 de 109 (24%) pontuava MELHOR que achar 1 peça
+    // onde se esperava 1 (100%). A parcela absoluta e o peso menor da sobra invertem isso.
+    const faltaGrande = computeConfidenceScore(input({
+      recentCounts: [{ daysAgo: 1, systemQty: 109, physicalQty: 83 }],
+    }));
+    const sobraPequena = computeConfidenceScore(input({
+      recentCounts: [{ daysAgo: 1, systemQty: 1, physicalQty: 2 }],
+    }));
+    expect(faltaGrande.factors.accuracyHistory.score)
+      .toBeLessThan(sobraPequena.factors.accuracyHistory.score);
+  });
+
+  it('falta pesa mais que sobra do mesmo tamanho', () => {
+    const falta = computeConfidenceScore(input({
+      recentCounts: [{ daysAgo: 1, systemQty: 50, physicalQty: 40 }],
+    }));
+    const sobra = computeConfidenceScore(input({
+      recentCounts: [{ daysAgo: 1, systemQty: 50, physicalQty: 60 }],
+    }));
+    expect(falta.factors.accuracyHistory.score)
+      .toBeLessThan(sobra.factors.accuracyHistory.score);
+  });
+
   it('passagem do tempo reduz a recência', () => {
     const recent = computeConfidenceScore(input({
       abcClass: 'B',

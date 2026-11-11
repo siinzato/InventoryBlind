@@ -7,6 +7,7 @@ import { downloadBlob } from '../pdfCenter/downloadFile';
 import {
   CLOSING_METRIC_ROWS,
   formatClosingDateTime,
+  formatDivergence,
   formatClosingDuration,
   formatClosingTime,
   formatAccuracy,
@@ -201,6 +202,19 @@ export async function downloadClosingReportPdf(doc: ClosingDocument): Promise<vo
     line(`${row.label}: ${row.value(doc.metrics)}`);
   }
 
+  // Logo após os indicadores: o número "18 divergências reais" vinha sozinho, e quem
+  // recebia a folha não tinha como saber em quais produtos.
+  heading('Produtos com divergência');
+  if (doc.divergentItems.length === 0) {
+    line('Nenhum produto apontado — as divergências desta linha não foram detalhadas.');
+  } else {
+    for (const item of doc.divergentItems) {
+      line(`${item.sku ?? '—'} — ${item.productName ?? '—'}`, 10, true);
+      const onde = item.location ? `${item.location} · ` : '';
+      line(`${onde}sistema ${item.expected} · contado ${item.counted} · ${formatDivergence(item.difference)}`, 9, false, 4);
+    }
+  }
+
   heading('Sessões de contagem');
   if (doc.sessions.length === 0) {
     line('Nenhuma contagem registrada para este ciclo.');
@@ -299,6 +313,13 @@ export function buildClosingReportWordHtml(doc: ClosingDocument): string {
         <p class="sub">${escapeHtml(sessionMetrics(s))}</p>
       `).join('');
 
+  const divergentes = doc.divergentItems.length === 0
+    ? '<p>Nenhum produto apontado — as divergências desta linha não foram detalhadas.</p>'
+    : doc.divergentItems.map(item => `
+        <p class="cat"><strong>${escapeHtml(item.sku ?? '—')} — ${escapeHtml(item.productName ?? '—')}</strong></p>
+        <p class="sub">${item.location ? `${escapeHtml(item.location)} · ` : ''}sistema ${item.expected} · contado ${item.counted} · ${escapeHtml(formatDivergence(item.difference))}</p>
+      `).join('');
+
   return `<!DOCTYPE html>
 <html xmlns:o="urn:schemas-microsoft-com:office:office" xmlns:w="urn:schemas-microsoft-com:office:word">
 <head><meta charset="utf-8" /><title>${escapeHtml(DOC_TITLE)} — ${escapeHtml(doc.brandName)}</title>
@@ -323,6 +344,8 @@ ul { margin: 0 0 6pt 18pt; }
 <table>${periodo}</table>
 <h2>Indicadores do fechamento</h2>
 <table>${metrics}</table>
+<h2>Produtos com divergência</h2>
+${divergentes}
 <h2>Sessões de contagem</h2>
 ${sessions}
 <h2>Categorias identificadas</h2>

@@ -36,12 +36,15 @@ interface Props {
   brandName: string;
   /** Divergências reais declaradas na contagem. Meta a reconciliar, nunca alterada aqui. */
   declared: number;
+  /** Avisa o modal que os apontamentos mudaram, para o relatorio exportado logo
+   *  depois ja sair com eles. */
+  onSaved?: () => void;
 }
 
 /** Rascunho por item: o que o operador digitou antes de salvar. */
 type Draft = Record<string, string>;
 
-export function ClosingDivergenceSection({ companyId, brandName, declared }: Props) {
+export function ClosingDivergenceSection({ companyId, brandName, declared, onSaved }: Props) {
   const [items, setItems] = useState<InventoryItem[]>([]);
   // Saldo por produto vindo da Fonte de Saldo. `expected_quantity` do item NÃO serve:
   // ele vem de `products.stock_quantity`, que está zerado nos 4.628 produtos desta
@@ -159,6 +162,7 @@ export function ClosingDivergenceSection({ companyId, brandName, declared }: Pro
       const cycle = await getActiveCycle(companyId);
       if (cycle) setItems(await listCycleItemsByLabel(cycle.id, brandName));
       setSalvo(true);
+      onSaved?.();
     } catch (e) {
       setErro(e instanceof Error ? e.message : 'Não foi possível salvar os apontamentos.');
     } finally {

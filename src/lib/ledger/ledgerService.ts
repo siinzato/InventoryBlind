@@ -133,17 +133,23 @@ async function lerContagemFisica(companyId: string, productId: string): Promise<
 async function lerInventario(companyId: string, productId: string): Promise<LedgerEntry[]> {
   const { data, error } = await supabase
     .from('inventory_items')
-    .select('id, counted_quantity, expected_quantity, divergence, counted_at, counted_by_name, observation, location')
+    .select('id, counted_quantity, expected_quantity, divergence, counted_at, updated_at, counted_by_name, observation, location')
     .eq('company_id', companyId)
     .eq('product_id', productId)
-    .eq('status', 'counted')
-    .not('counted_at', 'is', null)
-    .order('counted_at', { ascending: false })
+    // O critério é TER QUANTIDADE CONTADA, não `status = 'counted'`. O apontamento de
+    // divergência feito no fechamento da linha grava a quantidade sem promover o item
+    // a "contado" — de propósito, porque a view do painel soma `status` como progresso
+    // e o agregado da contagem manual já entra lá (ver inventoryCycleService). Com o
+    // filtro antigo esses apontamentos, que são justamente o histórico de divergência
+    // do produto, ficavam fora da ficha dele.
+    .not('counted_quantity', 'is', null)
+    .order('updated_at', { ascending: false })
     .limit(LIMITE_POR_ORIGEM);
   if (error) throw error;
 
   return (data ?? []).map(l => {
     const esperado = numero(l.expected_quantity);
+    const contado = numero(l.counted_quantity);
     const partes: string[] = [];
     if (l.location) partes.push(String(l.location));
     if (esperado !== null) partes.push(`o sistema marcava ${esperado}`);
@@ -153,12 +159,17 @@ async function lerInventario(companyId: string, productId: string): Promise<Ledg
       key: `inventario:${l.id}`,
       source: 'inventario' as const,
       effect: 'registrou' as const,
-      at: (l.counted_at as string) ?? '',
+      // Apontamento de divergência não tem `counted_at` (não é uma contagem do item,
+      // é o registro de que ele divergiu), então a data cai para `updated_at`.
+      at: (l.counted_at as string) ?? (l.updated_at as string) ?? '',
       title: 'Inventário por SKU',
       detail: partes.length > 0 ? partes.join(' · ') : null,
       quantity: numero(l.counted_quantity),
       quantityLabel: 'contado',
-      divergence: numero(l.divergence),
+      // DERIVADA de contado menos esperado, não lida da coluna `divergence`: aquela
+      // coluna é a do painel e este caminho não a escreve, então ela sairia sempre
+      // falsa e a ficha do produto nunca mostraria a diferença.
+      divergence: contado !== null && esperado !== null ? contado - esperado : null,
       actor: (l.counted_by_name as string) ?? null,
     };
   });

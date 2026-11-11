@@ -527,3 +527,16 @@ export async function saveItemDivergenceDetail(input: DivergenceDetailInput): Pr
   if (error) throw error;
   return itemFromRow(data as unknown as ItemRow);
 }
+
+/** Itens apontados como divergentes numa linha — base da seção do relatório de
+ *  fechamento. Leitura pura: divergência é derivada (contado <> saldo gravado),
+ *  nada é recalculado e nada é escrito. */
+export async function listDivergentItemsForLine(
+  companyId: string,
+  label: string
+): Promise<InventoryItem[]> {
+  const cycle = await getActiveCycle(companyId);
+  if (!cycle) return [];
+  const items = await listCycleItemsByLabel(cycle.id, label);
+  return items.filter(isDivergentItem);
+}

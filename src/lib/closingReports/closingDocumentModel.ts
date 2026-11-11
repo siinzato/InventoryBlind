@@ -38,6 +38,24 @@ export interface ClosingDocumentSession {
   accuracyFinal: number | null;
 }
 
+/** Produto apontado como divergente no fechamento. O relatório dizia "18 divergências
+ *  reais" sem dizer quais — este é o detalhe que faltava na folha que vai ao responsável. */
+export interface ClosingDocumentDivergentItem {
+  sku: string | null;
+  productName: string | null;
+  location: string | null;
+  /** Saldo do sistema no instante do apontamento (congelado da Fonte de Saldo). */
+  expected: number;
+  counted: number;
+  /** Contado menos sistema: negativo falta, positivo sobra. Nunca zero. */
+  difference: number;
+}
+
+/** "falta 3" / "sobra 2" — o sinal vira palavra só na hora de exibir. */
+export function formatDivergence(difference: number): string {
+  return difference < 0 ? `falta ${Math.abs(difference)}` : `sobra ${difference}`;
+}
+
 export interface ClosingDocument {
   brandName: string;
   /** URL/dataURL do logo da marca, quando houver. Opcional em todo consumidor: falha ou
@@ -56,6 +74,9 @@ export interface ClosingDocument {
    *  início e fim (que inclui as paradas). null quando nenhuma contagem tem duração. */
   countingSeconds: number | null;
   sessions: ClosingDocumentSession[];
+  /** Produtos apontados como divergentes. Vazio quando ninguem apontou — e ai o
+   *  relatorio diz isso, em vez de omitir a secao como se nao houvesse divergencia. */
+  divergentItems: ClosingDocumentDivergentItem[];
   metrics: ClosingDocumentMetrics;
   categories: ClosingDocumentCategory[];
   unclassifiedObservations: string[];
@@ -121,12 +142,15 @@ export interface BuildClosingDocumentInput {
   /** Contagens do ciclo (ver listClosingCycleRecords). Opcional: sem elas o documento
    *  sai como saía antes, sem a seção de sessões — exportar nunca depende desta leitura. */
   records?: InventoryCountRecord[];
+  /** Itens divergentes apontados no fechamento. Opcional: sem eles o documento sai
+   *  como saia antes. */
+  divergentItems?: ClosingDocumentDivergentItem[];
 }
 
 /** Monta o documento a partir dos dados já gravados. A ordem das categorias é a do
  *  próprio relatório (category_counts), preservando o que foi persistido na geração. */
 export function buildClosingReportDocument(input: BuildClosingDocumentInput): ClosingDocument {
-  const { brandName, report, observations, brandLogo = null, records = [] } = input;
+  const { brandName, report, observations, brandLogo = null, records = [], divergentItems = [] } = input;
 
   const sessions: ClosingDocumentSession[] = records.map(r => ({
     countNumber: r.count_number,
@@ -167,6 +191,7 @@ export function buildClosingReportDocument(input: BuildClosingDocumentInput): Cl
     finishedAt: fins.length > 0 ? fins[fins.length - 1] : null,
     countingSeconds: duracoes.length > 0 ? duracoes.reduce((a, b) => a + b, 0) : null,
     sessions,
+    divergentItems,
     metrics: {
       skusContados: report.skusContados,
       divergenciasEncontradas: report.divergenciasEncontradas,

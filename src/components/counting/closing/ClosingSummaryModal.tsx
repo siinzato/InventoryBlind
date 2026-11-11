@@ -11,6 +11,7 @@ import {
   buildClosingReportDocument,
   formatClosingDateTime,
   CLOSING_METRIC_ROWS,
+  type ClosingDocumentDivergentItem,
 } from '../../../lib/closingReports/closingDocumentModel';
 import { downloadClosingReportPdf, downloadClosingReportWord } from '../../../lib/closingReports/closingReportExport';
 import { renderClosingFeedback } from '../../../lib/closingReports/closingFeedbackTemplate';
@@ -18,6 +19,7 @@ import { listClosingCycleRecords } from '../../../lib/closingReports/closingRepo
 import type { InventoryCountRecord } from '../../../lib/supabase';
 import { BrandMark } from '../../brandLogos/BrandMark';
 import { ClosingDivergenceSection } from './ClosingDivergenceSection';
+import { listDivergentItemsForLine } from '../../../lib/inventoryCycle/inventoryCycleService';
 
 interface ClosingSummaryModalProps {
   open: boolean;
@@ -60,9 +62,35 @@ export function ClosingSummaryModal({
   }, [open, report]);
 
   // Modelo canônico: única fonte do PDF, do Word e do feedback.
+  // Produtos apontados como divergentes, para a seção "Produtos com divergência" do
+  // arquivo exportado. Mesma política da leitura acima: best-effort e sem recálculo —
+  // falhar aqui faz o documento sair sem a seção, nunca impede exportar.
+  // `recarregar` sobe quando o bloco de apontamento salva, para o PDF gerado logo
+  // depois já sair com o que acabou de ser apontado.
+  const [divergentItems, setDivergentItems] = useState<ClosingDocumentDivergentItem[]>([]);
+  const [recarregar, setRecarregar] = useState(0);
+  useEffect(() => {
+    if (!open || !report) { setDivergentItems([]); return; }
+    let ativo = true;
+    listDivergentItemsForLine(report.companyId, brandName)
+      .then(rows => {
+        if (!ativo) return;
+        setDivergentItems(rows.map(item => ({
+          sku: item.sku,
+          productName: item.productName,
+          location: item.location,
+          expected: item.expectedQuantity ?? 0,
+          counted: item.countedQuantity ?? 0,
+          difference: (item.countedQuantity ?? 0) - (item.expectedQuantity ?? 0),
+        })));
+      })
+      .catch(() => { if (ativo) setDivergentItems([]); });
+    return () => { ativo = false; };
+  }, [open, report, brandName, recarregar]);
+
   const doc = useMemo(
-    () => (report ? buildClosingReportDocument({ brandName, report, observations, brandLogo: brandLogoUrl ?? null, records: cycleRecords }) : null),
-    [brandName, report, observations, brandLogoUrl, cycleRecords]
+    () => (report ? buildClosingReportDocument({ brandName, report, observations, brandLogo: brandLogoUrl ?? null, records: cycleRecords, divergentItems }) : null),
+    [brandName, report, observations, brandLogoUrl, cycleRecords, divergentItems]
   );
 
   if (!report || !doc) return null;
@@ -199,6 +227,7 @@ export function ClosingSummaryModal({
           companyId={report.companyId}
           brandName={brandName}
           declared={report.divergenciasReais}
+          onSaved={() => setRecarregar(n => n + 1)}
         />
 
         <div className="border-t border-edge pt-4">

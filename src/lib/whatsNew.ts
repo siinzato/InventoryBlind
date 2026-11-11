@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-11-divergencias-no-relatorio-e-no-historico',
+    date: '2026-11-11',
+    category: 'melhoria',
+    title: 'Os produtos apontados agora saem no relatório e na ficha do produto',
+    description: 'Os produtos que você aponta como divergentes no fechamento da linha passaram a aparecer em dois lugares onde faziam falta. No relatório de fechamento, em PDF e em Word, entrou a seção "Produtos com divergência": cada produto com SKU, endereço, o saldo do sistema, a quantidade contada e se foi falta ou sobra. Antes o documento dizia apenas "18 divergências reais" sem informar em quais produtos, o que obrigava quem recebia a folha a perguntar. Quando nenhum produto foi apontado, o relatório diz isso em vez de omitir a seção. No histórico do produto, os apontamentos passaram a aparecer junto com as contagens, com a diferença entre o contado e o saldo do sistema — antes esse histórico só mostrava contagens completas e deixava as divergências de fora justamente na tela onde elas mais importam.',
+  },
+  {
     id: '2026-11-11-apontar-produtos-divergentes',
     date: '2026-11-11',
     category: 'novidade',

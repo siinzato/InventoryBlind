@@ -1,13 +1,14 @@
 import { pct, plural } from '../formatPtBr';
+import { ACCURACY_TARGET_PCT, ACCURACY_WARNING_FLOOR_PCT, classifyAccuracy } from '../accuracyScale';
+import type { AccuracyTargets } from '../accuracyScale';
 // Regras puras, determinísticas e centralizadas para o resumo operacional e os alertas
 // prioritários do bloco "KPIs e Indicadores" (Painel Administrativo). Nenhuma IA, nenhum motor
 // de recomendação — só limiares fixos e documentados sobre dados já existentes:
 //
 //   - acuracidade de inventários FECHADOS (InventorySnapshot.accuracy, já usada em
 //     OverviewTab/DangerZoneSection) é o único indicador com meta REAL hoje: o dashboard
-//     principal (App.tsx, bloco "Meta de Acuracidade") já usa 95% como alvo e 80% como piso de
-//     atenção. Reaproveitamos exatamente esses números aqui — não é um corte novo, é o mesmo já
-//     mostrado ao usuário em outro lugar do produto.
+//     principal (App.tsx, bloco "Meta de Acuracidade") já escreve 95% como alvo na tela. Os
+//     cortes agora vêm de src/lib/accuracyScale.ts, a régua única do produto.
 //   - custom_kpis (Produtividade Média, Taxa de Erro, etc.) não têm coluna de meta nem série
 //     histórica hoje — por isso nunca recebem status "dentro da meta/atenção/crítico": teriam
 //     que assumir se "subir" é bom ou ruim para cada indicador, o que não está nos dados.
@@ -22,19 +23,16 @@ export interface AccuracyPoint {
   accuracy: number;
 }
 
-/** Mesma meta já exibida em App.tsx ("Meta de Acuracidade": {valor}% / 95%). */
-export const ACCURACY_TARGET_PCT = 95;
-/** Mesmo piso de atenção já usado no gradiente de cor daquele mesmo bloco. */
-export const ACCURACY_WARNING_FLOOR_PCT = 80;
+// Os cortes vêm da régua única de acuracidade (src/lib/accuracyScale.ts). Reexportados
+// aqui para não quebrar quem já importava deste módulo.
+export { ACCURACY_TARGET_PCT, ACCURACY_WARNING_FLOOR_PCT };
 
-/** Classifica a acuracidade ATUAL contra a meta já existente no dashboard principal —
+/** Classifica a acuracidade ATUAL contra a régua única —
  *  >=95% dentro da meta, 80–94.9% atenção, <80% crítico. `null` (nenhum inventário fechado
  *  ainda) é "insuficiente", nunca tratado como dentro da meta por omissão. */
-export function classifyAccuracyByTarget(accuracy: number | null): HealthStatus {
-  if (accuracy === null) return 'insuficiente';
-  if (accuracy >= ACCURACY_TARGET_PCT) return 'saudavel';
-  if (accuracy >= ACCURACY_WARNING_FLOOR_PCT) return 'atencao';
-  return 'critico';
+export function classifyAccuracyByTarget(accuracy: number | null, targets?: AccuracyTargets): HealthStatus {
+  const banda = classifyAccuracy(accuracy, targets);
+  return banda === 'meta' ? 'saudavel' : banda === 'atencao' ? 'atencao' : banda === 'critico' ? 'critico' : 'insuficiente';
 }
 
 /** Queda de acuracidade (pontos percentuais) entre os dois últimos inventários fechados a

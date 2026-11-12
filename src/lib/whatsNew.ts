@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-12-risco-sem-classificacao-conta-como-c',
+    date: '2026-11-12',
+    category: 'melhoria',
+    title: 'Produto sem classificação deixa de aparecer como o de menor risco',
+    description: 'No Inventário por Risco, produto sem classificação ABC tinha esse item retirado do cálculo e o peso dele dividido entre os demais. Quando os outros dados também estavam em branco — sem custo cadastrado e sem venda no período —, o resultado era um risco MENOR que o de um produto classificado como C, e o item aparecia no fim da lista justamente por faltar informação sobre ele. Agora produto sem classificação é avaliado como classe C, e o painel de detalhes continua mostrando que a classificação está faltando. Produtos classificados como A, B ou C não mudam em nada.',
+  },
+  {
     id: '2026-11-12-produto-sem-classificacao-conta-como-c',
     date: '2026-11-12',
     category: 'melhoria',

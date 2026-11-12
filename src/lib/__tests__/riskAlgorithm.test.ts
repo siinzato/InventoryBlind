@@ -83,7 +83,7 @@ describe('computeRiskScore — probabilidade e impacto são independentes', () =
     expect(high.probability).toBe(low.probability);
   });
 
-  it('classificação ABC ausente não trava o cálculo — redistribui peso e registra o que falta', () => {
+  it('classificação ABC ausente não trava o cálculo — conta como C e registra o que falta', () => {
     const withAbc = computeRiskScore({ ...base, abcClass: 'A' });
     const withoutAbc = computeRiskScore({ ...base, abcClass: null });
     expect(withoutAbc.hasSufficientData).toBe(true);
@@ -92,6 +92,21 @@ describe('computeRiskScore — probabilidade e impacto são independentes', () =
     // Sem a classe A (que pesa a favor do impacto), o impacto sem ABC não deve
     // superar o calculado com ABC A presente para o mesmo produto.
     expect(withoutAbc.impact).toBeLessThanOrEqual(withAbc.impact);
+  });
+
+  it('sem classe ABC nunca pontua abaixo de um produto classificado como C', () => {
+    // Caso real: produto sem custo cadastrado e sem venda no período — todos os
+    // outros fatores de impacto zerados. Antes, tirar a classe do cálculo e
+    // redistribuir o peso deixava o impacto MENOR que o de um C, e o produto sem
+    // classificação caía para baixo da faixa mais baixa.
+    const zerado = {
+      ...base, unitPrice: 0, currentStockQuantity: 0, quantityMovedPerMonth: 0, criticalityLevel: 'normal' as const,
+    };
+    const classeC = computeRiskScore({ ...zerado, abcClass: 'C' });
+    const semClasse = computeRiskScore({ ...zerado, abcClass: null });
+    expect(semClasse.impact).toBe(classeC.impact);
+    expect(semClasse.riskScore).toBe(classeC.riskScore);
+    expect(semClasse.impactFactors.abcClass.detail).toBe('Sem classificação ABC — conta como classe C');
   });
 });
 

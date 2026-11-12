@@ -134,8 +134,13 @@ function adjustmentsScore(adjustmentCount: number): RiskFactor {
 }
 
 // ── Impacto (0-100) — sempre calculável (produto sempre tem preço/estoque). ───
-// Classe ABC ausente reduz o conjunto de fatores e redistribui o peso entre os
-// demais, em vez de fingir uma classe.
+// Classe ABC ausente conta como C. Redistribuir o peso da classe entre os demais
+// fatores invertia a lógica: num produto cujos outros fatores estão zerados (sem
+// custo cadastrado, sem venda no período), tirar a classe do cálculo não tornava o
+// impacto incerto — tornava o impacto MENOR que o de um produto classificado como C.
+// Produto sem classificação passava a correr por fora, abaixo da faixa mais baixa.
+// `missingFactors` continua registrando a falta, para a interface mostrar o que o
+// cadastro ainda não tem.
 
 const IMPACT_WEIGHTS_WITH_ABC = {
   abcClass: 25,
@@ -145,22 +150,15 @@ const IMPACT_WEIGHTS_WITH_ABC = {
   operationalCriticality: 15,
 } as const;
 
-const IMPACT_WEIGHTS_WITHOUT_ABC = {
-  financialValue: 34,
-  demand: 20,
-  coverage: 26,
-  operationalCriticality: 20,
-} as const;
-
 const ABC_IMPACT_SCORE: Record<'A' | 'B' | 'C', number> = { A: 100, B: 60, C: 25 };
 const CRITICALITY_SCORE: Record<CriticalityLevel, number> = { baixa: 20, normal: 50, alta: 80, maxima: 100 };
 
-function abcImpactScore(abcClass: 'A' | 'B' | 'C', weight: number): RiskFactor {
+function abcImpactScore(abcClass: 'A' | 'B' | 'C', weight: number, semClasse = false): RiskFactor {
   return {
     score: ABC_IMPACT_SCORE[abcClass],
     max: 100,
     weight,
-    detail: `Classe ABC ${abcClass}`,
+    detail: semClasse ? 'Sem classificação ABC — conta como classe C' : `Classe ABC ${abcClass}`,
   };
 }
 
@@ -210,21 +208,14 @@ function computeImpact(input: ImpactInput): { impact: number; factors: Record<st
   const missingFactors: string[] = [];
   const factors: Record<string, RiskFactor> = {};
 
-  if (input.abcClass) {
-    const w = IMPACT_WEIGHTS_WITH_ABC;
-    factors.abcClass = abcImpactScore(input.abcClass, w.abcClass);
-    factors.financialValue = financialValueScore(input.unitPrice, input.currentStockQuantity, w.financialValue);
-    factors.demand = demandScore(input.quantityMovedPerMonth, w.demand);
-    factors.coverage = coverageScore(input.currentStockQuantity, input.quantityMovedPerMonth, w.coverage);
-    factors.operationalCriticality = operationalCriticalityScore(input.criticalityLevel, w.operationalCriticality);
-  } else {
-    missingFactors.push('Classificação ABC');
-    const w = IMPACT_WEIGHTS_WITHOUT_ABC;
-    factors.financialValue = financialValueScore(input.unitPrice, input.currentStockQuantity, w.financialValue);
-    factors.demand = demandScore(input.quantityMovedPerMonth, w.demand);
-    factors.coverage = coverageScore(input.currentStockQuantity, input.quantityMovedPerMonth, w.coverage);
-    factors.operationalCriticality = operationalCriticalityScore(input.criticalityLevel, w.operationalCriticality);
-  }
+  if (!input.abcClass) missingFactors.push('Classificação ABC');
+
+  const w = IMPACT_WEIGHTS_WITH_ABC;
+  factors.abcClass = abcImpactScore(input.abcClass ?? 'C', w.abcClass, input.abcClass == null);
+  factors.financialValue = financialValueScore(input.unitPrice, input.currentStockQuantity, w.financialValue);
+  factors.demand = demandScore(input.quantityMovedPerMonth, w.demand);
+  factors.coverage = coverageScore(input.currentStockQuantity, input.quantityMovedPerMonth, w.coverage);
+  factors.operationalCriticality = operationalCriticalityScore(input.criticalityLevel, w.operationalCriticality);
 
   const impact = clamp(Math.round(
     Object.values(factors).reduce((sum, f) => sum + (f.score * f.weight) / 100, 0)

@@ -168,9 +168,19 @@ describe('buildWhyToCount — motivos reais, nunca genéricos e iguais para todo
   });
 });
 
+describe('TARGET_INTERVAL_DAYS — produto sem classe ABC', () => {
+  it('sem classe conta como C, nunca mais devagar que C', () => {
+    // Dois tercos do catalogo nao tem classe, quase sempre por nao ter tido venda.
+    // Estoque parado e onde a falta passa despercebida — nao pode ser a faixa mais lenta.
+    const semClasse = computeConfidenceScore(input({ abcClass: null, recentCounts: [] }));
+    const classeC = computeConfidenceScore(input({ abcClass: 'C', recentCounts: [] }));
+    expect(semClasse.targetIntervalDays).toBeLessThanOrEqual(classeC.targetIntervalDays);
+  });
+});
+
 describe('intervaloEfetivoDias — confiança baixa antecipa a próxima contagem', () => {
   it('item sem classe ABC e em atenção respeita o teto de 21 dias, não os 90 da classe', () => {
-    // Caso real: saldo 109, contado 83 (falta 26), sem classe ABC. Pelo prazo da classe
+    // Caso real: saldo 109, contado 83 (falta 26), sem classe ABC. Pelo prazo padrao
     // a recontagem cairia 90 dias depois; a confiança em atenção puxa para o teto.
     const confidence = computeConfidenceScore(input({
       abcClass: null,
@@ -178,7 +188,7 @@ describe('intervaloEfetivoDias — confiança baixa antecipa a próxima contagem
       recentCounts: [{ daysAgo: 0, systemQty: 109, physicalQty: 83 }],
     }));
     expect(confidence.riskLevel).toBe('medio');
-    expect(confidence.targetIntervalDays).toBe(90);
+    expect(confidence.targetIntervalDays).toBe(60);
     expect(intervaloEfetivoDias(confidence)).toBe(21);
   });
 

@@ -70,7 +70,12 @@ export interface PriorityResult {
 
 const clamp = (n: number, min = 0, max = 100) => Math.max(min, Math.min(max, n));
 
-const TARGET_INTERVAL_DAYS: Record<'A' | 'B' | 'C' | 'none', number> = { A: 15, B: 30, C: 60, none: 90 };
+// Produto sem classe ABC conta como C, nao como uma faixa mais lenta que C. Dois tercos
+// do catalogo nao tem classe, quase sempre por nao ter tido venda no periodo — e "nao
+// vende" nao quer dizer "nao some": e justamente no estoque parado que a falta passa
+// despercebida, porque nenhuma venda denuncia. Contar menos o que se conhece menos
+// invertia a logica.
+const TARGET_INTERVAL_DAYS: Record<'A' | 'B' | 'C' | 'none', number> = { A: 15, B: 30, C: 60, none: 60 };
 
 function targetIntervalFor(abcClass: AbcClass): number {
   return TARGET_INTERVAL_DAYS[abcClass ?? 'none'];
@@ -186,7 +191,7 @@ function bandForScore(score: number): RiskLevel {
 // Aperto do intervalo de contagem por faixa de confiança. Um produto mal avaliado volta
 // à fila antes do prazo da própria classe ABC; um produto estável segue o prazo da classe.
 // O teto existe porque o multiplicador sozinho não resolve item sem classe ABC: metade do
-// padrão de 90 dias ainda são 45, e um saldo com perda grande não espera um mês e meio.
+// padrão de 60 dias ainda são 30, e um saldo com perda grande não espera um mês.
 const APERTO_POR_FAIXA: Record<RiskLevel, { multiplicador: number; tetoDias: number | null }> = {
   critico:   { multiplicador: 0.25, tetoDias: 10 },
   medio:     { multiplicador: 0.5, tetoDias: 21 },

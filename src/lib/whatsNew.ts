@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-12-produto-sem-classificacao-conta-como-c',
+    date: '2026-11-12',
+    category: 'melhoria',
+    title: 'Produto sem classificação deixa de ser o último da fila de contagem',
+    description: 'Produto sem classificação ABC era reagendado a cada 90 dias, prazo mais longo que o da classe C, que é de 60. Na prática o sistema conferia com menos frequência justamente os produtos sobre os quais sabe menos. A maior parte desses produtos ficou sem classificação por não ter tido venda no período, e estoque parado é onde a falta passa mais tempo despercebida, porque nenhuma venda denuncia a diferença. Agora produto sem classificação segue o mesmo prazo da classe C. Produtos classificados como A, B ou C não mudam em nada.',
+  },
+  {
     id: '2026-11-11-sobra-grande-deixa-de-ter-desconto',
     date: '2026-11-11',
     category: 'melhoria',

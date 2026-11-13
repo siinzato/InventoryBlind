@@ -124,6 +124,19 @@ export default defineConfig({
         globPatterns: [
           '**/*.{js,css,html,ico,png,svg,woff2}'
         ],
+        // O mapa 3D arrasta three/fiber/drei: sozinho ele é ~919 kB, mais de 10% de
+        // tudo que o app precarrega. Deixá-lo no precache cobraria esse download na
+        // INSTALAÇÃO de todo mundo, inclusive de quem nunca abre a seção 3D — e o
+        // coletor no corredor é justamente quem menos tem banda sobrando.
+        //
+        // A troca: o mapa 3D passa a exigir rede na primeira abertura. É aceitável
+        // porque ele é uma visão de planejamento, não um passo da operação de
+        // contagem; o mapa 2D do Pulmão continua precarregado e funciona offline.
+        //
+        // O padrão do Workbox também descartaria silenciosamente qualquer arquivo
+        // acima de 2 MiB. Preferível excluir por nome, de propósito, a esbarrar nesse
+        // teto um dia sem perceber.
+        globIgnores: ['**/Warehouse3DViewer-*.js'],
         navigateFallback: '/index.html',
         runtimeCaching: [],
       },

@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-13-mapa-3d-estrutura-e-foco',
+    date: '2026-11-13',
+    category: 'melhoria',
+    title: 'Mapa 3D: altura da estrutura e foco no que pede atenção',
+    description: 'Nem todo porta-pallets começa no chão. Em Ajustar estrutura você informa a que altura a primeira prateleira do Pulmão fica, a distância entre andares, entre módulos e entre ruas — e, se só parte do pulmão for suspensa, pode dar uma altura só para aquela rua. Quando a estrutura está elevada, o mapa desenha os montantes do piso até a base, para ficar claro que aquilo está pendurado e não empilhado no chão. As medidas ficam salvas no seu navegador e não mexem em nenhum endereço cadastrado. O filtro de vagas também mudou: agora é uma lista com a contagem de cada situação, e ao escolher uma delas as demais vagas ficam translúcidas em vez de sumirem, o que deixa ver a posição exata da vaga no meio da estante sem perder a noção do armazém.',
+  },
+  {
     id: '2026-11-13-mapa-3d-conferencia-por-qr',
     date: '2026-11-13',
     category: 'melhoria',

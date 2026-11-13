@@ -28,63 +28,30 @@ import {
   Matrix4, MeshBasicMaterial, MeshStandardMaterial, PerspectiveCamera,
   type InstancedMesh,
 } from 'three';
-import { Canvas, useThree } from '@react-three/fiber';
+import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls } from '@react-three/drei';
-import { Badge, BrandLoader, Button, Notice, Panel, PanelSection, Select, SegmentedControl, type SegmentedOption } from '../ui';
+import {
+  Badge, BrandLoader, Button, Input, Modal, Notice, Panel, PanelSection, Select, SegmentedControl,
+  type SegmentedOption,
+} from '../ui';
 import { useTheme, type Theme } from '../../lib/useTheme';
 import { loadWarehouseSlots, type Slot, type SlotStatus, type WarehouseSlots } from '../../lib/wms/warehouse3dSlots';
+import {
+  LAYOUT_PADRAO, LIMITES, VAGA,
+  baseDaRua, carregarLayout, posicaoDaVaga, salvarLayout,
+  type Layout3DConfig,
+} from '../../lib/wms/warehouse3dLayout';
 import { listBinContents, type BinStockRow } from '../../lib/wms/wmsService';
 
 export type { Slot, SlotStatus } from '../../lib/wms/warehouse3dSlots';
 
 // ── Geometria ──────────────────────────────────────────────────────────────────
 //
-// Uma vaga é mais funda (Z) que larga (X) e mais baixa (Y) que ambas — é a proporção
-// de um pallet PBR em pé numa longarina, não um cubo. Cubo perfeito faria o armazém
-// parecer uma estante de cubos, que é justamente a leitura errada.
-// Em METROS, não em unidades arbitrárias. Um palete PBR carregado ocupa cerca de
-// 1,2 m de frente por 1,2 m de fundo, e a carga sobe ~1,4 m. A altura anterior (0,72)
-// era de meio palete: as vagas pareciam gavetas, e o porta-pallets perdia o pé-direito.
-const VAGA = { largura: 1.2, altura: 1.4, profundidade: 1.2 } as const;
-
-// Os três passos NÃO são o mesmo número, e é aí que mora a proporcionalidade:
+// As medidas e a conversão endereço -> posição moram em `lib/wms/warehouse3dLayout`,
+// onde são aritmética conferível sem WebGL. Aqui só se desenha.
 //
-// X (entre ruas)    — leva o corredor de empilhadeira inteiro no meio. É de longe o
-//                     maior vão, e é o que faz a cena parecer um armazém em vez de uma
-//                     matriz. Comprimir isto é o erro mais comum numa planta 3D.
-// Z (entre módulos) — módulos vizinhos dividem o montante vertical. Vão quase nulo.
-// Y (entre níveis)  — a espessura da longarina mais a folga de manobra do pallet.
-const PASSO = {
-  // 1,2 de vaga + 2,8 de corredor = 4,0 m entre eixos de rua. 2,8 m é a faixa de
-  // manobra de uma empilhadeira contrabalançada; abaixo disso o desenho mentiria
-  // sobre caber a máquina.
-  rua: VAGA.largura + 2.8,
-  modulo: VAGA.profundidade + 0.1,
-  // 1,4 de carga + 0,4 de longarina e folga de entrada do garfo = 1,8 m de pé-direito
-  // por nível, que é o passo típico de porta-pallets.
-  nivel: VAGA.altura + 0.4,
-} as const;
-
-/**
- * Converte um endereço lógico (rua, módulo, nível) na posição no espaço.
- *
- * Pura e 1-based: rua/módulo/nível começam em 1, como o endereço impresso na etiqueta.
- * A origem fica no canto da rua 1 / módulo 1, com o nível 1 apoiado no chão (y = 0),
- * para que o piso da cena seja o piso do armazém e não um plano arbitrário.
- *
- * `rua` aqui é o ÍNDICE da rua, não a letra: no banco a rua é 'A', 'B', 'C'. A
- * conversão letra -> índice acontece em `buildSlots`, que enxerga o conjunto inteiro.
- *
- * O resultado é absoluto, não centralizado — centralizar é trabalho da cena, que
- * conhece a extensão total.
- */
-export function getSlotPosition(rua: number, modulo: number, nivel: number): [number, number, number] {
-  return [
-    (rua - 1) * PASSO.rua,
-    (nivel - 1) * PASSO.nivel + VAGA.altura / 2,
-    (modulo - 1) * PASSO.modulo,
-  ];
-}
+// Uma vaga é 1,2 x 1,4 x 1,2 METROS — palete PBR carregado, não um cubo arbitrário.
+// Cubo perfeito faria o armazém parecer uma estante de cubos, que é a leitura errada.
 
 // ── Cor ────────────────────────────────────────────────────────────────────────
 //
@@ -125,6 +92,25 @@ const LEGENDA: ReadonlyArray<{ status: SlotStatus; rotulo: string }> = [
   { status: 'empty', rotulo: 'Livre' },
   { status: 'divergence', rotulo: 'Acima da capacidade' },
   { status: 'blocked', rotulo: 'Bloqueada' },
+];
+
+/**
+ * Filtro de status. Os rótulos dizem o que o filtro DE FATO faz.
+ *
+ * `divergence` é "acima da capacidade", e só isso. A divergência de contagem cega —
+ * "a contagem não bateu" — NÃO é derivável: a contagem é apurada por produto, e
+ * `products.location` não casa com código de vaga em nenhum dos 2.174 produtos que
+ * têm location preenchido. Chamar este filtro de "contagem cega não bateu" seria um
+ * rótulo mentindo sobre o que a tela sabe.
+ */
+type FiltroStatus = 'todas' | SlotStatus;
+
+const FILTROS: ReadonlyArray<{ value: FiltroStatus; rotulo: string }> = [
+  { value: 'todas', rotulo: 'Todas as vagas' },
+  { value: 'divergence', rotulo: 'Acima da capacidade' },
+  { value: 'occupied', rotulo: 'Ocupadas' },
+  { value: 'empty', rotulo: 'Livres' },
+  { value: 'blocked', rotulo: 'Bloqueadas' },
 ];
 
 type ModoCor = 'status' | 'ocupacao';
@@ -178,15 +164,17 @@ const FOLGA_CAMERA = 1.5;
  * estreito e um quadrado de mesma largura precisam de recuos diferentes, e a diagonal
  * é o que distingue os dois.
  */
-export function enquadrarCamera(slots: readonly Slot[]): [number, number, number] {
+export function enquadrarCamera(slots: readonly Slot[], cfg: Layout3DConfig): [number, number, number] {
   const magnitude = Math.hypot(...DIRECAO_CAMERA);
   if (slots.length === 0) return DIRECAO_CAMERA;
 
-  const largura = (Math.max(...slots.map(s => s.rua)) - 1) * PASSO.rua + VAGA.largura;
-  const profundidade = (Math.max(...slots.map(s => s.modulo)) - 1) * PASSO.modulo + VAGA.profundidade;
-  const altura = Math.max(...slots.map(s => s.nivel)) * PASSO.nivel;
+  const largura = (Math.max(...slots.map(s => s.rua)) - 1) * cfg.rowSpacing + VAGA.largura;
+  const profundidade = (Math.max(...slots.map(s => s.modulo)) - 1) * cfg.moduleWidth + VAGA.profundidade;
+  // A altura inclui a elevação da estrutura: com o pulmão suspenso a 3 m, a câmera
+  // precisa recuar mais, senão o armazém sobe para fora do quadro.
+  const topo = Math.max(...slots.map(s => baseDaRua(s.ruaCodigo, cfg) + s.nivel * cfg.levelHeight));
 
-  const distancia = Math.max(Math.hypot(largura, profundidade, altura) * FOLGA_CAMERA, 6);
+  const distancia = Math.max(Math.hypot(largura, profundidade, topo) * FOLGA_CAMERA, 6);
   const escala = distancia / magnitude;
   return [DIRECAO_CAMERA[0] * escala, DIRECAO_CAMERA[1] * escala, DIRECAO_CAMERA[2] * escala];
 }
@@ -286,6 +274,31 @@ function useArestasFundidas(vagas: readonly VagaDesenhavel[]): BufferGeometry {
 const MATERIAL_SOLIDO = new MeshStandardMaterial({ roughness: 0.72, metalness: 0.05 });
 /** Apanhador de clique: ocupa espaço para o raycast e não desenha nada. */
 const MATERIAL_INVISIVEL = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
+/**
+ * Modo raio-X: a vaga fora do filtro vira vidro em vez de sumir.
+ *
+ * `depthWrite: false` é o que faz funcionar — sem isso o vidro da frente esconderia o
+ * alerta atrás dele, que é exatamente o que se quis enxergar. O preço é que vidro
+ * sobre vidro não respeita ordem; aceitável, porque o que importa aqui é a posição da
+ * vaga em destaque dentro da estante, não o sombreado do contexto.
+ */
+const MATERIAL_RAIOX = new MeshBasicMaterial({ transparent: true, opacity: 0.15, depthWrite: false });
+/** Viga de sustentação do pulmão suspenso. Cinza de estrutura, nunca semântico. */
+const MATERIAL_VIGA = new MeshStandardMaterial({ color: '#475569', roughness: 0.9, metalness: 0.1 });
+/** 1 m de altura de propósito: escalar em Y passa a dar a altura direto em metros. */
+const GEOMETRIA_VIGA = new BoxGeometry(0.14, 1, 0.14);
+/**
+ * Material próprio do lote de divergências, para o pulso não contaminar as demais
+ * vagas. `emissive` âmbar: é a mesma família do `divergence` do mapa, então o alerta
+ * brilha na cor que já significa alerta no resto do produto — e não ganha um vermelho
+ * novo que nenhuma outra tela usa.
+ */
+const MATERIAL_ALERTA = new MeshStandardMaterial({
+  roughness: 0.6,
+  metalness: 0.05,
+  emissive: new Color('#F59E0B'),
+  emissiveIntensity: 0,
+});
 
 const MATRIZ = new Matrix4();
 const COR = new Color();
@@ -355,10 +368,70 @@ function LoteInstanciado({
   );
 }
 
+/**
+ * Pulso do alerta: respira a emissividade do material do lote de divergências.
+ *
+ * Anima o MATERIAL, não as instâncias — é um número por quadro, não um por vaga, então
+ * o custo não cresce com o tamanho do armazém.
+ *
+ * Respeita `prefers-reduced-motion`: para quem pediu menos movimento o alerta fica
+ * aceso e parado em vez de piscar. Reduzido, não removido — tirar o brilho faria a
+ * divergência sumir no meio da estante, que é o oposto do objetivo.
+ */
+function PulsoDeAlerta({ material, ativo }: { material: MeshStandardMaterial; ativo: boolean }) {
+  const reduzido = useMemo(
+    () => typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches,
+    [],
+  );
+
+  useFrame(({ clock }) => {
+    if (!ativo) {
+      material.emissiveIntensity = 0;
+      return;
+    }
+    material.emissiveIntensity = reduzido ? 0.35 : 0.2 + 0.3 * (1 + Math.sin(clock.elapsedTime * 2.6)) / 2;
+  });
+
+  return null;
+}
+
+/**
+ * Montantes do pulmão suspenso: do piso até a base da primeira prateleira.
+ *
+ * Sem eles, uma estrutura elevada aparece como mercadoria flutuando no ar — o desenho
+ * fica bonito e incompreensível. As colunas são o que diz "isto está pendurado a três
+ * metros, não empilhado no chão".
+ *
+ * Desenhadas só onde há elevação: com tudo apoiado no piso (o padrão), este lote fica
+ * vazio e não custa nada.
+ */
+function Vigas({ colunas }: { colunas: { x: number; z: number; altura: number }[] }) {
+  const ref = useRef<InstancedMesh>(null);
+  const capacidade = Math.max(1, colunas.length);
+
+  useEffect(() => {
+    const malha = ref.current;
+    if (!malha) return;
+    colunas.forEach((coluna, i) => {
+      // A geometria tem 1 m de altura, então escalar em Y dá a altura em metros.
+      MATRIZ.makeScale(1, coluna.altura, 1);
+      MATRIZ.setPosition(coluna.x, coluna.altura / 2, coluna.z);
+      malha.setMatrixAt(i, MATRIZ);
+    });
+    malha.count = colunas.length;
+    malha.instanceMatrix.needsUpdate = true;
+  }, [colunas]);
+
+  return <instancedMesh ref={ref} args={[GEOMETRIA_VIGA, MATERIAL_VIGA, capacidade]} />;
+}
+
 function Cena({
   solidas,
+  divergentes,
+  raioX,
   fiosAtivos,
   fiosAtenuados,
+  colunas,
   realce,
   extensao,
   deslocamento,
@@ -367,8 +440,11 @@ function Cena({
   onSelect,
 }: {
   solidas: VagaDesenhavel[];
+  divergentes: VagaDesenhavel[];
+  raioX: VagaDesenhavel[];
   fiosAtivos: VagaDesenhavel[];
   fiosAtenuados: VagaDesenhavel[];
+  colunas: { x: number; z: number; altura: number }[];
   realce: VagaDesenhavel | null;
   extensao: number;
   deslocamento: [number, number, number];
@@ -393,11 +469,24 @@ function Cena({
       <gridHelper args={[extensao, Math.max(1, Math.round(extensao)), centro, linha]} position={[0, 0, 0]} />
 
       <group position={deslocamento}>
+        {/* Montantes, quando o pulmão é suspenso. */}
+        <Vigas colunas={colunas} />
+
         {/* Vagas com conteúdo: um único objeto de GPU para todas. */}
         <LoteInstanciado
           key={`solidas-${solidas.length}`}
           vagas={solidas}
           material={MATERIAL_SOLIDO}
+          onHover={onHover}
+          onSelect={onSelect}
+        />
+
+        {/* Divergências em lote próprio, para poderem pulsar sem arrastar o resto. */}
+        <PulsoDeAlerta material={MATERIAL_ALERTA} ativo={divergentes.length > 0} />
+        <LoteInstanciado
+          key={`alerta-${divergentes.length}`}
+          vagas={divergentes}
+          material={MATERIAL_ALERTA}
           onHover={onHover}
           onSelect={onSelect}
         />
@@ -409,8 +498,19 @@ function Cena({
           <lineBasicMaterial color={COR_VAGA[theme].empty} />
         </lineSegments>
 
-        {/* Fora do filtro. Continua desenhado porque o filtro ISOLA, não amputa: sem
-            estas vagas o armazém perderia a forma e sobrariam cubos flutuando. */}
+        {/* Raio-X: vaga com carga que ficou FORA do filtro vira vidro em vez de sumir.
+            É o que deixa ver a posição exata do alerta no meio da estante, sem perder a
+            noção de onde ele está. O filtro isola, não amputa. */}
+        <LoteInstanciado
+          key={`raiox-${raioX.length}`}
+          vagas={raioX}
+          material={MATERIAL_RAIOX}
+          onHover={onHover}
+          onSelect={onSelect}
+        />
+
+        {/* Vaga VAZIA fora do filtro continua contorno, não vidro: vidro em 67 vagas
+            vazias faria o armazém parecer cheio, que é a leitura oposta da verdade. */}
         <lineSegments geometry={arestasAtenuadas}>
           <lineBasicMaterial color={COR_ATENUADA[theme]} />
         </lineSegments>
@@ -585,6 +685,183 @@ function PainelDetalhe({
   );
 }
 
+// ── Ajuste da estrutura ────────────────────────────────────────────────────────
+
+/** Campo numérico com unidade e limites do próprio domínio. */
+function CampoMetros({
+  rotulo,
+  ajuda,
+  valor,
+  min,
+  max,
+  onMudar,
+}: {
+  rotulo: string;
+  ajuda?: string;
+  valor: number;
+  min: number;
+  max: number;
+  onMudar: (v: number) => void;
+}) {
+  return (
+    <label className="block">
+      <span className="text-xs font-medium text-fg">{rotulo}</span>
+      {ajuda && <span className="mt-0.5 block text-xs leading-relaxed text-fg-muted">{ajuda}</span>}
+      <div className="mt-1 flex items-center gap-2">
+        <Input
+          type="number"
+          step={0.1}
+          min={min}
+          max={max}
+          value={valor}
+          // Campo vazio vira NaN em `Number('')`, e um NaN no eixo Y faz a vaga sumir
+          // da cena sem erro nenhum. O valor anterior fica até digitarem um número.
+          onChange={e => {
+            const n = Number(e.target.value);
+            if (Number.isFinite(n)) onMudar(n);
+          }}
+          className="w-full"
+        />
+        <span className="text-xs text-fg-muted">m</span>
+      </div>
+    </label>
+  );
+}
+
+/**
+ * Ajuste da estrutura física do porta-pallets.
+ *
+ * Estas medidas NÃO vêm do banco: são propriedade do galpão, não do endereço. Ficam
+ * no navegador de quem monta o mapa, e por isso o painel é uma preferência local, não
+ * um cadastro — gravar isso como dado da empresa sem alguém decidir seria inventar
+ * uma regra de negócio.
+ *
+ * O que NÃO está aqui, de propósito: número de níveis por rua. Quantos níveis uma rua
+ * tem é consequência dos endereços cadastrados, não escolha de exibição. Um campo
+ * para isso desenharia vagas que não existem ou esconderia vagas que existem.
+ */
+function AjusteDeEstrutura({
+  aberto,
+  onFechar,
+  layout,
+  ruas,
+  onMudar,
+}: {
+  aberto: boolean;
+  onFechar: () => void;
+  layout: Layout3DConfig;
+  ruas: string[];
+  onMudar: (patch: Partial<Layout3DConfig>) => void;
+}) {
+  const [ruaEmFoco, setRuaEmFoco] = useState<string>('');
+
+  if (!aberto) return null;
+
+  const elevacaoDaRua = ruaEmFoco ? baseDaRua(ruaEmFoco, layout) : layout.baseOffsetY;
+
+  return (
+    <Modal open onClose={onFechar} title="Ajustar estrutura do porta-pallets">
+      <div className="space-y-4">
+        <p className="text-xs leading-relaxed text-fg-muted">
+          Medidas do galpão, em metros. Ficam salvas neste navegador e não alteram nenhum
+          endereço cadastrado.
+        </p>
+
+        <CampoMetros
+          rotulo="Elevação da base"
+          ajuda="Altura do piso até a primeira prateleira. Use 0 para estrutura apoiada no chão; acima disso o mapa desenha os montantes de sustentação."
+          valor={layout.baseOffsetY}
+          min={LIMITES.baseOffsetY.min}
+          max={LIMITES.baseOffsetY.max}
+          onMudar={v => onMudar({ baseOffsetY: v })}
+        />
+
+        <CampoMetros
+          rotulo="Altura por nível"
+          ajuda="Distância entre andares, incluindo a longarina e a folga de entrada do garfo."
+          valor={layout.levelHeight}
+          min={LIMITES.levelHeight.min}
+          max={LIMITES.levelHeight.max}
+          onMudar={v => onMudar({ levelHeight: v })}
+        />
+
+        <CampoMetros
+          rotulo="Passo entre módulos"
+          ajuda="Distância de um módulo ao seguinte, ao longo da rua."
+          valor={layout.moduleWidth}
+          min={LIMITES.moduleWidth.min}
+          max={LIMITES.moduleWidth.max}
+          onMudar={v => onMudar({ moduleWidth: v })}
+        />
+
+        <CampoMetros
+          rotulo="Distância entre ruas"
+          ajuda="Inclui o corredor de manobra. Encolher aqui faz o desenho mentir sobre caber a empilhadeira."
+          valor={layout.rowSpacing}
+          min={LIMITES.rowSpacing.min}
+          max={LIMITES.rowSpacing.max}
+          onMudar={v => onMudar({ rowSpacing: v })}
+        />
+
+        {ruas.length > 1 && (
+          <div className="border-t border-edge pt-4">
+            <p className="text-xs font-medium text-fg">Elevação de uma rua específica</p>
+            <p className="mt-0.5 text-xs leading-relaxed text-fg-muted">
+              Para quando só parte do pulmão é suspensa. Sem ajuste próprio, a rua segue a
+              elevação geral acima.
+            </p>
+            <Select
+              value={ruaEmFoco}
+              onChange={e => setRuaEmFoco(e.target.value)}
+              className="mt-2 w-full"
+            >
+              <option value="">Escolha a rua…</option>
+              {ruas.map(r => (
+                <option key={r} value={r}>
+                  Rua {r}
+                  {layout.baseByStreet[r] !== undefined ? ` · ${layout.baseByStreet[r]} m` : ''}
+                </option>
+              ))}
+            </Select>
+
+            {ruaEmFoco && (
+              <div className="mt-3 space-y-2">
+                <CampoMetros
+                  rotulo={`Elevação da rua ${ruaEmFoco}`}
+                  valor={elevacaoDaRua}
+                  min={LIMITES.baseOffsetY.min}
+                  max={LIMITES.baseOffsetY.max}
+                  onMudar={v => onMudar({ baseByStreet: { ...layout.baseByStreet, [ruaEmFoco]: v } })}
+                />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  onClick={() => {
+                    const resto = { ...layout.baseByStreet };
+                    delete resto[ruaEmFoco];
+                    onMudar({ baseByStreet: resto });
+                  }}
+                >
+                  Voltar ao padrão geral
+                </Button>
+              </div>
+            )}
+          </div>
+        )}
+
+        <div className="flex justify-between gap-2 border-t border-edge pt-4">
+          <Button variant="ghost" size="sm" onClick={() => onMudar({ ...LAYOUT_PADRAO })}>
+            Restaurar padrão
+          </Button>
+          <Button variant="primary" size="sm" onClick={onFechar}>
+            Concluir
+          </Button>
+        </div>
+      </div>
+    </Modal>
+  );
+}
+
 // ── Componente ─────────────────────────────────────────────────────────────────
 
 interface Warehouse3DViewerProps {
@@ -624,8 +901,12 @@ export function Warehouse3DViewer({
   );
 
   const [modo, setModo] = useState<ModoCor>('status');
-  const [apenasAlertas, setApenasAlertas] = useState(false);
+  const [filtro, setFiltro] = useState<FiltroStatus>('todas');
   const [rua, setRua] = useState<string>(TODAS_AS_RUAS);
+  // Lido do localStorage uma vez, na montagem. É preferência de quem monta o mapa, não
+  // dado do armazém — o banco não guarda a altura da estrutura.
+  const [layout, setLayout] = useState<Layout3DConfig>(carregarLayout);
+  const [ajustando, setAjustando] = useState(false);
   const [apontada, setApontada] = useState<Slot | null>(null);
   const [selecionada, setSelecionada] = useState<Slot | null>(null);
 
@@ -668,53 +949,72 @@ export function Warehouse3DViewer({
 
   // Posição e cor de cada vaga, calculadas uma vez por mudança real de entrada. Sem
   // isto, cada movimento do mouse (que muda `apontada`) recalcularia a cena inteira.
-  const { solidas, fiosAtivos, fiosAtenuados, extensao, deslocamento } = useMemo(() => {
+  const { solidas, divergentes, raioX, fiosAtivos, fiosAtenuados, colunas, extensao, deslocamento } = useMemo(() => {
     const maxCaixas = vagas.reduce((m, s) => Math.max(m, s.caixas), 0);
     const atenuada = COR_ATENUADA[theme];
 
     const desenhaveis: VagaDesenhavel[] = vagas.map(slot => {
       const ativa =
         (rua === TODAS_AS_RUAS || slot.ruaCodigo === rua) &&
-        (!apenasAlertas || slot.status === 'divergence' || slot.status === 'blocked');
+        (filtro === 'todas' || slot.status === filtro);
       return {
         slot,
-        posicao: getSlotPosition(slot.rua, slot.modulo, slot.nivel),
+        posicao: posicaoDaVaga(slot, layout),
         cor: ativa ? corDaVaga(slot, modo, theme, maxCaixas) : atenuada,
         ativa,
       };
     });
 
-    if (vagas.length === 0) {
-      return {
-        solidas: [], fiosAtivos: [], fiosAtenuados: [],
-        extensao: 10, deslocamento: [0, 0, 0] as [number, number, number],
-      };
-    }
+    const vazio = {
+      solidas: [], divergentes: [], raioX: [], fiosAtivos: [], fiosAtenuados: [], colunas: [],
+      extensao: 10, deslocamento: [0, 0, 0] as [number, number, number],
+    };
+    if (vagas.length === 0) return vazio;
 
     const maxRua = Math.max(...vagas.map(s => s.rua));
     const maxModulo = Math.max(...vagas.map(s => s.modulo));
-    const larguraTotal = (maxRua - 1) * PASSO.rua;
-    const profundidadeTotal = (maxModulo - 1) * PASSO.modulo;
+    const larguraTotal = (maxRua - 1) * layout.rowSpacing;
+    const profundidadeTotal = (maxModulo - 1) * layout.moduleWidth;
+
+    // Montantes só onde a estrutura está elevada. Um por extremidade de rua e um a
+    // cada 4 módulos: o suficiente para ler "isto está suspenso" sem virar floresta.
+    const colunas: { x: number; z: number; altura: number }[] = [];
+    for (const letra of new Set(vagas.map(s => s.ruaCodigo))) {
+      const altura = baseDaRua(letra, layout);
+      if (altura <= 0) continue;
+      const daRua = vagas.filter(s => s.ruaCodigo === letra);
+      const x = (daRua[0].rua - 1) * layout.rowSpacing;
+      const modulos = [...new Set(daRua.map(s => s.modulo))].sort((a, b) => a - b);
+      const escolhidos = modulos.filter((m, i) => i === 0 || i === modulos.length - 1 || m % 4 === 0);
+      for (const m of escolhidos) colunas.push({ x, z: (m - 1) * layout.moduleWidth, altura });
+    }
 
     return {
-      solidas: desenhaveis.filter(v => v.ativa && v.slot.status !== 'empty'),
+      solidas: desenhaveis.filter(v => v.ativa && v.slot.status !== 'empty' && v.slot.status !== 'divergence'),
+      divergentes: desenhaveis.filter(v => v.ativa && v.slot.status === 'divergence'),
+      // Fora do filtro, mas com carga: vidro, para dar a profundidade do raio-X.
+      raioX: desenhaveis.filter(v => !v.ativa && v.slot.status !== 'empty'),
       fiosAtivos: desenhaveis.filter(v => v.ativa && v.slot.status === 'empty'),
-      // Vaga atenuada vai para o contorno mesmo quando tem carga: fora do filtro ela é
-      // contexto, e contexto não compete com o que se quis isolar.
-      fiosAtenuados: desenhaveis.filter(v => !v.ativa),
+      fiosAtenuados: desenhaveis.filter(v => !v.ativa && v.slot.status === 'empty'),
+      colunas,
       extensao: Math.max(larguraTotal, profundidadeTotal) + 4,
       // Centraliza na origem para o OrbitControls orbitar o armazém, não um canto dele.
       deslocamento: [-larguraTotal / 2, 0, -profundidadeTotal / 2] as [number, number, number],
     };
-  }, [vagas, modo, theme, rua, apenasAlertas]);
+  }, [vagas, modo, theme, rua, filtro, layout]);
+
+  const todasDesenhaveis = useMemo(
+    () => [...solidas, ...divergentes, ...raioX, ...fiosAtivos, ...fiosAtenuados],
+    [solidas, divergentes, raioX, fiosAtivos, fiosAtenuados],
+  );
 
   const realce = useMemo(() => {
     const alvo = apontada ?? selecionada;
     if (!alvo) return null;
-    return [...solidas, ...fiosAtivos, ...fiosAtenuados].find(v => v.slot.id === alvo.id) ?? null;
-  }, [apontada, selecionada, solidas, fiosAtivos, fiosAtenuados]);
+    return todasDesenhaveis.find(v => v.slot.id === alvo.id) ?? null;
+  }, [apontada, selecionada, todasDesenhaveis]);
 
-  const posicaoCamera = useMemo(() => enquadrarCamera(vagas), [vagas]);
+  const posicaoCamera = useMemo(() => enquadrarCamera(vagas, layout), [vagas, layout]);
   const distancia = Math.hypot(...posicaoCamera);
 
   // A MESMA conta do enquadramento inicial: se o reset usasse um valor próprio, o
@@ -725,6 +1025,36 @@ export function Warehouse3DViewer({
     controls.object.position.set(...posicaoCamera);
     controls.target.set(0, 0, 0);
     controls.update();
+  };
+
+  /**
+   * Leva a câmera até a primeira vaga com alerta.
+   *
+   * A posição vem do mesmo `deslocamento` que a cena aplica ao grupo, senão a câmera
+   * miraria o endereço absoluto e o armazém apareceria deslocado no quadro.
+   *
+   * O recuo é proporcional ao tamanho da vaga, não um número fixo: com o pulmão
+   * suspenso ou com módulos mais largos, uma distância fixa colaria a câmera na vaga.
+   */
+  const focarPrimeiroAlerta = () => {
+    const controls = controlsRef.current;
+    const alvo = divergentes[0];
+    if (!controls || !alvo) return;
+    const [x, y, z] = alvo.posicao;
+    const alvoX = x + deslocamento[0];
+    const alvoZ = z + deslocamento[2];
+    const recuo = Math.max(layout.rowSpacing, layout.moduleWidth) * 2.2;
+    controls.target.set(alvoX, y, alvoZ);
+    controls.object.position.set(alvoX + recuo, y + recuo * 0.6, alvoZ + recuo);
+    controls.update();
+  };
+
+  const trocarLayout = (patch: Partial<Layout3DConfig>) => {
+    setLayout(anterior => {
+      const proximo = { ...anterior, ...patch };
+      salvarLayout(proximo);
+      return proximo;
+    });
   };
 
   const selecionar = useCallback(
@@ -774,7 +1104,7 @@ export function Warehouse3DViewer({
     );
   }
 
-  const emDestaque = solidas.length + fiosAtivos.length;
+  const emDestaque = solidas.length + divergentes.length + fiosAtivos.length;
 
   return (
     // `relative` ancora os overlays; `overflow-hidden` impede que o canvas vaze no
@@ -804,8 +1134,11 @@ export function Warehouse3DViewer({
           <EnquadramentoResponsivo />
           <Cena
             solidas={solidas}
+            divergentes={divergentes}
+            raioX={raioX}
             fiosAtivos={fiosAtivos}
             fiosAtenuados={fiosAtenuados}
+            colunas={colunas}
             realce={realce}
             extensao={extensao}
             deslocamento={deslocamento}
@@ -863,15 +1196,34 @@ export function Warehouse3DViewer({
             ))}
           </Select>
 
-          <label className="flex items-center gap-2 text-xs text-fg-muted">
-            <input
-              type="checkbox"
-              checked={apenasAlertas}
-              onChange={e => setApenasAlertas(e.target.checked)}
-              className="h-3.5 w-3.5 rounded-[3px] border-edge accent-action"
-            />
-            Só o que pede atenção
-          </label>
+          <Select
+            value={filtro}
+            onChange={e => setFiltro(e.target.value as FiltroStatus)}
+            className="w-full"
+          >
+            {FILTROS.map(f => (
+              <option key={f.value} value={f.value}>
+                {f.rotulo}
+                {f.value === 'todas' ? '' : ` (${contagem[f.value]})`}
+              </option>
+            ))}
+          </Select>
+
+          {/* Atalho para o alerta. Aparece SÓ quando há alerta: um botão permanente
+              marcando zero vira ruído e, pior, treina a pessoa a ignorá-lo. */}
+          {contagem.divergence > 0 && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="w-full"
+              onClick={() => {
+                setFiltro('divergence');
+                focarPrimeiroAlerta();
+              }}
+            >
+              Ver <span className="text-code mx-1">{contagem.divergence}</span> acima da capacidade
+            </Button>
+          )}
 
           {/* O filtro isola, não amputa: as demais vagas continuam desenhadas em tom
               apagado, senão o armazém perderia a forma e o 3D perderia a razão. */}
@@ -892,12 +1244,23 @@ export function Warehouse3DViewer({
           </PanelSection>
         )}
 
-        <PanelSection padding="sm">
+        <PanelSection padding="sm" className="space-y-2">
           <Button variant="secondary" size="sm" className="w-full" onClick={resetarCamera}>
             Resetar câmera
           </Button>
+          <Button variant="ghost" size="sm" className="w-full" onClick={() => setAjustando(true)}>
+            Ajustar estrutura
+          </Button>
         </PanelSection>
       </Panel>
+
+      <AjusteDeEstrutura
+        aberto={ajustando}
+        onFechar={() => setAjustando(false)}
+        layout={layout}
+        ruas={ruas}
+        onMudar={trocarLayout}
+      />
 
       {selecionada && (
         <PainelDetalhe

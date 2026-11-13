@@ -42,26 +42,60 @@ export interface MatchOutcome {
    *  caller must not auto-link an ambiguous match — it becomes a manual review
    *  row instead, because guessing here silently merges two products. */
   ambiguous: boolean;
+  /** Presente só quando o vínculo existe mas o SKU do registro MUDOU desde a
+   *  última importação. Não associa e não desfaz: vai para revisão humana.
+   *  Ausente no caso normal, de propósito — quem compara o resultado inteiro
+   *  não precisa declarar um campo que só existe na exceção. */
+  skuChanged?: true;
 }
 
 /** Resolve a provider record to an internal row.
  *
  *  Precedence is deliberate and strict:
  *    1. an existing link for this external id — the only truly stable key, and
- *       the reason re-running a sync is a no-op instead of a duplicate;
+ *       the reason re-running a sync is a no-op instead of a duplicate. Com UMA
+ *       ressalva, aprendida em produção: se o SKU gravado no vínculo não é mais
+ *       o SKU que o registro traz, a identidade deixou de estar resolvida. O ERP
+ *       permite reaproveitar e corrigir SKU de um registro existente, e o
+ *       vínculo, amarrado ao id do ERP, continuava apontando para o produto
+ *       antigo — saldo de um produto entrando em outro, calado, em toda
+ *       importação seguinte. Nesses casos não associa nem desfaz: sinaliza;
  *    2. SKU, which the customer controls and usually maintains;
  *    3. EAN, which identifies a product but not necessarily *this seller's* row
  *       (two internal rows can legitimately share an EAN).
  *  Names are never used. */
 export function resolveMatch(
   normalized: NormalizedRef,
-  existingLinks: Pick<EntityLink, 'externalId' | 'internalId'>[],
+  existingLinks: (Pick<EntityLink, 'externalId' | 'internalId'> & { externalSku?: string | null })[],
   candidates: MatchCandidate[]
 ): MatchOutcome {
   const linked = existingLinks.find(
     link => link.externalId === normalized.externalId && link.internalId != null
   );
   if (linked?.internalId) {
+    // Só é divergência quando os DOIS lados têm SKU. Vínculo antigo sem SKU
+    // gravado, ou registro que chega sem SKU, não é prova de troca — e tratar
+    // ausência como mudança mandaria para revisão quem está correto.
+    const skuDoRegistro = normalizeSku(normalized.sku);
+
+    if (skuDoRegistro != null) {
+      // A comparação é contra o SKU GRAVADO NO VÍNCULO, não contra o SKU do
+      // produto associado. Comparar com o produto parece mais forte e é pior:
+      // um vínculo feito por EAN pode ter, legitimamente e para sempre, SKU
+      // interno diferente do SKU do ERP. Esse vínculo cairia em revisão em TODA
+      // importação, e o produto nunca mais receberia saldo — uma regra que
+      // protege de um erro raro causando um erro permanente é pior que o erro.
+      //
+      // O preço disso: vínculo que já estava torto ANTES desta regra não é
+      // detectado aqui, porque a importação seguinte já reescreveu o SKU do
+      // vínculo com o valor novo. Esse é um passivo de dados, de conferência
+      // única, e não um caso que a importação deva decidir sozinha.
+      const skuDoVinculo = normalizeSku(linked.externalSku);
+      if (skuDoVinculo != null && skuDoVinculo !== skuDoRegistro) {
+        return { internalId: null, source: 'external_id', ambiguous: false, skuChanged: true };
+      }
+
+    }
     return { internalId: linked.internalId, source: 'external_id', ambiguous: false };
   }
 

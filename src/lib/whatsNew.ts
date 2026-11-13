@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-13-congelar-produto-sem-fonte',
+    date: '2026-11-13',
+    category: 'novidade',
+    title: 'Congelar produto que sumiu da fonte de saldo',
+    description: 'Produto que sumiu da fonte de saldo do Tiny continuava sendo impresso na folha de contagem com o saldo em branco, e o operador lia isso como “conte e escreva aqui” em vez de “este produto não existe mais”. Agora, na tela Fonte de Saldo, o InventoryBlind mostra quais produtos deixaram de vir na última importação e permite congelá-los. Produto congelado sai das folhas de contagem, da fila de recontagem e da lista de risco, mantendo todo o histórico — e descongelar devolve ele ao fluxo normal a qualquer momento. Nada é congelado automaticamente: a lista vem sem nada marcado e você escolhe item por item. Os números de inventários já fechados não mudam; congelar vale daqui para frente. A mesma tela também lista, em separado, os produtos que nunca foram encontrados na fonte — esses não têm sugestão de congelamento, porque não dá para saber se saíram do ERP ou se nunca estiveram lá.',
+  },
+  {
+    id: '2026-11-13-sku-trocado-vai-para-revisao',
+    date: '2026-11-13',
+    category: 'correcao',
+    title: 'Produto que muda de SKU no Tiny não entrega mais o saldo ao produto errado',
+    description: 'Quando um produto tem o SKU alterado no Tiny, o saldo dele podia passar a ser gravado em outro produto do InventoryBlind — o vínculo era feito pelo código interno do Tiny e não reconferia o SKU. Agora, se um registro chega com SKU diferente do que tinha antes, a importação segura esse saldo e mostra o item na tela de Fonte de Saldo, com o novo contador “SKU trocado” e a lista dos SKUs envolvidos. Nada é associado nem desassociado por conta própria: você confere no Tiny se ainda é o mesmo produto e decide. Importações em que nenhum SKU mudou continuam exatamente como antes.',
+  },
+  {
     id: '2026-11-13-assistente-e-tabela-mesma-regua',
     date: '2026-11-13',
     category: 'correcao',

@@ -227,8 +227,11 @@ export async function recomputeRiskForProducts(
 export async function recomputeAllRiskForCompany(companyId: string, userId: string, userEmail: string): Promise<RecomputeSummary> {
   // Paginado: sem `.range()` vinham 1.000 dos 4.628 produtos, sem erro, e o
   // recálculo GRAVAVA só esses — daí `product_risk_scores` ter exatamente 1.000.
+  // Congelado fica de fora do recálculo: pontuar risco de produto que saiu de
+  // circulação gasta cálculo e, pior, disputa as primeiras posições da lista com
+  // produto que ainda está em uso. O score anterior dele não é apagado.
   const { rows, error } = await fetchAllPages<{ id: string }>('Risk/products', (from, to) =>
-    supabase.from('products').select('id').eq('company_id', companyId).order('id').range(from, to));
+    supabase.from('products').select('id').eq('company_id', companyId).is('frozen_at', null).order('id').range(from, to));
   if (error) { console.error('[Risk] Error loading products for full recompute:', error); return { updated: 0, insufficient: 0 }; }
   return recomputeRiskForProducts(rows.map(p => p.id), companyId, userId, userEmail);
 }
@@ -309,8 +312,11 @@ export async function listByTab(
 ): Promise<RiskListResult> {
   let query = supabase
     .from('product_risk_scores')
-    .select('*, products!inner(name, sku, location)', { count: 'exact' })
-    .eq('company_id', companyId);
+    .select('*, products!inner(name, sku, location, frozen_at)', { count: 'exact' })
+    .eq('company_id', companyId)
+    // O score de quem foi congelado continua gravado; o que ele não faz mais é
+    // aparecer na lista. Descongelar devolve o produto sem recalcular nada.
+    .is('products.frozen_at', null);
 
   if (tab === 'critical') query = query.eq('risk_level', 'critico');
   if (tab === 'high') query = query.eq('risk_level', 'alto');

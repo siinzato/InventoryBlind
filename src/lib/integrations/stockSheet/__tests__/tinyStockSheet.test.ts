@@ -13,7 +13,7 @@ import {
   normalizeHeader,
   parseTinyStockSheetGrid,
 } from '../tinyStockSheetContract';
-import { planStockSheetImport } from '../tinyStockSheetPlan';
+import { planStockSheetImport, decisionsWithBalance } from '../tinyStockSheetPlan';
 import type { TinyStockSheetRecord } from '../tinyStockSheetContract';
 import type { EntityLink } from '../../types';
 import type { MatchCandidate } from '../../matching';
@@ -440,7 +440,9 @@ describe('associação — regra canônica do domínio de integrações', () => 
     expect(plan.decisions.map(d => d.outcome)).toEqual(['ambiguous', 'ambiguous']);
   });
 
-  it('link existente pelo ID do Tiny vence, mesmo se o SKU mudou na fonte', () => {
+  it('link existente pelo ID do Tiny vence quando o vínculo não guarda SKU', () => {
+    // Sem SKU gravado no vínculo não há como provar troca, e presumir troca
+    // mandaria para revisão todo vínculo antigo do banco.
     const plan = planStockSheetImport({
       records: parsed([['1', 'Capa', 'SKU-RENOMEADO', '', '', '5']]),
       existingLinks: new Map([['1', link({ externalId: '1', internalId: 'p2' })]]),
@@ -449,6 +451,52 @@ describe('associação — regra canônica do domínio de integrações', () => 
     expect(plan.decisions[0].internalId).toBe('p2');
     expect(plan.decisions[0].matchSource).toBe('external_id');
     expect(plan.decisions[0].isNewLink).toBe(false);
+  });
+
+  it('SKU trocado no registro vai para revisão em vez de alimentar o produto antigo', () => {
+    const plan = planStockSheetImport({
+      records: parsed([['1', 'Capa', 'SKU-NOVO', '', '', '5']]),
+      existingLinks: new Map([
+        ['1', link({ externalId: '1', internalId: 'p2', externalSku: 'SKU-ANTIGO' })],
+      ]),
+      candidates,
+    });
+    expect(plan.decisions[0].outcome).toBe('sku-changed');
+    expect(plan.decisions[0].internalId).toBeNull();
+    expect(plan.counters.skuChanged).toBe(1);
+    expect(plan.counters.linked).toBe(0);
+  });
+
+  it('o registro segurado NÃO entra no snapshot — senão o vínculo seria zerado', () => {
+    // decisionsWithBalance alimenta o upsert dos vínculos com `internalId`.
+    // Uma decisão de SKU trocado tem internalId nulo: se entrasse aqui, a
+    // importação apagaria a associação existente em vez de preservá-la.
+    const plan = planStockSheetImport({
+      records: parsed([
+        ['1', 'Capa', 'SKU-NOVO', '', '', '5'],
+        ['2', 'Outra', 'CCAZ-1', '', '', '7'],
+      ]),
+      existingLinks: new Map([
+        ['1', link({ externalId: '1', internalId: 'p2', externalSku: 'SKU-ANTIGO' })],
+      ]),
+      candidates,
+    });
+    const comSaldo = decisionsWithBalance(plan.decisions);
+    expect(comSaldo.map(d => d.record.externalId)).toEqual(['2']);
+    expect(comSaldo.some(d => d.internalId === null)).toBe(false);
+  });
+
+  it('SKU inalterado continua associando normalmente', () => {
+    const plan = planStockSheetImport({
+      records: parsed([['1', 'Capa', 'CCAZ-1', '', '', '5']]),
+      existingLinks: new Map([
+        ['1', link({ externalId: '1', internalId: 'p2', externalSku: 'CCAZ-1' })],
+      ]),
+      candidates,
+    });
+    expect(plan.decisions[0].outcome).toBe('linked');
+    expect(plan.decisions[0].internalId).toBe('p2');
+    expect(plan.counters.skuChanged).toBe(0);
   });
 
   it('linha sem saldo não entra no snapshot e linha recusada conta como falha', () => {

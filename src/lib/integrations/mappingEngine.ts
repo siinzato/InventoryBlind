@@ -99,6 +99,9 @@ export interface Resolution {
   ambiguous: boolean;
   /** No link row existed for this external id yet. */
   isNew: boolean;
+  /** O vínculo existe, mas o SKU do registro mudou: vai para revisão em vez
+   *  de continuar alimentando o produto associado antes da troca. */
+  skuChanged: boolean;
 }
 
 /** Resolve one record. Pure apart from reading the pre-loaded index. */
@@ -107,7 +110,14 @@ export function resolve(input: ResolutionInput): Resolution {
 
   const outcome = resolveMatch(
     input.normalized,
-    existing ? [{ externalId: existing.externalId, internalId: existing.internalId }] : [],
+    existing
+      ? [{
+          externalId: existing.externalId,
+          internalId: existing.internalId,
+          // Sem isto a troca de SKU no ERP passa despercebida — era o defeito.
+          externalSku: existing.externalSku,
+        }]
+      : [],
     input.candidates
   );
 
@@ -117,6 +127,7 @@ export function resolve(input: ResolutionInput): Resolution {
     matchSource: outcome.source,
     ambiguous: outcome.ambiguous,
     isNew: existing == null,
+    skuChanged: outcome.skuChanged === true,
   };
 }
 

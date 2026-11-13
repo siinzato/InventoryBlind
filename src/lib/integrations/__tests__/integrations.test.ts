@@ -54,11 +54,67 @@ describe('resolveMatch', () => {
   ];
 
   it('prefers an existing external-id link over any other signal', () => {
-    // This is what makes a re-run idempotent: even when SKU changed on the
-    // provider side, the established link still wins.
+    // This is what makes a re-run idempotent. O vínculo não guarda SKU, então
+    // não há como saber se houve troca: a associação estabelecida vale.
     const outcome = resolveMatch(
       { externalId: 'ext-9', sku: 'ABC-2' },
       [{ externalId: 'ext-9', internalId: 'p1' }],
+      candidates
+    );
+    expect(outcome).toEqual({ internalId: 'p1', source: 'external_id', ambiguous: false });
+  });
+
+  it('o vínculo continua valendo quando o SKU gravado bate com o que chegou', () => {
+    const outcome = resolveMatch(
+      { externalId: 'ext-9', sku: 'abc-1' },
+      [{ externalId: 'ext-9', internalId: 'p1', externalSku: 'ABC-1' }],
+      candidates
+    );
+    expect(outcome).toEqual({ internalId: 'p1', source: 'external_id', ambiguous: false });
+  });
+
+  it('SKU trocado no ERP vai para revisão em vez de alimentar o produto antigo', () => {
+    // O caso real: no Tiny, o registro que era GCGCM110 passou a trazer o SKU
+    // GCGCM116. O vínculo, amarrado ao id do ERP, seguia apontando para
+    // GCGCM110, e o saldo de um produto entrava no outro — 11 vínculos assim,
+    // 3 deles roubando saldo de produto que existe no catálogo.
+    const outcome = resolveMatch(
+      { externalId: 'ext-9', sku: 'ABC-2' },
+      [{ externalId: 'ext-9', internalId: 'p1', externalSku: 'ABC-1' }],
+      candidates
+    );
+    expect(outcome).toEqual({
+      internalId: null,
+      source: 'external_id',
+      ambiguous: false,
+      skuChanged: true,
+    });
+  });
+
+  it('não associa ao produto do SKU novo por conta própria — quem decide é uma pessoa', () => {
+    // ABC-2 existe entre os candidatos (p2). Mesmo assim o resultado é nulo:
+    // reapontar sozinho seria trocar a identidade de um produto sem ninguém ver.
+    const outcome = resolveMatch(
+      { externalId: 'ext-9', sku: 'ABC-2' },
+      [{ externalId: 'ext-9', internalId: 'p1', externalSku: 'ABC-1' }],
+      candidates
+    );
+    expect(outcome.internalId).toBeNull();
+  });
+
+  it('registro que chega sem SKU não conta como troca', () => {
+    const outcome = resolveMatch(
+      { externalId: 'ext-9', sku: null },
+      [{ externalId: 'ext-9', internalId: 'p1', externalSku: 'ABC-1' }],
+      candidates
+    );
+    expect(outcome).toEqual({ internalId: 'p1', source: 'external_id', ambiguous: false });
+  });
+
+  it('diferença só de caixa ou espaço NÃO é troca de SKU', () => {
+    const outcome = resolveMatch(
+      { externalId: 'ext-9', sku: '  abc-1 ' },
+      [{ externalId: 'ext-9', internalId: 'p1', externalSku: 'ABC-1' }],
       candidates
     );
     expect(outcome).toEqual({ internalId: 'p1', source: 'external_id', ambiguous: false });

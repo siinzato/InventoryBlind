@@ -58,6 +58,7 @@ import {
   readTinyStockSheet,
 } from '../../lib/integrations/stockSheet/stockSheetSourceService';
 import type { StockSheetImportResult } from '../../lib/integrations/stockSheet/stockSheetSourceService';
+import { ProductFreezePanel } from '../productFreeze/ProductFreezePanel';
 import { plural } from '../../lib/formatPtBr';
 
 const SAMPLE_LIMIT = 8;
@@ -505,12 +506,51 @@ export function BalanceSourcePage({ onBack }: { onBack: () => void }) {
                   </StatCell>
                   <StatCell>
                     <Stat
+                      label="SKU trocado"
+                      value={result.counters.skuChanged.toLocaleString('pt-BR')}
+                      context="aguardando revisão"
+                      valueTone={result.counters.skuChanged > 0 ? 'warning' : 'default'}
+                    />
+                  </StatCell>
+                  <StatCell>
+                    <Stat
                       label="Ignoradas / recusadas"
                       value={`${result.counters.skipped.toLocaleString('pt-BR')} / ${result.counters.failed.toLocaleString('pt-BR')}`}
                       context="sem saldo / erro de leitura"
                     />
                   </StatCell>
                 </StatRow>
+                {result.counters.skuChanged > 0 && (
+                  <div className="mt-5 border-t border-edge pt-4">
+                    <p className="text-sm font-medium text-fg">
+                      {result.counters.skuChanged === 1
+                        ? '1 registro chegou com outro SKU'
+                        : `${result.counters.skuChanged.toLocaleString('pt-BR')} registros chegaram com outro SKU`}
+                    </p>
+                    <p className="mt-1 text-xs text-fg-subtle">
+                      Estes registros já estavam associados a um produto, e desta vez vieram com um
+                      SKU diferente do anterior. O saldo deles não foi gravado: continuar gravando
+                      colocaria o saldo de um produto dentro de outro. A associação que existia não
+                      foi desfeita — confira no Tiny se ainda é o mesmo produto.
+                    </p>
+                    <ul className="mt-3 space-y-1">
+                      {result.decisions
+                        .filter(d => d.outcome === 'sku-changed')
+                        .slice(0, 20)
+                        .map(d => (
+                          <li key={d.record.externalId} className="text-xs text-fg-muted">
+                            <span className="font-mono">{d.record.sku || '—'}</span>
+                            {d.record.name ? ` · ${d.record.name}` : ''}
+                          </li>
+                        ))}
+                    </ul>
+                    {result.counters.skuChanged > 20 && (
+                      <p className="mt-2 text-xs text-fg-subtle">
+                        Mostrando os 20 primeiros de {result.counters.skuChanged.toLocaleString('pt-BR')}.
+                      </p>
+                    )}
+                  </div>
+                )}
                 <p className="mt-4 text-xs text-fg-subtle">
                   O saldo ficou registrado nesta fonte. O cadastro dos produtos, o estoque do
                   InventoryBlind, as contagens e as movimentações não foram alterados.
@@ -518,6 +558,11 @@ export function BalanceSourcePage({ onBack }: { onBack: () => void }) {
               </PanelSection>
             </Panel>
           )}
+
+          {/* Reconciliação com o catálogo: o que a fonte deixou de trazer. Fica
+              aqui, e não numa tela própria, porque a pergunta "este produto ainda
+              existe?" só faz sentido ao lado da importação que a levantou. */}
+          {source && <ProductFreezePanel connectionId={source.id} onChanged={() => void load()} />}
 
           {source && runs.length > 0 && (
             <Panel>

@@ -288,8 +288,10 @@ export async function recomputeAllForCompany(companyId: string, userId: string, 
     // Paginado: sem `.range()` esta leitura voltava 1.000 dos 4.628 produtos sem
     // erro nenhum, e o recálculo GRAVAVA só esses — por isso
     // `product_confidence_scores` tinha exatamente 1.000 linhas.
+    // Congelado fica fora do recálculo e, portanto, do reagendamento: produto
+    // que saiu de circulação não deve voltar sozinho para a fila de contagem.
     const { rows, error } = await fetchAllPages<{ id: string }>('CBC/products', (from, to) =>
-      supabase.from('products').select('id').eq('company_id', companyId).order('id').range(from, to));
+      supabase.from('products').select('id').eq('company_id', companyId).is('frozen_at', null).order('id').range(from, to));
     if (error) { console.error('[CBC] Error loading products for full recompute:', error); return { updated: 0, insufficient: 0 }; }
     return await recomputeForProducts(rows.map(p => p.id), companyId, userId, userEmail);
   } finally {
@@ -378,8 +380,11 @@ export async function listByTab(
 ): Promise<CBCListResult> {
   let query = supabase
     .from('product_confidence_scores')
-    .select('*, products!inner(name, sku, location)', { count: 'exact' })
-    .eq('company_id', companyId);
+    .select('*, products!inner(name, sku, location, frozen_at)', { count: 'exact' })
+    .eq('company_id', companyId)
+    // Mesma postura do risco: a nota continua gravada, o produto é que sai da
+    // fila enquanto estiver congelado.
+    .is('products.frozen_at', null);
 
   const today = new Date().toISOString().slice(0, 10);
 

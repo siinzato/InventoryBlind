@@ -55,6 +55,10 @@ export async function loadReportProducts(companyId: string): Promise<LoadProduct
       .from('products')
       .select('id, name, sku, ean, location, product_brand_associations(brand_id, line_id)')
       .eq('company_id', companyId)
+      // Produto congelado não vai para a folha: a célula de saldo em branco é
+      // lida pelo operador como "conte e escreva aqui", e mandar alguém procurar
+      // no armazém algo que saiu da fonte é fazer trabalho que não produz dado.
+      .is('frozen_at', null)
       .order('id', { ascending: true })
       .range(from, from + PAGE_SIZE - 1);
     if (error) throw error;

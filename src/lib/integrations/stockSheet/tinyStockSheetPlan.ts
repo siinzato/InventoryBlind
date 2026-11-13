@@ -21,6 +21,8 @@ export type StockSheetOutcome =
   | 'unlinked'
   /** Mais de um candidato empatou (ou a chave se repete no arquivo): nunca associa. */
   | 'ambiguous'
+  /** O vínculo existe, mas o registro chegou com OUTRO SKU: vai para revisão. */
+  | 'sku-changed'
   /** Sem saldo na planilha — nada a gravar como saldo. */
   | 'skipped'
   /** Linha recusada na leitura (sem ID, ID repetido, saldo inválido). */
@@ -51,6 +53,8 @@ export interface StockSheetCounters {
   linked: number;
   unlinked: number;
   ambiguous: number;
+  /** Registros segurados porque o SKU mudou desde a última importação. */
+  skuChanged: number;
 }
 
 export interface StockSheetPlan {
@@ -108,6 +112,7 @@ export function planStockSheetImport({
     linked: 0,
     unlinked: 0,
     ambiguous: 0,
+    skuChanged: 0,
   };
 
   for (const record of records) {
@@ -146,9 +151,32 @@ export function planStockSheetImport({
         ean: blockedByEan ? null : record.ean,
         name: record.name,
       },
-      existing ? [{ externalId: existing.externalId, internalId: existing.internalId }] : [],
+      existing
+        ? [{
+            externalId: existing.externalId,
+            internalId: existing.internalId,
+            externalSku: existing.externalSku,
+          }]
+        : [],
       candidates
     );
+
+    // Antes de qualquer associação: o registro mudou de SKU desde a última
+    // importação. Não associa (continuaria alimentando o produto errado) e não
+    // desfaz o vínculo (destruir associação por conta própria é pior). Segura
+    // o registro fora do snapshot e devolve a decisão para uma pessoa.
+    if (outcome.skuChanged) {
+      counters.skuChanged += 1;
+      decisions.push({
+        record,
+        outcome: 'sku-changed',
+        internalId: null,
+        matchSource: null,
+        isNewLink,
+        reason: 'o SKU deste registro mudou desde a última importação',
+      });
+      continue;
+    }
 
     if (outcome.internalId != null) {
       counters.linked += 1;
@@ -192,11 +220,19 @@ export function planStockSheetImport({
   return { decisions, counters };
 }
 
-/** As decisões que produzem saldo no snapshot da fonte. */
+/** As decisões que produzem saldo no snapshot da fonte.
+ *
+ *  `sku-changed` fica DE FORA, e o motivo é mais forte que "não gravar saldo":
+ *  quem chama isto usa a lista para o upsert dos vínculos, com
+ *  `internalId: decision.internalId`. Como a decisão de SKU trocado tem
+ *  `internalId` nulo, deixá-la entrar aqui sobrescreveria o vínculo existente
+ *  com NULL — apagando, em nome de uma revisão, a associação que se queria
+ *  justamente preservar até alguém decidir. */
 export function decisionsWithBalance(decisions: StockSheetDecision[]): StockSheetDecision[] {
   return decisions.filter(
     decision =>
       decision.record.issue === null &&
+      decision.outcome !== 'sku-changed' &&
       decision.record.quantity !== null &&
       decision.record.externalId !== ''
   );

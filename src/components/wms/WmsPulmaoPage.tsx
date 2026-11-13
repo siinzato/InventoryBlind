@@ -10,10 +10,10 @@
 // O que ela NÃO faz: não encosta no vão de PICKING das capas. `products.location` e o
 // campo de local do Tiny continuam sendo daquele fluxo e não são lidos nem escritos aqui.
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Plus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
+import { BarChart3, Boxes, ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Plus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
 import {
-  Badge, Button, Input, Notice, Page, PageHeader, Panel, PanelSection,
+  Badge, BrandLoader, Button, Input, Notice, Page, PageHeader, Panel, PanelSection,
   SegmentedControl, Select, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
   type SegmentedOption,
 } from '../ui';
@@ -28,16 +28,24 @@ import { WmsBinOperations } from './WmsBinOperations';
 import { WmsAnalytics } from './WmsAnalytics';
 import { WmsStockInsights } from './WmsStockInsights';
 import { WmsStorageMap } from './WmsStorageMap';
+
+// Sob demanda: o visualizador 3D arrasta three/fiber/drei junto. Importado de forma
+// estatica, esse peso entraria no pacote de QUEM NUNCA abre a secao 3D — inclusive do
+// operador no corredor, com sinal ruim. Carregado so quando a secao e aberta.
+const Warehouse3DViewer = lazy(() =>
+  import('./Warehouse3DViewer').then(m => ({ default: m.Warehouse3DViewer })),
+);
 import { plural } from '../../lib/formatPtBr';
 import {
   boxesByBin, buildBinCodes, createBins, deleteBins, listBins, listMovements, setBinBlocked,
   type BinMovement, type BinStreetSpec, type StorageBin,
 } from '../../lib/wms/wmsService';
 
-type Mode = 'mapa' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos' | 'gestao';
+type Mode = 'mapa' | 'mapa3d' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos' | 'gestao';
 
 const MODES: SegmentedOption<Mode>[] = [
   { value: 'mapa', label: 'Mapa', icon: LayoutGrid },
+  { value: 'mapa3d', label: 'Mapa 3D', icon: Boxes },
   { value: 'movimentar', label: 'Movimentar', icon: PackagePlus },
   { value: 'enderecos', label: 'Endereços', icon: Warehouse },
   { value: 'consulta', label: 'Consultar SKU', icon: Search },
@@ -441,6 +449,21 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
         />
       )}
 
+      {mode === 'mapa3d' && (
+        // Altura explicita: o Canvas colapsa em zero dentro de um pai sem altura, e
+        // esta pagina empilha cabecalho e seletor de secao acima dele.
+        <div className="h-[calc(100vh-18rem)] min-h-[26rem]">
+          <Suspense fallback={<div className="flex h-full items-center justify-center rounded-container bg-surface-2"><BrandLoader label="Abrindo o mapa 3D" /></div>}>
+            <Warehouse3DViewer
+              onSelectSlot={slot => setOperateBin(slot.id)}
+              // Leva a vaga escolhida no 3D para a secao que de fato movimenta — o mesmo
+              // atalho que o mapa 2D ja oferece em onOperate.
+              onOperate={slot => { setOperateBin(slot.id); setMode('movimentar'); }}
+            />
+          </Suspense>
+        </div>
+      )}
+
       {mode === 'movimentar' && (
         <WmsBinOperations bins={bins} initialBinCode={operateBin || scannedBin} onMoved={load} />
       )}
@@ -746,7 +769,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                       const boxes = occupancy.get(bin.code) ?? 0;
                       return (
                         <Tr key={bin.id}>
-                          <Td className="font-medium text-fg">{bin.code}</Td>
+                          <Td className="text-code font-medium text-fg">{bin.code}</Td>
                           <Td className="text-center text-numeric">{boxes}</Td>
                           <Td className="text-center text-numeric">{bin.capacityBoxes ?? '—'}</Td>
                           <Td className="text-center">
@@ -820,9 +843,9 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
                     <Tr key={m.id}>
                       <Td className="text-caption">{formatDate(m.createdAt)}</Td>
                       <Td>{MOVEMENT_LABEL[m.movementType]}</Td>
-                      <Td className="text-numeric">{m.sku ?? '—'}</Td>
-                      <Td>{m.fromCode ?? '—'}</Td>
-                      <Td>{m.toCode ?? '—'}</Td>
+                      <Td className="text-code">{m.sku ?? '—'}</Td>
+                      <Td className="text-code">{m.fromCode ?? '—'}</Td>
+                      <Td className="text-code">{m.toCode ?? '—'}</Td>
                       <Td className="text-center text-numeric">{m.boxes}</Td>
                       <Td className="text-caption">{m.reason ?? '—'}</Td>
                     </Tr>

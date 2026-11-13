@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-13-mapa-3d-do-pulmao',
+    date: '2026-11-13',
+    category: 'novidade',
+    title: 'Mapa 3D do Pulmão',
+    description: 'O Pulmão ganhou uma nova seção, Mapa 3D, ao lado do Mapa. Ela mostra o porta-pallets em volume: dá para girar, aproximar e ver de uma vez só quanta altura está ocupada, quais corredores estão vazios e onde as vagas bloqueadas estão. Passando o mouse a vaga se destaca; clicando, abre um painel com o código do endereço, quantas caixas tem, quais produtos estão guardados ali e um atalho para movimentar aquela vaga. Dá para colorir por situação ou por ocupação, filtrar por rua e deixar em destaque só o que pede atenção — as demais vagas continuam desenhadas em tom apagado, para o armazém não perder a forma.',
+  },
+  {
+    id: '2026-11-13-pulmao-codigos-em-fonte-tecnica',
+    date: '2026-11-13',
+    category: 'melhoria',
+    title: 'Endereço de vaga e SKU no Pulmão ficam mais fáceis de ler',
+    description: 'No Pulmão, endereço de vaga, SKU e EAN passam a aparecer em fonte técnica de largura fixa. Esses códigos são lidos caractere a caractere por quem está no corredor, e na fonte anterior o zero e a letra O, o um e a letra L minuscula ficavam parecidos demais. Agora cada caractere ocupa a mesma largura, o que separa esses pares e faz as colunas alinharem na vertical — dá para descer a lista sem perder a referência. As quantidades continuam na fonte de sempre. Nenhum dado mudou, só a leitura.',
+  },
+  {
     id: '2026-11-13-congelar-produto-sem-fonte',
     date: '2026-11-13',
     category: 'novidade',

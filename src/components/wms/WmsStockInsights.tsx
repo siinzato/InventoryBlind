@@ -219,10 +219,10 @@ function SkuRows({
             {aberto ? <ChevronDown size={16} /> : <ChevronRight size={16} />}
           </button>
         </Td>
-        <Td className="text-numeric">{resumo.sku}</Td>
+        <Td className="text-code">{resumo.sku}</Td>
         <Td>
           {resumo.productName}
-          {resumo.ean && <span className="block text-caption text-numeric">{resumo.ean}</span>}
+          {resumo.ean && <span className="block text-caption text-code">{resumo.ean}</span>}
         </Td>
         <Td className="text-center text-numeric">
           {resumo.totalBoxes}
@@ -260,7 +260,7 @@ function SkuRows({
                 {resumo.topConcentration && resumo.binCount > 1 && (
                   <span>
                     Maior concentração:{' '}
-                    <strong>{resumo.topConcentration.binCode}</strong>
+                    <strong className="text-code">{resumo.topConcentration.binCode}</strong>
                     {' '}({Math.round(resumo.topConcentration.share * 100)}% das caixas)
                   </span>
                 )}
@@ -288,7 +288,7 @@ function SkuRows({
                   <tbody>
                     {resumo.placements.map(p => (
                       <Tr key={p.binId}>
-                        <Td className="font-medium text-fg">
+                        <Td className="text-code font-medium text-fg">
                           {p.binCode}
                           {p.binBlocked && (
                             <Lock size={12} className="inline ml-1.5 text-amber-600 dark:text-amber-400" />

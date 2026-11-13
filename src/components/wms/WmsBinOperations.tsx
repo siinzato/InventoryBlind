@@ -283,7 +283,7 @@ export function WmsBinOperations({
           )}
           {bin && (
             <div className="mt-2 flex flex-wrap items-center gap-2">
-              <Badge variant={bin.blocked ? 'warning' : 'accent'}>{bin.code}</Badge>
+              <Badge variant={bin.blocked ? 'warning' : 'accent'}><span className="text-code">{bin.code}</span></Badge>
               <span className="text-caption">
                 {bin.blocked ? 'Endereço bloqueado' : 'Endereço reconhecido'}
                 {bin.capacityBoxes !== null && ` · capacidade ${bin.capacityBoxes} cx`}
@@ -327,7 +327,7 @@ export function WmsBinOperations({
                 ) : (
                   contents.map(row => (
                     <Tr key={row.productId}>
-                      <Td className="text-numeric">{row.sku}</Td>
+                      <Td className="text-code">{row.sku}</Td>
                       <Td>{row.productName}</Td>
                       <Td className="text-center text-numeric">{row.boxes}</Td>
                       <Td className="text-center text-numeric">{row.units}</Td>
@@ -375,7 +375,7 @@ export function WmsBinOperations({
                         onClick={() => { setChosen(opt); setTerm(`${opt.sku} — ${opt.name}`); setOptions([]); }}
                         className="w-full text-left px-3 py-2 hover:bg-surface-3 transition-colors"
                       >
-                        <span className="text-numeric text-sm text-fg">{opt.sku}</span>
+                        <span className="text-code text-sm text-fg">{opt.sku}</span>
                         <span className="text-sm text-fg-muted"> · {opt.name}</span>
                       </button>
                     ))}
@@ -457,7 +457,7 @@ export function WmsBinOperations({
                     )}
                     {destBin && !destRejection && (
                       <div className="mt-2 flex flex-wrap items-center gap-2">
-                        <Badge variant="accent">{destBin.code}</Badge>
+                        <Badge variant="accent"><span className="text-code">{destBin.code}</span></Badge>
                         <span className="text-caption">
                           Destino reconhecido
                           {destBin.capacityBoxes !== null && ` · capacidade ${destBin.capacityBoxes} cx`}
@@ -514,7 +514,7 @@ export function WmsBinOperations({
                         }`}
                       >
                         <span className="flex flex-wrap items-center gap-2">
-                          <span className="font-semibold text-fg">{s.bin.code}</span>
+                          <span className="text-code font-semibold text-fg">{s.bin.code}</span>
                           {s.consolidates && <Badge variant="success">Consolida</Badge>}
                           {atual && <Badge variant="accent">Atual</Badge>}
                         </span>

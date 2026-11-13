@@ -195,6 +195,14 @@ html, body {
      stays reserved for SKU/EAN/IDs/code (a <code> element still gets it from
      Tailwind preflight). */
   .text-numeric  { @apply tabular-nums; }
+  /* Identificador tecnico: SKU, EAN, codigo de vaga, ID, hash. O comentario
+     acima reserva mono exatamente para isto, mas a classe nunca existiu — e
+     sem ela o WMS ficou com ZERO font-mono em 22 arquivos. Nao e preciosismo
+     tipografico: endereco de vaga e SKU sao lidos caractere a caractere por
+     quem esta no corredor, e em fonte proporcional 0/O e 1/l ficam ambiguos e
+     a coluna nao alinha na vertical. Quantidade continua em .text-numeric: a
+     face de UI com tabular-nums mantem o registro do resto do app. */
+  .text-code     { @apply font-mono tabular-nums; }
 }
 
 /* Proper scroll containers */

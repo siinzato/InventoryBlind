@@ -292,7 +292,7 @@ export function WmsStorageMap({
                             ${dim ? 'opacity-25' : ''}
                             ${selected?.id === bin.id ? 'ring-2 ring-accent ring-offset-1 ring-offset-surface-2' : ''}`}
                         >
-                          <span className="block text-[11px] font-semibold text-numeric leading-tight">{module}</span>
+                          <span className="block text-[11px] font-semibold text-code leading-tight">{module}</span>
                           <span className="block text-caption leading-tight mt-0.5">
                             {st === 'bloqueado'
                               ? <Lock size={11} className="inline" />
@@ -339,7 +339,7 @@ export function WmsStorageMap({
                     onClick={() => setSelected(bin)}
                     className={`rounded-container border px-2.5 py-1.5 text-xs transition-colors ${CELL_STYLE[statusOf(bin, boxes)]}`}
                   >
-                    {bin.code}
+                    <span className="text-code">{bin.code}</span>
                   </button>
                 );
               })}
@@ -353,7 +353,7 @@ export function WmsStorageMap({
           <PanelSection padding="sm" className="flex flex-wrap items-center justify-between gap-3">
             <div className="min-w-0">
               <div className="flex items-center gap-2">
-                <h3 className="text-title">{selected.code}</h3>
+                <h3 className="text-title text-code">{selected.code}</h3>
                 <Badge variant={STATUS_BADGE[selectedStatus]}>{STATUS_LABEL[selectedStatus]}</Badge>
               </div>
               {/* Endereço decomposto: o código é compacto para caber na célula, mas na
@@ -443,7 +443,7 @@ export function WmsStorageMap({
                 {contents.map(row => (
                   <li key={row.productId} className="py-2 flex items-baseline justify-between gap-3">
                     <span className="min-w-0">
-                      <span className="text-numeric text-sm text-fg">{row.sku}</span>
+                      <span className="text-code text-sm text-fg">{row.sku}</span>
                       <span className="text-sm text-fg-muted"> · {row.productName}</span>
                     </span>
                     <span className="text-sm text-fg-muted shrink-0 text-numeric">

@@ -327,7 +327,7 @@ export function WmsAnalytics({ bins }: { bins: StorageBin[] }) {
               <tbody>
                 {maiores.map(s => (
                   <Tr key={s.productId}>
-                    <Td className="text-numeric">{s.sku}</Td>
+                    <Td className="text-code">{s.sku}</Td>
                     <Td>{s.productName}</Td>
                     <Td className="text-center text-numeric">{s.boxes}</Td>
                     <Td className="text-center text-numeric">{s.bins}</Td>
@@ -345,7 +345,7 @@ export function WmsAnalytics({ bins }: { bins: StorageBin[] }) {
             <div className="mt-2 flex flex-wrap gap-2">
               {antigos.slice(0, 10).map(r => (
                 <Badge key={`${r.binCode}-${r.sku}`} variant={r.bucket === '30+' ? 'warning' : 'neutral'}>
-                  {r.binCode} · {r.sku} · {r.days}d
+                  <span className="text-code">{r.binCode}</span> · <span className="text-code">{r.sku}</span> · {r.days}d
                 </Badge>
               ))}
             </div>
@@ -388,9 +388,9 @@ export function WmsAnalytics({ bins }: { bins: StorageBin[] }) {
                   <Tr key={m.id}>
                     <Td className="text-caption whitespace-nowrap">{dateTime(m.createdAt)}</Td>
                     <Td>{MOVEMENT_LABEL[m.movementType] ?? m.movementType}</Td>
-                    <Td className="text-numeric">{m.sku ?? '—'}</Td>
-                    <Td className="text-fg">{m.fromCode ?? '—'}</Td>
-                    <Td className="text-fg">{m.toCode ?? '—'}</Td>
+                    <Td className="text-code">{m.sku ?? '—'}</Td>
+                    <Td className="text-code text-fg">{m.fromCode ?? '—'}</Td>
+                    <Td className="text-code text-fg">{m.toCode ?? '—'}</Td>
                     <Td className="text-center text-numeric">{m.boxes}</Td>
                     <Td className="text-caption">{m.operatorName ?? '—'}</Td>
                   </Tr>

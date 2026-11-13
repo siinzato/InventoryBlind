@@ -184,7 +184,16 @@ Footnote, Caption) e às classes utilitárias já existentes em
 | Callout / Subheadline | Texto secundário de apoio a um valor (ex.: "Top: Mercado Livre") | `text-fg-muted text-sm`/`text-xs` | Regular |
 | Footnote | Legendas de ajuda, helper text de formulário | `.text-caption` (`text-xs text-fg-subtle`) | Regular |
 | Caption | Rótulo de seção em maiúsculas, cabeçalho de tabela | `.text-section` (`text-xs font-semibold uppercase tracking-wide text-fg-subtle`) | Semibold |
-| Numérico (transversal) | Valores de KPI, IDs, quantidades, timestamps, colunas de tabela numéricas | `.text-numeric` (`font-mono tabular-nums`) | — |
+| Numérico (transversal) | Valores de KPI, quantidades, timestamps, colunas de tabela numéricas | `.text-numeric` (`tabular-nums`) | — |
+| Identificador técnico | SKU, EAN, código de vaga, ID, hash | `.text-code` (`font-mono tabular-nums`) | — |
+
+> **Correção de 13/11/2026.** Este documento descrevia `.text-numeric` como
+> `font-mono tabular-nums`. O CSS implementava só `tabular-nums`, e o comentário
+> em `src/index.css` explicava por quê: a face de UI com algarismos alinhados
+> mantém o registro do app, e mono fica reservado a SKU/EAN/ID/código. A decisão
+> do código estava certa; faltava a classe para a segunda metade dela — por isso
+> o WMS tinha ZERO `font-mono` em 22 arquivos. `.text-code` preenche essa lacuna
+> e a tabela acima passa a refletir o que existe.
 
 Regra: **nenhum valor arbitrário novo**. Um novo componente reutiliza uma
 das classes acima. Se nenhuma servir, a decisão de criar uma nova classe é

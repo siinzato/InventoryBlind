@@ -28,6 +28,10 @@ import { WmsBinOperations } from './WmsBinOperations';
 import { WmsAnalytics } from './WmsAnalytics';
 import { WmsStockInsights } from './WmsStockInsights';
 import { WmsStorageMap } from './WmsStorageMap';
+import { WmsBinScanner } from './WmsBinScanner';
+// Só o tipo: `import type` é apagado na compilação, então isto NÃO traz o peso do
+// visualizador 3D para dentro deste chunk.
+import type { Slot } from '../../lib/wms/warehouse3dSlots';
 
 // Sob demanda: o visualizador 3D arrasta three/fiber/drei junto. Importado de forma
 // estatica, esse peso entraria no pacote de QUEM NUNCA abre a secao 3D — inclusive do
@@ -135,6 +139,8 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   // Escaneou um QR? Vai direto operar. Senão, o mapa e a visao que responde a pergunta
   // do dia a dia — onde tem vaga, o que esta cheio.
   const [mode, setMode] = useState<Mode>(scannedBin ? 'movimentar' : 'mapa');
+  // Vaga escolhida no mapa 3D para conferência por QR. `null` mantém o leitor fechado.
+  const [scanSlot, setScanSlot] = useState<Slot | null>(null);
   // Vaga escolhida no mapa e levada para a aba Movimentar.
   const [operateBin, setOperateBin] = useState('');
   const [generatorOpen, setGeneratorOpen] = useState(false);
@@ -459,6 +465,7 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
               // Leva a vaga escolhida no 3D para a secao que de fato movimenta — o mesmo
               // atalho que o mapa 2D ja oferece em onOperate.
               onOperate={slot => { setOperateBin(slot.id); setMode('movimentar'); }}
+              onScanRequest={setScanSlot}
             />
           </Suspense>
         </div>
@@ -855,6 +862,34 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
             </Table>
           </div>
         </Panel>
+      )}
+
+      {/* Leitor de QR da vaga escolhida no mapa 3D.
+
+          `expectCode` põe o leitor em modo CONFERÊNCIA: o endereço já foi escolhido no
+          mapa, e a câmera serve para provar que o operador está fisicamente naquela
+          vaga. Lendo outra etiqueta o leitor recusa e continua lendo — trocar o
+          endereço em silêncio seria o oposto de conferir.
+
+          É um Modal sobreposto: o Canvas não desmonta e a câmera 3D não se mexe
+          enquanto o leitor está aberto.
+
+          Confirmada a presença, o fluxo segue para Movimentar com a vaga preenchida —
+          que é o caminho que já roda em produção. Registrar movimento exige produto,
+          caixas e unidades por caixa; refazer esse formulário dentro do overlay
+          duplicaria uma tela que funciona. */}
+      {scanSlot && (
+        <WmsBinScanner
+          open
+          title={`Conferir a vaga ${scanSlot.id}`}
+          expectCode={scanSlot.id}
+          onClose={() => setScanSlot(null)}
+          onDetected={code => {
+            setScanSlot(null);
+            setOperateBin(code);
+            setMode('movimentar');
+          }}
+        />
       )}
 
     </Page>

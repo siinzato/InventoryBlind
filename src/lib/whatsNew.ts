@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-13-mapa-3d-conferencia-por-qr',
+    date: '2026-11-13',
+    category: 'melhoria',
+    title: 'Conferir a vaga pela câmera, direto do Mapa 3D',
+    description: 'Ao clicar numa vaga no Mapa 3D, o painel de detalhes agora tem o botão Ler QR Code. Ele abre a câmera já sabendo qual endereço você escolheu: se a etiqueta lida for de outra vaga, a leitura é recusada e a câmera continua procurando — assim a conferência serve para confirmar que você está mesmo na vaga certa, e não para trocar o endereço sem você perceber. Confirmada a leitura, você segue direto para Movimentar com a vaga já preenchida. O mapa continua aberto atrás da câmera, sem perder o ângulo. Sem câmera disponível ou sem permissão, dá para digitar o endereço.',
+  },
+  {
     id: '2026-11-13-mapa-3d-do-pulmao',
     date: '2026-11-13',
     category: 'novidade',

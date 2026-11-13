@@ -28,6 +28,7 @@ import {
   Page, PageHeader, Panel, PanelSection, Table, Thead, Tr, Th, Td, Badge, Button,
   Input, Select, Stat, StatRow, StatCell,
 } from './ui';
+import { ACCURACY_TARGET_PCT } from '../lib/accuracyScale';
 
 interface BrandRow {
   id: string;
@@ -60,7 +61,8 @@ type EntityTab = 'linhas' | 'operadores' | 'produtos';
 type SortDir = 'asc' | 'desc';
 interface SortState { field: string; dir: SortDir; }
 
-const ACCURACY_TARGET = 95;
+// Mesma meta do restante do app — vem da regua unica, nao de uma copia local.
+const ACCURACY_TARGET = ACCURACY_TARGET_PCT;
 const PAGE_SIZE = 20;
 const EMPTY_TREND: TrendSummary = { points: [], totalSkus: 0, varianceP: null, avgAccuracy: null };
 

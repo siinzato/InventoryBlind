@@ -16,6 +16,7 @@ import {
 } from '../lib/heatmapUtils';
 import { Badge } from './ui';
 import { pct, plural } from '../lib/formatPtBr';
+import { ACCURACY_BAND_LABEL, classifyAccuracy } from '../lib/accuracyScale';
 
 interface HeatmapCardProps {
   area: HeatmapArea;
@@ -140,7 +141,7 @@ export const HeatmapCard: React.FC<HeatmapCardProps> = ({ area, onClick, viewMod
           <div className="flex items-center gap-1">
             <CheckCircle size={14} className={textClass} />
             <span className={textClass}>
-              {accuracy >= 90 ? 'Saudável' : accuracy >= 70 ? 'Atenção' : accuracy >= 50 ? 'Risco' : 'Crítico'}
+              {ACCURACY_BAND_LABEL[classifyAccuracy(accuracy)]}
             </span>
           </div>
           {area.divergencias > 0 && (

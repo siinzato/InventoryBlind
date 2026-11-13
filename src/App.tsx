@@ -127,6 +127,18 @@ import { DashboardIntegrationsHealth } from './components/dashboard/DashboardInt
 import { listConnections } from './lib/integrations/integrationService';
 import type { IntegrationConnection } from './lib/integrations/types';
 import { pct, int, plural } from './lib/formatPtBr';
+import { ACCURACY_TARGET_PCT, ACCURACY_BAND_TONE, classifyAccuracy } from './lib/accuracyScale';
+import type { AccuracyBand } from './lib/accuracyScale';
+
+// Cor da acuracidade na tabela por linha. Os CORTES vem da regua unica; as classes
+// ficam aqui porque esta tabela usa o tom 600 no claro, e nao o 700 do mapa de calor.
+// Unificar o criterio nao e motivo para mexer no shade de uma tela que ja estava boa.
+const ACCURACY_TABLE_TEXT_CLASS: Record<AccuracyBand, string> = {
+  meta: 'text-emerald-600 dark:text-emerald-400',
+  atencao: 'text-amber-600 dark:text-amber-400',
+  critico: 'text-red-600 dark:text-red-400',
+  insuficiente: 'text-fg-muted',
+};
 
 // Code-split large page components for smaller initial bundle
 const LandingPage = React.lazy(() => import('./components/LandingPage'));
@@ -1497,7 +1509,7 @@ function AppContent() {
                   {(() => {
                     const inProgressRows = globais.tabela.filter(b => b.status === 'ANDAMENTO');
                     const topInProgress = [...inProgressRows].sort((a, b) => b.progress - a.progress)[0] ?? null;
-                    const ACCURACY_TARGET = 95;
+                    const bandaIRA = classifyAccuracy(globais.acuracidade);
                     return ([
                       {
                         label: 'Progresso Geral',
@@ -1507,11 +1519,13 @@ function AppContent() {
                       {
                         label: 'Acuracidade (IRA)',
                         value: pct(globais.acuracidade),
-                        context: `Meta ${ACCURACY_TARGET}% · ${globais.acuracidade >= ACCURACY_TARGET ? 'dentro da meta' : 'abaixo da meta'}`,
+                        context: `Meta ${ACCURACY_TARGET_PCT}% · ${bandaIRA === 'meta' ? 'dentro da meta' : 'abaixo da meta'}`,
                         // The only figure here whose level is a condition, so the
-                        // only one allowed to carry colour.
-                        valueTone:
-                          globais.acuracidade >= 80 ? 'positive' : globais.acuracidade >= 50 ? 'warning' : 'critical',
+                        // only one allowed to carry colour. Texto e cor saem da MESMA
+                        // regua (src/lib/accuracyScale.ts): antes o texto comparava com
+                        // 95 e a cor virava verde em 80, de modo que 86,5% saia verde
+                        // com a legenda "abaixo da meta" ao lado.
+                        valueTone: ACCURACY_BAND_TONE[bandaIRA],
                       },
                       { label: 'Divergências', value: globais.totalDiv, context: 'Aguardando recontagem' },
                       {
@@ -2418,7 +2432,7 @@ function AppContent() {
                         </td>
                         <td className="px-3 py-2.5 text-center font-semibold">
                           {brand.accuracy !== null ? (
-                            <span className={brand.accuracy >= 80 ? 'text-emerald-600 dark:text-emerald-400' : brand.accuracy >= 50 ? 'text-amber-600 dark:text-amber-400' : 'text-red-600 dark:text-red-400'}>
+                            <span className={ACCURACY_TABLE_TEXT_CLASS[classifyAccuracy(brand.accuracy)]}>
                               {pct(brand.accuracy)}
                             </span>
                           ) : '-'}

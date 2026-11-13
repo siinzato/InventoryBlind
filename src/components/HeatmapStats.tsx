@@ -15,6 +15,7 @@ import {
 import type { HeatmapStats } from '../lib/heatmapTypes';
 import { Panel, PanelSection } from './ui';
 import { pct, int, plural } from '../lib/formatPtBr';
+import { ACCURACY_BAND_TEXT_CLASS, classifyAccuracy } from '../lib/accuracyScale';
 
 interface HeatmapStatsProps {
   stats: HeatmapStats;
@@ -57,10 +58,10 @@ export const HeatmapStatsComponent: React.FC<HeatmapStatsProps> = ({ stats }) =>
     stats.mediaGeracaoRisco >= 20 ? 'text-accent' :
     'text-emerald-700 dark:text-emerald-400';
 
-  const accuracyColor =
-    stats.mediaAcuracidade >= 80 ? 'text-emerald-700 dark:text-emerald-400' :
-    stats.mediaAcuracidade >= 60 ? 'text-amber-700 dark:text-amber-400' :
-    'text-red-700 dark:text-red-400';
+  // A media aritmetica das MESMAS acuracidades das areas era pintada com cortes
+  // proprios (80/60) enquanto cada area usava 90/70/50: na mesma tela, 85% era
+  // "Atencao" no cartao e verde no resumo. Agora as duas leem a regua unica.
+  const accuracyColor = ACCURACY_BAND_TEXT_CLASS[classifyAccuracy(stats.mediaAcuracidade)];
 
   const mainStats: StatItem[] = [
     {

@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-13-assistente-e-tabela-mesma-regua',
+    date: '2026-11-13',
+    category: 'correcao',
+    title: 'Assistente e tabela do painel passam a usar a mesma meta de acuracidade',
+    description: 'O assistente respondia “acuracidade Boa” a partir de 80%, enquanto o painel logo ao lado marcava o mesmo número como abaixo da meta de 95%. A tabela por linha do painel inicial tinha o mesmo problema: pintava de verde a partir de 80%. Agora o assistente e a tabela usam a mesma régua das demais telas — dentro da meta a partir de 95%, atenção entre 80% e a meta, crítico abaixo de 80%. Os números são os mesmos; o que mudou foi o critério, que agora é único em todo o sistema.',
+  },
+  {
+    id: '2026-11-12-mapa-de-calor-mesma-regua',
+    date: '2026-11-12',
+    category: 'correcao',
+    title: 'Mapa de Calor passa a classificar a acuracidade por uma régua só',
+    description: 'No Mapa de Calor, a acuracidade era classificada de três jeitos diferentes na mesma tela: o cartão de cada área usava uma faixa, a barra dentro dos detalhes da área usava outra, e a Média Acuracidade do resumo usava uma terceira. Na prática isso fazia 85% aparecer como “Atenção” no cartão e verde no resumo logo acima. Agora os três pontos usam a mesma régua do restante do sistema: dentro da meta a partir de 95%, atenção entre 80% e a meta, crítico abaixo de 80%. Alguns rótulos de área mudam de faixa por causa disso — os números são os mesmos de antes, o que mudou foi o critério, que passou a ser único.',
+  },
+  {
+    id: '2026-11-12-acuracidade-cor-bate-com-a-meta',
+    date: '2026-11-12',
+    category: 'correcao',
+    title: 'A cor da acuracidade no painel agora concorda com a meta escrita ao lado',
+    description: 'No resumo do painel inicial, o indicador de Acuracidade (IRA) mostrava a meta de 95% no texto, mas pintava o número de verde a partir de 80%. O resultado era um valor verde com a legenda “abaixo da meta” logo embaixo, duas informações contraditórias sobre a mesma coisa. Agora a cor e o texto seguem a mesma régua: verde só a partir da meta, âmbar entre 80% e a meta, vermelho abaixo de 80%. O número em si não mudou — mudou apenas a cor, que antes dizia o contrário do texto.',
+  },
+  {
     id: '2026-11-12-risco-sem-classificacao-conta-como-c',
     date: '2026-11-12',
     category: 'melhoria',

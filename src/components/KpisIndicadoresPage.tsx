@@ -11,6 +11,7 @@ import {
   groupDailyProduction, averageDailyProduction, pendingRecount, forecastBusinessDays,
   groupOperatorPeriodStats, buildOperationalAlerts, type CountRecordForKpis,
 } from '../lib/kpisIndicadores/executiveKpis';
+import { ACCURACY_TARGET_PCT } from '../lib/accuracyScale';
 
 interface KpisIndicadoresPageProps {
   companyId: string;
@@ -18,7 +19,8 @@ interface KpisIndicadoresPageProps {
   operatorStats: UserProductivityStats[];
 }
 
-const ACCURACY_TARGET = 95;
+// Mesma meta do restante do app — vem da regua unica, nao de uma copia local.
+const ACCURACY_TARGET = ACCURACY_TARGET_PCT;
 
 const PERIOD_OPTIONS: { value: ReportPeriod; label: string }[] = [
   { value: '7d', label: 'Últimos 7 dias' },

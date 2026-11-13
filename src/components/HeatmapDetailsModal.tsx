@@ -30,6 +30,7 @@ import {
 } from '../lib/heatmapUtils';
 import { Modal, Panel, PanelSection, Badge, Button, Stat } from './ui';
 import { pct } from '../lib/formatPtBr';
+import { ACCURACY_BAND_BG_CLASS, classifyAccuracy } from '../lib/accuracyScale';
 
 interface HeatmapDetailsModalProps {
   area: HeatmapArea | null;
@@ -290,11 +291,7 @@ export const HeatmapDetailsModal: React.FC<HeatmapDetailsModalProps> = ({
                   </div>
                   <div className="h-3 bg-edge rounded-full overflow-hidden">
                     <div
-                      className={`h-full ${
-                        area.acuracidade >= 90 ? 'bg-emerald-500' :
-                        area.acuracidade >= 70 ? 'bg-amber-500' :
-                        area.acuracidade >= 50 ? 'bg-accent' : 'bg-red-500'
-                      } transition-all`}
+                      className={`h-full ${ACCURACY_BAND_BG_CLASS[classifyAccuracy(area.acuracidade)]} transition-all`}
                       style={{ width: `${Math.min(area.acuracidade, 100)}%` }}
                     />
                   </div>

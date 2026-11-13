@@ -71,6 +71,25 @@ export const ACCURACY_BAND_LABEL: Record<AccuracyBand, string> = {
   insuficiente: 'Sem dados',
 };
 
+/** Classe de TEXTO por banda. Vive aqui, e não em cada tela, porque três telas do
+ *  mapa de calor pintavam a mesma grandeza com cortes diferentes; separar a régua
+ *  da cor deixaria a divergência voltar pela cor. Os valores são os que as telas já
+ *  usavam — só os cortes mudaram. */
+export const ACCURACY_BAND_TEXT_CLASS: Record<AccuracyBand, string> = {
+  meta: 'text-emerald-700 dark:text-emerald-400',
+  atencao: 'text-amber-700 dark:text-amber-400',
+  critico: 'text-red-700 dark:text-red-400',
+  insuficiente: 'text-fg-muted',
+};
+
+/** Classe de FUNDO por banda — barras de progresso e indicadores sólidos. */
+export const ACCURACY_BAND_BG_CLASS: Record<AccuracyBand, string> = {
+  meta: 'bg-emerald-500',
+  atencao: 'bg-amber-500',
+  critico: 'bg-red-500',
+  insuficiente: 'bg-fg-subtle',
+};
+
 /** Tom para `Stat.valueTone` — mesma escala de tons já usada pelo componente. */
 export const ACCURACY_BAND_TONE: Record<AccuracyBand, 'default' | 'positive' | 'warning' | 'critical'> = {
   meta: 'positive',

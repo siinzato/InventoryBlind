@@ -7,6 +7,7 @@
 //    inteligência de priorização/causa-raiz/estratégia mora lá agora, não aqui.
 
 import { supabase } from './supabase';
+import { classifyAccuracy } from './accuracyScale';
 import { detectIntent, generateContextualSuggestions, type GlobalStats } from './blindAIAgentAlgorithm';
 import type { BlindAISituation, TopVenda } from './supabase';
 import { pct, plural } from './formatPtBr';
@@ -30,7 +31,12 @@ function answerFastPath(intent: 'progress_status' | 'accuracy_status' | 'best_li
     }
     case 'accuracy_status': {
       const taxaDivergencia = globais.totalDone > 0 ? (globais.totalDiv / globais.totalDone) * 100 : 0;
-      const status = globais.acuracidade >= 80 ? 'Boa' : globais.acuracidade >= 50 ? 'Mediana, requer atenção' : 'Crítica, ação imediata recomendada';
+      // O agente respondia por cortes proprios (80/50) enquanto a tela que ele
+      // resume usa a meta de 95%: perguntar "como esta a acuracidade?" com 82%
+      // devolvia "Boa" sobre um numero que o painel marcava abaixo da meta. Os
+      // textos de status sao os mesmos; o que mudou foi o corte que os escolhe.
+      const banda = classifyAccuracy(globais.acuracidade);
+      const status = banda === 'meta' ? 'Boa' : banda === 'atencao' ? 'Mediana, requer atenção' : 'Crítica, ação imediata recomendada';
       return (
         `Acuracidade geral: ${pct(globais.acuracidade)}.\n\n` +
         `- Total de divergências: ${globais.totalDiv}\n` +

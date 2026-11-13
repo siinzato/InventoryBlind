@@ -57,15 +57,15 @@ export function FloorPlanUploadControl({ companyId, userId, userEmail, layout, o
         <div className="grid grid-cols-2 md:grid-cols-4 gap-3 items-end">
           <div>
             <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Posição X</label>
-            <input type="number" value={offsetX} onChange={e => setOffsetX(Number(e.target.value))} className="w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg" />
+            <input type="number" value={offsetX} onChange={e => setOffsetX(Number(e.target.value))} className="w-full p-2 border border-edge rounded-control bg-surface text-sm text-fg" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Posição Y</label>
-            <input type="number" value={offsetY} onChange={e => setOffsetY(Number(e.target.value))} className="w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg" />
+            <input type="number" value={offsetY} onChange={e => setOffsetY(Number(e.target.value))} className="w-full p-2 border border-edge rounded-control bg-surface text-sm text-fg" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Escala</label>
-            <input type="number" step={0.05} min={0.1} max={5} value={scale} onChange={e => setScale(Number(e.target.value))} className="w-full p-2 border border-edge rounded-lg bg-surface text-sm text-fg" />
+            <input type="number" step={0.05} min={0.1} max={5} value={scale} onChange={e => setScale(Number(e.target.value))} className="w-full p-2 border border-edge rounded-control bg-surface text-sm text-fg" />
           </div>
           <div>
             <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Opacidade</label>

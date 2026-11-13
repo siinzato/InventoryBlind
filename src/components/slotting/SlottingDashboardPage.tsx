@@ -132,16 +132,16 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
               <>
                 <div>
                   <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Nome</label>
-                  <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-2.5 border border-edge rounded-lg bg-surface text-sm text-fg" />
+                  <input value={newName} onChange={e => setNewName(e.target.value)} className="w-full p-2.5 border border-edge rounded-control bg-surface text-sm text-fg" />
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Largura (colunas)</label>
-                    <input type="number" min={2} max={60} value={newWidth} onChange={e => setNewWidth(Number(e.target.value))} className="w-full p-2.5 border border-edge rounded-lg bg-surface text-sm text-fg" />
+                    <input type="number" min={2} max={60} value={newWidth} onChange={e => setNewWidth(Number(e.target.value))} className="w-full p-2.5 border border-edge rounded-control bg-surface text-sm text-fg" />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Altura (linhas)</label>
-                    <input type="number" min={2} max={60} value={newHeight} onChange={e => setNewHeight(Number(e.target.value))} className="w-full p-2.5 border border-edge rounded-lg bg-surface text-sm text-fg" />
+                    <input type="number" min={2} max={60} value={newHeight} onChange={e => setNewHeight(Number(e.target.value))} className="w-full p-2.5 border border-edge rounded-control bg-surface text-sm text-fg" />
                   </div>
                 </div>
                 <Button onClick={handleCreateLayout} disabled={creating}>{creating ? 'Criando...' : 'Criar Layout'}</Button>
@@ -293,7 +293,7 @@ export function SlottingDashboardPage({ companyId, userId, userEmail, role }: Sl
               <p className="text-xs text-fg-subtle">Nenhuma recomendação pendente — clique em "Gerar Recomendações".</p>
             )}
             {recommendations.map(rec => (
-              <div key={rec.id} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-surface-3/50">
+              <div key={rec.id} className="flex items-start justify-between gap-3 p-3 rounded-container bg-surface-3/50">
                 <div className="min-w-0">
                   <div className="flex items-center gap-2 mb-1">
                     <Badge variant="accent">{RECOMMENDATION_LABEL[rec.recommendation_type]}</Badge>

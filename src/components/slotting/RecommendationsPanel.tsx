@@ -51,7 +51,7 @@ export function RecommendationsPanel({ companyId, layoutId, userId, userEmail, c
             <p className="text-xs text-fg-subtle">Nenhuma recomendação pendente — gere novas na aba Slotting.</p>
           )}
           {recommendations.map(rec => (
-            <div key={rec.id} className="flex items-start justify-between gap-3 p-3 rounded-lg bg-surface-3/50">
+            <div key={rec.id} className="flex items-start justify-between gap-3 p-3 rounded-container bg-surface-3/50">
               <div className="min-w-0">
                 <div className="flex items-center gap-2 mb-1">
                   <Badge variant="accent">{RECOMMENDATION_LABEL[rec.recommendation_type]}</Badge>

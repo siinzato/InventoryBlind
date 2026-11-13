@@ -84,7 +84,7 @@ export function SkuMoveSimulator({ companyId, userId, userEmail, layout, cells, 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
               <div>
                 <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">SKU a mover (posição atual)</label>
-                <select value={sourceLocation} onChange={e => { setSourceLocation(e.target.value); setApplied(false); }} className="w-full p-2.5 border border-edge rounded-lg bg-surface text-sm text-fg">
+                <select value={sourceLocation} onChange={e => { setSourceLocation(e.target.value); setApplied(false); }} className="w-full p-2.5 border border-edge rounded-control bg-surface text-sm text-fg">
                   <option value="">Selecione...</option>
                   {occupiedPositions.map(c => (
                     <option key={c.location_code} value={c.location_code!}>
@@ -95,7 +95,7 @@ export function SkuMoveSimulator({ companyId, userId, userEmail, layout, cells, 
               </div>
               <div>
                 <label className="block text-xs font-semibold text-fg-subtle uppercase tracking-wide mb-1">Nova posição (livre)</label>
-                <select value={destKey} onChange={e => { setDestKey(e.target.value); setApplied(false); }} className="w-full p-2.5 border border-edge rounded-lg bg-surface text-sm text-fg">
+                <select value={destKey} onChange={e => { setDestKey(e.target.value); setApplied(false); }} className="w-full p-2.5 border border-edge rounded-control bg-surface text-sm text-fg">
                   <option value="">Selecione...</option>
                   {vacantLabeledPositions.map(c => (
                     <option key={`${c.x},${c.y}`} value={`${c.x},${c.y}`}>{c.location_code} ({c.x},{c.y})</option>

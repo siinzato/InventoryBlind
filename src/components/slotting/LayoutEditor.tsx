@@ -91,7 +91,7 @@ export function LayoutEditor({ companyId, userId, userEmail, layout, cells, onCe
               <select
                 value={pendingType}
                 onChange={e => setPendingType(e.target.value as WarehouseCellType)}
-                className="p-2 border border-edge rounded-lg bg-surface text-sm text-fg"
+                className="p-2 border border-edge rounded-control bg-surface text-sm text-fg"
               >
                 {(Object.keys(TYPE_LABEL) as WarehouseCellType[]).map(t => (
                   <option key={t} value={t}>{TYPE_LABEL[t]}</option>
@@ -104,7 +104,7 @@ export function LayoutEditor({ companyId, userId, userEmail, layout, cells, onCe
                 <input
                   value={pendingLocation}
                   onChange={e => setPendingLocation(e.target.value)}
-                  className="p-2 border border-edge rounded-lg bg-surface text-sm text-fg"
+                  className="p-2 border border-edge rounded-control bg-surface text-sm text-fg"
                   placeholder="Ex: A1-03"
                 />
               </div>

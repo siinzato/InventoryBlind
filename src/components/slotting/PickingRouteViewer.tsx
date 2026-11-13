@@ -76,7 +76,7 @@ export function PickingRouteViewer({ companyId, layout, cells }: PickingRouteVie
           <select
             value={selectedId}
             onChange={e => setSelectedId(e.target.value)}
-            className="p-2 border border-edge rounded-lg bg-surface text-sm text-fg min-w-[220px]"
+            className="p-2 border border-edge rounded-control bg-surface text-sm text-fg min-w-[220px]"
           >
             <option value="">Selecione uma operação Full...</option>
             {operations.map(op => (

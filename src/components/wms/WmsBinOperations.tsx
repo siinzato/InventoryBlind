@@ -402,7 +402,7 @@ export function WmsBinOperations({
                   <select
                     value={targetProductId}
                     onChange={e => setTargetProductId(e.target.value)}
-                    className="w-full p-2.5 border border-edge rounded-lg bg-surface text-fg text-sm"
+                    className="w-full p-2.5 border border-edge rounded-control bg-surface text-fg text-sm"
                   >
                     <option value="">Selecione...</option>
                     {(contents ?? []).map(row => (

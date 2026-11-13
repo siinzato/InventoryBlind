@@ -289,10 +289,18 @@ function StepEscala({ draft, onChanged, onSaved }: { draft: WarehouseLayout; onC
         <div className="relative" style={{ width: gridWidthPx, height: gridHeightPx }}>
           <FloorPlanBackground layout={draft} cellPixelSize={CELL_PX} />
           <svg className="absolute inset-0 pointer-events-none" width={gridWidthPx} height={gridHeightPx}>
+            {/* `rgb(var(--accent))`, não `var(--accent)` direto: o token guarda os
+                CANAIS separados por espaço (`30 95 191`), não uma cor — é o formato que
+                o Tailwind consome em `rgb(var(--accent) / <alpha-value>)`.
+                Usado cru, resolvia para a string "30 95 191", que não é paint válido:
+                o `stroke` caía para `none` e a linha de medição ficava INVISÍVEL,
+                enquanto os pontos saíam pretos. O fallback `#2563eb` nunca entrava em
+                ação, porque o token existe — ele só mascarava o defeito na leitura do
+                código. Medido no navegador antes e depois. */}
             {points.length === 2 && (
-              <line x1={points[0].x} y1={points[0].y} x2={points[1].x} y2={points[1].y} stroke="var(--accent, #2563eb)" strokeWidth={2} />
+              <line x1={points[0].x} y1={points[0].y} x2={points[1].x} y2={points[1].y} stroke="rgb(var(--accent))" strokeWidth={2} />
             )}
-            {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={5} fill="var(--accent, #2563eb)" />)}
+            {points.map((p, i) => <circle key={i} cx={p.x} cy={p.y} r={5} fill="rgb(var(--accent))" />)}
           </svg>
         </div>
       </div>

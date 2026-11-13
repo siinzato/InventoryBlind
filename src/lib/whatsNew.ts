@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-13-calibracao-linha-visivel',
+    date: '2026-11-13',
+    category: 'correcao',
+    title: 'A linha de medição da planta voltou a aparecer',
+    description: 'Ao calibrar a escala da planta do armazém, você marca dois pontos e informa a distância real entre eles. A linha que liga esses dois pontos não estava sendo desenhada, e os pontos apareciam pretos — dava para calibrar, mas sem enxergar o que estava sendo medido. Agora a linha e os pontos aparecem na cor de destaque, tanto no tema claro quanto no escuro.',
+  },
+  {
     id: '2026-11-13-mapa-3d-estrutura-e-foco',
     date: '2026-11-13',
     category: 'melhoria',

@@ -100,6 +100,21 @@ describe('buildSlots', () => {
   });
 
   it('armazém vazio devolve listas vazias, não quebra', () => {
-    expect(buildSlots([], new Map())).toEqual({ slots: [], naoPosicionaveis: [] });
+    expect(buildSlots([], new Map())).toEqual({
+      slots: [],
+      naoPosicionaveis: [],
+      codigoPorBinId: new Map(),
+    });
+  });
+
+  it('mapeia UUID -> código de TODAS as vagas, inclusive as não posicionáveis', () => {
+    // O evento de tempo real chega com o UUID. Deixar de fora a vaga fora do padrão
+    // faria uma mudança nela parecer vaga desconhecida.
+    const { codigoPorBinId } = buildSlots(
+      [vaga({ code: 'PP-A01-N1' }), vaga({ code: 'FORA-DO-PADRAO' })],
+      new Map(),
+    );
+    expect(codigoPorBinId.get('id-PP-A01-N1')).toBe('PP-A01-N1');
+    expect(codigoPorBinId.get('id-FORA-DO-PADRAO')).toBe('FORA-DO-PADRAO');
   });
 });

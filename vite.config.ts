@@ -136,7 +136,12 @@ export default defineConfig({
         // O padrão do Workbox também descartaria silenciosamente qualquer arquivo
         // acima de 2 MiB. Preferível excluir por nome, de propósito, a esbarrar nesse
         // teto um dia sem perceber.
-        globIgnores: ['**/Warehouse3DViewer-*.js'],
+        // A JetBrains Mono entra pelo mesmo raciocínio: ela é usada SÓ no HUD do mapa
+        // 3D, cujo próprio código já está fora do precache. Precarregar a fonte de uma
+        // tela que não é precarregada cobraria 64 kB na instalação de todo mundo para
+        // servir a quem talvez nunca abra a seção. Sem o arquivo, a pilha mono padrão
+        // assume e o HUD continua legível.
+        globIgnores: ['**/Warehouse3DViewer-*.js', '**/jetbrains-mono-*.woff2'],
         navigateFallback: '/index.html',
         runtimeCaching: [],
       },

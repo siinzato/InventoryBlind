@@ -219,6 +219,38 @@ export async function boxesByBin(): Promise<Map<string, number>> {
   return map;
 }
 
+/** Uma linha de saldo por (endereço, SKU) — sem nome de produto, sem pack, sem data.
+ *
+ *  Existe separada de `boxesByBin` porque a pergunta é outra: aquela responde "quanto
+ *  há aqui", esta responde "O QUE há aqui". Cruzar endereço com classificação de
+ *  produto exige o SKU, que a soma por endereço joga fora.
+ *
+ *  Paginada: o PostgREST corta a resposta em 1000 linhas por padrão, e endereço
+ *  misturado gera MAIS linhas que endereços. Sem paginar, um pulmão grande voltaria
+ *  truncado em silêncio e a tela coloriria parte do armazém como "sem classificação"
+ *  sem nada indicar que o dado foi cortado.
+ */
+export async function skusByBin(): Promise<Map<string, { sku: string; boxes: number }[]>> {
+  const PAGINA = 1000;
+  const map = new Map<string, { sku: string; boxes: number }[]>();
+  for (let de = 0; ; de += PAGINA) {
+    const { data, error } = await supabase
+      .from('wms_product_stock_v')
+      .select('bin_code, sku, boxes')
+      .order('bin_code', { ascending: true })
+      .order('sku', { ascending: true })
+      .range(de, de + PAGINA - 1);
+    if (error) throw error;
+    const pagina = (data ?? []) as { bin_code: string; sku: string; boxes: number }[];
+    for (const row of pagina) {
+      const atual = map.get(row.bin_code);
+      if (atual) atual.push({ sku: row.sku, boxes: row.boxes });
+      else map.set(row.bin_code, [{ sku: row.sku, boxes: row.boxes }]);
+    }
+    if (pagina.length < PAGINA) return map;
+  }
+}
+
 /**
  * Última quantidade por caixa conhecida para o SKU.
  *

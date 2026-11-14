@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-14-mapa-3d-armazem-de-verdade',
+    date: '2026-11-14',
+    category: 'novidade',
+    title: 'Mapa 3D: o Pulmão agora parece o Pulmão',
+    description: 'As vagas deixaram de ser cubos soltos no vazio. O mapa 3D passou a desenhar a estante de porta-pallets de verdade — colunas e travessas metálicas formando os vãos — e, nas posições com saldo, o palete de madeira com as caixas empilhadas em cima. Vaga livre virou o vão vazio da estante, como no galpão. Em volta há agora um galpão completo: piso de concreto, faixas de circulação pintadas no chão, paredes e sombras suaves sob as estantes (dá para voltar ao fundo limpo quando quiser mais desempenho). Cada corredor ganhou placas suspensas com o nome da rua, e um radar no canto mostra, em tempo real, onde a câmera está e para que lado ela aponta — clique na planta e a câmera desliza até lá.',
+  },
+  {
+    id: '2026-11-14-mapa-3d-achar-e-coletar',
+    date: '2026-11-14',
+    category: 'novidade',
+    title: 'Mapa 3D: achar o produto e montar a coleta',
+    description: 'Digite um SKU ou parte do nome do produto e as vagas que o contêm acendem no mapa, com as demais translúcidas — dá para localizar a mercadoria no meio da estante de relance. Quando o produto está em mais de um endereço, o mapa desenha a rota de coleta no chão: uma linha que corre pelos corredores na ordem da entrada mais antiga para a mais nova, contornando as estantes pela cabeceira em vez de cortar caminho por cima delas. Um painel lista as paradas numeradas e leva a câmera suavemente até a próxima. Clicando numa vaga, o painel de detalhe mostra situação, caixas, unidades, data de entrada e o que há guardado ali — e permite conferir o endereço pela câmera do aparelho.',
+  },
+  {
+    id: '2026-11-14-mapa-3d-giro-tempo-real-auditoria',
+    date: '2026-11-14',
+    category: 'novidade',
+    title: 'Mapa 3D: giro dos produtos, atualização ao vivo e registro',
+    description: 'O mapa ganhou o modo Curva ABC: as vagas passam a ser coloridas pelo giro do que está guardado nelas, usando a Curva ABC que você já publicou, e o painel indica de qual análise veio a classificação. Com isso o mapa aponta os itens de alto giro guardados acima do nível do chão — os que mais custam tempo de empilhadeira — com um marcador sobre a vaga e um atalho para ir até ela. O mapa também acompanha o galpão ao vivo: quando outro operador movimenta ou bloqueia um endereço, a vaga pisca e tudo se atualiza sozinho, sem recarregar a página nem perder o ângulo de câmera. E o botão Capturar visão 3D baixa a vista atual como imagem, já com data, hora e o ângulo exato impressos na borda, pronta para anexar a um relatório.',
+  },
+  {
     id: '2026-11-13-calibracao-linha-visivel',
     date: '2026-11-13',
     category: 'correcao',

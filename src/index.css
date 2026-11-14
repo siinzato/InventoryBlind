@@ -205,6 +205,20 @@ html, body {
   .text-code     { @apply font-mono tabular-nums; }
 }
 
+/* JetBrains Mono APENAS dentro do mapa 3D.
+   Escopado de proposito. Trocar a familia mono global mudaria a tipografia de SKU,
+   EAN, ID e codigo de vaga em TODAS as telas do produto — isso e alteracao da
+   Design Constitution (a pilha mono esta fixada no tailwind.config), nao acabamento
+   de uma tela. Aqui o ganho e local e concreto: no HUD do 3D os codigos sao lidos
+   caractere a caractere sobre uma cena colorida, e o zero cortado da JetBrains Mono
+   separa 0 de O melhor que a pilha padrao.
+   A fonte e carregada pelo chunk do mapa 3D, que e sob demanda. Se o arquivo nao
+   chegar, a pilha padrao assume e nada quebra. */
+.hud-3d .text-code,
+.hud-3d-rotulo {
+  font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
+}
+
 /* Proper scroll containers */
 .scroll-y {
   overflow-y: auto;

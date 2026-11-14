@@ -146,6 +146,51 @@ export async function listSkuSnapshots(companyId: string, analysisId: string): P
   }
 }
 
+/**
+ * Classe de GIRO de uma lista conhecida de SKUs, e só isso.
+ *
+ * Separada de `listSkuSnapshots` por volume: aquela traz a análise inteira com as ~30
+ * colunas de cada SKU, porque a tela da Curva ABC precisa de todas. Quem só quer saber
+ * "este SKU é A, B ou C" estaria baixando 1.034 linhas completas para ler uma coluna.
+ *
+ * `turnover_class` — giro —, não `revenue_class` nem `profit_class`. É a classificação
+ * por QUANTIDADE movimentada, que é a única das três ligada ao custo de ir buscar a
+ * mercadoria. Faturamento e lucro respondem perguntas comerciais, não de armazenagem.
+ *
+ * SKU sem linha na análise fica FORA do mapa, não entra como 'C'. Não ter sido
+ * classificado e ter girado pouco são coisas diferentes, e tratar uma como a outra
+ * inventaria classificação para produto que a análise nunca viu.
+ */
+export async function turnoverClassBySku(
+  companyId: string,
+  analysisId: string,
+  skus: readonly string[],
+): Promise<Map<string, 'A' | 'B' | 'C'>> {
+  const map = new Map<string, 'A' | 'B' | 'C'>();
+  const unicos = [...new Set(skus)].filter(s => s.length > 0);
+  if (unicos.length === 0) return map;
+
+  // Em lotes: `in` vira lista na URL, e algumas centenas de SKUs estouram o limite de
+  // tamanho da requisição. Cada lote devolve no máximo uma linha por SKU, então nenhum
+  // chega perto do corte de 1000 linhas do PostgREST.
+  const LOTE = 200;
+  for (let i = 0; i < unicos.length; i += LOTE) {
+    const { data, error } = await supabase
+      .from('abc_curve_sku_snapshots')
+      .select('sku, turnover_class')
+      .eq('company_id', companyId)
+      .eq('analysis_id', analysisId)
+      .in('sku', unicos.slice(i, i + LOTE));
+    if (error) throw error;
+    for (const row of (data ?? []) as { sku: string; turnover_class: string | null }[]) {
+      if (row.turnover_class === 'A' || row.turnover_class === 'B' || row.turnover_class === 'C') {
+        map.set(row.sku, row.turnover_class);
+      }
+    }
+  }
+  return map;
+}
+
 export async function listRecommendations(companyId: string, analysisId: string) {
   const rows: Record<string, unknown>[] = [];
   for (let from = 0; ; from += FETCH_PAGE) {

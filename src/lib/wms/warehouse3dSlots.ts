@@ -47,6 +47,18 @@ export interface WarehouseSlots {
    * sem dizer isso a ninguém.
    */
   naoPosicionaveis: string[];
+  /**
+   * UUID da vaga -> código impresso na etiqueta.
+   *
+   * O mapa 3D identifica vaga pelo CÓDIGO (`PP-A01-N1`), mas o banco referencia por
+   * UUID: o saldo guarda `bin_id`, não o código. Um evento de tempo real chega com o
+   * UUID, e sem esta tradução não há como saber QUAL endereço acabou de mudar.
+   *
+   * Inclui também as vagas não posicionáveis: elas não aparecem no desenho, mas uma
+   * mudança nelas ainda precisa ser reconhecida em vez de tratada como vaga
+   * desconhecida.
+   */
+  codigoPorBinId: Map<string, string>;
 }
 
 /**
@@ -107,7 +119,11 @@ export function buildSlots(bins: readonly StorageBin[], caixasPorVaga: ReadonlyM
     };
   });
 
-  return { slots, naoPosicionaveis };
+  // Construído sobre TODAS as vagas recebidas, não só as desenháveis — ver o comentário
+  // de `codigoPorBinId`.
+  const codigoPorBinId = new Map(bins.map(b => [b.id, b.code]));
+
+  return { slots, naoPosicionaveis, codigoPorBinId };
 }
 
 /** Carrega os endereços reais do Pulmão e o saldo de cada um. */

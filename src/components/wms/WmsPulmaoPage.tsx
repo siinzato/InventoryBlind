@@ -24,6 +24,7 @@ import {
   A4_PER_PAGE, LABEL_FORMATS, fallbackValuePt, planLabels, sheetsFor,
   type A4PerPage, type LabelFormatId,
 } from '../../lib/wms/labelLayout';
+import { useAuth } from '../../lib/auth';
 import { WmsBinOperations } from './WmsBinOperations';
 import { WmsAnalytics } from './WmsAnalytics';
 import { WmsStockInsights } from './WmsStockInsights';
@@ -130,6 +131,7 @@ const formatDate = (iso: string): string => new Date(iso).toLocaleDateString('pt
 
 
 export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
+  const { companyId } = useAuth();
   // Veio de um QR de vaga? Abre direto em Movimentar com o endereco preenchido — e a
   // query e lida uma vez so, no primeiro render, para nao reabrir ao trocar de secao.
   const [scannedBin] = useState(() => {
@@ -461,6 +463,10 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
         <div className="h-[calc(100vh-18rem)] min-h-[26rem]">
           <Suspense fallback={<div className="flex h-full items-center justify-center rounded-container bg-surface-2"><BrandLoader label="Abrindo o mapa 3D" /></div>}>
             <Warehouse3DViewer
+              // A empresa vem daqui, e não de dentro do visualizador: ele é renderizável
+              // isolado, e ler o contexto de autenticação lá dentro passaria a exigir o
+              // AuthProvider para desenhar um cubo.
+              companyId={companyId}
               onSelectSlot={slot => setOperateBin(slot.id)}
               // Leva a vaga escolhida no 3D para a secao que de fato movimenta — o mesmo
               // atalho que o mapa 2D ja oferece em onOperate.

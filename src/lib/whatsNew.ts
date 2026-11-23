@@ -20,8 +20,8 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
-    id: '2026-11-18-grade-da-planta-redimensionavel',
-    date: '2026-11-18',
+    id: '2026-11-23-grade-da-planta-redimensionavel',
+    date: '2026-11-23',
     category: 'melhoria',
     title: 'A grade da planta agora acompanha o tamanho do armazém',
     description: 'Até agora o tamanho da grade era escolhido uma única vez, na criação da planta, e não dava mais para mudar. Quem passou a ocupar um galpão maior ficava sem saída: ou desenhava o prédio novo espremido na grade antiga, ou afrouxava a escala até cada quadradinho valer metros demais — e aí um corredor estreito e um largo viravam a mesma coisa no desenho. Na etapa "Planta" do configurador agora há um campo de largura e altura: dá para aumentar a grade a qualquer momento e seguir desenhando. Se a escala já estiver calibrada, o tamanho aparece em metros ao lado, então você confere direto contra a medida real do galpão. Diminuir também é possível, e o sistema avisa antes quantas células já desenhadas ficariam de fora. Tudo acontece no rascunho — a planta que a operação usa só muda quando você publicar.',

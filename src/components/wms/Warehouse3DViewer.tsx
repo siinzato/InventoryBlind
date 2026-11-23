@@ -27,8 +27,8 @@ import {
 import {
   BoxGeometry, BufferAttribute, BufferGeometry, Color, EdgesGeometry,
   Matrix4, MeshBasicMaterial, MeshStandardMaterial, OctahedronGeometry, PerspectiveCamera,
-  Vector3,
-  type InstancedMesh,
+  SRGBColorSpace, TextureLoader, Vector3,
+  type InstancedMesh, type Texture,
 } from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { Html, Line, OrbitControls } from '@react-three/drei';
@@ -53,6 +53,9 @@ import {
   type Layout3DConfig,
 } from '../../lib/wms/warehouse3dLayout';
 import { listBinContents, searchStock, type BinStockRow } from '../../lib/wms/wmsService';
+// A ponte com o Slotting: a planta do armazém é UMA só, e quem a edita é o configurador
+// 2D. O 3D lê a publicada em vez de manter uma segunda verdade sobre o mesmo galpão.
+import { getPublishedLayout, getFloorPlanSignedUrl } from '../../lib/slottingLayoutService';
 import {
   ABC_VAZIO, NIVEL_DE_PISO, alertasDeGiro, loadAbcDoArmazem,
   type AbcClasse, type AbcDaVaga, type AbcDoArmazem,
@@ -214,6 +217,79 @@ const FILTROS: ReadonlyArray<{ value: FiltroStatus; rotulo: string }> = [
   { value: 'empty', rotulo: 'Livres' },
   { value: 'blocked', rotulo: 'Bloqueadas' },
 ];
+
+/**
+ * Para que serve a cena agora.
+ *
+ * `operacional` é tudo que esta tela sempre fez: saldo, busca, rota, tempo real. É o
+ * padrão e continua idêntico — trocar de modo não pode ser caminho sem volta.
+ *
+ * `edicao` é o Galpão Builder: a cena deixa de ser só leitura e passa a aceitar
+ * construção. Por ora acende a grade de referência do piso; o catálogo e a manipulação
+ * de objeto entram nas etapas seguintes.
+ */
+type ModoVisor = 'operacional' | 'edicao';
+
+const MODOS_VISOR: SegmentedOption<ModoVisor>[] = [
+  { value: 'operacional', label: 'Operacional' },
+  { value: 'edicao', label: 'Edição' },
+];
+
+/** Divisão da grade de construção, em metros. Um metro é a unidade em que se fala de
+ *  corredor e de vão no galpão — meio metro polui e dois metros não ajuda a mirar. */
+const PASSO_GRADE_BUILDER = 1;
+
+// ── Catálogo de construção ───────────────────────────────────────────────────────────
+//
+// O que o Modo Edição sabe colocar no chão. Tudo vive em ESTADO LOCAL do React: construir
+// é imediato e reversível, sem ida ao banco. Gravar é etapa própria — e misturar as duas
+// faria cada clique de teste virar uma linha em produção.
+
+type FerramentaBuilder = 'navegar' | 'porta-pallets' | 'coluna' | 'doca';
+
+type TipoConstruido = Exclude<FerramentaBuilder, 'navegar'>;
+
+interface PecaDoCatalogo {
+  rotulo: string;
+  /** Dimensões em METROS: [largura (X), altura (Y), profundidade (Z)]. */
+  tamanho: [number, number, number];
+  /**
+   * Demarcação de solo em vez de estrutura.
+   *
+   * Muda onde a peça se apoia: estrutura sobe a partir do piso, demarcação fica rente a
+   * ele. Sem a distinção, uma área de doca nasceria flutuando a meia altura.
+   */
+  noChao: boolean;
+}
+
+const CATALOGO: Record<TipoConstruido, PecaDoCatalogo> = {
+  // 1,2 de vão e ~4,2 de altura: três níveis do passo padrão (1,4) do próprio mapa.
+  'porta-pallets': { rotulo: 'Porta-Pallets', tamanho: [1.2, 4.2, 1.2], noChao: false },
+  coluna: { rotulo: 'Coluna', tamanho: [0.3, 4.5, 0.3], noChao: false },
+  doca: { rotulo: 'Doca / Expedição', tamanho: [3, 0.04, 3], noChao: true },
+};
+
+/** Cores do builder. Hex porque é WebGL, no mesmo padrão de COR_VAGA e COR_GRADE. */
+const COR_BUILDER: Record<Theme, { fantasma: string; peca: string; selecionada: string; doca: string }> = {
+  light: { fantasma: '#3E7BE0', peca: '#64748B', selecionada: '#1E5FBF', doca: '#F59E0B' },
+  dark: { fantasma: '#7FB3F5', peca: '#475569', selecionada: '#3E7BE0', doca: '#B45309' },
+};
+
+interface ObjetoConstruido {
+  id: string;
+  tipo: TipoConstruido;
+  /** Centro em metros, já alinhado à grade. */
+  x: number;
+  z: number;
+  /** Múltiplos de 90°, em radianos. */
+  rotacaoY: number;
+}
+
+/** Altura do centro da peça para que a BASE encoste no piso. */
+function alturaDoCentro(peca: PecaDoCatalogo): number {
+  // Demarcação ganha 2 cm para não brigar por z-fighting com a laje do cenário.
+  return peca.noChao ? peca.tamanho[1] / 2 + 0.02 : peca.tamanho[1] / 2;
+}
 
 type ModoCor = 'status' | 'ocupacao' | 'abc';
 
@@ -1016,6 +1092,15 @@ function Cena({
   realce,
   extensao,
   deslocamento,
+  plantaNoPiso,
+  modoVisor,
+  ferramenta,
+  objetos,
+  selecionadoNoBuilder,
+  onConstruir,
+  onSelecionarObjeto,
+  onGirarObjeto,
+  onExcluirObjeto,
   theme,
   onHover,
   onSelect,
@@ -1038,6 +1123,15 @@ function Cena({
   realce: VagaDesenhavel | null;
   extensao: number;
   deslocamento: [number, number, number];
+  plantaNoPiso: PlantaNoPiso | null;
+  modoVisor: ModoVisor;
+  ferramenta: FerramentaBuilder;
+  objetos: ObjetoConstruido[];
+  selecionadoNoBuilder: string | null;
+  onConstruir: (x: number, z: number) => void;
+  onSelecionarObjeto: (id: string) => void;
+  onGirarObjeto: (id: string) => void;
+  onExcluirObjeto: (id: string) => void;
   theme: Theme;
   onHover: (slot: Slot | null) => void;
   onSelect: (slot: Slot) => void;
@@ -1065,6 +1159,40 @@ function Cena({
           {/* Piso. Sem referência de chão, orbitar desorienta: os cubos parecem flutuar
               no vazio e some a noção de qual rua está na frente. */}
           <gridHelper args={[extensao, Math.max(1, Math.round(extensao)), centro, linha]} position={[0, 0, 0]} />
+        </>
+      )}
+
+      {/* Grade de construção. Separada da grade decorativa acima de propósito: aquela
+          só existe no fundo "limpo" e serve para não perder a noção de chão ao orbitar;
+          esta precisa aparecer TAMBÉM dentro do galpão, porque é nela que se mira para
+          posicionar estrutura. Fica 1 cm acima do piso para não brigar por z-fighting
+          com a laje do cenário. */}
+      {/* Fora do bloco de Modo Edição: a planta é referência dos DOIS modos — no
+          operacional ela diz onde a vaga fica no galpão de verdade. */}
+      {plantaNoPiso && <PlantaDesenhadaNoPiso planta={plantaNoPiso} theme={theme} />}
+
+      {modoVisor === 'edicao' && (
+        <>
+          <gridHelper
+            args={[
+              Math.ceil(extensao / PASSO_GRADE_BUILDER) * PASSO_GRADE_BUILDER,
+              Math.ceil(extensao / PASSO_GRADE_BUILDER),
+              linha,
+              linha,
+            ]}
+            position={[0, 0.01, 0]}
+          />
+          <Construcao
+            ferramenta={ferramenta}
+            objetos={objetos}
+            selecionado={selecionadoNoBuilder}
+            extensao={extensao}
+            theme={theme}
+            onConstruir={onConstruir}
+            onSelecionar={onSelecionarObjeto}
+            onGirar={onGirarObjeto}
+            onExcluir={onExcluirObjeto}
+          />
         </>
       )}
 
@@ -1200,6 +1328,198 @@ class FronteiraDeErro extends Component<{ children: ReactNode; aoFalhar: ReactNo
 }
 
 // ── Painel de detalhe ──────────────────────────────────────────────────────────
+
+/** O que o 3D precisa para desenhar a planta no chão: a imagem e o tamanho REAL dela. */
+interface PlantaNoPiso {
+  url: string;
+  /** Largura da planta em metros: grid_width × cell_size_meters da planta publicada. */
+  largura: number;
+  /** Profundidade em metros: grid_height × cell_size_meters. */
+  profundidade: number;
+}
+
+/**
+ * A planta do armazém desenhada no piso da cena 3D.
+ *
+ * É a mesma imagem que o configurador usa de fundo na grade 2D, servida pela mesma URL
+ * assinada — não é uma segunda cópia que poderia divergir. O tamanho vem da escala
+ * calibrada da planta publicada, então ela ocupa no 3D os metros que ocupa no galpão.
+ *
+ * ── A textura é carregada à mão, e não por `useTexture` ───────────────────────────
+ * `useTexture` do drei suspende, e suspender aqui congelaria a cena inteira enquanto a
+ * imagem baixa — inclusive as vagas, que já estão prontas. Carregando por fora, a cena
+ * aparece primeiro e a planta entra quando chega.
+ *
+ * ── Falhar aqui não pode derrubar o mapa ──────────────────────────────────────────
+ * URL assinada expira e imagem some. No erro, o componente simplesmente não desenha: o
+ * piso fica liso, que é exatamente o que a tela era antes desta camada existir.
+ */
+function PlantaDesenhadaNoPiso({ planta, theme }: { planta: PlantaNoPiso; theme: Theme }) {
+  const [textura, setTextura] = useState<Texture | null>(null);
+
+  useEffect(() => {
+    let cancelado = false;
+    const carregador = new TextureLoader();
+    carregador.load(
+      planta.url,
+      t => {
+        if (cancelado) { t.dispose(); return; }
+        // Sem isto a imagem entra em linear e aparece lavada contra o piso.
+        t.colorSpace = SRGBColorSpace;
+        setTextura(t);
+      },
+      undefined,
+      () => { if (!cancelado) console.error('[WMS 3D] Não foi possível carregar a planta do piso.'); },
+    );
+    return () => { cancelado = true; };
+  }, [planta.url]);
+
+  useEffect(() => () => { textura?.dispose(); }, [textura]);
+
+  if (!textura) return null;
+
+  return (
+    // Entre o piso (-0,01) e as faixas de circulação (0,005): a planta cobre o concreto
+    // sem apagar a sinalização pintada por cima dele.
+    <mesh rotation={[-Math.PI / 2, 0, 0]} position={[0, 0.002, 0]}>
+      <planeGeometry args={[planta.largura, planta.profundidade]} />
+      {/* `color` MULTIPLICA a textura. Planta técnica é quase toda branca, e branco sobre
+          o piso claro do tema light é invisível — foi assim que esta camada pareceu não
+          existir no primeiro teste. O cinza puxa o fundo da planta para baixo do tom do
+          concreto sem tocar nas linhas, que já são escuras. No tema escuro não há o que
+          corrigir: branco sobre piso escuro contrasta sozinho. */}
+      <meshBasicMaterial
+        map={textura}
+        color={theme === 'light' ? '#C2C6CE' : '#FFFFFF'}
+        transparent
+        opacity={0.92}
+        toneMapped={false}
+      />
+    </mesh>
+  );
+}
+
+/**
+ * Camada de construção do Modo Edição.
+ *
+ * Três coisas, nesta ordem de profundidade: o plano que captura o ponteiro, o fantasma
+ * que segue o cursor, e as peças já colocadas.
+ *
+ * ── Por que o plano é transparente e não `visible={false}` ────────────────────────
+ * O raycaster do three PULA objeto invisível. Com `visible={false}` o plano existiria na
+ * cena e nunca seria atingido pelo ponteiro — o fantasma simplesmente não apareceria, sem
+ * erro nenhum para explicar. Por isso ele é visível com `opacity: 0`, e `depthWrite`
+ * desligado para não recortar o que está atrás dele.
+ *
+ * ── O estado do fantasma mora AQUI ────────────────────────────────────────────────
+ * `onPointerMove` dispara dezenas de vezes por segundo. Guardar a posição no componente
+ * de cima redesenharia o armazém inteiro a cada movimento do mouse; aqui só este subtree
+ * se redesenha.
+ */
+function Construcao({
+  ferramenta,
+  objetos,
+  selecionado,
+  extensao,
+  theme,
+  onConstruir,
+  onSelecionar,
+  onGirar,
+  onExcluir,
+}: {
+  ferramenta: FerramentaBuilder;
+  objetos: ObjetoConstruido[];
+  selecionado: string | null;
+  extensao: number;
+  theme: Theme;
+  onConstruir: (x: number, z: number) => void;
+  onSelecionar: (id: string) => void;
+  onGirar: (id: string) => void;
+  onExcluir: (id: string) => void;
+}) {
+  const [alvo, setAlvo] = useState<[number, number] | null>(null);
+  const cores = COR_BUILDER[theme];
+  const construindo = ferramenta !== 'navegar';
+  const pecaAtiva = construindo ? CATALOGO[ferramenta as TipoConstruido] : null;
+
+  return (
+    <>
+      <mesh
+        rotation={[-Math.PI / 2, 0, 0]}
+        position={[0, 0, 0]}
+        onPointerMove={e => {
+          if (!construindo) return;
+          e.stopPropagation();
+          // Snap: o metro é a unidade da grade desenhada, então arredondar para inteiro
+          // é literalmente encaixar na linha que a pessoa está vendo.
+          setAlvo([Math.round(e.point.x), Math.round(e.point.z)]);
+        }}
+        onPointerLeave={() => setAlvo(null)}
+        onClick={e => {
+          if (!construindo || !alvo) return;
+          e.stopPropagation();
+          onConstruir(alvo[0], alvo[1]);
+        }}
+      >
+        {/* Maior que a cena: construir fora do contorno atual do armazém é justamente o
+            caso de uso quando o galpão cresce. */}
+        <planeGeometry args={[extensao * 2.5, extensao * 2.5]} />
+        <meshBasicMaterial transparent opacity={0} depthWrite={false} />
+      </mesh>
+
+      {pecaAtiva && alvo && (
+        <mesh position={[alvo[0], alturaDoCentro(pecaAtiva), alvo[1]]}>
+          <boxGeometry args={pecaAtiva.tamanho} />
+          <meshStandardMaterial color={cores.fantasma} transparent opacity={0.45} depthWrite={false} />
+        </mesh>
+      )}
+
+      {objetos.map(obj => {
+        const peca = CATALOGO[obj.tipo];
+        const ativo = selecionado === obj.id;
+        const cor = ativo ? cores.selecionada : obj.tipo === 'doca' ? cores.doca : cores.peca;
+        return (
+          <group
+            key={obj.id}
+            position={[obj.x, alturaDoCentro(peca), obj.z]}
+            rotation={[0, obj.rotacaoY, 0]}
+          >
+            <mesh
+              onClick={e => {
+                e.stopPropagation();
+                onSelecionar(obj.id);
+              }}
+            >
+              <boxGeometry args={peca.tamanho} />
+              <meshStandardMaterial color={cor} />
+            </mesh>
+
+            {ativo && (
+              <Html center distanceFactor={22} position={[0, peca.tamanho[1] / 2 + 0.8, 0]}>
+                <div className="flex gap-1 whitespace-nowrap rounded-control border border-edge bg-surface px-1.5 py-1 shadow-control">
+                  <button
+                    type="button"
+                    className="rounded-control px-2 py-1 text-xs text-fg hover:bg-surface-3"
+                    onClick={() => onGirar(obj.id)}
+                  >
+                    Girar 90°
+                  </button>
+                  <button
+                    type="button"
+                    className="rounded-control px-2 py-1 text-xs text-red-600 hover:bg-surface-3 dark:text-red-400"
+                    onClick={() => onExcluir(obj.id)}
+                  >
+                    Excluir
+                  </button>
+                </div>
+              </Html>
+            )}
+          </group>
+        );
+      })}
+    </>
+  );
+}
 
 /** Data curta para a grade. Formatada à mão, como no módulo de captura: o painel é
  *  lido no corredor e a data não pode mudar de formato conforme a locale da máquina. */
@@ -1844,6 +2164,96 @@ export function Warehouse3DViewer({
     slotsExternos ? { fase: 'pronto', dados: { slots: [...slotsExternos], naoPosicionaveis: [], codigoPorBinId: new Map() } } : { fase: 'carregando' },
   );
 
+  const [modoVisor, setModoVisor] = useState<ModoVisor>('operacional');
+
+  // ── A planta do armazém no piso do 3D ────────────────────────────────────────────
+  // A ponte que faltava: o mapa 3D posicionava tudo por aritmética do código da vaga e
+  // nunca tinha olhado para a planta. Aqui ele passa a ler a MESMA planta publicada que
+  // o configurador 2D edita — imagem e escala — e desenhá-la no chão da cena.
+  const [plantaNoPiso, setPlantaNoPiso] = useState<PlantaNoPiso | null>(null);
+
+  useEffect(() => {
+    if (!companyId) return;
+    let cancelado = false;
+    (async () => {
+      const planta = await getPublishedLayout(companyId);
+      if (cancelado || !planta?.background_image_path) return;
+      const url = await getFloorPlanSignedUrl(planta.background_image_path);
+      if (cancelado || !url) return;
+      setPlantaNoPiso({
+        url,
+        // Metros reais, não células: é a escala calibrada que faz a planta ocupar no 3D
+        // o mesmo tamanho que ocupa no galpão.
+        largura: planta.grid_width * planta.cell_size_meters,
+        profundidade: planta.grid_height * planta.cell_size_meters,
+      });
+    })();
+    return () => { cancelado = true; };
+  }, [companyId]);
+
+  // ── Builder: tudo local, nada no banco ───────────────────────────────────────────
+  // Construir precisa ser barato de desfazer. Com cada clique indo ao Supabase, testar
+  // um arranjo deixaria rastro em produção e a borracha dependeria da rede.
+  const [ferramenta, setFerramenta] = useState<FerramentaBuilder>('navegar');
+  const [objetos, setObjetos] = useState<ObjetoConstruido[]>([]);
+  const [selecionadoNoBuilder, setSelecionadoNoBuilder] = useState<string | null>(null);
+  // Contador em vez de random: o id só precisa ser único dentro desta sessão de edição,
+  // e um contador é reproduzível quando se está depurando o que foi colocado onde.
+  const proximoIdDoObjeto = useRef(1);
+
+  const construirObjeto = useCallback(
+    (x: number, z: number) => {
+      setFerramenta(atual => {
+        if (atual === 'navegar') return atual;
+        const id = `obj-${proximoIdDoObjeto.current++}`;
+        setObjetos(lista => [...lista, { id, tipo: atual, x, z, rotacaoY: 0 }]);
+        setSelecionadoNoBuilder(id);
+        return atual;
+      });
+    },
+    [],
+  );
+
+  const girarObjeto = useCallback((id: string) => {
+    setObjetos(lista =>
+      lista.map(o => (o.id === id ? { ...o, rotacaoY: o.rotacaoY + Math.PI / 2 } : o)),
+    );
+  }, []);
+
+  const excluirObjeto = useCallback((id: string) => {
+    setObjetos(lista => lista.filter(o => o.id !== id));
+    setSelecionadoNoBuilder(atual => (atual === id ? null : atual));
+  }, []);
+
+  // Sair do Modo Edição desarma a ferramenta. Sem isto, voltar para cá traria o fantasma
+  // já colado no cursor e o primeiro clique construiria sem intenção.
+  useEffect(() => {
+    if (modoVisor === 'operacional') {
+      setFerramenta('navegar');
+      setSelecionadoNoBuilder(null);
+    }
+  }, [modoVisor]);
+
+  // Atalhos R e Del, só com peça selecionada no Modo Edição.
+  useEffect(() => {
+    if (modoVisor !== 'edicao' || !selecionadoNoBuilder) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      // Enquanto a pessoa digita na busca, R é letra, não atalho.
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)) return;
+      if (e.key === 'r' || e.key === 'R') {
+        e.preventDefault();
+        girarObjeto(selecionadoNoBuilder);
+      }
+      if (e.key === 'Delete') {
+        e.preventDefault();
+        excluirObjeto(selecionadoNoBuilder);
+      }
+    };
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [modoVisor, selecionadoNoBuilder, girarObjeto, excluirObjeto]);
+
   const [modo, setModo] = useState<ModoCor>('status');
   const [filtro, setFiltro] = useState<FiltroStatus>('todas');
   const [rua, setRua] = useState<string>(TODAS_AS_RUAS);
@@ -2482,6 +2892,15 @@ export function Warehouse3DViewer({
             realce={realce}
             extensao={extensao}
             deslocamento={deslocamento}
+            plantaNoPiso={plantaNoPiso}
+            modoVisor={modoVisor}
+            ferramenta={ferramenta}
+            objetos={objetos}
+            selecionadoNoBuilder={selecionadoNoBuilder}
+            onConstruir={construirObjeto}
+            onSelecionarObjeto={setSelecionadoNoBuilder}
+            onGirarObjeto={girarObjeto}
+            onExcluirObjeto={excluirObjeto}
             theme={theme}
             onHover={setApontada}
             onSelect={selecionar}
@@ -2506,6 +2925,48 @@ export function Warehouse3DViewer({
           <CapturadorDeCena registrar={registrarCapturador} />
         </Canvas>
       </FronteiraDeErro>
+
+      {/* Catálogo de construção. Barra inferior e não painel lateral: a mão vai do
+          catálogo para o chão o tempo todo, e a borda de baixo é o caminho mais curto
+          entre escolher a peça e mirar na grade. */}
+      {modoVisor === 'edicao' && (
+        <div className="pointer-events-auto absolute bottom-3 left-1/2 -translate-x-1/2">
+          <Panel>
+            <PanelSection padding="sm">
+              <div className="flex flex-wrap items-center justify-center gap-1.5">
+                <Button
+                  variant={ferramenta === 'navegar' ? 'primary' : 'ghost'}
+                  size="sm"
+                  onClick={() => setFerramenta('navegar')}
+                >
+                  Selecionar / Navegar
+                </Button>
+                <span aria-hidden className="mx-0.5 h-5 w-px bg-edge" />
+                {(Object.keys(CATALOGO) as TipoConstruido[]).map(tipo => (
+                  <Button
+                    key={tipo}
+                    variant={ferramenta === tipo ? 'primary' : 'ghost'}
+                    size="sm"
+                    onClick={() => {
+                      setFerramenta(tipo);
+                      // Soltar a seleção ao armar a ferramenta: a mini-barra de girar e
+                      // excluir sobre a peça antiga só atrapalharia a mira da nova.
+                      setSelecionadoNoBuilder(null);
+                    }}
+                  >
+                    + {CATALOGO[tipo].rotulo}
+                  </Button>
+                ))}
+              </div>
+              <p className="mt-1.5 text-center text-xs text-fg-subtle">
+                {ferramenta === 'navegar'
+                  ? `Clique numa peça para girar ou excluir. ${objetos.length} ${objetos.length === 1 ? 'peça colocada' : 'peças colocadas'}.`
+                  : 'Mova o ponteiro sobre o piso e clique para construir. R gira, Del exclui.'}
+              </p>
+            </PanelSection>
+          </Panel>
+        </div>
+      )}
 
       <Panel className="pointer-events-auto absolute left-3 top-3 w-[15rem]">
         {/* A legenda acompanha o modo. Mostrar as duas ao mesmo tempo obrigaria a
@@ -2579,6 +3040,25 @@ export function Warehouse3DViewer({
           ))}
         </PanelSection>
         )}
+
+        {/* Para que serve a cena. Fica no topo porque decide o que vem abaixo: no modo
+            Edição o painel continua sendo o mesmo, mas a cena aceita construção. */}
+        <PanelSection padding="sm" className="space-y-2">
+          <SegmentedControl
+            options={MODOS_VISOR}
+            value={modoVisor}
+            onChange={setModoVisor}
+            label="Modo"
+            width="full"
+          />
+          {modoVisor === 'edicao' && (
+            <p className="text-xs text-fg-muted">
+              Grade de {PASSO_GRADE_BUILDER} m acesa no piso, e o catálogo de construção na barra
+              de baixo. O que você montar vive só nesta sessão — ainda não há como gravar, então
+              sair da tela descarta.
+            </p>
+          )}
+        </PanelSection>
 
         <PanelSection padding="sm" className="space-y-2">
           {/* "SKU ou produto", NÃO "SKU ou lote". O WMS não tem camadas de lote: o saldo

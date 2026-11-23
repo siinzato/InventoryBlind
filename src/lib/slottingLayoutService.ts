@@ -9,9 +9,28 @@ import { planGridResize } from './slottingEngine';
 import { listRecords } from './rcaService';
 import type { RawReplayEvent, ReplayEventType } from './warehouseReplayEngine';
 
-export async function getActiveLayout(companyId: string): Promise<WarehouseLayout | null> {
+/**
+ * Pavimento padrão das leituras de planta.
+ *
+ * Toda tela que existia antes do AZ 2027 falava de UM galpão de um piso só, e continua
+ * falando: sem passar `andar`, tudo que já funcionava segue lendo o térreo. O Andar 2 só
+ * aparece para quem pedir por ele.
+ */
+export const ANDAR_TERREO = 1;
+
+// ── Por que todas as leituras de planta passaram a filtrar por andar ──────────────────
+// `.maybeSingle()` devolve ERRO quando a consulta casa mais de uma linha, e o tratamento
+// aqui é log + null — ou seja, a tela perderia a planta sem dizer por quê. Enquanto havia
+// uma planta por empresa isso nunca acontecia. Com uma planta por PAVIMENTO, aconteceria
+// na primeira vez que o Andar 2 existisse.
+//
+// O filtro por `andar` é o que mantém `.maybeSingle()` correto, e os índices parciais da
+// migration 131 garantem a mesma coisa do lado do banco: no máximo uma publicada e um
+// rascunho por pavimento. Correto por construção, não por sorte.
+
+export async function getActiveLayout(companyId: string, andar: number = ANDAR_TERREO): Promise<WarehouseLayout | null> {
   const { data, error } = await supabase
-    .from('warehouse_layouts').select('*').eq('company_id', companyId).eq('is_active', true).order('created_at', { ascending: false }).maybeSingle();
+    .from('warehouse_layouts').select('*').eq('company_id', companyId).eq('andar', andar).eq('is_active', true).order('created_at', { ascending: false }).maybeSingle();
   if (error) { console.error('[Slotting] Error loading active layout:', error); return null; }
   return data as WarehouseLayout | null;
 }
@@ -22,11 +41,12 @@ export async function createLayout(
   gridWidth: number,
   gridHeight: number,
   userId: string,
-  userEmail: string
+  userEmail: string,
+  andar: number = ANDAR_TERREO
 ): Promise<WarehouseLayout | null> {
   const { data: layout, error } = await supabase
     .from('warehouse_layouts')
-    .insert({ company_id: companyId, name, grid_width: gridWidth, grid_height: gridHeight })
+    .insert({ company_id: companyId, name, andar, grid_width: gridWidth, grid_height: gridHeight })
     .select()
     .maybeSingle();
   if (error || !layout) { console.error('[Slotting] Error creating layout:', error); return null; }
@@ -240,17 +260,17 @@ export async function deleteZone(zoneId: string, companyId: string, layoutId: st
 // `status='draft'`. Toda tela operacional (Operação/Layout e slotting/Replay/Análises) só
 // lê `is_active=true AND status='published'` — nunca o rascunho.
 
-export async function getPublishedLayout(companyId: string): Promise<WarehouseLayout | null> {
+export async function getPublishedLayout(companyId: string, andar: number = ANDAR_TERREO): Promise<WarehouseLayout | null> {
   const { data, error } = await supabase
-    .from('warehouse_layouts').select('*').eq('company_id', companyId).eq('is_active', true).eq('status', 'published')
+    .from('warehouse_layouts').select('*').eq('company_id', companyId).eq('andar', andar).eq('is_active', true).eq('status', 'published')
     .order('created_at', { ascending: false }).maybeSingle();
   if (error) { console.error('[Slotting] Error loading published layout:', error); return null; }
   return data as WarehouseLayout | null;
 }
 
-export async function getDraftLayout(companyId: string): Promise<WarehouseLayout | null> {
+export async function getDraftLayout(companyId: string, andar: number = ANDAR_TERREO): Promise<WarehouseLayout | null> {
   const { data, error } = await supabase
-    .from('warehouse_layouts').select('*').eq('company_id', companyId).eq('status', 'draft')
+    .from('warehouse_layouts').select('*').eq('company_id', companyId).eq('andar', andar).eq('status', 'draft')
     .order('created_at', { ascending: false }).maybeSingle();
   if (error) { console.error('[Slotting] Error loading draft layout:', error); return null; }
   return data as WarehouseLayout | null;
@@ -258,16 +278,25 @@ export async function getDraftLayout(companyId: string): Promise<WarehouseLayout
 
 /** Abre (ou reaproveita) o rascunho de edição — clona a planta publicada e todas as suas
  *  células/zonas; nunca move a operação ao vivo para o rascunho. */
-export async function openLayoutDraft(companyId: string, userId: string, userEmail: string): Promise<WarehouseLayout | null> {
-  const existingDraft = await getDraftLayout(companyId);
+export async function openLayoutDraft(
+  companyId: string,
+  userId: string,
+  userEmail: string,
+  andar: number = ANDAR_TERREO,
+): Promise<WarehouseLayout | null> {
+  const existingDraft = await getDraftLayout(companyId, andar);
   if (existingDraft) return existingDraft;
 
-  const published = await getPublishedLayout(companyId);
+  const published = await getPublishedLayout(companyId, andar);
 
   const { data: draft, error } = await supabase
     .from('warehouse_layouts')
     .insert({
       company_id: companyId,
+      // O rascunho nasce no MESMO pavimento que se pediu para editar. Herdar do
+      // publicado não serviria: quando o Andar 2 ainda não tem planta, `published` é
+      // null e o rascunho cairia no térreo, sobrescrevendo o rascunho de lá.
+      andar,
       name: published?.name ?? 'Layout Principal',
       grid_width: published?.grid_width ?? 20,
       grid_height: published?.grid_height ?? 20,
@@ -310,7 +339,18 @@ export async function openLayoutDraft(companyId: string, userId: string, userEma
  *  editada), o rascunho vira a nova publicada. Chamador já deve ter confirmado
  *  `validateLayoutForPublish` sem erros bloqueadores. */
 export async function publishLayoutDraft(companyId: string, draftLayoutId: string, userId: string, userEmail: string): Promise<boolean> {
-  const published = await getPublishedLayout(companyId);
+  // O pavimento vem do PRÓPRIO rascunho, não de um parâmetro: publicar o Andar 2 não
+  // pode arquivar a planta do térreo. Ler aqui evita que quem chama precise lembrar
+  // de passar o andar certo — e errar isso apagaria a planta do andar errado.
+  const { data: rascunho, error: draftError } = await supabase
+    .from('warehouse_layouts').select('andar')
+    .eq('id', draftLayoutId).eq('company_id', companyId).maybeSingle();
+  if (draftError || !rascunho) {
+    console.error('[Slotting] Error loading draft before publish:', draftError);
+    return false;
+  }
+
+  const published = await getPublishedLayout(companyId, (rascunho as { andar: number }).andar);
 
   if (published) {
     const { error: archiveError } = await supabase

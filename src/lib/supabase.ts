@@ -576,6 +576,8 @@ export interface WarehouseLayout {
   id: string;
   company_id: string;
   name: string;
+  /** Pavimento que esta planta representa. 1 = térreo. Uma planta cobre UM piso. */
+  andar: number;
   grid_width: number;
   grid_height: number;
   cell_size_meters: number;

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { computeCellSizeFromTwoPoints, planGridResize, GRID_MIN, GRID_MAX } from '../slottingEngine';
+import { computeCellSizeFromTwoPoints, planGridResize, GRID_MIN, GRID_MAX, GRID_MAX_CELLS } from '../slottingEngine';
 import type { WarehouseCell } from '../supabase';
 
 /** Grade cheia de 'vazio', como `createLayout` monta. */
@@ -111,5 +111,41 @@ describe('planGridResize - redimensionamento da grade do rascunho', () => {
   it('recusa numero quebrado', () => {
     expect(planGridResize(grade(20, 15), 20.5, 15).valido).toBe(false);
     expect(planGridResize(grade(20, 15), 20, Number.NaN).valido).toBe(false);
+  });
+});
+
+describe('planGridResize - limites de tamanho', () => {
+  it('aceita a grade do galpao de 45,2 m com celula de 0,50 m', () => {
+    // 21 x 90 = 1.890 celulas. Era impossivel com o teto antigo de 60 por lado.
+    const plano = planGridResize(grade(20, 15), 21, 90);
+    expect(plano.valido).toBe(true);
+    expect(plano.motivo).toBeNull();
+  });
+
+  it('recusa grade com os dois lados validos mas celulas demais', () => {
+    // 80 e 80 estao dentro de 2..100, e 6.400 passa de GRID_MAX_CELLS.
+    const plano = planGridResize(grade(20, 15), 80, 80);
+    expect(plano.valido).toBe(false);
+    expect(plano.motivo).toContain('6.400');
+    expect(plano.toCreate).toHaveLength(0);
+    expect(plano.toRemove).toHaveLength(0);
+  });
+
+  it('aceita exatamente o teto de celulas e recusa uma linha acima', () => {
+    expect(planGridResize(grade(20, 15), 100, 40).valido).toBe(true);
+    expect(planGridResize(grade(20, 15), 100, 41).valido).toBe(false);
+  });
+
+  it('da motivo diferente para lado invalido e para total invalido', () => {
+    const lado = planGridResize(grade(20, 15), GRID_MAX + 1, 10);
+    const total = planGridResize(grade(20, 15), 90, 90);
+    expect(lado.motivo).toContain(String(GRID_MAX));
+    expect(total.motivo).toContain('células');
+    expect(lado.motivo).not.toEqual(total.motivo);
+  });
+
+  it('o teto por lado permite as 90 celulas que 0,50 m exige', () => {
+    expect(GRID_MAX).toBeGreaterThanOrEqual(90);
+    expect(GRID_MAX_CELLS).toBeGreaterThanOrEqual(21 * 90);
   });
 });

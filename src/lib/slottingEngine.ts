@@ -63,9 +63,26 @@ export function computeCellSizeFromTwoPoints(input: ScaleCalibrationInput): numb
 // Isto aqui é só a aritmética de "quais células entram e quais saem". Fica fora do serviço
 // porque errar nela apaga desenho do usuário, e isso se confere por teste, não clicando.
 
-/** Limites da grade, em células — os mesmos que o formulário de criação já aceita. */
+/**
+ * Limites da grade, em células por lado.
+ *
+ * O teto subiu de 60 para 100 para a celula poder valer 0,50 m: num galpao de 45,2 m
+ * isso exige 90 celulas no comprimento, e a 60 o mais fino possivel era 0,75 m — nessa
+ * escala corredores de 1,2 m, 1,4 m e 1,8 m arredondam todos para 2 celulas e viram o
+ * mesmo desenho. A 0,50 m eles viram 2, 3 e 4.
+ */
 export const GRID_MIN = 2;
-export const GRID_MAX = 60;
+export const GRID_MAX = 100;
+
+/**
+ * Teto de células da grade inteira, independente do formato.
+ *
+ * O lado sozinho não basta: 100 × 100 daria 10.000 células, e cada célula é uma LINHA
+ * no banco — criadas num insert só, lidas a cada abertura do configurador e desenhadas
+ * todas de uma vez. 4.000 cobre tudo que a grade de 60 × 60 ja permitia (3.600) e o
+ * galpao de 21 × 90 (1.890), e barra o absurdo antes de ele virar requisicao.
+ */
+export const GRID_MAX_CELLS = 4000;
 
 export interface GridResizePlan {
   /** Células que passam a existir porque a grade cresceu. Entram como 'vazio'. */
@@ -79,8 +96,16 @@ export interface GridResizePlan {
    * Sem ele o usuário descobre que perdeu a expedição depois de clicar.
    */
   desenhoPerdido: number;
-  /** false quando a largura/altura pedida está fora de GRID_MIN..GRID_MAX. */
+  /** false quando a grade pedida nao cabe nos limites. `motivo` diz qual deles. */
   valido: boolean;
+  /**
+   * Por que a grade foi recusada, pronto para exibir — ou null quando ela vale.
+   *
+   * Existe porque "fora dos limites" virou duas regras diferentes: o lado e o total de
+   * celulas. Uma grade de 80 × 80 tem os dois lados dentro de 2..100 e ainda assim e
+   * invalida, entao uma mensagem generica sobre o lado mentiria para quem a digitou.
+   */
+  motivo: string | null;
 }
 
 /**
@@ -95,10 +120,21 @@ export function planGridResize(
   nextWidth: number,
   nextHeight: number,
 ): GridResizePlan {
-  const invalido: GridResizePlan = { toCreate: [], toRemove: [], desenhoPerdido: 0, valido: false };
-  if (!Number.isInteger(nextWidth) || !Number.isInteger(nextHeight)) return invalido;
-  if (nextWidth < GRID_MIN || nextWidth > GRID_MAX) return invalido;
-  if (nextHeight < GRID_MIN || nextHeight > GRID_MAX) return invalido;
+  const recusa = (motivo: string): GridResizePlan =>
+    ({ toCreate: [], toRemove: [], desenhoPerdido: 0, valido: false, motivo });
+
+  if (!Number.isInteger(nextWidth) || !Number.isInteger(nextHeight)) {
+    return recusa('Largura e altura precisam ser números inteiros.');
+  }
+  if (nextWidth < GRID_MIN || nextWidth > GRID_MAX || nextHeight < GRID_MIN || nextHeight > GRID_MAX) {
+    return recusa(`Largura e altura precisam estar entre ${GRID_MIN} e ${GRID_MAX} células.`);
+  }
+  if (nextWidth * nextHeight > GRID_MAX_CELLS) {
+    return recusa(
+      `${nextWidth} × ${nextHeight} dá ${(nextWidth * nextHeight).toLocaleString('pt-BR')} células, ` +
+      `acima do limite de ${GRID_MAX_CELLS.toLocaleString('pt-BR')}.`,
+    );
+  }
 
   const presentes = new Set(existing.map(c => cellKey(c.x, c.y)));
 
@@ -116,6 +152,7 @@ export function planGridResize(
     toRemove: foraDaGrade.map(c => ({ x: c.x, y: c.y })),
     desenhoPerdido: foraDaGrade.filter(c => c.cell_type !== 'vazio' || !!c.location_code).length,
     valido: true,
+    motivo: null,
   };
 }
 

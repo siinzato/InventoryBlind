@@ -1,11 +1,11 @@
 // Slotting Intelligence — CRUD do layout (grade + células) e leitura de dados de movimento
 // (picks do Full Manager) que alimentam o motor puro em slottingEngine.ts.
 
-import { fetchAllPages } from './supabasePagination';
+import { fetchAllPages, SUPABASE_PAGE } from './supabasePagination';
 import { supabase, WarehouseLayout, WarehouseCell, WarehouseCellType, WarehouseZone, WarehouseZoneKind } from './supabase';
 import { logAuditEvent } from './auditLogService';
 import type { ClassifiedAddressRow } from './warehouseAddressImport';
-import { planGridResize, GRID_MIN, GRID_MAX } from './slottingEngine';
+import { planGridResize } from './slottingEngine';
 import { listRecords } from './rcaService';
 import type { RawReplayEvent, ReplayEventType } from './warehouseReplayEngine';
 
@@ -73,7 +73,7 @@ export async function resizeLayoutDraft(
 
   const cells = await getCells(layoutId, companyId);
   const plano = planGridResize(cells, nextWidth, nextHeight);
-  if (!plano.valido) return { ok: false, erro: `Largura e altura precisam estar entre ${GRID_MIN} e ${GRID_MAX}.` };
+  if (!plano.valido) return { ok: false, erro: plano.motivo ?? 'Tamanho de grade inválido.' };
 
   // Fora da grade é exatamente `x >= largura` OU `y >= altura`. Duas faixas resolvem, em vez
   // de mandar centenas de pares (x,y) numa cláusula gigante.
@@ -92,9 +92,13 @@ export async function resizeLayoutDraft(
     }
   }
 
-  if (plano.toCreate.length > 0) {
+  // Em blocos: com a grade podendo chegar a milhares de celulas, um insert unico viraria
+  // um corpo de requisicao enorme numa ida so. O tamanho do bloco acompanha o teto de
+  // linhas do PostgREST, que e o mesmo numero que a leitura ja respeita.
+  for (let i = 0; i < plano.toCreate.length; i += SUPABASE_PAGE) {
+    const bloco = plano.toCreate.slice(i, i + SUPABASE_PAGE);
     const { error: insertError } = await supabase.from('warehouse_cells').insert(
-      plano.toCreate.map(p => ({
+      bloco.map(p => ({
         layout_id: layoutId, company_id: companyId, x: p.x, y: p.y, cell_type: 'vazio' as WarehouseCellType,
       })),
     );
@@ -128,11 +132,24 @@ export async function resizeLayoutDraft(
   return { ok: true };
 }
 
+/**
+ * Todas as células da planta.
+ *
+ * Paginada porque uma consulta sem `.range()` volta no maximo 1.000 linhas e PARECE
+ * completa — e a grade passou a poder ter mais que isso. Uma planta de 21 × 90 tem 1.890
+ * celulas: sem paginar, o configurador desenharia 1.000 e o resto sumiria sem erro, o
+ * publish contaria posicoes a menos e `openLayoutDraft` clonaria um rascunho truncado.
+ *
+ * `order('y').order('x')` ja da a ordenacao estavel que o paginador exige: existe unique
+ * em (layout_id, x, y), entao nao ha empate possivel na virada do bloco.
+ */
 export async function getCells(layoutId: string, companyId: string): Promise<WarehouseCell[]> {
-  const { data, error } = await supabase
-    .from('warehouse_cells').select('*').eq('layout_id', layoutId).eq('company_id', companyId).order('y').order('x');
+  const { rows, error } = await fetchAllPages<WarehouseCell>('Slotting/cells', (from, to) =>
+    supabase
+      .from('warehouse_cells').select('*').eq('layout_id', layoutId).eq('company_id', companyId)
+      .order('y').order('x').range(from, to));
   if (error) { console.error('[Slotting] Error loading cells:', error); return []; }
-  return data as WarehouseCell[];
+  return rows;
 }
 
 export async function upsertCell(

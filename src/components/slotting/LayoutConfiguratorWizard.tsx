@@ -277,10 +277,8 @@ function StepPlanta({ companyId, userId, userEmail, draft, cells, onChanged, onS
             {redimensionando ? 'Aplicando...' : 'Aplicar tamanho'}
           </Button>
         </div>
-        {!plano.valido && (
-          <p className="text-xs text-red-600 dark:text-red-400">
-            Largura e altura precisam ser números inteiros entre {GRID_MIN} e {GRID_MAX}.
-          </p>
+        {!plano.valido && plano.motivo && (
+          <p className="text-xs text-red-600 dark:text-red-400">{plano.motivo}</p>
         )}
         {plano.valido && mudou && plano.desenhoPerdido > 0 && (
           <Notice tone="warning">

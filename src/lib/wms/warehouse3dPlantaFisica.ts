@@ -179,6 +179,108 @@ export function blocosDaPlanta(
   return blocos;
 }
 
+// ── A estante de verdade ─────────────────────────────────────────────────────────────
+//
+// Uma fileira NÃO é um bloco maciço. Desenhada como caixa cheia ela vira muro de
+// concreto: some o vão onde o palete entra, somem os montantes, some a leitura de
+// "quantas posições tem esta rua". O volume fechado também mente sobre ocupação — um
+// porta-pallets vazio é quase todo ar.
+//
+// Aqui a fileira é decomposta nas peças que ela tem no galpão: montantes verticais nas
+// divisas de posição e longarinas corridas por nível. As medidas de seção são as mesmas
+// que `warehouse3dEstrutura.ts` já usa para as vagas montadas por código, para as duas
+// vistas não parecerem dois produtos diferentes.
+
+/** Vão de uma posição de palete ao longo da fileira. */
+export const PASSO_DA_POSICAO = 1.2;
+
+/** Níveis de armazenagem por fileira — o mesmo que as ruas A e B têm cadastrado. */
+export const NIVEIS_POR_FILEIRA = 3;
+
+/** Seção do montante e altura da longarina, iguais às da estrutura por código. */
+const SECAO_MONTANTE = 0.09;
+const ALTURA_DA_VIGA = 0.07;
+
+export interface PecaDaFileira {
+  tipo: 'montante' | 'viga';
+  /** Centro em metros, no mesmo referencial dos blocos (origem no canto da planta). */
+  centro: [number, number, number];
+  tamanho: [number, number, number];
+}
+
+/**
+ * Montantes e longarinas de uma fileira.
+ *
+ * O passo real é o comprimento dividido pelo número INTEIRO de posições que cabem, e não
+ * 1,2 m fixo: com passo fixo a última posição sobraria para fora da fileira ou deixaria
+ * um pedaço órfão no fim. Dividir o comprimento faz os montantes das pontas caírem
+ * exatamente nas extremidades.
+ */
+export function pecasDaFileira(bloco: BlocoFisico): PecaDaFileira[] {
+  if (bloco.tipo !== 'fileira') return [];
+
+  const [cx, , cz] = bloco.centro;
+  const [profundidade, altura, comprimento] = bloco.tamanho;
+
+  const posicoes = posicoesDaFileira(bloco);
+  const passo = comprimento / posicoes;
+  const zInicio = cz - comprimento / 2;
+
+  // Montante e longarina ficam nas duas faces da fileira, recuados meia seção para não
+  // sobrar metade da peça para fora da profundidade declarada.
+  const faces = [
+    cx - profundidade / 2 + SECAO_MONTANTE / 2,
+    cx + profundidade / 2 - SECAO_MONTANTE / 2,
+  ];
+
+  const pecas: PecaDaFileira[] = [];
+
+  // Montantes: um a mais que o número de posições, porque eles ficam nas DIVISAS.
+  for (let i = 0; i <= posicoes; i++) {
+    const z = zInicio + i * passo;
+    for (const x of faces) {
+      pecas.push({
+        tipo: 'montante',
+        centro: [x, altura / 2, z],
+        tamanho: [SECAO_MONTANTE, altura, SECAO_MONTANTE],
+      });
+    }
+  }
+
+  // Longarinas: corridas pelo comprimento inteiro, uma por nível em cada face.
+  //
+  // O `- ALTURA_DA_VIGA / 2` não é detalhe: centrada na altura do nível, metade da
+  // longarina do último nível sobra PARA FORA da estante (4,235 contra 4,2 de altura).
+  // Subtraindo meia altura, o TOPO da peça encosta no nível, que é onde a longarina
+  // fica numa estante de verdade — o palete apoia em cima dela.
+  const alturaDoNivel = altura / NIVEIS_POR_FILEIRA;
+  for (let n = 1; n <= NIVEIS_POR_FILEIRA; n++) {
+    const y = n * alturaDoNivel - ALTURA_DA_VIGA / 2;
+    for (const x of faces) {
+      pecas.push({
+        tipo: 'viga',
+        centro: [x, y, cz],
+        tamanho: [SECAO_MONTANTE, ALTURA_DA_VIGA, comprimento],
+      });
+    }
+  }
+
+  return pecas;
+}
+
+/**
+ * Quantas posições de palete a fileira comporta, por nível.
+ *
+ * Arredonda para BAIXO, e isso é o ponto. Arredondando para cima, os 15 m do galpão novo
+ * dariam 13 posições — vão de 1,154 m, onde um palete PBR de 1,20 m não entra. O
+ * resultado seria uma estante que o desenho promete e a operação não tem. Para baixo dá
+ * 12 posições de 1,25 m, que cabem.
+ */
+export function posicoesDaFileira(bloco: BlocoFisico): number {
+  if (bloco.tipo !== 'fileira') return 0;
+  return Math.max(1, Math.floor(bloco.tamanho[2] / PASSO_DA_POSICAO));
+}
+
 /** Comprimento total do conjunto, somando os trechos. */
 export function comprimentoTotal(trechos: TrechoDaPlanta[] = AZ2027_TERREO): number {
   return trechos.reduce((soma, t) => Math.max(soma, t.zInicio + t.comprimento), 0);

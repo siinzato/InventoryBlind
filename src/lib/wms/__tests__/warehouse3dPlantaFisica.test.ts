@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   AZ2027_TERREO, EXPEDICAO, LARGURA_DO_PREDIO, PROFUNDIDADE_DA_FILEIRA,
-  blocosDaPlanta, comprimentoTotal, posicoesEmX,
+  blocosDaPlanta, comprimentoTotal, posicoesEmX, pecasDaFileira, posicoesDaFileira, NIVEIS_POR_FILEIRA,
 } from '../warehouse3dPlantaFisica';
 
 describe('warehouse3dPlantaFisica - geometria lida da planta AZ 2027', () => {
@@ -82,5 +82,54 @@ describe('warehouse3dPlantaFisica - geometria lida da planta AZ 2027', () => {
         expect(sobrepoeX && sobrepoeZ).toBe(false);
       }
     }
+  });
+});
+
+describe('pecasDaFileira - a estante decomposta', () => {
+  const fileira = () => blocosDaPlanta().filter(b => b.tipo === 'fileira')[0];
+
+  it('montantes ficam nas DIVISAS: um a mais que o numero de posicoes, nas duas faces', () => {
+    const b = fileira();
+    const pecas = pecasDaFileira(b);
+    const montantes = pecas.filter(p => p.tipo === 'montante');
+    expect(montantes).toHaveLength((posicoesDaFileira(b) + 1) * 2);
+  });
+
+  it('uma longarina por nivel em cada face', () => {
+    const vigas = pecasDaFileira(fileira()).filter(p => p.tipo === 'viga');
+    expect(vigas).toHaveLength(NIVEIS_POR_FILEIRA * 2);
+  });
+
+  it('os montantes das pontas caem exatamente nas extremidades da fileira', () => {
+    const b = fileira();
+    const zs = pecasDaFileira(b).filter(p => p.tipo === 'montante').map(p => p.centro[2]);
+    expect(Math.min(...zs)).toBeCloseTo(b.centro[2] - b.tamanho[2] / 2, 6);
+    expect(Math.max(...zs)).toBeCloseTo(b.centro[2] + b.tamanho[2] / 2, 6);
+  });
+
+  it('nenhuma peca sai da profundidade declarada da fileira', () => {
+    const b = fileira();
+    for (const p of pecasDaFileira(b)) {
+      expect(p.centro[0] - p.tamanho[0] / 2).toBeGreaterThanOrEqual(b.centro[0] - b.tamanho[0] / 2 - 1e-9);
+      expect(p.centro[0] + p.tamanho[0] / 2).toBeLessThanOrEqual(b.centro[0] + b.tamanho[0] / 2 + 1e-9);
+    }
+  });
+
+  it('nenhuma peca passa da altura da fileira', () => {
+    const b = fileira();
+    for (const p of pecasDaFileira(b)) {
+      expect(p.centro[1] + p.tamanho[1] / 2).toBeLessThanOrEqual(b.tamanho[1] + 1e-9);
+    }
+  });
+
+  it('a expedicao nao vira estante', () => {
+    const exp = blocosDaPlanta().find(b => b.tipo === 'expedicao')!;
+    expect(pecasDaFileira(exp)).toHaveLength(0);
+    expect(posicoesDaFileira(exp)).toBe(0);
+  });
+
+  it('o galpao novo da 12 posicoes por fileira nos 15 m desenhados', () => {
+    const novo = blocosDaPlanta().filter(b => b.rotulo === 'RUA E')[0];
+    expect(posicoesDaFileira(novo)).toBe(12);
   });
 });

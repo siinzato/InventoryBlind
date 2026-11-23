@@ -58,7 +58,8 @@ import { listBinContents, searchStock, type BinStockRow } from '../../lib/wms/wm
 import { getPublishedLayout, getFloorPlanSignedUrl } from '../../lib/slottingLayoutService';
 // A planta como geometria: as fileiras vêm das medidas, não do código da vaga.
 import {
-  blocosDaPlanta, comprimentoTotal, LARGURA_DO_PREDIO, type BlocoFisico,
+  blocosDaPlanta, comprimentoTotal, LARGURA_DO_PREDIO, pecasDaFileira, posicoesDaFileira,
+  type BlocoFisico,
 } from '../../lib/wms/warehouse3dPlantaFisica';
 import {
   ABC_VAZIO, NIVEL_DE_PISO, alertasDeGiro, loadAbcDoArmazem,
@@ -1361,22 +1362,30 @@ function PlantaFisica3D({ blocos, theme }: { blocos: BlocoFisico[]; theme: Theme
 
   return (
     <group position={[-largura / 2, 0, -comprimento / 2]}>
-      {blocos.map(b => (
-        <group key={b.id} position={b.centro}>
-          <mesh>
-            <boxGeometry args={b.tamanho} />
-            <meshStandardMaterial
-              color={b.tipo === 'expedicao' ? cores.doca : cores.peca}
-              roughness={0.85}
-              metalness={0}
-              transparent={b.tipo === 'expedicao'}
-              opacity={b.tipo === 'expedicao' ? 0.55 : 1}
-            />
-          </mesh>
+      {/* Demarcação de solo continua sendo um plano: expedição é tinta no chão. */}
+      {blocos.filter(b => b.tipo === 'expedicao').map(b => (
+        <mesh key={b.id} position={b.centro}>
+          <boxGeometry args={b.tamanho} />
+          <meshStandardMaterial color={cores.doca} roughness={0.9} metalness={0} transparent opacity={0.5} />
+        </mesh>
+      ))}
+
+      {/* A fileira é DECOMPOSTA em montantes e longarinas. Caixa cheia no lugar disso
+          vira muro: some o vão onde o palete entra e some a leitura de quantas posições
+          a rua tem. Porta-pallets vazio é quase todo ar, e o desenho tem que mostrar isso. */}
+      {blocos.filter(b => b.tipo === 'fileira').map(b => (
+        <group key={b.id}>
+          {pecasDaFileira(b).map((p, i) => (
+            <mesh key={`${b.id}-${i}`} position={p.centro}>
+              <boxGeometry args={p.tamanho} />
+              <meshStandardMaterial color={cores.peca} roughness={0.6} metalness={0.15} />
+            </mesh>
+          ))}
           {b.rotulo && (
-            <Html center distanceFactor={26} position={[0, b.tamanho[1] / 2 + 0.7, 0]}>
+            <Html center distanceFactor={26} position={[b.centro[0], b.tamanho[1] + 0.6, b.centro[2]]}>
               <span className="whitespace-nowrap rounded-control bg-ink-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white">
                 {b.rotulo}
+                <span className="ml-1 opacity-70">{posicoesDaFileira(b)} pos.</span>
               </span>
             </Html>
           )}

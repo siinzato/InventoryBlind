@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   AZ2027_TERREO, EXPEDICAO, LARGURA_DO_PREDIO, PROFUNDIDADE_DA_FILEIRA,
   blocosDaPlanta, comprimentoTotal, posicoesEmX, pecasDaFileira, posicoesDaFileira, NIVEIS_POR_FILEIRA,
+  vaosDaFileira, mesasDaPlanta,
 } from '../warehouse3dPlantaFisica';
 
 describe('warehouse3dPlantaFisica - geometria lida da planta AZ 2027', () => {
@@ -131,5 +132,109 @@ describe('pecasDaFileira - a estante decomposta', () => {
   it('o galpao novo da 12 posicoes por fileira nos 15 m desenhados', () => {
     const novo = blocosDaPlanta().filter(b => b.rotulo === 'RUA E')[0];
     expect(posicoesDaFileira(novo)).toBe(12);
+  });
+});
+
+describe('vaosDaFileira e mesasDaPlanta', () => {
+  const fileiraE = () => blocosDaPlanta().filter(b => b.rotulo === 'RUA E')[0];
+
+  it('o vao sabe o codigo do endereco que ocupa, no formato que o cadastro usa', () => {
+    const vaos = vaosDaFileira(fileiraE());
+    expect(vaos[0].codigo).toBe('PP-E01-N1');
+    expect(vaos.find(v => v.posicao === 12 && v.nivel === 3)?.codigo).toBe('PP-E12-N3');
+  });
+
+  it('entrega posicoes x niveis vaos, um por endereco', () => {
+    const b = fileiraE();
+    expect(vaosDaFileira(b)).toHaveLength(posicoesDaFileira(b) * NIVEIS_POR_FILEIRA);
+  });
+
+  it('fileira sem rua cadastrada gera vao SEM codigo, e nao um codigo inventado', () => {
+    const semRua = blocosDaPlanta().filter(b => b.tipo === 'fileira' && !b.rotulo)[0];
+    expect(semRua).toBeDefined();
+    expect(vaosDaFileira(semRua).every(v => v.codigo === null)).toBe(true);
+  });
+
+  it('o nivel 1 apoia no piso e nenhum vao passa da altura da estante', () => {
+    const b = fileiraE();
+    const vaos = vaosDaFileira(b);
+    const base = Math.min(...vaos.map(v => v.centro[1] - v.tamanho[1] / 2));
+    expect(base).toBeGreaterThanOrEqual(0);
+    for (const v of vaos) {
+      expect(v.centro[1] + v.tamanho[1] / 2).toBeLessThanOrEqual(b.tamanho[1] + 1e-9);
+    }
+  });
+
+  it('o vao cabe dentro da fileira, sem invadir montante nem vizinho', () => {
+    const b = fileiraE();
+    for (const v of vaosDaFileira(b)) {
+      expect(v.tamanho[0]).toBeLessThan(b.tamanho[0]);
+      expect(v.centro[2] - v.tamanho[2] / 2).toBeGreaterThanOrEqual(b.centro[2] - b.tamanho[2] / 2 - 1e-9);
+      expect(v.centro[2] + v.tamanho[2] / 2).toBeLessThanOrEqual(b.centro[2] + b.tamanho[2] / 2 + 1e-9);
+    }
+  });
+
+  it('a expedicao nao gera vao: nao e estante', () => {
+    const exp = blocosDaPlanta().find(b => b.tipo === 'expedicao')!;
+    expect(vaosDaFileira(exp)).toHaveLength(0);
+  });
+
+  it('entrega 4 bancadas de embalagem e 5 baias, todas dentro do predio', () => {
+    const mesas = mesasDaPlanta();
+    expect(mesas).toHaveLength(9);
+    for (const m of mesas) {
+      expect(m.tipo).toBe('bancada');
+      expect(m.centro[0] - m.tamanho[0] / 2).toBeGreaterThanOrEqual(0);
+      expect(m.centro[0] + m.tamanho[0] / 2).toBeLessThanOrEqual(LARGURA_DO_PREDIO);
+      // Apoiadas no chao, nao flutuando.
+      expect(m.centro[1] - m.tamanho[1] / 2).toBeCloseTo(0, 6);
+    }
+  });
+
+  it('nenhuma mesa cai em cima de uma fileira', () => {
+    const fileiras = blocosDaPlanta().filter(b => b.tipo === 'fileira');
+    for (const m of mesasDaPlanta()) {
+      for (const f of fileiras) {
+        const chocaX = Math.abs(m.centro[0] - f.centro[0]) < (m.tamanho[0] + f.tamanho[0]) / 2 - 1e-6;
+        const chocaZ = Math.abs(m.centro[2] - f.centro[2]) < (m.tamanho[2] + f.tamanho[2]) / 2 - 1e-6;
+        expect(chocaX && chocaZ).toBe(false);
+      }
+    }
+  });
+});
+
+describe('a fileira nunca fica mais curta que o cadastro', () => {
+  it('estende a fileira para caber todas as posicoes cadastradas', () => {
+    // A planta desenha 10,5 m (8 posicoes) no predio atual, mas a rua A tem 13
+    // cadastradas e a D tem 16. Sem estender, PP-A13-N3 com carga nao teria vao e a
+    // mercadoria sumiria do mapa. Aconteceu em 23/11/2026.
+    const real = { A: 13, B: 3, C: 7, D: 16, E: 12, F: 12, G: 12, H: 12 };
+    const blocos = blocosDaPlanta(undefined, undefined, real);
+    for (const [letra, posicoes] of Object.entries(real)) {
+      const f = blocos.find(b => b.rotulo === `RUA ${letra}`)!;
+      expect(posicoesDaFileira(f)).toBeGreaterThanOrEqual(posicoes);
+    }
+  });
+
+  it('todo codigo cadastrado encontra um vao desenhado', () => {
+    const real = { A: 13, B: 3, C: 7, D: 16, E: 12, F: 12, G: 12, H: 12 };
+    const desenhados = new Set<string>();
+    for (const f of blocosDaPlanta(undefined, undefined, real).filter(b => b.tipo === 'fileira')) {
+      for (const v of vaosDaFileira(f)) if (v.codigo) desenhados.add(v.codigo);
+    }
+    for (const [letra, posicoes] of Object.entries(real)) {
+      for (let p = 1; p <= posicoes; p++) {
+        for (let n = 1; n <= NIVEIS_POR_FILEIRA; n++) {
+          expect(desenhados.has(`PP-${letra}${String(p).padStart(2, '0')}-N${n}`)).toBe(true);
+        }
+      }
+    }
+  });
+
+  it('rua menor que a planta NAO encolhe a fileira abaixo do desenho', () => {
+    // A rua B tem 3 posicoes; a fileira continua com o comprimento da planta, porque
+    // encolher deixaria um buraco no desenho do predio.
+    const b = blocosDaPlanta(undefined, undefined, { B: 3 }).find(x => x.rotulo === 'RUA B')!;
+    expect(b.tamanho[2]).toBeCloseTo(AZ2027_TERREO[0].comprimentoDaFileira, 6);
   });
 });

@@ -58,8 +58,8 @@ import { listBinContents, searchStock, type BinStockRow } from '../../lib/wms/wm
 import { getPublishedLayout, getFloorPlanSignedUrl } from '../../lib/slottingLayoutService';
 // A planta como geometria: as fileiras vêm das medidas, não do código da vaga.
 import {
-  blocosDaPlanta, comprimentoTotal, LARGURA_DO_PREDIO, pecasDaFileira, posicoesDaFileira,
-  type BlocoFisico,
+  blocosDaPlanta, comprimentoTotal, LARGURA_DO_PREDIO, mesasDaPlanta, pecasDaFileira,
+  posicoesDaFileira, vaosDaFileira, type BlocoFisico,
 } from '../../lib/wms/warehouse3dPlantaFisica';
 import {
   ABC_VAZIO, NIVEL_DE_PISO, alertasDeGiro, loadAbcDoArmazem,
@@ -244,13 +244,16 @@ const MODOS_VISOR: SegmentedOption<ModoVisor>[] = [
  *  corredor e de vão no galpão — meio metro polui e dois metros não ajuda a mirar. */
 const PASSO_GRADE_BUILDER = 1;
 
+/** Espessura do palete de madeira desenhado dentro do vão, a mesma da estrutura por código. */
+const ALTURA_DO_PALETE = 0.12;
+
 // ── Catálogo de construção ───────────────────────────────────────────────────────────
 //
 // O que o Modo Edição sabe colocar no chão. Tudo vive em ESTADO LOCAL do React: construir
 // é imediato e reversível, sem ida ao banco. Gravar é etapa própria — e misturar as duas
 // faria cada clique de teste virar uma linha em produção.
 
-type FerramentaBuilder = 'navegar' | 'porta-pallets' | 'coluna' | 'doca';
+type FerramentaBuilder = 'navegar' | 'porta-pallets' | 'mesa' | 'doca';
 
 type TipoConstruido = Exclude<FerramentaBuilder, 'navegar'>;
 
@@ -268,10 +271,13 @@ interface PecaDoCatalogo {
 }
 
 const CATALOGO: Record<TipoConstruido, PecaDoCatalogo> = {
-  // 1,2 de vão e ~4,2 de altura: três níveis do passo padrão (1,4) do próprio mapa.
-  'porta-pallets': { rotulo: 'Porta-Pallets', tamanho: [1.2, 4.2, 1.2], noChao: false },
-  coluna: { rotulo: 'Coluna', tamanho: [0.3, 4.5, 0.3], noChao: false },
-  doca: { rotulo: 'Doca / Expedição', tamanho: [3, 0.04, 3], noChao: true },
+  // Um trecho de estante com 3 posições e 3 níveis, nas MESMAS medidas da planta: 1,1 de
+  // profundidade, 4,2 de altura, 3,6 de comprimento (3 × 1,2). Colocar um "porta-pallets"
+  // que não tem a geometria do porta-pallets desenhado faria o builder construir outra
+  // coisa diferente do galpão.
+  'porta-pallets': { rotulo: 'Porta-Pallets', tamanho: [1.1, 4.2, 3.6], noChao: false },
+  mesa: { rotulo: 'Mesa de expedição', tamanho: [1.6, 0.9, 0.8], noChao: false },
+  doca: { rotulo: 'Área de doca', tamanho: [3, 0.04, 3], noChao: true },
 };
 
 /** Cores do builder. Hex porque é WebGL, no mesmo padrão de COR_VAGA e COR_GRADE. */
@@ -1098,7 +1104,7 @@ function Cena({
   extensao,
   deslocamento,
   plantaNoPiso,
-  blocosFisicos,
+  plantaFisica,
   modoVisor,
   ferramenta,
   objetos,
@@ -1130,7 +1136,15 @@ function Cena({
   extensao: number;
   deslocamento: [number, number, number];
   plantaNoPiso: PlantaNoPiso | null;
-  blocosFisicos: BlocoFisico[] | null;
+  /** Tudo que a planta física precisa, ou null quando a vista por código está ligada. */
+  plantaFisica: {
+    blocos: BlocoFisico[];
+    mesas: BlocoFisico[];
+    vagasPorCodigo: Map<string, Slot>;
+    modoCor: ModoCor;
+    maxCaixas: number;
+    abcPorVaga: ReadonlyMap<string, AbcDaVaga>;
+  } | null;
   modoVisor: ModoVisor;
   ferramenta: FerramentaBuilder;
   objetos: ObjetoConstruido[];
@@ -1178,7 +1192,19 @@ function Cena({
           operacional ela diz onde a vaga fica no galpão de verdade. */}
       {plantaNoPiso && <PlantaDesenhadaNoPiso planta={plantaNoPiso} theme={theme} />}
 
-      {blocosFisicos && <PlantaFisica3D blocos={blocosFisicos} theme={theme} />}
+      {plantaFisica && (
+        <PlantaFisica3D
+          blocos={plantaFisica.blocos}
+          mesas={plantaFisica.mesas}
+          vagasPorCodigo={plantaFisica.vagasPorCodigo}
+          modoCor={plantaFisica.modoCor}
+          maxCaixas={plantaFisica.maxCaixas}
+          abcPorVaga={plantaFisica.abcPorVaga}
+          theme={theme}
+          onSelecionarVaga={onSelect}
+          onApontarVaga={onHover}
+        />
+      )}
 
       {modoVisor === 'edicao' && (
         <>
@@ -1208,7 +1234,7 @@ function Cena({
       {/* As vagas montadas pelo CÓDIGO. Saem de cena enquanto a planta física está
           desenhada: as duas juntas foi o que produziu o mapa errado por cima do desenho
           certo — grade regular atravessando fileira posicionada por medida. */}
-      {!blocosFisicos && (
+      {!plantaFisica && (
       <group position={deslocamento}>
         {/* Montantes, quando o pulmão é suspenso. */}
         <Vigas colunas={colunas} />
@@ -1355,7 +1381,29 @@ class FronteiraDeErro extends Component<{ children: ReactNode; aoFalhar: ReactNo
  * mesmo referencial em que a imagem da planta é desenhada — é isso que faz as duas
  * coisas se sobreporem em vez de flutuarem uma sobre a outra.
  */
-function PlantaFisica3D({ blocos, theme }: { blocos: BlocoFisico[]; theme: Theme }) {
+function PlantaFisica3D({
+  blocos,
+  mesas,
+  vagasPorCodigo,
+  modoCor,
+  maxCaixas,
+  abcPorVaga,
+  theme,
+  onSelecionarVaga,
+  onApontarVaga,
+}: {
+  blocos: BlocoFisico[];
+  mesas: BlocoFisico[];
+  /** Vaga real de cada código, para o vão saber o que mostrar e o clique saber o que abrir. */
+  vagasPorCodigo: Map<string, Slot>;
+  modoCor: ModoCor;
+  /** Os mesmos dois que a vista por código usa, para as cores não divergirem entre elas. */
+  maxCaixas: number;
+  abcPorVaga: ReadonlyMap<string, AbcDaVaga>;
+  theme: Theme;
+  onSelecionarVaga: (slot: Slot) => void;
+  onApontarVaga: (slot: Slot | null) => void;
+}) {
   const cores = COR_BUILDER[theme];
   const largura = LARGURA_DO_PREDIO;
   const comprimento = comprimentoTotal();
@@ -1373,6 +1421,15 @@ function PlantaFisica3D({ blocos, theme }: { blocos: BlocoFisico[]; theme: Theme
       {/* A fileira é DECOMPOSTA em montantes e longarinas. Caixa cheia no lugar disso
           vira muro: some o vão onde o palete entra e some a leitura de quantas posições
           a rua tem. Porta-pallets vazio é quase todo ar, e o desenho tem que mostrar isso. */}
+      {/* Mesas de embalagem e baias de expedição. Não guardam endereço: são superfície
+          de trabalho, e contá-las como estante inventaria posição que não existe. */}
+      {mesas.map(m => (
+        <mesh key={m.id} position={m.centro}>
+          <boxGeometry args={m.tamanho} />
+          <meshStandardMaterial color={cores.fantasma} roughness={0.8} metalness={0} />
+        </mesh>
+      ))}
+
       {blocos.filter(b => b.tipo === 'fileira').map(b => (
         <group key={b.id}>
           {pecasDaFileira(b).map((p, i) => (
@@ -1381,6 +1438,73 @@ function PlantaFisica3D({ blocos, theme }: { blocos: BlocoFisico[]; theme: Theme
               <meshStandardMaterial color={cores.peca} roughness={0.6} metalness={0.15} />
             </mesh>
           ))}
+
+          {/* O VÃO é o que se clica. Cada um corresponde a um endereço, então clicar
+              aqui abre a mesma vaga que a vista por código abre — é o mesmo objeto, e
+              não duas descrições paralelas do mesmo galpão.
+              Vão sem vaga cadastrada fica translúcido e inerte: mostra que o lugar
+              existe na planta sem fingir que há endereço para receber mercadoria. */}
+          {vaosDaFileira(b).map(vao => {
+            const slot = vao.codigo ? vagasPorCodigo.get(vao.codigo) ?? null : null;
+            const cor = slot ? corDaVaga(slot, modoCor, theme, maxCaixas, abcPorVaga) : cores.peca;
+            const [largura, alturaVao, profundidade] = vao.tamanho;
+            const [vx, vy, vz] = vao.centro;
+            const base = vy - alturaVao / 2;
+            const temCarga = !!slot && slot.caixas > 0;
+            const alturaDaCarga = (alturaVao - ALTURA_DO_PALETE) * 0.88;
+
+            const aoClicar = slot
+              ? (e: { stopPropagation: () => void }) => { e.stopPropagation(); onSelecionarVaga(slot); }
+              : undefined;
+
+            return (
+              <group key={`${b.id}-${vao.posicao}-${vao.nivel}`}>
+                {/* Vaga com saldo ganha palete de madeira e carga, como o mapa sempre
+                    desenhou. Caixa translúcida no lugar disso tirava o volume que faz a
+                    estante ler como estante cheia — e a madeira é o que dá o contraste
+                    quente contra o aço. */}
+                {temCarga && (
+                  <>
+                    <mesh position={[vx, base + ALTURA_DO_PALETE / 2, vz]} onClick={aoClicar}>
+                      <boxGeometry args={[largura, ALTURA_DO_PALETE, profundidade]} />
+                      <meshStandardMaterial color={COR_PALETE[theme]} roughness={0.9} metalness={0} />
+                    </mesh>
+                    <mesh
+                      position={[vx, base + ALTURA_DO_PALETE + alturaDaCarga / 2, vz]}
+                      onClick={aoClicar}
+                      onPointerOver={slot ? e => { e.stopPropagation(); onApontarVaga(slot); } : undefined}
+                      onPointerOut={slot ? () => onApontarVaga(null) : undefined}
+                    >
+                      <boxGeometry args={[largura * 0.94, alturaDaCarga, profundidade * 0.94]} />
+                      <meshStandardMaterial color={cor} roughness={0.72} metalness={0} />
+                    </mesh>
+                  </>
+                )}
+
+                {/* Vão livre: superfície quase invisível que existe para RECEBER O CLIQUE.
+                    Sem ela não haveria onde clicar para endereçar mercadoria num lugar
+                    vazio, que é justamente o que se quer fazer num vão vazio. */}
+                {!temCarga && (
+                  <mesh
+                    position={vao.centro}
+                    onClick={aoClicar}
+                    onPointerOver={slot ? e => { e.stopPropagation(); onApontarVaga(slot); } : undefined}
+                    onPointerOut={slot ? () => onApontarVaga(null) : undefined}
+                  >
+                    <boxGeometry args={vao.tamanho} />
+                    <meshStandardMaterial
+                      color={cor}
+                      roughness={0.8}
+                      metalness={0}
+                      transparent
+                      opacity={slot ? 0.12 : 0.05}
+                    />
+                  </mesh>
+                )}
+              </group>
+            );
+          })}
+
           {b.rotulo && (
             <Html center distanceFactor={26} position={[b.centro[0], b.tamanho[1] + 0.6, b.centro[2]]}>
               <span className="whitespace-nowrap rounded-control bg-ink-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white">
@@ -1550,15 +1674,35 @@ function Construcao({
             position={[obj.x, alturaDoCentro(peca), obj.z]}
             rotation={[0, obj.rotacaoY, 0]}
           >
-            <mesh
-              onClick={e => {
-                e.stopPropagation();
-                onSelecionar(obj.id);
-              }}
-            >
-              <boxGeometry args={peca.tamanho} />
-              <meshStandardMaterial color={cor} />
-            </mesh>
+            {/* Porta-pallets colocado é DESENHADO como porta-pallets: montantes e
+                longarinas, a mesma decomposição da planta. Caixa cheia faria o builder
+                construir uma coisa e o mapa mostrar outra. */}
+            {obj.tipo === 'porta-pallets' ? (
+              <group onClick={e => { e.stopPropagation(); onSelecionar(obj.id); }}>
+                {pecasDaFileira({
+                  id: obj.id,
+                  tipo: 'fileira',
+                  centro: [0, peca.tamanho[1] / 2, 0],
+                  tamanho: peca.tamanho,
+                  rotulo: '',
+                }).map((p, i) => (
+                  <mesh key={i} position={[p.centro[0], p.centro[1] - peca.tamanho[1] / 2, p.centro[2]]}>
+                    <boxGeometry args={p.tamanho} />
+                    <meshStandardMaterial color={cor} roughness={0.6} metalness={0.15} />
+                  </mesh>
+                ))}
+              </group>
+            ) : (
+              <mesh
+                onClick={e => {
+                  e.stopPropagation();
+                  onSelecionar(obj.id);
+                }}
+              >
+                <boxGeometry args={peca.tamanho} />
+                <meshStandardMaterial color={cor} />
+              </mesh>
+            )}
 
             {ativo && (
               <Html center distanceFactor={22} position={[0, peca.tamanho[1] / 2 + 0.8, 0]}>
@@ -2235,8 +2379,7 @@ export function Warehouse3DViewer({
   // A planta reproduzida em 3D pelas medidas. Ligada por padrão: é o desenho do galpão
   // de verdade. Desligar devolve as vagas montadas pelo código, que é onde vivem status,
   // busca e rota — as duas não podem aparecer juntas porque ocupam o mesmo chão.
-  const [plantaFisica, setPlantaFisica] = useState(true);
-  const blocosFisicos = useMemo(() => (plantaFisica ? blocosDaPlanta() : null), [plantaFisica]);
+  const [mostrarPlantaFisica, setMostrarPlantaFisica] = useState(true);
 
   // ── A planta do armazém no piso do 3D ────────────────────────────────────────────
   // A ponte que faltava: o mapa 3D posicionava tudo por aritmética do código da vaga e
@@ -2575,6 +2718,34 @@ export function Warehouse3DViewer({
    *  o problema quem já foi procurar. */
   const alertasGiro = useMemo(() => alertasDeGiro(vagas, abc.porVaga), [vagas, abc]);
 
+  /**
+   * A planta física pronta para desenhar, com as vagas REAIS ligadas aos vãos.
+   *
+   * O mapa por código é o que faz o clique funcionar: cada vão sabe o endereço que
+   * ocupa, acha a vaga e abre a MESMA que a vista por código abriria. Sem ele o vão
+   * seria enfeite — desenho bonito que não responde a clique.
+   */
+  const plantaFisica = useMemo(() => {
+    if (!mostrarPlantaFisica) return null;
+
+    // Maior posição cadastrada por rua. Entra no desenho para a fileira nunca ficar mais
+    // curta que o cadastro — sem isso, vaga com carga numa posição alta não tem vão onde
+    // aparecer e a mercadoria some do mapa.
+    const posicoesPorRua: Record<string, number> = {};
+    for (const v of vagas) {
+      posicoesPorRua[v.ruaCodigo] = Math.max(posicoesPorRua[v.ruaCodigo] ?? 0, v.modulo);
+    }
+
+    return {
+      blocos: blocosDaPlanta(undefined, undefined, posicoesPorRua),
+      mesas: mesasDaPlanta(),
+      vagasPorCodigo: new Map(vagas.map(v => [v.id, v])),
+      modoCor: modo,
+      maxCaixas: vagas.reduce((m, s) => Math.max(m, s.caixas), 0),
+      abcPorVaga: abc.porVaga,
+    };
+  }, [mostrarPlantaFisica, vagas, modo, abc.porVaga]);
+
   // Posição e cor de cada vaga, calculadas uma vez por mudança real de entrada. Sem
   // isto, cada movimento do mouse (que muda `apontada`) recalcularia a cena inteira.
   const {
@@ -2767,7 +2938,7 @@ export function Warehouse3DViewer({
    * por código descreve outra geometria, e usá-la deixava o galpão de 45,2 m cortado pela
    * parede e fora do enquadramento — foi o que apareceu no primeiro teste.
    */
-  const extensao = blocosFisicos ? Math.max(extensaoDasVagas, comprimentoTotal()) : extensaoDasVagas;
+  const extensao = plantaFisica ? Math.max(extensaoDasVagas, comprimentoTotal()) : extensaoDasVagas;
 
   /** Muda quando o conjunto desenhado muda — é o gatilho para refazer a sombra. */
   const chaveDeSombra = `${solidas.length}-${divergentes.length}-${fiosAtivos.length}-${raioX.length}-${extensao.toFixed(1)}`;
@@ -2824,10 +2995,10 @@ export function Warehouse3DViewer({
    */
   const posicaoCamera = useMemo(() => {
     const base = enquadrarCamera(vagas, layout);
-    if (!blocosFisicos || extensaoDasVagas <= 0) return base;
+    if (!plantaFisica || extensaoDasVagas <= 0) return base;
     const fator = Math.max(1, comprimentoTotal() / extensaoDasVagas);
     return [base[0] * fator, base[1] * fator, base[2] * fator] as [number, number, number];
-  }, [vagas, layout, blocosFisicos, extensaoDasVagas]);
+  }, [vagas, layout, plantaFisica, extensaoDasVagas]);
   const distancia = Math.hypot(...posicaoCamera);
 
   // A MESMA conta do enquadramento inicial: se o reset usasse um valor próprio, o
@@ -2987,7 +3158,7 @@ export function Warehouse3DViewer({
             extensao={extensao}
             deslocamento={deslocamento}
             plantaNoPiso={plantaNoPiso}
-            blocosFisicos={blocosFisicos}
+            plantaFisica={plantaFisica}
             modoVisor={modoVisor}
             ferramenta={ferramenta}
             objetos={objetos}
@@ -3063,7 +3234,11 @@ export function Warehouse3DViewer({
         </div>
       )}
 
-      <Panel className="pointer-events-auto absolute left-3 top-3 w-[15rem]">
+      {/* `max-h` + rolagem: o painel cresceu com o seletor de modo e o catálogo, e numa
+          altura de canvas menor ele passava do fim da moldura — o rodapé (contagem em
+          destaque, resetar câmera, capturar vista) simplesmente ficava fora da tela, sem
+          nada indicando que havia mais coisa ali. */}
+      <Panel className="pointer-events-auto absolute left-3 top-3 flex max-h-[calc(100%-1.5rem)] w-[15rem] flex-col overflow-y-auto">
         {/* A legenda acompanha o modo. Mostrar as duas ao mesmo tempo obrigaria a
             pessoa a descobrir sozinha qual delas explica o que está na tela. */}
         {modo === 'abc' ? (
@@ -3147,15 +3322,15 @@ export function Warehouse3DViewer({
             width="full"
           />
           <Button
-            variant={plantaFisica ? 'primary' : 'secondary'}
+            variant={mostrarPlantaFisica ? 'primary' : 'secondary'}
             size="sm"
             className="w-full"
-            onClick={() => setPlantaFisica(v => !v)}
+            onClick={() => setMostrarPlantaFisica(v => !v)}
           >
-            {plantaFisica ? 'Planta do galpão' : 'Vagas por código'}
+            {mostrarPlantaFisica ? 'Planta do galpão' : 'Vagas por código'}
           </Button>
           <p className="text-xs text-fg-muted">
-            {plantaFisica
+            {mostrarPlantaFisica
               ? 'Fileiras desenhadas pelas medidas da planta: 10,3 × 45,2 m, corredores de 2,65 m no galpão novo. Status, busca e rota vivem no outro modo.'
               : 'Vagas posicionadas pelo código do endereço, em grade regular. Não coincide com o desenho da planta.'}
           </p>

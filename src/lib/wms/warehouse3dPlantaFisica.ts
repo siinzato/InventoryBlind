@@ -17,7 +17,7 @@
 /** Uma caixa do cenário, em metros, já posicionada pelo CENTRO. */
 export interface BlocoFisico {
   id: string;
-  tipo: 'fileira' | 'expedicao' | 'bancada' | 'piso';
+  tipo: 'fileira' | 'expedicao' | 'bancada';
   /** Centro: [x, y, z]. */
   centro: [number, number, number];
   /** Dimensões: [largura em X, altura em Y, comprimento em Z]. */
@@ -143,22 +143,34 @@ export function posicoesEmX(trecho: TrechoDaPlanta, larguraDoPredio = LARGURA_DO
 export function blocosDaPlanta(
   trechos: TrechoDaPlanta[] = AZ2027_TERREO,
   rotulosPorTrecho: Record<string, string[]> = { 'Prédio atual': ['A', 'B', 'C', 'D'], 'Galpão novo': ['E', 'F', 'G', 'H'] },
+  posicoesCadastradas: Record<string, number> = {},
 ): BlocoFisico[] {
   const blocos: BlocoFisico[] = [];
 
   for (const trecho of trechos) {
     const xs = posicoesEmX(trecho);
     const zInicioDasFileiras = trecho.zInicio + trecho.corredorInicio;
-    const zCentro = zInicioDasFileiras + trecho.comprimentoDaFileira / 2;
     const rotulos = rotulosPorTrecho[trecho.nome] ?? [];
 
     xs.forEach((x, i) => {
+      const letra = rotulos[i];
+
+      // A fileira nunca é mais curta do que o CADASTRO exige.
+      //
+      // A planta diz 10,5 m para as fileiras do prédio atual (3 módulos de 3,5 m), o
+      // que dá 8 posições. Mas a rua A tem 13 cadastradas e a D tem 16 — e com 8 vãos
+      // desenhados, `PP-A13-N3` com 16 caixas simplesmente NÃO APARECIA no mapa.
+      // Mercadoria sumindo do desenho é pior que desenho fora de medida: a medida da
+      // planta é aproximada e o cadastro é o que a operação usa todo dia.
+      const posicoes = letra ? posicoesCadastradas[letra] ?? 0 : 0;
+      const comprimento = Math.max(trecho.comprimentoDaFileira, posicoes * PASSO_DA_POSICAO);
+
       blocos.push({
         id: `${trecho.nome}-fileira-${i + 1}`,
         tipo: 'fileira',
-        centro: [x, ALTURA_DA_FILEIRA / 2, zCentro],
-        tamanho: [PROFUNDIDADE_DA_FILEIRA, ALTURA_DA_FILEIRA, trecho.comprimentoDaFileira],
-        rotulo: rotulos[i] ? `RUA ${rotulos[i]}` : '',
+        centro: [x, ALTURA_DA_FILEIRA / 2, zInicioDasFileiras + comprimento / 2],
+        tamanho: [PROFUNDIDADE_DA_FILEIRA, ALTURA_DA_FILEIRA, comprimento],
+        rotulo: letra ? `RUA ${letra}` : '',
       });
     });
   }
@@ -279,6 +291,119 @@ export function pecasDaFileira(bloco: BlocoFisico): PecaDaFileira[] {
 export function posicoesDaFileira(bloco: BlocoFisico): number {
   if (bloco.tipo !== 'fileira') return 0;
   return Math.max(1, Math.floor(bloco.tamanho[2] / PASSO_DA_POSICAO));
+}
+
+/**
+ * Um vão da estante: uma posição de palete, num nível.
+ *
+ * É o que se clica. Cada vão corresponde a UM endereço — `PP-E03-N2` é a posição 3 da
+ * rua E no nível 2 —, então o desenho e o cadastro passam a falar do mesmo objeto, em
+ * vez de serem duas descrições paralelas do mesmo galpão.
+ */
+export interface VaoDaFileira {
+  /** Código do endereço, ou null quando a fileira não tem rua cadastrada. */
+  codigo: string | null;
+  /** 1-based, ao longo do comprimento da fileira. */
+  posicao: number;
+  /** 1-based, de baixo para cima. */
+  nivel: number;
+  centro: [number, number, number];
+  tamanho: [number, number, number];
+}
+
+/** Letra da rua a partir do rótulo ("RUA E" → "E"). */
+function letraDaRua(rotulo: string): string | null {
+  const m = /^RUA\s+([A-Z]+)$/.exec(rotulo.trim());
+  return m ? m[1] : null;
+}
+
+/**
+ * Os vãos clicáveis de uma fileira.
+ *
+ * O código é montado no MESMO formato que `buildBinCodes` grava — prefixo, letra,
+ * posição com dois dígitos, nível. Montar diferente produziria vão que não acha vaga
+ * nenhuma, e o clique cairia no vazio sem erro para explicar.
+ */
+export function vaosDaFileira(bloco: BlocoFisico, prefixo = 'PP'): VaoDaFileira[] {
+  if (bloco.tipo !== 'fileira') return [];
+
+  const [cx, , cz] = bloco.centro;
+  const [profundidade, altura, comprimento] = bloco.tamanho;
+  const posicoes = posicoesDaFileira(bloco);
+  const passo = comprimento / posicoes;
+  const zInicio = cz - comprimento / 2;
+  const alturaDoNivel = altura / NIVEIS_POR_FILEIRA;
+  const letra = letraDaRua(bloco.rotulo);
+
+  const vaos: VaoDaFileira[] = [];
+  for (let p = 1; p <= posicoes; p++) {
+    for (let n = 1; n <= NIVEIS_POR_FILEIRA; n++) {
+      vaos.push({
+        codigo: letra ? `${prefixo}-${letra}${String(p).padStart(2, '0')}-N${n}` : null,
+        posicao: p,
+        nivel: n,
+        centro: [
+          cx,
+          // Base do nível mais meia altura: o nível 1 apoia no piso, não flutua.
+          (n - 1) * alturaDoNivel + alturaDoNivel / 2,
+          zInicio + (p - 0.5) * passo,
+        ],
+        // Recuado dos montantes e da longarina, para o vão ler como abertura e o clique
+        // não disputar a superfície com a estrutura.
+        tamanho: [profundidade * 0.82, alturaDoNivel * 0.74, passo * 0.86],
+      });
+    }
+  }
+  return vaos;
+}
+
+/**
+ * Mesas e bancadas da planta.
+ *
+ * Separadas das fileiras porque não armazenam endereço: são superfície de trabalho, e
+ * tratá-las como estante faria o mapa contar posição que não existe.
+ */
+export function mesasDaPlanta(trechos: TrechoDaPlanta[] = AZ2027_TERREO): BlocoFisico[] {
+  const mesas: BlocoFisico[] = [];
+  const TAMPO = { largura: 1.6, altura: 0.9, profundidade: 0.8 } as const;
+
+  // 4 bancadas de embalagem, no fim do prédio atual, perto do portão do galpão.
+  const atual = trechos.find(t => t.nome === 'Prédio atual');
+  if (atual) {
+    const z = atual.zInicio + atual.comprimento - 3.2;
+    const vaoEntre = (LARGURA_DO_PREDIO - 4 * TAMPO.largura) / 5;
+    for (let i = 0; i < 4; i++) {
+      const x = vaoEntre * (i + 1) + TAMPO.largura * (i + 0.5);
+      mesas.push({
+        id: `bancada-${i + 1}`,
+        tipo: 'bancada',
+        centro: [x, TAMPO.altura / 2, z],
+        tamanho: [TAMPO.largura, TAMPO.altura, TAMPO.profundidade],
+        rotulo: i === 0 ? 'EMBALAGEM' : '',
+      });
+    }
+  }
+
+  // 5 baias de pallets prontos, dentro da expedição.
+  const ultimo = trechos[trechos.length - 1];
+  if (ultimo) {
+    const fim = ultimo.zInicio + ultimo.comprimento;
+    const z = fim - EXPEDICAO.comprimento + 2.4;
+    const vaoEntre = (EXPEDICAO.largura - 5 * 1.2) / 6;
+    const borda = (LARGURA_DO_PREDIO - EXPEDICAO.largura) / 2;
+    for (let i = 0; i < 5; i++) {
+      const x = borda + vaoEntre * (i + 1) + 1.2 * (i + 0.5);
+      mesas.push({
+        id: `baia-${i + 1}`,
+        tipo: 'bancada',
+        centro: [x, 0.45, z],
+        tamanho: [1.2, 0.9, 1.2],
+        rotulo: i === 0 ? 'BAIAS' : '',
+      });
+    }
+  }
+
+  return mesas;
 }
 
 /** Comprimento total do conjunto, somando os trechos. */

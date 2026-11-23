@@ -27,3 +27,11 @@ supabase/.temp/
 # Instalador do InventoryFull: mora num Release do GitHub, nao no pacote de deploy.
 # Ver o comentario em src/components/InventoryFullPage.tsx.
 public/downloads/
+
+# Pasta de til criada por engano quando um comando expande `~` como caminho literal
+# em vez do HOME (acontece no shell do Windows). Nunca deve entrar em commit.
+~/
+
+# Arquivos de driver de impressora (.CAT/.INF/.DSI) que caem aqui ao instalar a
+# impressora de etiquetas. Nao fazem parte do app.
+gdi/

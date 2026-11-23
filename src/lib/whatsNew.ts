@@ -27,8 +27,8 @@ export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
     description: 'Até agora o tamanho da grade era escolhido uma única vez, na criação da planta, e não dava mais para mudar. Quem passou a ocupar um galpão maior ficava sem saída: ou desenhava o prédio novo espremido na grade antiga, ou afrouxava a escala até cada quadradinho valer metros demais — e aí um corredor estreito e um largo viravam a mesma coisa no desenho. Na etapa "Planta" do configurador agora há um campo de largura e altura: dá para aumentar a grade a qualquer momento e seguir desenhando. Se a escala já estiver calibrada, o tamanho aparece em metros ao lado, então você confere direto contra a medida real do galpão. Diminuir também é possível, e o sistema avisa antes quantas células já desenhadas ficariam de fora. Tudo acontece no rascunho — a planta que a operação usa só muda quando você publicar.',
   },
   {
-    id: '2026-11-14-acesso-rapido-no-menu',
-    date: '2026-11-14',
+    id: '2026-11-23-acesso-rapido-no-menu',
+    date: '2026-11-23',
     category: 'melhoria',
     title: 'Seus favoritos agora ficam no menu lateral',
     description: 'O "Acesso rápido" saiu de dentro do dashboard e passou a aparecer também no fim do menu lateral, como uma seção própria. São os mesmos atalhos que você já escolhe — mudou um lá e muda aqui na hora, sem recarregar. Com isso dá para pular direto para a sua tela preferida de qualquer lugar do sistema, não só do dashboard. Quem ainda não escolheu nenhum favorito vê no menu um convite para escolher.',

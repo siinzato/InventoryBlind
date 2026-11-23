@@ -52,6 +52,73 @@ export function computeCellSizeFromTwoPoints(input: ScaleCalibrationInput): numb
   return realDistanceMeters / cellsDistance;
 }
 
+// ── Redimensionamento da grade ───────────────────────────────────────────────────────────
+//
+// A grade nasce fixa: `createLayout` grava `grid_width`/`grid_height` uma vez e nada no app
+// voltava a escrever nesses campos. Enquanto o galpão for o mesmo, tudo bem — mas um prédio
+// mais comprido simplesmente não cabia na grade escolhida da primeira vez, e a saída seria
+// afrouxar a escala até cada célula valer metros demais para distinguir um corredor de
+// 1,2 m de um de 2,65 m.
+//
+// Isto aqui é só a aritmética de "quais células entram e quais saem". Fica fora do serviço
+// porque errar nela apaga desenho do usuário, e isso se confere por teste, não clicando.
+
+/** Limites da grade, em células — os mesmos que o formulário de criação já aceita. */
+export const GRID_MIN = 2;
+export const GRID_MAX = 60;
+
+export interface GridResizePlan {
+  /** Células que passam a existir porque a grade cresceu. Entram como 'vazio'. */
+  toCreate: GridPoint[];
+  /** Células que deixam de existir porque a grade encolheu. */
+  toRemove: GridPoint[];
+  /**
+   * Quantas das removidas tinham desenho — tipo diferente de 'vazio' ou endereço vinculado.
+   *
+   * É o número que precisa aparecer ANTES de aplicar: crescer é inofensivo, encolher apaga.
+   * Sem ele o usuário descobre que perdeu a expedição depois de clicar.
+   */
+  desenhoPerdido: number;
+  /** false quando a largura/altura pedida está fora de GRID_MIN..GRID_MAX. */
+  valido: boolean;
+}
+
+/**
+ * Diferença entre a grade atual e a pedida.
+ *
+ * `existing` é a lista de células como está no banco. Não assume que ela cobre a grade
+ * inteira: o que falta vira `toCreate`, então a função também conserta uma grade
+ * incompleta em vez de duplicar célula.
+ */
+export function planGridResize(
+  existing: Pick<WarehouseCell, 'x' | 'y' | 'cell_type' | 'location_code'>[],
+  nextWidth: number,
+  nextHeight: number,
+): GridResizePlan {
+  const invalido: GridResizePlan = { toCreate: [], toRemove: [], desenhoPerdido: 0, valido: false };
+  if (!Number.isInteger(nextWidth) || !Number.isInteger(nextHeight)) return invalido;
+  if (nextWidth < GRID_MIN || nextWidth > GRID_MAX) return invalido;
+  if (nextHeight < GRID_MIN || nextHeight > GRID_MAX) return invalido;
+
+  const presentes = new Set(existing.map(c => cellKey(c.x, c.y)));
+
+  const toCreate: GridPoint[] = [];
+  for (let x = 0; x < nextWidth; x++) {
+    for (let y = 0; y < nextHeight; y++) {
+      if (!presentes.has(cellKey(x, y))) toCreate.push({ x, y });
+    }
+  }
+
+  const foraDaGrade = existing.filter(c => c.x >= nextWidth || c.y >= nextHeight);
+
+  return {
+    toCreate,
+    toRemove: foraDaGrade.map(c => ({ x: c.x, y: c.y })),
+    desenhoPerdido: foraDaGrade.filter(c => c.cell_type !== 'vazio' || !!c.location_code).length,
+    valido: true,
+  };
+}
+
 export function findExpeditionCell(cells: WarehouseCell[]): WarehouseCell | null {
   return cells.find(c => c.cell_type === 'expedicao') ?? null;
 }

@@ -5,6 +5,7 @@ import { fetchAllPages } from './supabasePagination';
 import { supabase, WarehouseLayout, WarehouseCell, WarehouseCellType, WarehouseZone, WarehouseZoneKind } from './supabase';
 import { logAuditEvent } from './auditLogService';
 import type { ClassifiedAddressRow } from './warehouseAddressImport';
+import { planGridResize, GRID_MIN, GRID_MAX } from './slottingEngine';
 import { listRecords } from './rcaService';
 import type { RawReplayEvent, ReplayEventType } from './warehouseReplayEngine';
 
@@ -41,6 +42,90 @@ export async function createLayout(
 
   await logAuditEvent({ companyId, userId, userEmail, action: 'slotting.layout_updated', resourceType: 'warehouse_layout', resourceId: layout.id, metadata: { event: 'created', gridWidth, gridHeight } });
   return layout as WarehouseLayout;
+}
+
+/**
+ * Redimensiona a grade de um RASCUNHO.
+ *
+ * Só rascunho: a planta publicada é a que as telas operacionais leem, e mudar a grade dela
+ * embaixo de quem está usando trocaria o chão no meio do caminho. O fluxo continua sendo o
+ * mesmo de sempre — mexe no rascunho, confere, publica.
+ *
+ * Crescer só acrescenta célula 'vazio'. Encolher APAGA o que fica fora, por isso quem chama
+ * precisa ter mostrado `desenhoPerdido` do plano antes de chegar aqui.
+ */
+export async function resizeLayoutDraft(
+  layoutId: string,
+  companyId: string,
+  nextWidth: number,
+  nextHeight: number,
+  userId: string,
+  userEmail: string,
+): Promise<{ ok: boolean; erro?: string }> {
+  const { data: layout, error: loadError } = await supabase
+    .from('warehouse_layouts').select('id, status, grid_width, grid_height')
+    .eq('id', layoutId).eq('company_id', companyId).maybeSingle();
+  if (loadError || !layout) {
+    console.error('[Slotting] Error loading layout for resize:', loadError);
+    return { ok: false, erro: 'Não foi possível ler a planta.' };
+  }
+  if (layout.status !== 'draft') return { ok: false, erro: 'Só o rascunho pode ser redimensionado.' };
+
+  const cells = await getCells(layoutId, companyId);
+  const plano = planGridResize(cells, nextWidth, nextHeight);
+  if (!plano.valido) return { ok: false, erro: `Largura e altura precisam estar entre ${GRID_MIN} e ${GRID_MAX}.` };
+
+  // Fora da grade é exatamente `x >= largura` OU `y >= altura`. Duas faixas resolvem, em vez
+  // de mandar centenas de pares (x,y) numa cláusula gigante.
+  if (plano.toRemove.length > 0) {
+    const { error: errX } = await supabase.from('warehouse_cells').delete()
+      .eq('layout_id', layoutId).eq('company_id', companyId).gte('x', nextWidth);
+    if (errX) {
+      console.error('[Slotting] Error trimming cells by width:', errX);
+      return { ok: false, erro: 'Não foi possível remover as células que ficaram fora.' };
+    }
+    const { error: errY } = await supabase.from('warehouse_cells').delete()
+      .eq('layout_id', layoutId).eq('company_id', companyId).gte('y', nextHeight);
+    if (errY) {
+      console.error('[Slotting] Error trimming cells by height:', errY);
+      return { ok: false, erro: 'Não foi possível remover as células que ficaram fora.' };
+    }
+  }
+
+  if (plano.toCreate.length > 0) {
+    const { error: insertError } = await supabase.from('warehouse_cells').insert(
+      plano.toCreate.map(p => ({
+        layout_id: layoutId, company_id: companyId, x: p.x, y: p.y, cell_type: 'vazio' as WarehouseCellType,
+      })),
+    );
+    if (insertError) {
+      console.error('[Slotting] Error creating cells for resize:', insertError);
+      return { ok: false, erro: 'Não foi possível criar as células novas.' };
+    }
+  }
+
+  // A dimensão vai por último: se qualquer passo acima falhar, a grade continua coerente com
+  // as células que existem, em vez de anunciar um tamanho que o banco não tem.
+  const { error: dimError } = await supabase
+    .from('warehouse_layouts').update({ grid_width: nextWidth, grid_height: nextHeight })
+    .eq('id', layoutId).eq('company_id', companyId);
+  if (dimError) {
+    console.error('[Slotting] Error updating grid dimensions:', dimError);
+    return { ok: false, erro: 'Não foi possível gravar o novo tamanho da grade.' };
+  }
+
+  await logAuditEvent({
+    companyId, userId, userEmail, action: 'slotting.layout_updated',
+    resourceType: 'warehouse_layout', resourceId: layoutId,
+    metadata: {
+      event: 'grid_resized',
+      de: `${layout.grid_width}x${layout.grid_height}`,
+      para: `${nextWidth}x${nextHeight}`,
+      criadas: plano.toCreate.length,
+      removidas: plano.toRemove.length,
+    },
+  });
+  return { ok: true };
 }
 
 export async function getCells(layoutId: string, companyId: string): Promise<WarehouseCell[]> {

@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { computeCellSizeFromTwoPoints } from '../slottingEngine';
+import { computeCellSizeFromTwoPoints, planGridResize, GRID_MIN, GRID_MAX } from '../slottingEngine';
+import type { WarehouseCell } from '../supabase';
+
+/** Grade cheia de 'vazio', como `createLayout` monta. */
+const grade = (w: number, h: number): Pick<WarehouseCell, 'x' | 'y' | 'cell_type' | 'location_code'>[] => {
+  const out = [];
+  for (let x = 0; x < w; x++) for (let y = 0; y < h; y++) out.push({ x, y, cell_type: 'vazio' as const, location_code: null });
+  return out;
+};
 
 describe('computeCellSizeFromTwoPoints — calibração visual de escala', () => {
   it('calcula metros por célula a partir de dois pontos e uma distância real em metros', () => {
@@ -42,5 +50,66 @@ describe('computeCellSizeFromTwoPoints — calibração visual de escala', () =>
     expect(computeCellSizeFromTwoPoints({ pointA: { x: 5, y: 5 }, pointB: { x: 5, y: 5 }, pixelsPerCell: 20, realDistance: 10, unit: 'm' })).toBeNull();
     expect(computeCellSizeFromTwoPoints({ pointA: { x: 0, y: 0 }, pointB: { x: 10, y: 0 }, pixelsPerCell: 20, realDistance: 0, unit: 'm' })).toBeNull();
     expect(computeCellSizeFromTwoPoints({ pointA: { x: 0, y: 0 }, pointB: { x: 10, y: 0 }, pixelsPerCell: 0, realDistance: 10, unit: 'm' })).toBeNull();
+  });
+});
+
+describe('planGridResize - redimensionamento da grade do rascunho', () => {
+  it('crescer so acrescenta celulas e nao remove nada', () => {
+    // 20x15 -> 48x15: as 28 colunas novas entram inteiras, 28 * 15 = 420 celulas.
+    const plano = planGridResize(grade(20, 15), 48, 15);
+    expect(plano.valido).toBe(true);
+    expect(plano.toCreate).toHaveLength(420);
+    expect(plano.toRemove).toHaveLength(0);
+    expect(plano.desenhoPerdido).toBe(0);
+    // Nenhuma celula ja existente aparece como "criar".
+    expect(plano.toCreate.every(p => p.x >= 20)).toBe(true);
+  });
+
+  it('encolher remove o que fica fora e conta quanto desenho se perde', () => {
+    const cells = grade(20, 15);
+    // Expedicao na coluna 18 (sai) e um rack na coluna 3 (fica).
+    cells.find(c => c.x === 18 && c.y === 2)!.cell_type = 'expedicao';
+    cells.find(c => c.x === 3 && c.y === 2)!.cell_type = 'modulo';
+    // Uma posicao com endereco vinculado na linha 13 (sai).
+    const vinculada = cells.find(c => c.x === 1 && c.y === 13)!;
+    vinculada.cell_type = 'posicao';
+    vinculada.location_code = 'A-01-1';
+
+    const plano = planGridResize(cells, 10, 11);
+
+    expect(plano.valido).toBe(true);
+    expect(plano.toCreate).toHaveLength(0);
+    // Fora = x >= 10 OU y >= 11. 10*15 (colunas 10..19) + 10*4 (linhas 11..14 das que ficam).
+    expect(plano.toRemove).toHaveLength(190);
+    // So a expedicao e a posicao vinculada contam como desenho perdido.
+    expect(plano.desenhoPerdido).toBe(2);
+  });
+
+  it('completa buraco numa grade incompleta em vez de duplicar celula', () => {
+    const cells = grade(4, 4).filter(c => !(c.x === 2 && c.y === 2));
+    const plano = planGridResize(cells, 4, 4);
+    expect(plano.toCreate).toEqual([{ x: 2, y: 2 }]);
+    expect(plano.toRemove).toHaveLength(0);
+  });
+
+  it('nao mexe em nada quando o tamanho e o mesmo', () => {
+    const plano = planGridResize(grade(20, 15), 20, 15);
+    expect(plano.valido).toBe(true);
+    expect(plano.toCreate).toHaveLength(0);
+    expect(plano.toRemove).toHaveLength(0);
+  });
+
+  it('recusa tamanho fora dos limites sem propor remocao nenhuma', () => {
+    for (const [w, h] of [[GRID_MIN - 1, 10], [10, GRID_MIN - 1], [GRID_MAX + 1, 10], [10, GRID_MAX + 1], [0, 0]]) {
+      const plano = planGridResize(grade(20, 15), w, h);
+      expect(plano.valido).toBe(false);
+      expect(plano.toRemove).toHaveLength(0);
+      expect(plano.toCreate).toHaveLength(0);
+    }
+  });
+
+  it('recusa numero quebrado', () => {
+    expect(planGridResize(grade(20, 15), 20.5, 15).valido).toBe(false);
+    expect(planGridResize(grade(20, 15), 20, Number.NaN).valido).toBe(false);
   });
 });

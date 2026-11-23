@@ -12,9 +12,9 @@ import { Modal, Button, Input, Select, Badge, Notice, PhaseRail, Panel, PanelSec
 import {
   openLayoutDraft, uploadFloorPlanImage, getFloorPlanSignedUrl, confirmLayoutScale,
   upsertCellsBatch, getZones, upsertZone, getCells, publishLayoutDraft,
-  getKnownAddressCodes, getExistingAddressBindings, applyAddressImport,
+  getKnownAddressCodes, getExistingAddressBindings, applyAddressImport, resizeLayoutDraft,
 } from '../../lib/slottingLayoutService';
-import { computeCellSizeFromTwoPoints, type LengthUnit } from '../../lib/slottingEngine';
+import { computeCellSizeFromTwoPoints, planGridResize, GRID_MIN, GRID_MAX, type LengthUnit } from '../../lib/slottingEngine';
 import { validateLayoutForPublish } from '../../lib/warehouseLayoutPublishing';
 import { classifyAddressRows, parseAddressCsv, ADDRESS_CSV_TEMPLATE_HEADER, type ClassifiedAddressRow } from '../../lib/warehouseAddressImport';
 import { downloadFile } from '../../lib/productImportUtils';
@@ -136,7 +136,7 @@ export function LayoutConfiguratorWizard({ companyId, userId, userEmail, open, o
         ) : (
           <>
             {step === 'planta' && (
-              <StepPlanta companyId={companyId} userId={userId} userEmail={userEmail} draft={draft} onChanged={setDraft} onSaved={() => setSavedAt(new Date())} />
+              <StepPlanta companyId={companyId} userId={userId} userEmail={userEmail} draft={draft} cells={cells} onChanged={setDraft} onSaved={() => setSavedAt(new Date())} onResized={reloadCellsAndZones} />
             )}
             {step === 'escala' && (
               <StepEscala draft={draft} onChanged={setDraft} onSaved={() => setSavedAt(new Date())} />
@@ -183,13 +183,37 @@ export function LayoutConfiguratorWizard({ companyId, userId, userEmail, open, o
 
 // ── Etapa 1 — Planta ─────────────────────────────────────────────────────────────────────
 
-function StepPlanta({ companyId, userId, userEmail, draft, onChanged, onSaved }: {
-  companyId: string; userId: string; userEmail: string; draft: WarehouseLayout;
-  onChanged: (l: WarehouseLayout) => void; onSaved: () => void;
+function StepPlanta({ companyId, userId, userEmail, draft, cells, onChanged, onSaved, onResized }: {
+  companyId: string; userId: string; userEmail: string; draft: WarehouseLayout; cells: WarehouseCell[];
+  onChanged: (l: WarehouseLayout) => void; onSaved: () => void; onResized: () => Promise<void>;
 }) {
   const fileInputRef = useRef<HTMLInputElement>(null);
   const [uploading, setUploading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [largura, setLargura] = useState(draft.grid_width);
+  const [altura, setAltura] = useState(draft.grid_height);
+  const [redimensionando, setRedimensionando] = useState(false);
+  const [erroGrade, setErroGrade] = useState<string | null>(null);
+
+  // A grade do rascunho pode ter sido trocada nesta mesma sessão; os campos acompanham.
+  useEffect(() => { setLargura(draft.grid_width); setAltura(draft.grid_height); }, [draft.grid_width, draft.grid_height]);
+
+  const plano = useMemo(() => planGridResize(cells, largura, altura), [cells, largura, altura]);
+  const mudou = largura !== draft.grid_width || altura !== draft.grid_height;
+
+  /** Só vale mostrar metros depois da calibração — antes disso o número seria chute. */
+  const emMetros = (celulas: number) =>
+    draft.scale_confirmed ? `${(celulas * draft.cell_size_meters).toFixed(1).replace('.', ',')} m` : null;
+
+  async function handleResize() {
+    setErroGrade(null);
+    setRedimensionando(true);
+    const r = await resizeLayoutDraft(draft.id, companyId, largura, altura, userId, userEmail);
+    setRedimensionando(false);
+    if (!r.ok) { setErroGrade(r.erro ?? 'Não foi possível mudar o tamanho da grade.'); return; }
+    onChanged({ ...draft, grid_width: largura, grid_height: altura });
+    await onResized();
+  }
 
   async function handleFile(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -223,6 +247,51 @@ function StepPlanta({ companyId, userId, userEmail, draft, onChanged, onSaved }:
           <FloorPlanPreview layout={draft} />
         </div>
       )}
+
+      <div className="border-t border-edge pt-4 space-y-3">
+        <div>
+          <p className="text-sm font-medium text-fg">Tamanho da grade</p>
+          <p className="text-xs text-fg-muted mt-0.5">
+            Quantas células cobrem o armazém. Um prédio mais comprido precisa de mais colunas — sem isso,
+            cada célula teria que valer metros demais para distinguir um corredor estreito de um largo.
+          </p>
+        </div>
+        <div className="flex flex-wrap items-end gap-3">
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1" htmlFor="grade-largura">Largura (colunas)</label>
+            <Input
+              id="grade-largura" type="number" min={GRID_MIN} max={GRID_MAX} value={largura}
+              onChange={e => setLargura(Number(e.target.value))} className="w-28"
+            />
+            {emMetros(largura) && <p className="text-xs text-fg-subtle mt-1">{emMetros(largura)}</p>}
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-fg-muted mb-1" htmlFor="grade-altura">Altura (linhas)</label>
+            <Input
+              id="grade-altura" type="number" min={GRID_MIN} max={GRID_MAX} value={altura}
+              onChange={e => setAltura(Number(e.target.value))} className="w-28"
+            />
+            {emMetros(altura) && <p className="text-xs text-fg-subtle mt-1">{emMetros(altura)}</p>}
+          </div>
+          <Button variant="secondary" onClick={handleResize} disabled={!mudou || !plano.valido || redimensionando}>
+            {redimensionando ? 'Aplicando...' : 'Aplicar tamanho'}
+          </Button>
+        </div>
+        {!plano.valido && (
+          <p className="text-xs text-red-600 dark:text-red-400">
+            Largura e altura precisam ser números inteiros entre {GRID_MIN} e {GRID_MAX}.
+          </p>
+        )}
+        {plano.valido && mudou && plano.desenhoPerdido > 0 && (
+          <Notice tone="warning">
+            {plano.desenhoPerdido === 1
+              ? '1 célula já desenhada fica fora da grade nova e será apagada.'
+              : `${plano.desenhoPerdido} células já desenhadas ficam fora da grade nova e serão apagadas.`}{' '}
+            Isso vale só para o rascunho — a planta publicada não muda até você publicar.
+          </Notice>
+        )}
+        {erroGrade && <p className="text-xs text-red-600 dark:text-red-400">{erroGrade}</p>}
+      </div>
     </div>
   );
 }

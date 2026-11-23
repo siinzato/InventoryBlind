@@ -56,6 +56,10 @@ import { listBinContents, searchStock, type BinStockRow } from '../../lib/wms/wm
 // A ponte com o Slotting: a planta do armazém é UMA só, e quem a edita é o configurador
 // 2D. O 3D lê a publicada em vez de manter uma segunda verdade sobre o mesmo galpão.
 import { getPublishedLayout, getFloorPlanSignedUrl } from '../../lib/slottingLayoutService';
+// A planta como geometria: as fileiras vêm das medidas, não do código da vaga.
+import {
+  blocosDaPlanta, comprimentoTotal, LARGURA_DO_PREDIO, type BlocoFisico,
+} from '../../lib/wms/warehouse3dPlantaFisica';
 import {
   ABC_VAZIO, NIVEL_DE_PISO, alertasDeGiro, loadAbcDoArmazem,
   type AbcClasse, type AbcDaVaga, type AbcDoArmazem,
@@ -1093,6 +1097,7 @@ function Cena({
   extensao,
   deslocamento,
   plantaNoPiso,
+  blocosFisicos,
   modoVisor,
   ferramenta,
   objetos,
@@ -1124,6 +1129,7 @@ function Cena({
   extensao: number;
   deslocamento: [number, number, number];
   plantaNoPiso: PlantaNoPiso | null;
+  blocosFisicos: BlocoFisico[] | null;
   modoVisor: ModoVisor;
   ferramenta: FerramentaBuilder;
   objetos: ObjetoConstruido[];
@@ -1171,6 +1177,8 @@ function Cena({
           operacional ela diz onde a vaga fica no galpão de verdade. */}
       {plantaNoPiso && <PlantaDesenhadaNoPiso planta={plantaNoPiso} theme={theme} />}
 
+      {blocosFisicos && <PlantaFisica3D blocos={blocosFisicos} theme={theme} />}
+
       {modoVisor === 'edicao' && (
         <>
           <gridHelper
@@ -1196,6 +1204,10 @@ function Cena({
         </>
       )}
 
+      {/* As vagas montadas pelo CÓDIGO. Saem de cena enquanto a planta física está
+          desenhada: as duas juntas foi o que produziu o mapa errado por cima do desenho
+          certo — grade regular atravessando fileira posicionada por medida. */}
+      {!blocosFisicos && (
       <group position={deslocamento}>
         {/* Montantes, quando o pulmão é suspenso. */}
         <Vigas colunas={colunas} />
@@ -1300,6 +1312,7 @@ function Cena({
           </lineSegments>
         )}
       </group>
+      )}
     </>
   );
 }
@@ -1328,6 +1341,50 @@ class FronteiraDeErro extends Component<{ children: ReactNode; aoFalhar: ReactNo
 }
 
 // ── Painel de detalhe ──────────────────────────────────────────────────────────
+
+/**
+ * A planta reproduzida em três dimensões, a partir das MEDIDAS.
+ *
+ * Diferença de origem, e é a diferença que importa: as vagas por código produzem uma
+ * grade regular (rua × 4 m, módulo × 1,3 m) que não tem como coincidir com o desenho,
+ * porque `PP-E03-N1` não diz onde a rua E fica no prédio. Aqui cada fileira vem com
+ * lugar, comprimento e direção lidos da planta, então ela cai em cima do desenho.
+ *
+ * Os blocos chegam com a origem no canto (X 0→10,3, Z 0→45,2) e são centrados aqui, no
+ * mesmo referencial em que a imagem da planta é desenhada — é isso que faz as duas
+ * coisas se sobreporem em vez de flutuarem uma sobre a outra.
+ */
+function PlantaFisica3D({ blocos, theme }: { blocos: BlocoFisico[]; theme: Theme }) {
+  const cores = COR_BUILDER[theme];
+  const largura = LARGURA_DO_PREDIO;
+  const comprimento = comprimentoTotal();
+
+  return (
+    <group position={[-largura / 2, 0, -comprimento / 2]}>
+      {blocos.map(b => (
+        <group key={b.id} position={b.centro}>
+          <mesh>
+            <boxGeometry args={b.tamanho} />
+            <meshStandardMaterial
+              color={b.tipo === 'expedicao' ? cores.doca : cores.peca}
+              roughness={0.85}
+              metalness={0}
+              transparent={b.tipo === 'expedicao'}
+              opacity={b.tipo === 'expedicao' ? 0.55 : 1}
+            />
+          </mesh>
+          {b.rotulo && (
+            <Html center distanceFactor={26} position={[0, b.tamanho[1] / 2 + 0.7, 0]}>
+              <span className="whitespace-nowrap rounded-control bg-ink-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white">
+                {b.rotulo}
+              </span>
+            </Html>
+          )}
+        </group>
+      ))}
+    </group>
+  );
+}
 
 /** O que o 3D precisa para desenhar a planta no chão: a imagem e o tamanho REAL dela. */
 interface PlantaNoPiso {
@@ -2166,6 +2223,12 @@ export function Warehouse3DViewer({
 
   const [modoVisor, setModoVisor] = useState<ModoVisor>('operacional');
 
+  // A planta reproduzida em 3D pelas medidas. Ligada por padrão: é o desenho do galpão
+  // de verdade. Desligar devolve as vagas montadas pelo código, que é onde vivem status,
+  // busca e rota — as duas não podem aparecer juntas porque ocupam o mesmo chão.
+  const [plantaFisica, setPlantaFisica] = useState(true);
+  const blocosFisicos = useMemo(() => (plantaFisica ? blocosDaPlanta() : null), [plantaFisica]);
+
   // ── A planta do armazém no piso do 3D ────────────────────────────────────────────
   // A ponte que faltava: o mapa 3D posicionava tudo por aritmética do código da vaga e
   // nunca tinha olhado para a planta. Aqui ele passa a ler a MESMA planta publicada que
@@ -2507,7 +2570,7 @@ export function Warehouse3DViewer({
   // isto, cada movimento do mouse (que muda `apontada`) recalcularia a cena inteira.
   const {
     solidas, divergentes, raioX, fiosAtivos, fiosAtenuados,
-    colunas, comCarga, placas, achadas, marcadores, extensao, deslocamento,
+    colunas, comCarga, placas, achadas, marcadores, extensao: extensaoDasVagas, deslocamento,
   } = useMemo(() => {
     const maxCaixas = vagas.reduce((m, s) => Math.max(m, s.caixas), 0);
     const atenuada = COR_ATENUADA[theme];
@@ -2688,6 +2751,15 @@ export function Warehouse3DViewer({
     return { paradas, caminho: caminhoNoPiso(paradas, layout), subidas: subidasAteAVaga(paradas) };
   }, [ordemFifo, vagas, layout]);
 
+  /**
+   * Extensão que dimensiona o cenário e a câmera.
+   *
+   * Com a planta física desenhada ela vem da PLANTA, não das vagas: a extensão das vagas
+   * por código descreve outra geometria, e usá-la deixava o galpão de 45,2 m cortado pela
+   * parede e fora do enquadramento — foi o que apareceu no primeiro teste.
+   */
+  const extensao = blocosFisicos ? Math.max(extensaoDasVagas, comprimentoTotal()) : extensaoDasVagas;
+
   /** Muda quando o conjunto desenhado muda — é o gatilho para refazer a sombra. */
   const chaveDeSombra = `${solidas.length}-${divergentes.length}-${fiosAtivos.length}-${raioX.length}-${extensao.toFixed(1)}`;
 
@@ -2733,7 +2805,20 @@ export function Warehouse3DViewer({
     desenho.src = capturar();
   }, []);
 
-  const posicaoCamera = useMemo(() => enquadrarCamera(vagas, layout), [vagas, layout]);
+  /**
+   * Enquadramento inicial.
+   *
+   * Com a planta física desenhada, enquadrar pelas VAGAS deixa o galpão cortado: o
+   * contorno delas tem ~28 m e a planta tem 45,2. A câmera recua na proporção entre as
+   * duas extensões, mantendo o mesmo ângulo — é a mesma vista, de mais longe, em vez de
+   * uma vista própria que o reset não saberia reproduzir.
+   */
+  const posicaoCamera = useMemo(() => {
+    const base = enquadrarCamera(vagas, layout);
+    if (!blocosFisicos || extensaoDasVagas <= 0) return base;
+    const fator = Math.max(1, comprimentoTotal() / extensaoDasVagas);
+    return [base[0] * fator, base[1] * fator, base[2] * fator] as [number, number, number];
+  }, [vagas, layout, blocosFisicos, extensaoDasVagas]);
   const distancia = Math.hypot(...posicaoCamera);
 
   // A MESMA conta do enquadramento inicial: se o reset usasse um valor próprio, o
@@ -2893,6 +2978,7 @@ export function Warehouse3DViewer({
             extensao={extensao}
             deslocamento={deslocamento}
             plantaNoPiso={plantaNoPiso}
+            blocosFisicos={blocosFisicos}
             modoVisor={modoVisor}
             ferramenta={ferramenta}
             objetos={objetos}
@@ -3051,6 +3137,19 @@ export function Warehouse3DViewer({
             label="Modo"
             width="full"
           />
+          <Button
+            variant={plantaFisica ? 'primary' : 'secondary'}
+            size="sm"
+            className="w-full"
+            onClick={() => setPlantaFisica(v => !v)}
+          >
+            {plantaFisica ? 'Planta do galpão' : 'Vagas por código'}
+          </Button>
+          <p className="text-xs text-fg-muted">
+            {plantaFisica
+              ? 'Fileiras desenhadas pelas medidas da planta: 10,3 × 45,2 m, corredores de 2,65 m no galpão novo. Status, busca e rota vivem no outro modo.'
+              : 'Vagas posicionadas pelo código do endereço, em grade regular. Não coincide com o desenho da planta.'}
+          </p>
           {modoVisor === 'edicao' && (
             <p className="text-xs text-fg-muted">
               Grade de {PASSO_GRADE_BUILDER} m acesa no piso, e o catálogo de construção na barra

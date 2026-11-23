@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-23-mapa-3d-desenha-a-planta',
+    date: '2026-11-23',
+    category: 'novidade',
+    title: 'O mapa 3D agora desenha a planta do galpão',
+    description: 'Até agora o mapa 3D montava as estantes a partir do código de cada endereço, numa grade sempre igual — e por isso ele nunca batia com a planta do armazém: o código diz em que rua e em que posição a mercadoria está, mas não diz onde aquela rua fica dentro do prédio. Agora o mapa desenha o galpão pelas medidas da planta. As fileiras nascem no lugar certo, com o comprimento certo, os corredores com a largura real de cada um, as duas fileiras coladas de costas no meio do galpão novo, a área de expedição marcada no chão e a passagem entre os dois prédios. A planta também aparece desenhada no próprio piso, atrás das estantes, para conferir o desenho contra a realidade. Dá para alternar entre essa vista e a vista por endereço, que é onde continuam o saldo de cada vaga, a busca por produto e a rota de coleta.',
+  },
+  {
     id: '2026-11-23-grade-da-planta-redimensionavel',
     date: '2026-11-23',
     category: 'melhoria',

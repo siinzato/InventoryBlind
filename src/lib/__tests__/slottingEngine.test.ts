@@ -115,37 +115,57 @@ describe('planGridResize - redimensionamento da grade do rascunho', () => {
 });
 
 describe('planGridResize - limites de tamanho', () => {
-  it('aceita a grade do galpao de 45,2 m com celula de 0,50 m', () => {
-    // 21 x 90 = 1.890 celulas. Era impossivel com o teto antigo de 60 por lado.
-    const plano = planGridResize(grade(20, 15), 21, 90);
+  it('aceita a grade do galpao de 45,2 m na resolucao maxima que o banco permite', () => {
+    // 14 x 60 = 840 celulas, a 0,753 m => 10,5 x 45,2 m.
+    const plano = planGridResize(grade(20, 15), 14, 60);
     expect(plano.valido).toBe(true);
     expect(plano.motivo).toBeNull();
   });
 
-  it('recusa grade com os dois lados validos mas celulas demais', () => {
-    // 80 e 80 estao dentro de 2..100, e 6.400 passa de GRID_MAX_CELLS.
-    const plano = planGridResize(grade(20, 15), 80, 80);
+  it('recusa as 90 celulas que 0,50 m exigiria, porque o banco limita a 60', () => {
+    // Guarda de regressao: o CHECK de warehouse_layouts e grid_width/height BETWEEN 2 AND 60.
+    // Se GRID_MAX subir sem a migration que afrouxa o CHECK, a gravacao falha DEPOIS de as
+    // celulas ja terem sido criadas, e a grade fica incoerente. Aconteceu em 23/11/2026.
+    const plano = planGridResize(grade(20, 15), 21, 90);
     expect(plano.valido).toBe(false);
-    expect(plano.motivo).toContain('6.400');
-    expect(plano.toCreate).toHaveLength(0);
-    expect(plano.toRemove).toHaveLength(0);
+    expect(plano.motivo).toContain('60');
   });
 
-  it('aceita exatamente o teto de celulas e recusa uma linha acima', () => {
-    expect(planGridResize(grade(20, 15), 100, 40).valido).toBe(true);
-    expect(planGridResize(grade(20, 15), 100, 41).valido).toBe(false);
+  it('a maior grade que o lado permite cabe no teto de celulas', () => {
+    // Com GRID_MAX em 60, a maior grade possivel e 3.600 celulas, abaixo das 4.000. Ou
+    // seja: hoje a regra de total NAO e alcancavel, e e proposital -- ela so volta a
+    // morder se o lado subir junto com o CHECK do banco. O teste existe para que subir
+    // GRID_MAX sem rever GRID_MAX_CELLS quebre aqui, e nao em producao.
+    const maior = planGridResize(grade(2, 2), GRID_MAX, GRID_MAX);
+    expect(maior.valido).toBe(true);
+    expect(GRID_MAX * GRID_MAX).toBeLessThanOrEqual(GRID_MAX_CELLS);
   });
 
-  it('da motivo diferente para lado invalido e para total invalido', () => {
+  it('qualquer grade acima do limite e recusada sem propor mudanca nenhuma', () => {
+    for (const [w, h] of [[80, 80], [GRID_MAX + 1, 2], [2, GRID_MAX + 1]]) {
+      const plano = planGridResize(grade(2, 2), w, h);
+      expect(plano.valido).toBe(false);
+      expect(plano.toCreate).toHaveLength(0);
+      expect(plano.toRemove).toHaveLength(0);
+    }
+  });
+
+  it('o motivo diz qual regra barrou', () => {
+    // Com o lado limitado a 60, as duas mensagens que o usuario pode ver sao a de limite
+    // e a de numero quebrado. A de total de celulas e inalcancavel hoje: 60 x 60 = 3.600
+    // fica abaixo das 4.000, e qualquer lado maior ja e barrado antes.
     const lado = planGridResize(grade(20, 15), GRID_MAX + 1, 10);
-    const total = planGridResize(grade(20, 15), 90, 90);
+    const quebrado = planGridResize(grade(20, 15), 20.5, 10);
     expect(lado.motivo).toContain(String(GRID_MAX));
-    expect(total.motivo).toContain('células');
-    expect(lado.motivo).not.toEqual(total.motivo);
+    expect(quebrado.motivo).toContain('inteiros');
+    expect(lado.motivo).not.toEqual(quebrado.motivo);
   });
 
-  it('o teto por lado permite as 90 celulas que 0,50 m exige', () => {
-    expect(GRID_MAX).toBeGreaterThanOrEqual(90);
-    expect(GRID_MAX_CELLS).toBeGreaterThanOrEqual(21 * 90);
+  it('o teto por lado concorda com o CHECK do banco', () => {
+    // Nao e preferencia: warehouse_layouts recusa acima de 60 por lado. Mudar este
+    // numero sem mudar o CHECK quebra a gravacao da dimensao.
+    expect(GRID_MAX).toBe(60);
+    // O teto de celulas tem que caber a maior grade possivel, senao vira regra morta.
+    expect(GRID_MAX_CELLS).toBeGreaterThanOrEqual(GRID_MAX * GRID_MAX);
   });
 });

@@ -66,13 +66,21 @@ export function computeCellSizeFromTwoPoints(input: ScaleCalibrationInput): numb
 /**
  * Limites da grade, em células por lado.
  *
- * O teto subiu de 60 para 100 para a celula poder valer 0,50 m: num galpao de 45,2 m
- * isso exige 90 celulas no comprimento, e a 60 o mais fino possivel era 0,75 m — nessa
- * escala corredores de 1,2 m, 1,4 m e 1,8 m arredondam todos para 2 celulas e viram o
- * mesmo desenho. A 0,50 m eles viram 2, 3 e 4.
+ * 60 NÃO é escolha de produto: é o que o banco aceita. `warehouse_layouts` tem
+ * `CHECK (grid_width BETWEEN 2 AND 60)` e o mesmo para `grid_height`, de uma migration
+ * anterior. Este número existe para a tela recusar na hora, com mensagem clara, em vez
+ * de deixar o usuário descobrir no erro opaco da gravação.
+ *
+ * Já subiu para 100 aqui uma vez, para permitir célula de 0,50 m (um galpão de 45,2 m
+ * precisa de 90 células no comprimento). O banco recusou, e a grade ficou com as células
+ * criadas e a dimensão não gravada. Subir de novo exige migration alterando os dois
+ * CHECKs — enquanto ela não existir, este número tem que concordar com o banco.
+ *
+ * Consequência conhecida: a 60, o mais fino num galpão de 45,2 m é 0,753 m por célula, e
+ * nessa escala corredores de 1,2 m, 1,4 m e 1,8 m arredondam todos para 2 células.
  */
 export const GRID_MIN = 2;
-export const GRID_MAX = 100;
+export const GRID_MAX = 60;
 
 /**
  * Teto de células da grade inteira, independente do formato.

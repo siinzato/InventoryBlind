@@ -1,14 +1,21 @@
-import { useEffect, useState } from 'react';
 import { Settings2 } from 'lucide-react';
 import { Panel, PanelSection, Button, type SidebarNavGroup } from '../ui';
-import { listShortcuts, type UserShortcut } from '../../lib/shortcuts/shortcutService';
+import { type UserShortcut } from '../../lib/shortcuts/shortcutService';
 import { buildRouteRegistry, findRouteOption, type ShortcutRouteOption } from '../../lib/shortcuts/routeRegistry';
-import { ShortcutManagerModal } from './ShortcutManagerModal';
 
 interface MyShortcutsCardProps {
-  companyId: string;
-  userId: string;
   navGroups: SidebarNavGroup[];
+  /**
+   * Atalhos vindos do PAI, nao carregados aqui.
+   *
+   * A sidebar passou a mostrar os mesmos favoritos, e duas listas carregadas em
+   * paralelo sairiam de sincronia no instante em que alguem editasse de um lado.
+   * Quem carrega agora e o `useShortcuts` do App; este card so desenha.
+   */
+  shortcuts: UserShortcut[];
+  carregando: boolean;
+  /** Abre o gerenciador, que vive no App porque a sidebar tambem precisa abri-lo. */
+  onGerenciar: () => void;
 }
 
 /** Faixa fixa do topo do dashboard — sempre "Acesso rápido", para todo usuário e
@@ -17,29 +24,9 @@ interface MyShortcutsCardProps {
  *  Compacta e horizontal (não é mais um Panel cheio de wrap) — mesmos dados e
  *  mesma lógica de sempre (listShortcuts/ShortcutManagerModal), só reapresentados
  *  como uma única linha discreta em vez de um card grande. */
-export function MyShortcutsCard({ companyId, userId, navGroups }: MyShortcutsCardProps) {
-  const [shortcuts, setShortcuts] = useState<UserShortcut[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [showManager, setShowManager] = useState(false);
-
+export function MyShortcutsCard({ navGroups, shortcuts, carregando, onGerenciar }: MyShortcutsCardProps) {
   const registry = buildRouteRegistry(navGroups);
-
-  const load = async () => {
-    if (!userId) { setLoading(false); return; }
-    setLoading(true);
-    try {
-      setShortcuts(await listShortcuts(companyId, userId));
-    } catch (err) {
-      console.error('Error loading shortcuts:', err);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    load();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [companyId, userId]);
+  const loading = carregando;
 
   // Rota que perdeu permissão/plano some da exibição sem apagar a preferência —
   // a linha continua salva, só deixa de casar com o registro atual.
@@ -72,21 +59,10 @@ export function MyShortcutsCard({ companyId, userId, navGroups }: MyShortcutsCar
           )}
         </div>
 
-        <Button variant="ghost" size="sm" className="flex-shrink-0" onClick={() => setShowManager(true)}>
+        <Button variant="ghost" size="sm" className="flex-shrink-0" onClick={onGerenciar}>
           <Settings2 size={14} /> Gerenciar
         </Button>
       </PanelSection>
-
-      {showManager && userId && (
-        <ShortcutManagerModal
-          companyId={companyId}
-          userId={userId}
-          navGroups={navGroups}
-          shortcuts={shortcuts}
-          onClose={() => setShowManager(false)}
-          onChanged={load}
-        />
-      )}
     </Panel>
   );
 }

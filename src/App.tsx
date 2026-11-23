@@ -80,6 +80,7 @@ import {
   Boxes,
   FileBarChart2,
   Folder,
+  Star,
 } from 'lucide-react';
 import { supabase, type BrandData, type TopVenda, type CustomKPI, type InventorySnapshot, type InventoryBrandHistory, type BlindAISituation, type UserProductivityStats } from './lib/supabase';
 import { getTeamProductivity } from './lib/productivityService';
@@ -121,6 +122,9 @@ import { readCompleted as readCompletedDiagnostic } from './lib/operationDiagnos
 import { evaluateDiagnosticEligibility } from './lib/dashboardDiagnosticRule';
 import { readBlockedFeatureInterest } from './lib/blockedFeatureInterest';
 import { MyShortcutsCard } from './components/dashboard/MyShortcutsCard';
+import { ShortcutManagerModal } from './components/dashboard/ShortcutManagerModal';
+import { useShortcuts } from './lib/shortcuts/useShortcuts';
+import { ID_ESCOLHER_FAVORITOS, resolverFavoritos } from './lib/shortcuts/sidebarFavorites';
 import { DashboardPriorities } from './components/dashboard/DashboardPriorities';
 import { DashboardInventoryProgress } from './components/dashboard/DashboardInventoryProgress';
 import { DashboardIntegrationsHealth } from './components/dashboard/DashboardIntegrationsHealth';
@@ -448,6 +452,13 @@ function AppContent() {
 
   const isLoggedIn = canManageUsers(profile?.role);
   const [mobileOpen, setMobileOpen] = useState(false);
+  // Atalhos do usuário: UM estado para as duas superfícies que os mostram (a faixa do
+  // dashboard e a seção da sidebar). Ver o comentário em `useShortcuts`.
+  const { atalhos, carregando: carregandoAtalhos, recarregar: recarregarAtalhos } = useShortcuts(
+    companyId,
+    profile?.id ?? '',
+  );
+  const [gerenciarFavoritos, setGerenciarFavoritos] = useState(false);
   // Per-device only — same rationale as workspacePrefs.ts (remembered workspace):
   // whether the sidebar is collapsed is a device convenience, not an account setting.
   const [sidebarCollapsed, setSidebarCollapsed] = useState(() => {
@@ -1011,6 +1022,40 @@ function AppContent() {
     },
   ];
 
+  // ── Acesso rápido na sidebar ──────────────────────────────────────────────────
+  //
+  // Os MESMOS atalhos da faixa do dashboard, numa seção própria no fim do menu. Não é
+  // uma lista nova: `resolverFavoritos` devolve os próprios itens de `navGroups`, com
+  // o onClick e o active deles, então os dois lugares navegam pelo mesmo caminho e o
+  // destaque de "você está aqui" continua certo.
+  //
+  // Derivado DEPOIS de navGroups e nunca anexado à fonte do registro de rotas: se a
+  // seção entrasse no array que alimenta `buildRouteRegistry`, um favorito viraria
+  // candidato a favorito de si mesmo no gerenciador.
+  const itensFavoritos = resolverFavoritos(atalhos, navGroups);
+
+  const navGroupsComFavoritos: SidebarNavGroup[] = [
+    ...navGroups,
+    {
+      id: 'acesso-rapido-group',
+      label: 'Acesso rápido',
+      sectionLabel: 'Acesso rápido',
+      icon: <Star />,
+      items: itensFavoritos.length > 0
+        ? itensFavoritos
+        // Sem favorito, a seção não some: uma linha convida a escolher. Escondê-la
+        // deixaria o recurso invisível para quem nunca rolou o topo do dashboard —
+        // que é exatamente como ele estava até agora.
+        : [{
+            id: ID_ESCOLHER_FAVORITOS,
+            label: 'Escolher favoritos',
+            icon: <Star />,
+            onClick: () => { setGerenciarFavoritos(true); setMobileOpen(false); },
+            active: false,
+          }],
+    },
+  ];
+
   // Nome humano da tela, lido do próprio menu — assim o contexto do chamado diz
   // "Catálogo de Produtos" e não o id interno da aba, e acompanha qualquer
   // renomeação feita no menu sem uma segunda lista para esquecer de atualizar.
@@ -1165,7 +1210,7 @@ function AppContent() {
           especificidade, a última classe declarada no bundle vencia). */}
       <div className="hidden md:block">
       <Sidebar
-        groups={navGroups}
+        groups={navGroupsComFavoritos}
         collapsed={sidebarCollapsed}
         onToggleCollapsed={toggleSidebarCollapsed}
         railHelp={{ icon: <HelpCircle size={17} />, label: 'Recursos e Conhecimento', onClick: () => setActiveTab('knowledge') }}
@@ -1215,13 +1260,27 @@ function AppContent() {
       />
       </div>
 
+      {/* Gerenciador de favoritos. Vive AQUI, e não dentro do card do dashboard,
+          porque a sidebar também o abre — e a sidebar existe em qualquer aba. Dentro
+          do card, "Escolher favoritos" só funcionaria com o dashboard na tela. */}
+      {profile?.id && gerenciarFavoritos && (
+        <ShortcutManagerModal
+          companyId={companyId}
+          userId={profile.id}
+          navGroups={navGroups}
+          shortcuts={atalhos}
+          onClose={() => setGerenciarFavoritos(false)}
+          onChanged={recarregarAtalhos}
+        />
+      )}
+
       {/* ── SIDEBAR (mobile drawer) ──────────────────────────────────────── */}
       {mobileOpen && (
         <div className="md:hidden fixed inset-0 z-[1000] flex">
           <div className="absolute inset-0 bg-black/40" onClick={() => setMobileOpen(false)} />
           <div className="relative z-10 flex h-full">
             <Sidebar
-              groups={navGroups}
+              groups={navGroupsComFavoritos}
               header={sidebarHeader}
               hideRail
               // O drawer é `fixed inset-0`: cobre a barra de status em cima e a barra de
@@ -1487,7 +1546,15 @@ function AppContent() {
             {/* Acesso rápido — espaço fixo do topo do dashboard, sempre, para todo
                 usuário e plano. Nunca é substituído pelo diagnóstico. */}
             {profile?.id && (
-              <MyShortcutsCard companyId={companyId} userId={profile.id} navGroups={navGroups} />
+              <MyShortcutsCard
+                // `navGroups`, nao `navGroupsComFavoritos`: o registro de rotas sai
+                // daqui, e incluir a secao de favoritos faria um favorito aparecer
+                // como candidato a favorito de si mesmo no gerenciador.
+                navGroups={navGroups}
+                shortcuts={atalhos}
+                carregando={carregandoAtalhos}
+                onGerenciar={() => setGerenciarFavoritos(true)}
+              />
             )}
 
             {/* Aviso de diagnóstico — separado de Acesso rápido, só quando elegível

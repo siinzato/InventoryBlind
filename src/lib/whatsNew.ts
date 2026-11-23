@@ -20,6 +20,13 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-14-acesso-rapido-no-menu',
+    date: '2026-11-14',
+    category: 'melhoria',
+    title: 'Seus favoritos agora ficam no menu lateral',
+    description: 'O "Acesso rápido" saiu de dentro do dashboard e passou a aparecer também no fim do menu lateral, como uma seção própria. São os mesmos atalhos que você já escolhe — mudou um lá e muda aqui na hora, sem recarregar. Com isso dá para pular direto para a sua tela preferida de qualquer lugar do sistema, não só do dashboard. Quem ainda não escolheu nenhum favorito vê no menu um convite para escolher.',
+  },
+  {
     id: '2026-11-14-mapa-3d-armazem-de-verdade',
     date: '2026-11-14',
     category: 'novidade',

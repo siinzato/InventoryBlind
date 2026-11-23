@@ -53,6 +53,7 @@ import {
   type Layout3DConfig,
 } from '../../lib/wms/warehouse3dLayout';
 import { listBinContents, searchStock, type BinStockRow } from '../../lib/wms/wmsService';
+import { listarPecas, salvarPecas } from '../../lib/wms/builderObjects';
 // A ponte com o Slotting: a planta do armazém é UMA só, e quem a edita é o configurador
 // 2D. O 3D lê a publicada em vez de manter uma segunda verdade sobre o mesmo galpão.
 import { getPublishedLayout, getFloorPlanSignedUrl } from '../../lib/slottingLayoutService';
@@ -247,6 +248,9 @@ const PASSO_GRADE_BUILDER = 1;
 /** Espessura do palete de madeira desenhado dentro do vão, a mesma da estrutura por código. */
 const ALTURA_DO_PALETE = 0.12;
 
+/** Pavimento que este mapa desenha. O mezanino entra quando houver vaga cadastrada lá. */
+const ANDAR_DO_MAPA = 1;
+
 // ── Catálogo de construção ───────────────────────────────────────────────────────────
 //
 // O que o Modo Edição sabe colocar no chão. Tudo vive em ESTADO LOCAL do React: construir
@@ -286,9 +290,38 @@ const COR_BUILDER: Record<Theme, { fantasma: string; peca: string; selecionada: 
   dark: { fantasma: '#7FB3F5', peca: '#475569', selecionada: '#3E7BE0', doca: '#B45309' },
 };
 
+/**
+ * Variante do porta-pallets.
+ *
+ * Muda a GEOMETRIA, não só a aparência: o duplo é duas fileiras costa-a-costa, como a
+ * dupla central do galpão novo, e o de picking é mais baixo e mais raso. Tratar isso
+ * como enfeite faria o builder desenhar um rack e a operação ter outro.
+ */
+type TipoDeEstante = 'simples' | 'duplo' | 'picking';
+
+const ESTANTES: Record<TipoDeEstante, { rotulo: string; tamanho: [number, number, number] }> = {
+  simples: { rotulo: 'Simples', tamanho: [1.1, 4.2, 3.6] },
+  // Profundidade dobrada: duas fileiras encostadas, sem corredor entre elas.
+  duplo: { rotulo: 'Duplo', tamanho: [2.2, 4.2, 3.6] },
+  // Picking é para separar à mão: altura de alcance e prateleira rasa.
+  picking: { rotulo: 'Picking', tamanho: [0.8, 2.4, 3.6] },
+};
+
+/** Cores de estante. Nomes do galpão, não hex, porque é isso que se fala na operação. */
+const CORES_DE_ESTANTE: { chave: string; rotulo: string; hex: string }[] = [
+  { chave: 'laranja', rotulo: 'Laranja', hex: '#C8A070' },
+  { chave: 'azul', rotulo: 'Azul', hex: '#3E6FA8' },
+  { chave: 'cinza', rotulo: 'Cinza', hex: '#64748B' },
+  { chave: 'verde', rotulo: 'Verde', hex: '#4B7F62' },
+];
+
 interface ObjetoConstruido {
   id: string;
   tipo: TipoConstruido;
+  /** Só faz sentido para porta-pallets; as outras peças ignoram. */
+  estante: TipoDeEstante;
+  /** Chave de CORES_DE_ESTANTE. */
+  cor: string;
   /** Centro em metros, já alinhado à grade. */
   x: number;
   z: number;
@@ -1107,6 +1140,7 @@ function Cena({
   plantaFisica,
   modoVisor,
   ferramenta,
+  estanteEscolhida,
   objetos,
   selecionadoNoBuilder,
   onConstruir,
@@ -1147,6 +1181,7 @@ function Cena({
   } | null;
   modoVisor: ModoVisor;
   ferramenta: FerramentaBuilder;
+  estanteEscolhida: TipoDeEstante;
   objetos: ObjetoConstruido[];
   selecionadoNoBuilder: string | null;
   onConstruir: (x: number, z: number) => void;
@@ -1219,6 +1254,7 @@ function Cena({
           />
           <Construcao
             ferramenta={ferramenta}
+            estanteEscolhida={estanteEscolhida}
             objetos={objetos}
             selecionado={selecionadoNoBuilder}
             extensao={extensao}
@@ -1481,9 +1517,12 @@ function PlantaFisica3D({
                   </>
                 )}
 
-                {/* Vão livre: superfície quase invisível que existe para RECEBER O CLIQUE.
-                    Sem ela não haveria onde clicar para endereçar mercadoria num lugar
-                    vazio, que é justamente o que se quer fazer num vão vazio. */}
+                {/* Vaga livre é CAIXA SÓLIDA, como o mapa por código sempre desenhou.
+                    Translúcida, ela sumia e sobrava só o aço — a estante lia como
+                    andaime. O volume da vaga vazia é o que dá massa ao porta-pallets, e
+                    é também o que se clica para endereçar mercadoria ali.
+                    Vão da planta sem endereço cadastrado continua fantasma: ali o lugar
+                    existe no desenho, mas não há vaga para receber nada. */}
                 {!temCarga && (
                   <mesh
                     position={vao.centro}
@@ -1496,8 +1535,8 @@ function PlantaFisica3D({
                       color={cor}
                       roughness={0.8}
                       metalness={0}
-                      transparent
-                      opacity={slot ? 0.12 : 0.05}
+                      transparent={!slot}
+                      opacity={slot ? 1 : 0.06}
                     />
                   </mesh>
                 )}
@@ -1608,6 +1647,7 @@ function PlantaDesenhadaNoPiso({ planta, theme }: { planta: PlantaNoPiso; theme:
  */
 function Construcao({
   ferramenta,
+  estanteEscolhida,
   objetos,
   selecionado,
   extensao,
@@ -1618,6 +1658,8 @@ function Construcao({
   onExcluir,
 }: {
   ferramenta: FerramentaBuilder;
+  /** Variante que o fantasma deve mostrar — a mesma que a próxima peça vai nascer. */
+  estanteEscolhida: TipoDeEstante;
   objetos: ObjetoConstruido[];
   selecionado: string | null;
   extensao: number;
@@ -1630,7 +1672,17 @@ function Construcao({
   const [alvo, setAlvo] = useState<[number, number] | null>(null);
   const cores = COR_BUILDER[theme];
   const construindo = ferramenta !== 'navegar';
-  const pecaAtiva = construindo ? CATALOGO[ferramenta as TipoConstruido] : null;
+
+  /** Tamanho da peça: porta-pallets segue a VARIANTE escolhida, o resto segue o catálogo. */
+  const tamanhoDe = (tipo: TipoConstruido, estante: TipoDeEstante): [number, number, number] =>
+    tipo === 'porta-pallets' ? ESTANTES[estante].tamanho : CATALOGO[tipo].tamanho;
+
+  const hexDe = (chave: string) =>
+    CORES_DE_ESTANTE.find(c => c.chave === chave)?.hex ?? cores.peca;
+
+  const tamanhoAtivo = construindo
+    ? tamanhoDe(ferramenta as TipoConstruido, estanteEscolhida)
+    : null;
 
   return (
     <>
@@ -1657,17 +1709,30 @@ function Construcao({
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {pecaAtiva && alvo && (
-        <mesh position={[alvo[0], alturaDoCentro(pecaAtiva), alvo[1]]}>
-          <boxGeometry args={pecaAtiva.tamanho} />
+      {tamanhoAtivo && alvo && (
+        <mesh
+          position={[
+            alvo[0],
+            CATALOGO[ferramenta as TipoConstruido].noChao
+              ? tamanhoAtivo[1] / 2 + 0.02
+              : tamanhoAtivo[1] / 2,
+            alvo[1],
+          ]}
+        >
+          <boxGeometry args={tamanhoAtivo} />
           <meshStandardMaterial color={cores.fantasma} transparent opacity={0.45} depthWrite={false} />
         </mesh>
       )}
 
       {objetos.map(obj => {
-        const peca = CATALOGO[obj.tipo];
+        const tamanho = tamanhoDe(obj.tipo, obj.estante);
+        const peca: PecaDoCatalogo = { ...CATALOGO[obj.tipo], tamanho };
         const ativo = selecionado === obj.id;
-        const cor = ativo ? cores.selecionada : obj.tipo === 'doca' ? cores.doca : cores.peca;
+        const cor = ativo
+          ? cores.selecionada
+          : obj.tipo === 'doca'
+            ? cores.doca
+            : hexDe(obj.cor);
         return (
           <group
             key={obj.id}
@@ -1682,11 +1747,11 @@ function Construcao({
                 {pecasDaFileira({
                   id: obj.id,
                   tipo: 'fileira',
-                  centro: [0, peca.tamanho[1] / 2, 0],
-                  tamanho: peca.tamanho,
+                  centro: [0, tamanho[1] / 2, 0],
+                  tamanho,
                   rotulo: '',
                 }).map((p, i) => (
-                  <mesh key={i} position={[p.centro[0], p.centro[1] - peca.tamanho[1] / 2, p.centro[2]]}>
+                  <mesh key={i} position={[p.centro[0], p.centro[1] - tamanho[1] / 2, p.centro[2]]}>
                     <boxGeometry args={p.tamanho} />
                     <meshStandardMaterial color={cor} roughness={0.6} metalness={0.15} />
                   </mesh>
@@ -2412,6 +2477,47 @@ export function Warehouse3DViewer({
   const [ferramenta, setFerramenta] = useState<FerramentaBuilder>('navegar');
   const [objetos, setObjetos] = useState<ObjetoConstruido[]>([]);
   const [selecionadoNoBuilder, setSelecionadoNoBuilder] = useState<string | null>(null);
+  // Tipo e cor valem para a PRÓXIMA peça e para a selecionada: escolher antes de colocar
+  // e corrigir depois de colocar são as duas formas de usar isto, e as duas precisam
+  // funcionar sem obrigar a excluir e refazer.
+  const [estanteEscolhida, setEstanteEscolhida] = useState<TipoDeEstante>('simples');
+  const [corEscolhida, setCorEscolhida] = useState(CORES_DE_ESTANTE[0].chave);
+  const [salvandoPecas, setSalvandoPecas] = useState(false);
+  const [erroAoSalvar, setErroAoSalvar] = useState<string | null>(null);
+  const [salvoEm, setSalvoEm] = useState<Date | null>(null);
+
+  // Carrega o que a equipe já montou. Roda uma vez: recarregar a cada troca de modo
+  // descartaria o que a pessoa acabou de colocar e ainda não salvou.
+  useEffect(() => {
+    let cancelado = false;
+    listarPecas(ANDAR_DO_MAPA).then(salvas => {
+      if (cancelado || salvas.length === 0) return;
+      setObjetos(salvas.map(p => ({
+        id: p.id,
+        tipo: p.tipo as TipoConstruido,
+        estante: p.estante as TipoDeEstante,
+        cor: p.cor,
+        x: p.x,
+        z: p.z,
+        rotacaoY: p.rotacaoY,
+      })));
+    });
+    return () => { cancelado = true; };
+  }, []);
+
+  const salvarConstrucao = useCallback(async () => {
+    setErroAoSalvar(null);
+    setSalvandoPecas(true);
+    const r = await salvarPecas(
+      objetos.map(o => ({
+        id: o.id, tipo: o.tipo, estante: o.estante, cor: o.cor, x: o.x, z: o.z, rotacaoY: o.rotacaoY,
+      })),
+      ANDAR_DO_MAPA,
+    );
+    setSalvandoPecas(false);
+    if (!r.ok) { setErroAoSalvar(r.erro ?? 'Não foi possível salvar.'); return; }
+    setSalvoEm(new Date());
+  }, [objetos]);
   // Contador em vez de random: o id só precisa ser único dentro desta sessão de edição,
   // e um contador é reproduzível quando se está depurando o que foi colocado onde.
   const proximoIdDoObjeto = useRef(1);
@@ -2421,13 +2527,27 @@ export function Warehouse3DViewer({
       setFerramenta(atual => {
         if (atual === 'navegar') return atual;
         const id = `obj-${proximoIdDoObjeto.current++}`;
-        setObjetos(lista => [...lista, { id, tipo: atual, x, z, rotacaoY: 0 }]);
+        setObjetos(lista => [
+          ...lista,
+          { id, tipo: atual, estante: estanteEscolhida, cor: corEscolhida, x, z, rotacaoY: 0 },
+        ]);
         setSelecionadoNoBuilder(id);
         return atual;
       });
     },
-    [],
+    [estanteEscolhida, corEscolhida],
   );
+
+  /** Troca tipo ou cor da peça selecionada, para corrigir sem excluir e refazer. */
+  const ajustarObjeto = useCallback((id: string, patch: Partial<Pick<ObjetoConstruido, 'estante' | 'cor'>>) => {
+    setObjetos(lista => lista.map(o => (o.id === id ? { ...o, ...patch } : o)));
+  }, []);
+
+  /** Id da peça selecionada SE ela for porta-pallets — tipo e cor só valem para estante. */
+  const selecionadoDoTipoEstante = useMemo(() => {
+    const alvo = objetos.find(o => o.id === selecionadoNoBuilder);
+    return alvo?.tipo === 'porta-pallets' ? alvo.id : null;
+  }, [objetos, selecionadoNoBuilder]);
 
   const girarObjeto = useCallback((id: string) => {
     setObjetos(lista =>
@@ -3161,6 +3281,7 @@ export function Warehouse3DViewer({
             plantaFisica={plantaFisica}
             modoVisor={modoVisor}
             ferramenta={ferramenta}
+            estanteEscolhida={estanteEscolhida}
             objetos={objetos}
             selecionadoNoBuilder={selecionadoNoBuilder}
             onConstruir={construirObjeto}
@@ -3224,6 +3345,53 @@ export function Warehouse3DViewer({
                   </Button>
                 ))}
               </div>
+              {/* Tipo e cor valem para a PRÓXIMA peça e, com algo selecionado, para a
+                  peça selecionada — corrigir sem excluir e refazer é o uso mais comum. */}
+              {(ferramenta === 'porta-pallets' || selecionadoDoTipoEstante) && (
+                <div className="mt-2 flex flex-wrap items-center justify-center gap-1.5 border-t border-edge pt-2">
+                  {(Object.keys(ESTANTES) as TipoDeEstante[]).map(t => (
+                    <Button
+                      key={t}
+                      variant={estanteEscolhida === t ? 'primary' : 'ghost'}
+                      size="sm"
+                      onClick={() => {
+                        setEstanteEscolhida(t);
+                        if (selecionadoDoTipoEstante) ajustarObjeto(selecionadoDoTipoEstante, { estante: t });
+                      }}
+                    >
+                      {ESTANTES[t].rotulo}
+                    </Button>
+                  ))}
+                  <span aria-hidden className="mx-0.5 h-5 w-px bg-edge" />
+                  {CORES_DE_ESTANTE.map(c => (
+                    <button
+                      key={c.chave}
+                      type="button"
+                      aria-label={`Cor ${c.rotulo}`}
+                      title={c.rotulo}
+                      onClick={() => {
+                        setCorEscolhida(c.chave);
+                        if (selecionadoDoTipoEstante) ajustarObjeto(selecionadoDoTipoEstante, { cor: c.chave });
+                      }}
+                      className={`h-6 w-6 rounded-control border-2 ${corEscolhida === c.chave ? 'border-accent' : 'border-edge'}`}
+                      style={{ backgroundColor: c.hex }}
+                    />
+                  ))}
+                </div>
+              )}
+              <div className="mt-2 flex items-center justify-center gap-2 border-t border-edge pt-2">
+                <Button size="sm" onClick={salvarConstrucao} disabled={salvandoPecas}>
+                  {salvandoPecas ? 'Salvando...' : 'Salvar construção'}
+                </Button>
+                <span className="text-xs text-fg-subtle">
+                  {erroAoSalvar
+                    ? erroAoSalvar
+                    : salvoEm
+                      ? `Salvo às ${salvoEm.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}`
+                      : 'Ainda não salvo nesta sessão'}
+                </span>
+              </div>
+
               <p className="mt-1.5 text-center text-xs text-fg-subtle">
                 {ferramenta === 'navegar'
                   ? `Clique numa peça para girar ou excluir. ${objetos.length} ${objetos.length === 1 ? 'peça colocada' : 'peças colocadas'}.`
@@ -3337,8 +3505,8 @@ export function Warehouse3DViewer({
           {modoVisor === 'edicao' && (
             <p className="text-xs text-fg-muted">
               Grade de {PASSO_GRADE_BUILDER} m acesa no piso, e o catálogo de construção na barra
-              de baixo. O que você montar vive só nesta sessão — ainda não há como gravar, então
-              sair da tela descarta.
+              de baixo. "Salvar construção" grava para a equipe inteira; sem salvar, o que você
+              montar some ao sair da tela.
             </p>
           )}
         </PanelSection>

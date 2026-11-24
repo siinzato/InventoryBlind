@@ -31,7 +31,7 @@ import {
   type InstancedMesh, type Texture,
 } from 'three';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { Html, Line, OrbitControls } from '@react-three/drei';
+import { Html, Line, OrbitControls, PointerLockControls } from '@react-three/drei';
 // Só os pesos e o subconjunto que esta tela usa. O pacote inteiro tem 2,4 MB (todos os
 // alfabetos e pesos); estes três arquivos somam 72 kB. E ficam no CHUNK DO MAPA 3D, que
 // é carregado sob demanda — quem nunca abre a seção não baixa fonte nenhuma.
@@ -250,6 +250,12 @@ const ALTURA_DO_PALETE = 0.12;
 
 /** Pavimento que este mapa desenha. O mezanino entra quando houver vaga cadastrada lá. */
 const ANDAR_DO_MAPA = 1;
+
+/** Altura dos olhos de quem caminha, em metros. */
+const ALTURA_DOS_OLHOS = 1.65;
+
+/** Velocidade da caminhada, em m/s. Passo de quem anda conferindo, não de quem corre. */
+const VELOCIDADE_A_PE = 2.2;
 
 // ── Catálogo de construção ───────────────────────────────────────────────────────────
 //
@@ -1178,6 +1184,8 @@ function Cena({
     modoCor: ModoCor;
     maxCaixas: number;
     abcPorVaga: ReadonlyMap<string, AbcDaVaga>;
+    /** Vazio = todas. Fileira fora da seleção fica apagada e não recebe clique. */
+    ruasSelecionadas: ReadonlySet<string>;
   } | null;
   modoVisor: ModoVisor;
   ferramenta: FerramentaBuilder;
@@ -1235,6 +1243,7 @@ function Cena({
           modoCor={plantaFisica.modoCor}
           maxCaixas={plantaFisica.maxCaixas}
           abcPorVaga={plantaFisica.abcPorVaga}
+          ruasSelecionadas={plantaFisica.ruasSelecionadas}
           theme={theme}
           onSelecionarVaga={onSelect}
           onApontarVaga={onHover}
@@ -1424,6 +1433,7 @@ function PlantaFisica3D({
   modoCor,
   maxCaixas,
   abcPorVaga,
+  ruasSelecionadas,
   theme,
   onSelecionarVaga,
   onApontarVaga,
@@ -1436,6 +1446,7 @@ function PlantaFisica3D({
   /** Os mesmos dois que a vista por código usa, para as cores não divergirem entre elas. */
   maxCaixas: number;
   abcPorVaga: ReadonlyMap<string, AbcDaVaga>;
+  ruasSelecionadas: ReadonlySet<string>;
   theme: Theme;
   onSelecionarVaga: (slot: Slot) => void;
   onApontarVaga: (slot: Slot | null) => void;
@@ -1466,7 +1477,13 @@ function PlantaFisica3D({
         </mesh>
       ))}
 
-      {blocos.filter(b => b.tipo === 'fileira').map(b => (
+      {blocos.filter(b => b.tipo === 'fileira').map(b => {
+        // Fora da seleção de ruas: a fileira continua desenhada, para o galpão não ficar
+        // com buracos, mas apagada e sem clique. Sumir com ela tiraria a referência de
+        // onde a rua escolhida fica dentro do prédio.
+        const letra = (/^RUA\s+([A-Z]+)$/.exec(b.rotulo) ?? [])[1];
+        const noFiltro = ruasSelecionadas.size === 0 || (!!letra && ruasSelecionadas.has(letra));
+        return (
         <group key={b.id}>
           {pecasDaFileira(b).map((p, i) => (
             <mesh key={`${b.id}-${i}`} position={p.centro}>
@@ -1481,7 +1498,7 @@ function PlantaFisica3D({
               Vão sem vaga cadastrada fica translúcido e inerte: mostra que o lugar
               existe na planta sem fingir que há endereço para receber mercadoria. */}
           {vaosDaFileira(b).map(vao => {
-            const slot = vao.codigo ? vagasPorCodigo.get(vao.codigo) ?? null : null;
+            const slot = noFiltro && vao.codigo ? vagasPorCodigo.get(vao.codigo) ?? null : null;
             const cor = slot ? corDaVaga(slot, modoCor, theme, maxCaixas, abcPorVaga) : cores.peca;
             const [largura, alturaVao, profundidade] = vao.tamanho;
             const [vx, vy, vz] = vao.centro;
@@ -1546,14 +1563,18 @@ function PlantaFisica3D({
 
           {b.rotulo && (
             <Html center distanceFactor={26} position={[b.centro[0], b.tamanho[1] + 0.6, b.centro[2]]}>
-              <span className="whitespace-nowrap rounded-control bg-ink-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white">
+              <span
+                className="whitespace-nowrap rounded-control bg-ink-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white"
+                style={{ opacity: noFiltro ? 1 : 0.35 }}
+              >
                 {b.rotulo}
                 <span className="ml-1 opacity-70">{posicoesDaFileira(b)} pos.</span>
               </span>
             </Html>
           )}
         </group>
-      ))}
+        );
+      })}
     </group>
   );
 }
@@ -1796,6 +1817,76 @@ function Construcao({
   );
 }
 
+/**
+ * Caminhada em primeira pessoa dentro do galpão.
+ *
+ * `PointerLockControls` do drei resolve só o OLHAR — travar o ponteiro e girar a câmera.
+ * O andar é daqui: W/A/S/D movendo no plano, com a altura presa na dos olhos.
+ *
+ * ── Por que a frente é achatada antes de normalizar ──────────────────────────────
+ * `getWorldDirection` devolve para onde a câmera APONTA, inclusive para cima e para
+ * baixo. Usada crua, olhar para o teto faria o W subir voando. Zerar o Y antes de
+ * normalizar é o que transforma "para onde olho" em "para onde ando".
+ *
+ * ── Por que o tempo do quadro entra na conta ─────────────────────────────────────
+ * Somar um passo fixo por quadro faria a pessoa andar mais rápido numa máquina que
+ * roda a 120 FPS do que numa de 30. Multiplicar pelo delta mantém 2,2 m/s em qualquer
+ * uma — é metro por segundo, não metro por quadro.
+ */
+function Caminhada({ limite }: { limite: number }) {
+  const { camera } = useThree();
+  const teclas = useRef<Record<string, boolean>>({});
+
+  // Entrada: põe a pessoa DENTRO do galpão, na altura dos olhos, olhando para o centro.
+  // Sem isto a caminhada começa de onde a órbita parou — tipicamente a dezenas de metros
+  // e lá no alto, de onde W não chega a lugar nenhum em tempo razoável.
+  useEffect(() => {
+    camera.position.set(0, ALTURA_DOS_OLHOS, limite * 0.45);
+    camera.lookAt(0, ALTURA_DOS_OLHOS, 0);
+  }, [camera, limite]);
+
+  useEffect(() => {
+    const aperta = (e: KeyboardEvent) => { teclas.current[e.code] = true; };
+    const solta = (e: KeyboardEvent) => { teclas.current[e.code] = false; };
+    window.addEventListener('keydown', aperta);
+    window.addEventListener('keyup', solta);
+    // Soltar tudo ao sair: com a tecla "presa" no desmonte, voltar para a caminhada
+    // começaria andando sozinho.
+    return () => {
+      window.removeEventListener('keydown', aperta);
+      window.removeEventListener('keyup', solta);
+      teclas.current = {};
+    };
+  }, []);
+
+  useFrame((_, delta) => {
+    const passo = VELOCIDADE_A_PE * delta;
+
+    const frente = new Vector3();
+    camera.getWorldDirection(frente);
+    frente.y = 0;
+    if (frente.lengthSq() === 0) return;
+    frente.normalize();
+
+    const lado = new Vector3().crossVectors(frente, new Vector3(0, 1, 0)).normalize();
+
+    if (teclas.current.KeyW || teclas.current.ArrowUp) camera.position.addScaledVector(frente, passo);
+    if (teclas.current.KeyS || teclas.current.ArrowDown) camera.position.addScaledVector(frente, -passo);
+    if (teclas.current.KeyD || teclas.current.ArrowRight) camera.position.addScaledVector(lado, passo);
+    if (teclas.current.KeyA || teclas.current.ArrowLeft) camera.position.addScaledVector(lado, -passo);
+
+    // Altura fixa: sem isto qualquer imprecisão acumularia e a pessoa afundaria no piso
+    // ou subiria devagar sem perceber.
+    camera.position.y = ALTURA_DOS_OLHOS;
+
+    // Cerca. Sair do galpão para o vazio desorienta e não há como voltar sem resetar.
+    camera.position.x = Math.max(-limite, Math.min(limite, camera.position.x));
+    camera.position.z = Math.max(-limite, Math.min(limite, camera.position.z));
+  });
+
+  return null;
+}
+
 /** Data curta para a grade. Formatada à mão, como no módulo de captura: o painel é
  *  lido no corredor e a data não pode mudar de formato conforme a locale da máquina. */
 function dataCurta(iso: string): string {
@@ -1818,6 +1909,7 @@ function PainelDetalhe({
   onFechar,
   onScanRequest,
   onOperate,
+  onProcurarSku,
 }: {
   slot: Slot;
   /** Classificação de giro desta vaga. `undefined` = nenhum SKU daqui está na análise. */
@@ -1825,6 +1917,13 @@ function PainelDetalhe({
   onFechar: () => void;
   onScanRequest?: (slot: Slot) => void;
   onOperate?: (slot: Slot) => void;
+  /**
+   * Procura um SKU no armazém inteiro, acendendo todos os endereços que o têm.
+   *
+   * Existe porque a pergunta que nasce ao abrir uma vaga é "onde MAIS tem isto" — e até
+   * agora ela obrigava a fechar o painel e redigitar o código na busca.
+   */
+  onProcurarSku?: (sku: string) => void;
 }) {
   // Hook em vez de prop: a especificação pede para NÃO mexer na interface do
   // componente, e o tema é exatamente o tipo de contexto que não deve virar prop só
@@ -2037,6 +2136,18 @@ function PainelDetalhe({
                   )}
                 </div>
                 <p className="mt-0.5 text-xs text-fg-muted">{linha.productName}</p>
+                {/* Por LINHA, e não um botão no rodapé: a vaga pode ter mais de um
+                    produto, e um botão só teria que escolher qual procurar — ou
+                    escolheria errado, ou pediria mais um clique para desambiguar. */}
+                {onProcurarSku && (
+                  <button
+                    type="button"
+                    className="mt-1 text-xs text-accent underline-offset-2 hover:underline"
+                    onClick={() => onProcurarSku(linha.sku)}
+                  >
+                    Ver onde mais tem este produto
+                  </button>
+                )}
                 <p className="mt-0.5 text-xs text-fg-muted">
                   <span className="text-code">{linha.boxes}</span> cx ·{' '}
                   <span className="text-code">{linha.units}</span> un
@@ -2423,7 +2534,6 @@ type Estado =
 // `hud-3d` é o escopo da JetBrains Mono: a regra no index.css só alcança o que está
 // dentro desta moldura, então a tipografia técnica do resto do produto fica intocada.
 const MOLDURA = 'hud-3d relative h-full min-h-[24rem] w-full overflow-hidden rounded-container bg-surface-2';
-const TODAS_AS_RUAS = '';
 
 export function Warehouse3DViewer({
   slots: slotsExternos,
@@ -2445,6 +2555,15 @@ export function Warehouse3DViewer({
   // de verdade. Desligar devolve as vagas montadas pelo código, que é onde vivem status,
   // busca e rota — as duas não podem aparecer juntas porque ocupam o mesmo chão.
   const [mostrarPlantaFisica, setMostrarPlantaFisica] = useState(true);
+
+  /**
+   * Caminhar dentro do galpão, em vez de orbitar por fora.
+   *
+   * Sai da órbita porque são dois jeitos incompatíveis de mexer na mesma câmera. Entrar
+   * trava o ponteiro do mouse — por isso o rótulo diz como sair, senão a pessoa fica
+   * presa sem saber que é Esc.
+   */
+  const [caminhando, setCaminhando] = useState(false);
 
   // ── A planta do armazém no piso do 3D ────────────────────────────────────────────
   // A ponte que faltava: o mapa 3D posicionava tudo por aritmética do código da vaga e
@@ -2591,7 +2710,9 @@ export function Warehouse3DViewer({
 
   const [modo, setModo] = useState<ModoCor>('status');
   const [filtro, setFiltro] = useState<FiltroStatus>('todas');
-  const [rua, setRua] = useState<string>(TODAS_AS_RUAS);
+  /** Conjunto VAZIO significa todas as ruas. Guardar "todas" como um valor sentinela
+   *  obrigaria cada leitura a lembrar do sentinela; o conjunto vazio ja diz isso. */
+  const [ruasSelecionadas, setRuasSelecionadas] = useState<Set<string>>(() => new Set());
   // Lido do localStorage uma vez, na montagem. É preferência de quem monta o mapa, não
   // dado do armazém — o banco não guarda a altura da estrutura.
   const [layout, setLayout] = useState<Layout3DConfig>(carregarLayout);
@@ -2863,8 +2984,9 @@ export function Warehouse3DViewer({
       modoCor: modo,
       maxCaixas: vagas.reduce((m, s) => Math.max(m, s.caixas), 0),
       abcPorVaga: abc.porVaga,
+      ruasSelecionadas,
     };
-  }, [mostrarPlantaFisica, vagas, modo, abc.porVaga]);
+  }, [mostrarPlantaFisica, vagas, modo, abc.porVaga, ruasSelecionadas]);
 
   // Posição e cor de cada vaga, calculadas uma vez por mudança real de entrada. Sem
   // isto, cada movimento do mouse (que muda `apontada`) recalcularia a cena inteira.
@@ -2878,7 +3000,7 @@ export function Warehouse3DViewer({
     const desenhaveis: VagaDesenhavel[] = vagas.map(slot => {
       const achada = achados !== null && achados.has(slot.id);
       const ativa =
-        (rua === TODAS_AS_RUAS || slot.ruaCodigo === rua) &&
+        (ruasSelecionadas.size === 0 || ruasSelecionadas.has(slot.ruaCodigo)) &&
         (filtro === 'todas' || slot.status === filtro) &&
         // Busca em curso restringe junto com os demais filtros, em vez de substituí-los.
         (achados === null || achada);
@@ -2967,7 +3089,7 @@ export function Warehouse3DViewer({
       // Centraliza na origem para o OrbitControls orbitar o armazém, não um canto dele.
       deslocamento: [-larguraTotal / 2, 0, -profundidadeTotal / 2] as [number, number, number],
     };
-  }, [vagas, modo, theme, rua, filtro, layout, achados, abc, alertasGiro, pulsando]);
+  }, [vagas, modo, theme, ruasSelecionadas, filtro, layout, achados, abc, alertasGiro, pulsando]);
 
   const todasDesenhaveis = useMemo(
     () => [...solidas, ...divergentes, ...raioX, ...fiosAtivos, ...fiosAtenuados],
@@ -3292,18 +3414,27 @@ export function Warehouse3DViewer({
             onHover={setApontada}
             onSelect={selecionar}
           />
-          <OrbitControls
-            ref={controlsRef}
-            enableDamping
-            dampingFactor={0.08}
-            // Também proporcionais: um teto fixo prenderia a câmera dentro de um
-            // armazém grande, impedindo justamente a vista geral que o 3D existe para dar.
-            minDistance={2}
-            maxDistance={distancia * 2.5}
-            // Trava acima do piso: por baixo do chão não existe ponto de vista real no
-            // armazém, e chegar lá é o jeito mais rápido de o operador se perder.
-            maxPolarAngle={Math.PI / 2.05}
-          />
+          {/* Os dois controles são mutuamente exclusivos: ambos montados, cada um
+              mexeria na mesma câmera por conta própria e a vista brigaria consigo mesma. */}
+          {caminhando ? (
+            <>
+              <PointerLockControls />
+              <Caminhada limite={extensao} />
+            </>
+          ) : (
+            <OrbitControls
+              ref={controlsRef}
+              enableDamping
+              dampingFactor={0.08}
+              // Também proporcionais: um teto fixo prenderia a câmera dentro de um
+              // armazém grande, impedindo justamente a vista geral que o 3D existe para dar.
+              minDistance={2}
+              maxDistance={distancia * 2.5}
+              // Trava acima do piso: por baixo do chão não existe ponto de vista real no
+              // armazém, e chegar lá é o jeito mais rápido de o operador se perder.
+              maxPolarAngle={Math.PI / 2.05}
+            />
+          )}
 
           {/* Dentro do Canvas porque é onde `useFrame` existe. Nenhum dos dois desenha
               nada: um lê a câmera para o radar, o outro conduz a transição do clique. */}
@@ -3624,14 +3755,53 @@ export function Warehouse3DViewer({
 
           <SegmentedControl options={MODOS} value={modo} onChange={setModo} label="Colorir por" width="full" />
 
-          <Select value={rua} onChange={e => setRua(e.target.value)} className="w-full">
-            <option value={TODAS_AS_RUAS}>Todas as ruas</option>
-            {ruas.map(r => (
-              <option key={r} value={r}>
-                Rua {r}
-              </option>
-            ))}
-          </Select>
+          {/* Caixas em vez de dropdown: conferir DUAS ruas lado a lado é o caso comum, e
+              o dropdown obrigava a escolher uma ou ver o galpão inteiro. Conjunto vazio
+              significa "todas" — é o estado inicial e o que o botão Limpar devolve. */}
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-fg-muted">
+                {ruasSelecionadas.size === 0
+                  ? 'Todas as ruas'
+                  : `${ruasSelecionadas.size} de ${ruas.length} ruas`}
+              </span>
+              {ruasSelecionadas.size > 0 && (
+                <button
+                  type="button"
+                  className="text-xs text-accent underline-offset-2 hover:underline"
+                  onClick={() => setRuasSelecionadas(new Set())}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+            <div className="flex flex-wrap gap-1">
+              {ruas.map(r => {
+                const ativa = ruasSelecionadas.has(r);
+                return (
+                  <button
+                    key={r}
+                    type="button"
+                    aria-pressed={ativa}
+                    onClick={() =>
+                      setRuasSelecionadas(atual => {
+                        const proximo = new Set(atual);
+                        if (proximo.has(r)) proximo.delete(r); else proximo.add(r);
+                        return proximo;
+                      })
+                    }
+                    className={`text-code rounded-control border px-2 py-1 text-xs ${
+                      ativa
+                        ? 'border-accent bg-accent/15 text-fg'
+                        : 'border-edge text-fg-muted hover:bg-surface-3'
+                    }`}
+                  >
+                    {r}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
 
           <Select
             value={filtro}
@@ -3716,7 +3886,28 @@ export function Warehouse3DViewer({
         )}
 
         <PanelSection padding="sm" className="space-y-2">
-          <Button variant="secondary" size="sm" className="w-full" onClick={resetarCamera}>
+          <Button
+            variant={caminhando ? 'primary' : 'secondary'}
+            size="sm"
+            className="w-full"
+            onClick={() => setCaminhando(v => !v)}
+          >
+            {caminhando ? 'Sair da caminhada' : 'Caminhar no galpão'}
+          </Button>
+          {caminhando && (
+            <p className="text-xs text-fg-muted">
+              Clique na cena para assumir o controle. <span className="text-code">W A S D</span> anda,
+              o mouse olha, <span className="text-code">Esc</span> solta o ponteiro. Enquanto caminha,
+              clicar não abre vaga.
+            </p>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="w-full"
+            onClick={resetarCamera}
+            disabled={caminhando}
+          >
             Resetar câmera
           </Button>
           <Button variant="ghost" size="sm" className="w-full" onClick={() => setAjustando(true)}>
@@ -3770,6 +3961,9 @@ export function Warehouse3DViewer({
           onFechar={() => setSelecionada(null)}
           onScanRequest={onScanRequest}
           onOperate={onOperate}
+          // Fecha a gaveta ao procurar: o resultado da busca é a CENA acendendo vários
+          // endereços, e o painel aberto por cima esconderia metade deles.
+          onProcurarSku={sku => { setBusca(sku); setSelecionada(null); }}
         />
       )}
     </div>

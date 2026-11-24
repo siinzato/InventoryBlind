@@ -20,6 +20,27 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-24-mapa-3d-caminhar-no-galpao',
+    date: '2026-11-24',
+    category: 'novidade',
+    title: 'Dá para caminhar dentro do galpão no mapa 3D',
+    description: 'Até agora o mapa 3D só era visto de fora, girando em volta do prédio. Agora há o botão "Caminhar no galpão": a câmera desce para a altura dos olhos, dentro do armazém, e você anda pelos corredores com as teclas W, A, S, D (ou as setas) enquanto o mouse olha em volta. É a vista de quem está no chão do galpão — serve para conferir se um corredor está largo o suficiente, se a placa da rua é legível de longe ou como a estante aparece para quem vai coletar. Para sair, basta apertar Esc. Enquanto está caminhando, clicar não abre a vaga — é o preço de o mouse estar servindo para olhar em volta.',
+  },
+  {
+    id: '2026-11-24-mapa-3d-onde-mais-tem-este-produto',
+    date: '2026-11-24',
+    category: 'melhoria',
+    title: 'Do endereço aberto direto para os outros endereços do produto',
+    description: 'Ao abrir uma vaga no mapa 3D, a pergunta que nasce quase sempre é: onde mais tem este produto? Antes era preciso anotar o código, fechar o painel e digitar na busca. Agora cada produto listado na vaga traz o atalho "Ver onde mais tem este produto": um clique e o mapa acende todos os endereços daquele item, na ordem da entrada mais antiga para a mais nova, com a rota de coleta já desenhada. O atalho fica em cada linha de produto, e não num botão só no rodapé, porque uma mesma vaga pode guardar mais de um item.',
+  },
+  {
+    id: '2026-11-24-mapa-3d-filtro-de-varias-ruas',
+    date: '2026-11-24',
+    category: 'melhoria',
+    title: 'Dá para ver duas ruas ao mesmo tempo no mapa 3D',
+    description: 'O filtro de rua do mapa 3D era uma lista onde só cabia uma escolha: ou você via uma rua sozinha, ou via o galpão inteiro. Comparar a rua E com a rua F, que é o caso mais comum, não tinha como. Agora cada rua é um botão: clique nas que quiser e veja só elas, com o aviso de quantas estão selecionadas e um "Limpar" para voltar a ver tudo. O filtro também passou a valer na vista da planta — as fileiras de fora da seleção continuam desenhadas, porém apagadas, para você não perder a referência de onde a rua escolhida fica dentro do prédio.',
+  },
+  {
     id: '2026-11-23-mapa-3d-desenha-a-planta',
     date: '2026-11-23',
     category: 'novidade',

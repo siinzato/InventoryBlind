@@ -13,7 +13,13 @@
 // builder). Soltas eram 30 e poucas, e a assinatura escondia o que pertencia a quê.
 
 import { useState } from 'react';
-import { Crosshair, PanelLeftClose, PanelLeftOpen, ShieldAlert } from 'lucide-react';
+import type { ReactNode } from 'react';
+import {
+  Camera, ChevronDown, Crosshair, Footprints, Layers, Maximize, Minimize,
+  PanelLeftClose, PanelLeftOpen, RotateCcw, Ruler, Search, ShieldAlert,
+  SlidersHorizontal, Sun, SunDim, View,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
 import {
   Button, Input, Modal, Notice, Panel, PanelSection, Select, SegmentedControl,
 } from '../../ui';
@@ -34,6 +40,122 @@ import type { VagaDesenhavel } from './recursos3d';
 import type { RotaDesenhavel } from './Cena3D';
 
 
+
+/**
+ * Botão de ícone da fileira de vista.
+ *
+ * O ícone sozinho não diz nada a quem não o reconhece, nem a um leitor de tela. Por isso
+ * o `rotulo` vai nos dois lugares que resolvem isso — `title` para quem passa o mouse,
+ * `aria-label` para quem não vê o desenho — e ele descreve a AÇÃO, não o estado.
+ *
+ * `aria-pressed` só aparece quando o botão é um alternador de verdade. Num botão que
+ * apenas dispara (resetar, capturar) ele seria uma promessa de estado que não existe.
+ *
+ * `h-11` não é estética: é o mínimo de alvo de toque que a Design Constitution exige, e
+ * quem usa este mapa no celular está com o telefone na mão dentro do galpão.
+ */
+function BotaoDeVista({
+  rotulo,
+  ativo,
+  disabled,
+  onClick,
+  children,
+}: {
+  rotulo: string;
+  ativo?: boolean;
+  disabled?: boolean;
+  onClick: () => void;
+  children: ReactNode;
+}) {
+  return (
+    <button
+      type="button"
+      title={rotulo}
+      aria-label={rotulo}
+      aria-pressed={ativo}
+      disabled={disabled}
+      onClick={onClick}
+      className={`flex h-11 flex-1 items-center justify-center rounded-control border transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40 disabled:pointer-events-none disabled:opacity-50 ${
+        ativo
+          ? 'border-accent bg-accent/10 text-accent'
+          : 'border-edge text-fg-muted hover:bg-surface-2 hover:text-fg'
+      }`}
+    >
+      {children}
+    </button>
+  );
+}
+
+/**
+ * Um grupo do painel: cabeçalho com ícone, resumo do que está ativo e corpo recolhível.
+ *
+ * ── Por que agrupar ────────────────────────────────────────────────────────────
+ * O painel era uma coluna única de onze controles sem hierarquia nenhuma: legenda, modo,
+ * planta, pavimento, busca, rota, cor, ruas, status, alertas, câmera. Tudo com o mesmo
+ * peso, nessa ordem, e nada dizendo o que pertencia a quê — "Colorir por" ficava no meio
+ * da seção de busca, a três controles de distância da legenda que ele comanda.
+ *
+ * ── Por que o resumo aparece SEMPRE, aberto ou fechado ─────────────────────────
+ * É ele que torna o recolhimento honesto. Uma seção fechada escondendo um filtro ligado
+ * faria a tela mentir sobre o que está mostrando — e um mapa que esconde que está
+ * filtrado é pior do que um mapa sem filtro. Com o resumo no cabeçalho, "2 ruas · 207 de
+ * 215" continua visível com o grupo inteiro recolhido.
+ *
+ * `destacado` acende ícone e resumo no accent: a cor de ação e estado ativo do produto,
+ * nunca decoração. Sem nada fora do padrão, o grupo fica neutro.
+ *
+ * Sem fundo de hover no cabeçalho inteiro, de propósito: um bloco cinza por trás de cada
+ * título devolveria ao painel as cinco caixas que o agrupamento veio tirar. O que dá a
+ * pista de que é clicável é o galão girando e o título acendendo.
+ */
+function SecaoDoHud({
+  titulo,
+  icone: Icone,
+  resumo,
+  destacado = false,
+  comecaAberta = true,
+  children,
+}: {
+  titulo: string;
+  icone: LucideIcon;
+  /** O que está ativo aqui dentro, em uma linha curta. */
+  resumo?: string;
+  /** Há algo fora do padrão neste grupo. */
+  destacado?: boolean;
+  comecaAberta?: boolean;
+  children: ReactNode;
+}) {
+  const [aberta, setAberta] = useState(comecaAberta);
+
+  return (
+    <PanelSection padding="sm" className="space-y-2">
+      <button
+        type="button"
+        onClick={() => setAberta(a => !a)}
+        aria-expanded={aberta}
+        className="group flex w-full items-center gap-2 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/40"
+      >
+        <Icone
+          aria-hidden
+          className={`h-3.5 w-3.5 shrink-0 ${destacado ? 'text-accent' : 'text-fg-subtle'}`}
+        />
+        <span className="text-xs font-medium text-fg-muted transition-colors group-hover:text-fg">
+          {titulo}
+        </span>
+        <span
+          className={`ml-auto truncate text-xs ${destacado ? 'text-accent' : 'text-fg-subtle'}`}
+        >
+          {resumo ?? ''}
+        </span>
+        <ChevronDown
+          aria-hidden
+          className={`h-3.5 w-3.5 shrink-0 text-fg-subtle transition-transform ${aberta ? '' : '-rotate-90'}`}
+        />
+      </button>
+      {aberta && children}
+    </PanelSection>
+  );
+}
 
 // ── Ajuste da estrutura ────────────────────────────────────────────────────────
 
@@ -235,6 +357,9 @@ export interface VisaoDoHud {
   andar: number;
   caminhando: boolean;
   fundo: FundoDaCena;
+  telaCheia: boolean;
+  /** Falso esconde o botão: API ausente, ou bloqueada por estar num iframe. */
+  suportaTelaCheia: boolean;
 }
 
 export interface BuscaDoHud {
@@ -283,6 +408,7 @@ export interface AcoesDoHud {
   setParadaAtual: (n: number) => void;
   setCaminhando: (f: (v: boolean) => boolean) => void;
   setFundo: (f: (v: FundoDaCena) => FundoDaCena) => void;
+  alternarTelaCheia: () => void;
   setAjustando: (v: boolean) => void;
   setFerramenta: (f: FerramentaBuilder) => void;
   setEstanteEscolhida: (t: TipoDeEstante) => void;
@@ -326,7 +452,10 @@ export function Hud3D({
   theme: Theme;
 }) {
   const { modo, contagem, contagemAbc, abc, abcFalhou } = legenda;
-  const { modoVisor, mostrarPlantaFisica, origemDaPlanta, pavimentos, andar, caminhando, fundo } = visao;
+  const {
+    modoVisor, mostrarPlantaFisica, origemDaPlanta, pavimentos, andar, caminhando, fundo,
+    telaCheia, suportaTelaCheia,
+  } = visao;
   const { busca, buscando, achados, achadas, rota, rotaAberta, paradaAtual } = dadosDaBusca;
   const { ruas, ruasSelecionadas, filtro, alertasGiro, divergentes, emDestaque, totalDeVagas, naoPosicionaveis } = filtros;
   const {
@@ -336,7 +465,7 @@ export function Hud3D({
   const {
     setModo, setModoVisor, setMostrarPlantaFisica, setAndar, setBusca, setFiltro,
     setRuasSelecionadas, limparRuas, setRotaAberta, setParadaAtual, setCaminhando, setFundo,
-    setAjustando, setFerramenta, setEstanteEscolhida, setCorEscolhida,
+    alternarTelaCheia, setAjustando, setFerramenta, setEstanteEscolhida, setCorEscolhida,
     setSelecionadoNoBuilder, ajustarObjeto, salvarConstrucao, focarVaga, voarAteParada,
     resetarCamera, capturarCena, trocarLayout,
   } = acoes;
@@ -350,6 +479,52 @@ export function Hud3D({
   const [aberto, setAberto] = useState(
     () => typeof window === 'undefined' || window.innerWidth >= LARGURA_ESTREITA,
   );
+
+  // ── Resumos de cabeçalho ──────────────────────────────────────────────────────
+  //
+  // O que cada grupo diz de si quando está recolhido. Calculados aqui, e não dentro de
+  // `SecaoDoHud`, porque é o HUD que sabe o que conta como "fora do padrão" em cada
+  // assunto — a seção só sabe desenhar.
+
+  const filtrando = ruasSelecionadas.size > 0 || filtro !== 'todas';
+  const resumoDosFiltros = filtrando
+    ? [
+        ruasSelecionadas.size > 0
+          ? `${ruasSelecionadas.size} ${ruasSelecionadas.size === 1 ? 'rua' : 'ruas'}`
+          : null,
+        // O número em destaque entra no RESUMO, não só no corpo: é ele que diz quanto do
+        // armazém sobrou na tela, e é exatamente o que não pode sumir num grupo fechado.
+        `${emDestaque} de ${totalDeVagas}`,
+      ]
+        .filter(Boolean)
+        .join(' · ')
+    : `${totalDeVagas} ${totalDeVagas === 1 ? 'vaga' : 'vagas'}`;
+
+  const buscaAtiva = busca.trim().length >= 2;
+  const resumoDaBusca = !buscaAtiva
+    ? undefined
+    : buscando
+      ? 'procurando…'
+      : `${achadas.length} ${achadas.length === 1 ? 'vaga' : 'vagas'}`;
+
+  const resumoDaVista = [
+    mostrarPlantaFisica ? 'planta' : 'código',
+    pavimentos.length > 1 ? (andar === 1 ? 'térreo' : `${andar}º andar`) : null,
+    modoVisor === 'edicao' ? 'edição' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  const resumoDaCamera = [
+    caminhando ? 'caminhando' : null,
+    telaCheia ? 'tela cheia' : null,
+    fundo === 'limpo' ? 'sem galpão' : null,
+  ]
+    .filter(Boolean)
+    .join(' · ');
+
+  /** Os dois atalhos de alerta existem? Decide se a faixa de alertas é desenhada. */
+  const temAlerta = contagem.divergence > 0 || alertasGiro.length > 0;
 
   return (
     <>
@@ -479,8 +654,18 @@ export function Hud3D({
         </PanelSection>
         {/* A legenda acompanha o modo. Mostrar as duas ao mesmo tempo obrigaria a
             pessoa a descobrir sozinha qual delas explica o que está na tela. */}
+        <SecaoDoHud
+          titulo="Legenda"
+          icone={Layers}
+          resumo={MODOS.find(m => m.value === modo)?.label.toLowerCase()}
+        >
+          {/* "Colorir por" vive AQUI, encostado na legenda que ele comanda. Antes ficava
+              no meio da seção de busca, a três controles de distância — e a legenda
+              trocava inteira sem nada por perto explicando por quê. */}
+          <SegmentedControl options={MODOS} value={modo} onChange={setModo} label="Colorir por" width="full" />
+
         {modo === 'abc' ? (
-          <PanelSection padding="sm" className="space-y-2">
+          <div className="space-y-2">
             {LEGENDA_ABC.map(({ classe, rotulo }) => (
               <div key={classe} className="flex items-center justify-between gap-2">
                 <span className="flex items-center gap-2 text-xs text-fg-muted">
@@ -524,9 +709,9 @@ export function Hud3D({
                   : 'Nenhuma Curva ABC publicada. Publique uma análise para colorir o armazém por giro.'}
               </p>
             )}
-          </PanelSection>
+          </div>
         ) : (
-        <PanelSection padding="sm" className="space-y-2">
+        <div className="space-y-2">
           {LEGENDA.map(({ status, rotulo }) => (
             <div key={status} className="flex items-center justify-between gap-2">
               <span className="flex items-center gap-2 text-xs text-fg-muted">
@@ -546,12 +731,76 @@ export function Hud3D({
               <span className="text-code text-xs text-fg">{contagem[status]}</span>
             </div>
           ))}
-        </PanelSection>
+        </div>
+        )}
+        </SecaoDoHud>
+
+        {/* Os dois atalhos de alerta, FORA de qualquer grupo recolhível.
+            Eles viviam no meio da seção de filtros — e um aviso de mercadoria acima da
+            capacidade atrás de um cabeçalho fechado é um aviso que não avisa. Aqui a
+            faixa só existe quando há o que apontar, então ela nunca é espaço vazio. */}
+        {temAlerta && (
+          <PanelSection padding="sm" className="space-y-2">
+            {/* Atalho para o alerta. Aparece SÓ quando há alerta: um botão permanente
+                marcando zero vira ruído e, pior, treina a pessoa a ignorá-lo. */}
+            {contagem.divergence > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  setFiltro('divergence');
+                  focarVaga(divergentes[0]?.slot);
+                }}
+              >
+                {/* A cor vem da CENA, não de `text-amber-400`: o ícone tem de ser
+                    exatamente o âmbar que pinta a vaga lá dentro. Paleta Tailwind crua
+                    aqui criaria um segundo amarelo, parecido e diferente. */}
+                <ShieldAlert
+                  aria-hidden
+                  className="mr-1.5 h-3.5 w-3.5 shrink-0"
+                  style={{ color: COR_VAGA[theme].divergence }}
+                />
+                Ver <span className="text-code mx-1">{contagem.divergence}</span> acima da capacidade
+              </Button>
+            )}
+
+            {/* Mesma regra do atalho acima: aparece só quando há o que apontar. Leva junto
+                o modo de cor, porque o alerta não faz sentido sobre o mapa de Status — o
+                losango explica POR QUE a vaga está marcada apenas quando a cor é a curva. */}
+            {alertasGiro.length > 0 && (
+              <Button
+                variant="secondary"
+                size="sm"
+                className="w-full"
+                onClick={() => {
+                  setModo('abc');
+                  focarVaga(alertasGiro[0]);
+                }}
+              >
+                {/* Vermelho do marcador 3D do mesmo alerta — o losango que paira sobre a
+                    vaga. Ícone e marcador têm de ser a mesma cor, senão são lidos como
+                    dois avisos diferentes. */}
+                <ShieldAlert
+                  aria-hidden
+                  className="mr-1.5 h-3.5 w-3.5 shrink-0"
+                  style={{ color: COR_ALERTA_GIRO }}
+                />
+                <span className="text-code mr-1">{alertasGiro.length}</span>
+                {alertasGiro.length === 1 ? 'vaga de alto giro elevada' : 'vagas de alto giro elevadas'}
+              </Button>
+            )}
+          </PanelSection>
         )}
 
         {/* Para que serve a cena. Fica no topo porque decide o que vem abaixo: no modo
             Edição o painel continua sendo o mesmo, mas a cena aceita construção. */}
-        <PanelSection padding="sm" className="space-y-2">
+        <SecaoDoHud
+          titulo="Vista"
+          icone={View}
+          resumo={resumoDaVista}
+          destacado={modoVisor === 'edicao'}
+        >
           <SegmentedControl
             options={MODOS_VISOR}
             value={modoVisor}
@@ -608,14 +857,23 @@ export function Hud3D({
               montar some ao sair da tela.
             </p>
           )}
-        </PanelSection>
+        </SecaoDoHud>
 
-        <PanelSection padding="sm" className="space-y-2">
+        <SecaoDoHud
+          titulo="Busca e rota"
+          icone={Search}
+          resumo={resumoDaBusca}
+          destacado={buscaAtiva}
+        >
           {/* "SKU ou produto", NÃO "SKU ou lote". O WMS não tem camadas de lote: o saldo
               é uma linha por endereço e produto, com uma única data de entrada. Oferecer
               busca por lote prometeria algo que nunca encontraria nada. */}
+          {/* O ícone dentro do campo é o que o `Input` já sabe fazer: a lupa marcava
+              presença só no cabeçalho do grupo, e um campo de busca sem lupa no meio de
+              seis controles parecidos não se anuncia como busca. */}
           <Input
             type="search"
+            icon={<Search aria-hidden />}
             value={busca}
             onChange={e => setBusca(e.target.value)}
             placeholder="Buscar SKU ou produto…"
@@ -721,8 +979,19 @@ export function Hud3D({
             </div>
           )}
 
-          <SegmentedControl options={MODOS} value={modo} onChange={setModo} label="Colorir por" width="full" />
+        </SecaoDoHud>
 
+        {/* Filtros começa RECOLHIDO, e é o único grupo que começa assim: são os controles
+            que menos se mexem e os que mais ocupavam coluna. O que impede isso de
+            esconder estado é o resumo do cabeçalho, que diz quantas ruas e quantas vagas
+            sobraram em destaque mesmo com o grupo inteiro fechado. */}
+        <SecaoDoHud
+          titulo="Filtros"
+          icone={SlidersHorizontal}
+          resumo={resumoDosFiltros}
+          destacado={filtrando}
+          comecaAberta={false}
+        >
           {/* Caixas em vez de dropdown: conferir DUAS ruas lado a lado é o caso comum, e
               o dropdown obrigava a escolher uma ou ver o galpão inteiro. Conjunto vazio
               significa "todas" — é o estado inicial e o que o botão Limpar devolve. */}
@@ -771,68 +1040,37 @@ export function Hud3D({
             </div>
           </div>
 
-          <Select
-            value={filtro}
-            onChange={e => setFiltro(e.target.value as FiltroStatus)}
-            className="w-full"
-          >
-            {FILTROS.map(f => (
-              <option key={f.value} value={f.value}>
-                {f.rotulo}
-                {f.value === 'todas' ? '' : ` (${contagem[f.value]})`}
-              </option>
-            ))}
-          </Select>
-
-          {/* Atalho para o alerta. Aparece SÓ quando há alerta: um botão permanente
-              marcando zero vira ruído e, pior, treina a pessoa a ignorá-lo. */}
-          {contagem.divergence > 0 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setFiltro('divergence');
-                focarVaga(divergentes[0]?.slot);
-              }}
+          {/* O filtro de status agora DIZ que está ligado.
+              Um `<select>` marcando "Livres" tem exatamente a mesma aparência de um
+              marcando "Todas as vagas" — e com ele ligado o mapa esconde a maior parte do
+              armazém. O anel no accent e o "Limpar" são o mesmo par que as ruas já
+              tinham; faltava ao status, que é o filtro mais radical dos dois. */}
+          <div>
+            <div className="mb-1 flex items-center justify-between">
+              <span className="text-xs font-medium text-fg-muted">Situação</span>
+              {filtro !== 'todas' && (
+                <button
+                  type="button"
+                  className="text-xs text-accent underline-offset-2 hover:underline"
+                  onClick={() => setFiltro('todas')}
+                >
+                  Limpar
+                </button>
+              )}
+            </div>
+            <Select
+              value={filtro}
+              onChange={e => setFiltro(e.target.value as FiltroStatus)}
+              className={`w-full ${filtro !== 'todas' ? 'border-accent ring-1 ring-accent/30' : ''}`}
             >
-              {/* A cor vem da CENA, não de `text-amber-400`: o ícone tem de ser
-                  exatamente o âmbar que pinta a vaga lá dentro. Paleta Tailwind crua
-                  aqui criaria um segundo amarelo, parecido e diferente. */}
-              <ShieldAlert
-                aria-hidden
-                className="mr-1.5 h-3.5 w-3.5 shrink-0"
-                style={{ color: COR_VAGA[theme].divergence }}
-              />
-              Ver <span className="text-code mx-1">{contagem.divergence}</span> acima da capacidade
-            </Button>
-          )}
-
-          {/* Mesma regra do atalho acima: aparece só quando há o que apontar. Leva junto
-              o modo de cor, porque o alerta não faz sentido sobre o mapa de Status — o
-              losango explica POR QUE a vaga está marcada apenas quando a cor é a curva. */}
-          {alertasGiro.length > 0 && (
-            <Button
-              variant="secondary"
-              size="sm"
-              className="w-full"
-              onClick={() => {
-                setModo('abc');
-                focarVaga(alertasGiro[0]);
-              }}
-            >
-              {/* Vermelho do marcador 3D do mesmo alerta — o losango que paira sobre a
-                  vaga. Ícone e marcador têm de ser a mesma cor, senão são lidos como
-                  dois avisos diferentes. */}
-              <ShieldAlert
-                aria-hidden
-                className="mr-1.5 h-3.5 w-3.5 shrink-0"
-                style={{ color: COR_ALERTA_GIRO }}
-              />
-              <span className="text-code mr-1">{alertasGiro.length}</span>
-              {alertasGiro.length === 1 ? 'vaga de alto giro elevada' : 'vagas de alto giro elevadas'}
-            </Button>
-          )}
+              {FILTROS.map(f => (
+                <option key={f.value} value={f.value}>
+                  {f.rotulo}
+                  {f.value === 'todas' ? '' : ` (${contagem[f.value]})`}
+                </option>
+              ))}
+            </Select>
+          </div>
 
           {/* O filtro isola, não amputa: as demais vagas continuam desenhadas em tom
               apagado, senão o armazém perderia a forma e o 3D perderia a razão. */}
@@ -840,7 +1078,7 @@ export function Hud3D({
             <span className="text-code">{emDestaque}</span> de{' '}
             <span className="text-code">{totalDeVagas}</span> em destaque
           </p>
-        </PanelSection>
+        </SecaoDoHud>
 
         {/* Vaga sem posição não é descartada em silêncio: some do desenho, mas o
             número fica à vista. Senão o 3D mostraria menos armazém do que existe. */}
@@ -853,13 +1091,22 @@ export function Hud3D({
           </PanelSection>
         )}
 
-        <PanelSection padding="sm" className="space-y-2">
+        <SecaoDoHud
+          titulo="Câmera e galpão"
+          icone={Camera}
+          resumo={resumoDaCamera}
+          destacado={caminhando}
+        >
           <Button
             variant={caminhando ? 'primary' : 'secondary'}
             size="sm"
             className="w-full"
             onClick={() => setCaminhando(v => !v)}
           >
+            {/* O ícone some na saída: "Sair da caminhada" é o fim de um estado, e pegada
+                nenhuma ilustra sair. Pôr o mesmo ícone nos dois faria o botão parecer o
+                mesmo botão antes e depois do clique. */}
+            {!caminhando && <Footprints aria-hidden className="mr-1.5 h-3.5 w-3.5 shrink-0" />}
             {caminhando ? 'Sair da caminhada' : 'Caminhar no galpão'}
           </Button>
           {caminhando && (
@@ -869,33 +1116,58 @@ export function Hud3D({
               clicar não abre vaga.
             </p>
           )}
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full"
-            onClick={resetarCamera}
-            disabled={caminhando}
-          >
-            Resetar câmera
-          </Button>
+          {/* Fileira de ícones, não quatro botões empilhados de largura cheia.
+              Empilhados, eles davam o mesmo peso visual a coisas de pesos diferentes e
+              empurravam o painel para baixo — e a tela cheia seria o quinto. Agrupados,
+              ficam lidos pelo que têm em comum: todos mexem na VISTA, nenhum muda dado.
+              O rótulo de cada um vai no `title` e no `aria-label`, e diz o que o clique
+              FAZ. É a correção do antigo "Fundo: galpão", que mostrava o estado atual e
+              deixava ninguém saber se clicar ligava ou desligava. */}
+          <div className="flex items-center gap-1">
+            <BotaoDeVista
+              rotulo="Resetar a câmera para a vista inicial"
+              onClick={resetarCamera}
+              disabled={caminhando}
+            >
+              <RotateCcw aria-hidden className="h-4 w-4" />
+            </BotaoDeVista>
+            {/* "Limpo" existe para quem precisa de quadro: o cenário custa um piso, quatro
+                paredes e um passe de sombra, e numa máquina fraca isso é o que sobra de
+                orçamento. Voltar para ele devolve exatamente a cena anterior. */}
+            <BotaoDeVista
+              rotulo={fundo === 'galpao' ? 'Esconder o galpão em volta' : 'Mostrar o galpão em volta'}
+              ativo={fundo === 'galpao'}
+              onClick={() => setFundo(f => (f === 'galpao' ? 'limpo' : 'galpao'))}
+            >
+              {fundo === 'galpao'
+                ? <Sun aria-hidden className="h-4 w-4" />
+                : <SunDim aria-hidden className="h-4 w-4" />}
+            </BotaoDeVista>
+            {/* Escondido quando a API não existe ou está bloqueada — um botão de tela
+                cheia que não abre tela cheia é pior do que nenhum. */}
+            {suportaTelaCheia && (
+              <BotaoDeVista
+                rotulo={telaCheia ? 'Sair da tela cheia (F)' : 'Ver em tela cheia (F)'}
+                ativo={telaCheia}
+                onClick={alternarTelaCheia}
+              >
+                {telaCheia
+                  ? <Minimize aria-hidden className="h-4 w-4" />
+                  : <Maximize aria-hidden className="h-4 w-4" />}
+              </BotaoDeVista>
+            )}
+            <BotaoDeVista rotulo="Capturar a visão 3D como imagem" onClick={capturarCena}>
+              <Camera aria-hidden className="h-4 w-4" />
+            </BotaoDeVista>
+          </div>
+          {/* Fora da fileira: abre um modal e mexe na MEDIDA da estante, não na vista.
+              Na fileira, pareceria mais um ajuste de câmera. A régua diz isso num
+              desenho — é medida, não enquadramento. */}
           <Button variant="ghost" size="sm" className="w-full" onClick={() => setAjustando(true)}>
+            <Ruler aria-hidden className="mr-1.5 h-3.5 w-3.5 shrink-0" />
             Ajustar estrutura
           </Button>
-          {/* "Limpo" existe para quem precisa de quadro: o cenário custa um piso, quatro
-              paredes e um passe de sombra, e numa máquina fraca isso é o que sobra de
-              orçamento. Voltar para ele devolve exatamente a cena anterior. */}
-          <Button
-            variant="ghost"
-            size="sm"
-            className="w-full"
-            onClick={() => setFundo(f => (f === 'galpao' ? 'limpo' : 'galpao'))}
-          >
-            Fundo: {fundo === 'galpao' ? 'galpão' : 'limpo'}
-          </Button>
-          <Button variant="ghost" size="sm" className="w-full" onClick={capturarCena}>
-            Capturar visão 3D
-          </Button>
-        </PanelSection>
+        </SecaoDoHud>
       </Panel>
       )}
 

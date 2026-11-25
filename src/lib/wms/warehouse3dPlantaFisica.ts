@@ -453,3 +453,346 @@ export function mesasDaPlanta(trechos: TrechoDaPlanta[] = AZ2027_TERREO): BlocoF
 export function comprimentoTotal(trechos: TrechoDaPlanta[] = AZ2027_TERREO): number {
   return trechos.reduce((soma, t) => Math.max(soma, t.zInicio + t.comprimento), 0);
 }
+
+// ── Sinalização e leitura espacial ───────────────────────────────────────────────────
+//
+// Quem olha o galpão de cima precisa saber EM QUE RUA está olhando, e quem caminha
+// precisa saber em que corredor entrou. Nenhuma das duas respostas está na geometria da
+// estante: um porta-pallets é igual ao outro. Por isso a sinalização é dado próprio,
+// calculado aqui e desenhado lá — aritmética, conferível sem WebGL.
+
+/** Altura da placa acima do topo da fileira, em metros. Alta o bastante para a placa não
+ *  ser tapada pelo palete do último nível, baixa o bastante para pertencer à estante. */
+const ALTURA_DA_PLACA = 0.6;
+
+/** Uma placa aérea de identificação de rua. */
+export interface PlacaDaFileira {
+  /** Letra da rua. Fileira sem rua cadastrada não ganha placa — nada a anunciar. */
+  rotulo: string;
+  /** Posições de palete da fileira. A placa diz o TAMANHO da rua, não só o nome dela. */
+  posicoes: number;
+  x: number;
+  y: number;
+  z: number;
+}
+
+/**
+ * Onde pendurar as placas de cada fileira.
+ *
+ * DUAS por fileira, uma em cada ponta, e isso é o ponto: um corredor se entra pelos dois
+ * lados, e uma placa só no meio obriga quem entrou pela outra ponta a percorrer meia rua
+ * para descobrir em qual está. Recuadas meia posição para dentro, para a placa ficar
+ * sobre a estrutura em vez de pairar além do fim dela.
+ *
+ * Fileira de uma posição só ganha uma placa, no centro: as duas pontas seriam o mesmo
+ * lugar, e duas placas sobrepostas é uma placa ilegível.
+ */
+export function placasDasFileiras(blocos: readonly BlocoFisico[]): PlacaDaFileira[] {
+  const placas: PlacaDaFileira[] = [];
+
+  for (const bloco of blocos) {
+    if (bloco.tipo !== 'fileira') continue;
+    const letra = letraDaRua(bloco.rotulo);
+    if (!letra) continue;
+
+    const [cx, , cz] = bloco.centro;
+    const [, altura, comprimento] = bloco.tamanho;
+    const posicoes = posicoesDaFileira(bloco);
+    const passo = comprimento / posicoes;
+    const y = altura + ALTURA_DA_PLACA;
+
+    const zs =
+      posicoes > 1
+        ? [cz - comprimento / 2 + passo / 2, cz + comprimento / 2 - passo / 2]
+        : [cz];
+
+    for (const z of zs) placas.push({ rotulo: letra, posicoes, x: cx, y, z });
+  }
+
+  return placas;
+}
+
+/**
+ * Demarcação de solo da fileira: espessura da tinta, altura acima da laje e folga lateral.
+ *
+ * `altura` fica acima das faixas de circulação do cenário (0,005 m) e abaixo da
+ * demarcação da expedição (0,02 m): três camadas de tinta coplanares brigariam por
+ * profundidade e o chão piscaria conforme a câmera gira.
+ */
+const DEMARCACAO = { espessura: 0.01, altura: 0.012, folga: 0.22 } as const;
+
+/** Uma faixa pintada no piso, já posicionada pelo centro. */
+export interface FaixaDePiso {
+  centro: [number, number, number];
+  tamanho: [number, number, number];
+}
+
+/** As fileiras compartilham faixa de Z? Só então elas disputam espaço no eixo X. */
+function convivemEmZ(a: BlocoFisico, b: BlocoFisico): boolean {
+  const [, , az] = a.centro;
+  const [, , bz] = b.centro;
+  return Math.abs(az - bz) < (a.tamanho[2] + b.tamanho[2]) / 2;
+}
+
+/**
+ * A tinta no chão que delimita o pé de cada fileira.
+ *
+ * Existe para a LEITURA do espaço, não para enfeitar: vista de cima, a estante e o
+ * corredor têm o mesmo chão cinza, e nada diz onde um acaba e o outro começa. Com o pé
+ * da fileira pintado, o corredor passa a ser o que sobrou entre duas marcações — que é
+ * exatamente como se lê um galpão de verdade.
+ *
+ * Cor NEUTRA, decidida no módulo de aparência: rua não tem cor semântica. O amarelo já
+ * significa circulação no cenário, e isto é o contrário — é onde não se circula.
+ *
+ * ── Por que a folga é calculada por lado ────────────────────────────────────────
+ * No galpão novo duas fileiras ficam COSTA A COSTA, com as faces encostadas. Uma folga
+ * fixa dos dois lados faria as duas marcações se sobreporem em 0,44 m de tinta
+ * coplanar — z-fighting puro, o chão piscando entre os dois tons conforme a câmera
+ * gira. Aqui cada lado recebe no máximo metade do vão até a vizinha, então a marcação
+ * de uma encosta na da outra e nunca a invade.
+ *
+ * Em Z não há clamp: os trechos do conjunto estão a quase 9 m um do outro, e inventar
+ * uma regra para uma colisão que não existe seria complicar sem necessidade.
+ */
+export function faixasDePiso(
+  blocos: readonly BlocoFisico[],
+  folgaMaxima: number = DEMARCACAO.folga,
+): FaixaDePiso[] {
+  const fileiras = blocos.filter(b => b.tipo === 'fileira');
+
+  return fileiras.map(bloco => {
+    const [cx, , cz] = bloco.centro;
+    const [profundidade, , comprimento] = bloco.tamanho;
+
+    let folgaEsquerda = folgaMaxima;
+    let folgaDireita = folgaMaxima;
+
+    for (const outra of fileiras) {
+      if (outra === bloco || !convivemEmZ(bloco, outra)) continue;
+      const vao = Math.abs(outra.centro[0] - cx) - (profundidade + outra.tamanho[0]) / 2;
+      // `Math.max(0, …)` e não um `continue` em vão negativo, e isso foi medido: as duas
+      // fileiras costa-a-costa dão vão −2,2e-16 em vez de zero exato, e um guarda
+      // `if (vao < 0) continue` deixava as duas com folga cheia — 0,44 m de tinta
+      // sobreposta, que é justamente o caso que esta função existe para evitar.
+      const metade = Math.max(0, vao) / 2;
+      if (outra.centro[0] < cx) folgaEsquerda = Math.min(folgaEsquerda, metade);
+      else folgaDireita = Math.min(folgaDireita, metade);
+    }
+
+    return {
+      centro: [cx + (folgaDireita - folgaEsquerda) / 2, DEMARCACAO.altura, cz],
+      tamanho: [
+        profundidade + folgaEsquerda + folgaDireita,
+        DEMARCACAO.espessura,
+        comprimento + folgaMaxima * 2,
+      ],
+    };
+  });
+}
+
+// ── Acabamento do cenário: sapata, zebrado e equipamento ─────────────────────────────
+//
+// Nada aqui carrega dado. São as coisas que um galpão tem e que o desenho não tinha, e
+// cada uma existe por um motivo de LEITURA, não de enfeite: a sapata devolve o contato da
+// estante com o piso na vista de cima, o zebrado diz onde é área de manobra e a
+// empilhadeira dá a escala — um rack de 4,2 m só parece 4,2 m ao lado de algo cujo
+// tamanho se conhece.
+
+/** Medidas da sapata — as mesmas da vista por código, para a estante não mudar de
+ *  construção conforme a aba aberta. */
+const SAPATA = { lado: 0.26, espessura: 0.02 } as const;
+
+/**
+ * As sapatas de todas as fileiras informadas.
+ *
+ * Derivadas das PEÇAS, não recalculadas das medidas: sapata que não nasce debaixo de um
+ * montante é sapata no lugar errado, e com a derivação as duas se movem sempre juntas.
+ */
+export function sapatasDasFileiras(pecas: readonly PecaDaFileira[]): FaixaDePiso[] {
+  return pecas
+    .filter(p => p.tipo === 'montante')
+    .map(p => ({
+      centro: [p.centro[0], SAPATA.espessura / 2, p.centro[2]] as [number, number, number],
+      tamanho: [SAPATA.lado, SAPATA.espessura, SAPATA.lado] as [number, number, number],
+    }));
+}
+
+/**
+ * Zebrado de segurança da expedição.
+ *
+ * ── Por que tracejado e não uma borda corrida ──────────────────────────────────
+ * Área de manobra se marca com zebrado justamente porque o tracejado é lido como
+ * ADVERTÊNCIA e a linha corrida é lida como limite. São significados diferentes no chão
+ * de um galpão, e aqui o certo é o primeiro: a expedição não é área proibida, é área onde
+ * empilhadeira manobra.
+ *
+ * ── Por que não é girado 45° ───────────────────────────────────────────────────
+ * O zebrado clássico é diagonal, mas a diagonal exigiria rotação em Y nas instâncias, e
+ * `aplicarPecas` gira só em Z — que é o eixo de que a diagonal da estante precisa.
+ * Ortogonal e alternado dá a mesma leitura de advertência sem arrastar um segundo eixo de
+ * giro para dentro do módulo de desenho inteiro.
+ *
+ * `altura` fica ACIMA da chapa da expedição, que vai de 0 a 0,04 m: coplanar com ela, o
+ * zebrado piscaria conforme a câmera gira.
+ */
+const ZEBRADO = { faixa: 0.3, traco: 0.5, vao: 0.5, espessura: 0.01, altura: 0.045 } as const;
+
+/**
+ * Os traços do zebrado em volta da área de expedição.
+ *
+ * Passo INTEIRO, como em `pecasDaFileira`: o número de traços é o que cabe no lado, e o
+ * passo é o lado dividido por ele. Com passo fixo, o último traço de cada lado sobraria
+ * para fora da área marcada — um zebrado que escapa justamente do que ele delimita.
+ */
+export function faixasDaExpedicao(blocos: readonly BlocoFisico[]): FaixaDePiso[] {
+  const area = blocos.find(b => b.tipo === 'expedicao');
+  if (!area) return [];
+
+  const [cx, , cz] = area.centro;
+  const [largura, , comprimento] = area.tamanho;
+  const faixas: FaixaDePiso[] = [];
+  const passoNominal = ZEBRADO.traco + ZEBRADO.vao;
+
+  // Lados longos (variam em X), nas duas bordas em Z.
+  const emX = Math.max(1, Math.floor(largura / passoNominal));
+  const passoX = largura / emX;
+  for (let i = 0; i < emX; i += 1) {
+    const x = cx - largura / 2 + (i + 0.5) * passoX;
+    for (const z of [cz - comprimento / 2 + ZEBRADO.faixa / 2, cz + comprimento / 2 - ZEBRADO.faixa / 2]) {
+      faixas.push({
+        centro: [x, ZEBRADO.altura, z],
+        tamanho: [passoX * 0.5, ZEBRADO.espessura, ZEBRADO.faixa],
+      });
+    }
+  }
+
+  // Lados curtos (variam em Z), nas duas bordas em X. Recuados da faixa dos lados longos,
+  // senão o canto vira um bloco cheio em vez de zebrado.
+  const util = comprimento - ZEBRADO.faixa * 2;
+  const emZ = Math.max(1, Math.floor(util / passoNominal));
+  const passoZ = util / emZ;
+  for (let i = 0; i < emZ; i += 1) {
+    const z = cz - comprimento / 2 + ZEBRADO.faixa + (i + 0.5) * passoZ;
+    for (const x of [cx - largura / 2 + ZEBRADO.faixa / 2, cx + largura / 2 - ZEBRADO.faixa / 2]) {
+      faixas.push({
+        centro: [x, ZEBRADO.altura, z],
+        tamanho: [ZEBRADO.faixa, ZEBRADO.espessura, passoZ * 0.5],
+      });
+    }
+  }
+
+  return faixas;
+}
+
+/**
+ * Medidas da empilhadeira contrabalançada, em metros.
+ *
+ * São as de um equipamento real de 2,5 t, e isso é o ponto do item: a empilhadeira não
+ * está na cena para enfeitar, está para dar ESCALA. Um rack de 4,2 m só parece 4,2 m
+ * quando há ao lado algo cujo tamanho o olho já conhece — e quem trabalha num galpão
+ * conhece o tamanho de uma empilhadeira. Medida errada aqui mentiria sobre o tamanho do
+ * galpão inteiro, que é justo o que ela veio consertar.
+ */
+export const EMPILHADEIRA = {
+  largura: 1.1,
+  comprimentoDoCorpo: 1.9,
+  alturaDoCorpo: 1.0,
+  alturaDoTeto: 2.1,
+  alturaDoMastro: 2.3,
+  secaoDoMastro: 0.11,
+  comprimentoDoGarfo: 1.1,
+} as const;
+
+/** As duas malhas de uma frota, mais a pegada de cada equipamento no piso. */
+export interface EquipamentosDaCena {
+  /** Corpo e teto de proteção. */
+  corpo: FaixaDePiso[];
+  /** Mastro, colunas do teto e garfos. */
+  aco: FaixaDePiso[];
+  /** Pegada no piso, para a caminhada não atravessar o equipamento. */
+  pegadas: FaixaDePiso[];
+}
+
+const semEquipamento = (): EquipamentosDaCena => ({ corpo: [], aco: [], pegadas: [] });
+
+/**
+ * Duas empilhadeiras ESTACIONADAS na expedição.
+ *
+ * ── Por que ali, e não num corredor ────────────────────────────────────────────
+ * Expedição é a única área grande sem endereço. Pôr equipamento num corredor de manobra
+ * faria o desenho afirmar que aquele corredor está bloqueado, e quem planeja separação
+ * olhando o mapa acreditaria. Encostadas nas duas laterais da doca, atrás da fileira de
+ * baias, elas ficam onde uma empilhadeira de fato para no fim do turno.
+ *
+ * ── Por que a cor não é amarela de empilhadeira ────────────────────────────────
+ * A cor é decidida fora daqui, mas o motivo vive junto da geometria: o amarelo de
+ * equipamento é vizinho do âmbar que significa "acima da capacidade" nesta mesma cena. A
+ * escolhida é o amarelo de MARCAÇÃO de solo, que a cena já declara como não-semântico —
+ * então o equipamento entra na família de "sinalização e circulação" em vez de inventar um
+ * segundo alerta.
+ */
+export function equipamentosDaExpedicao(blocos: readonly BlocoFisico[]): EquipamentosDaCena {
+  const area = blocos.find(b => b.tipo === 'expedicao');
+  if (!area) return semEquipamento();
+
+  const e = EMPILHADEIRA;
+  const [cx, , cz] = area.centro;
+  const [largura, , comprimento] = area.tamanho;
+
+  // Encostadas na borda da doca, a um quinto e a quatro quintos da largura: fora da
+  // fileira de baias, que ocupa o meio da área.
+  const z = cz + comprimento / 2 - e.comprimentoDoCorpo / 2 - ZEBRADO.faixa - 0.4;
+  const xs = [cx - largura / 2 + largura * 0.2, cx + largura / 2 - largura * 0.2];
+
+  const resultado = semEquipamento();
+
+  for (const x of xs) {
+    const fundo = z + e.comprimentoDoCorpo / 2;
+    const frente = z - e.comprimentoDoCorpo / 2;
+
+    // Corpo: a massa, do chão ao banco.
+    resultado.corpo.push({
+      centro: [x, e.alturaDoCorpo / 2, z],
+      tamanho: [e.largura, e.alturaDoCorpo, e.comprimentoDoCorpo],
+    });
+    // Teto de proteção: a chapa sobre a cabeça do operador.
+    resultado.corpo.push({
+      centro: [x, e.alturaDoTeto, z + 0.15],
+      tamanho: [e.largura, 0.06, e.comprimentoDoCorpo * 0.62],
+    });
+
+    // Colunas do teto, nos dois cantos de trás.
+    for (const dx of [-e.largura / 2 + 0.07, e.largura / 2 - 0.07]) {
+      resultado.aco.push({
+        centro: [x + dx, (e.alturaDoCorpo + e.alturaDoTeto) / 2, fundo - 0.12],
+        tamanho: [0.07, e.alturaDoTeto - e.alturaDoCorpo, 0.07],
+      });
+    }
+    // Mastro: dois trilhos na frente. É a peça que faz a silhueta ser lida como
+    // empilhadeira em vez de caixote.
+    for (const dx of [-0.3, 0.3]) {
+      resultado.aco.push({
+        centro: [x + dx, e.alturaDoMastro / 2, frente - e.secaoDoMastro / 2],
+        tamanho: [e.secaoDoMastro, e.alturaDoMastro, e.secaoDoMastro],
+      });
+    }
+    // Garfos: rentes ao piso, à frente do mastro.
+    for (const dx of [-0.3, 0.3]) {
+      resultado.aco.push({
+        centro: [x + dx, 0.06, frente - e.secaoDoMastro - e.comprimentoDoGarfo / 2],
+        tamanho: [0.12, 0.05, e.comprimentoDoGarfo],
+      });
+    }
+
+    // A pegada inclui os garfos: quem caminha esbarra no garfo antes de esbarrar no
+    // corpo, e é exatamente assim que se machuca o pé num galpão de verdade.
+    const comprimentoTotal = e.comprimentoDoCorpo + e.secaoDoMastro + e.comprimentoDoGarfo;
+    resultado.pegadas.push({
+      centro: [x, 0, fundo - comprimentoTotal / 2],
+      tamanho: [e.largura, 0, comprimentoTotal],
+    });
+  }
+
+  return resultado;
+}

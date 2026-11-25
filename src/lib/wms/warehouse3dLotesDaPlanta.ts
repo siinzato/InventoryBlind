@@ -68,6 +68,47 @@ export interface MedidasDoVao {
 
 /** Fração da altura do vão que a carga ocupa acima do palete. */
 const FATOR_DA_CARGA = 0.88;
+
+/**
+ * Quanto a altura da carga pode encolher em relação ao padrão.
+ *
+ * 14% é o teto. Mais do que isso e a diferença deixa de ser "pallets montados por pessoas
+ * diferentes" e passa a parecer dado — alguém leria altura como quantidade, que é
+ * exatamente o que a cor já diz e a altura NÃO diz.
+ */
+const VARIACAO_MAXIMA = 0.14;
+
+/**
+ * Variação determinística da altura da carga, a partir do código do endereço.
+ *
+ * ── Por que existe ─────────────────────────────────────────────────────────────
+ * Todo pallet com a mesma altura exata é a assinatura de desenho gerado: num galpão real
+ * nenhuma carga é montada igual à do vizinho. A uniformidade perfeita era o que mais
+ * denunciava a cena como artificial.
+ *
+ * ── Por que determinística, e não aleatória ────────────────────────────────────
+ * `Math.random()` faria a mesma vaga mudar de altura a cada filtro aplicado, a cada troca
+ * de tema e a cada atualização de tempo real — o armazém respirando sozinho. Pior: faria
+ * o mapa parecer que algo mudou quando nada mudou. Derivando do CÓDIGO, a altura de
+ * `PP-A13-N3` é sempre a mesma, em qualquer sessão e em qualquer máquina.
+ *
+ * FNV-1a sobre o código, com `Math.imul` para o produto não estourar para ponto
+ * flutuante: um hash somando charCodes daria alturas quase iguais para códigos vizinhos,
+ * e `PP-A01` até `PP-A13` são todos vizinhos.
+ *
+ * Só encolhe, nunca cresce. A carga já ocupa 88% do vão; variar para cima a faria
+ * atravessar a longarina do nível de cima em algumas vagas e não em outras — um bug que
+ * só apareceria nos endereços cujo hash calhasse alto.
+ */
+export function variacaoDaCarga(codigo: string): number {
+  let hash = 2166136261;
+  for (let i = 0; i < codigo.length; i += 1) {
+    hash ^= codigo.charCodeAt(i);
+    hash = Math.imul(hash, 16777619);
+  }
+  const fracao = ((hash >>> 0) % 1000) / 1000;
+  return 1 - fracao * VARIACAO_MAXIMA;
+}
 /** Recuo lateral da carga em relação ao vão — ela nunca ocupa a borda exata do palete. */
 const RECUO_DA_CARGA = 0.94;
 
@@ -132,7 +173,8 @@ export function lotesDaPlanta(
             : paleta.atenuada;
 
       if (slot.caixas > 0) {
-        const alturaDaCarga = (alturaVao - medidas.alturaDoPalete) * FATOR_DA_CARGA;
+        const alturaDaCarga =
+          (alturaVao - medidas.alturaDoPalete) * FATOR_DA_CARGA * variacaoDaCarga(slot.id);
         const palete: InstanciaDeVao = {
           codigo: slot.id,
           centro: [vx, base + medidas.alturaDoPalete / 2, vz],

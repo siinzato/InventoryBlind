@@ -4,7 +4,7 @@
 // comportamento é o CACHE do conteúdo, que vive em `cacheDeConteudo.ts`.
 
 import { useEffect, useMemo, useState, type ReactNode } from 'react';
-import { Package, ScanLine, ShieldAlert, X } from 'lucide-react';
+import { Package, ScanLine, Search, ShieldAlert, X } from 'lucide-react';
 import { Button, Panel, PanelSection } from '../../ui';
 import { useTheme } from '../../../lib/useTheme';
 import { int } from '../../../lib/formatPtBr';
@@ -184,7 +184,9 @@ export function PainelDetalhe({
   }, [slot.id]);
 
   return (
-    <Panel className="pointer-events-auto absolute right-3 top-3 flex max-h-[calc(100%-1.5rem)] w-[19rem] max-w-[calc(100%-1.5rem)] flex-col">
+    // `min-h-0` é o que faz a rolagem interna funcionar dentro da coluna flex: sem ele o
+    // painel cresce pelo conteúdo e empurra o radar para fora da moldura em vez de rolar.
+    <Panel className="pointer-events-auto flex min-h-0 w-[19rem] max-w-full flex-col">
       {/* Cabeçalho: o endereço é o assunto, então ele é o maior elemento do painel. O
           fechar virou ícone — a palavra "Fechar" competia em peso com o código da vaga
           que a pessoa veio ler. */}
@@ -209,11 +211,34 @@ export function PainelDetalhe({
       {/* Grade técnica. Substitui as linhas rótulo-à-esquerda/valor-à-direita: em duas
           colunas o olho varre os VALORES numa coluna só, que é como se lê terminal. Os
           blocos sem dado não entram — célula com travessão é ruído com aparência de
-          informação. */}
+          informação.
+
+          ── Por que as caixas saíram ─────────────────────────────────────────────
+          Cada bloco era `rounded-control border border-edge bg-surface-2` DENTRO de um
+          `Panel` que já é `bg-surface-2`: o fundo era o mesmo, então a borda estava
+          sozinha desenhando quatro caixinhas dentro de uma caixa. É o padrão que a
+          Design Constitution chama de card-dentro-de-card, e é o que dá à tela aquela
+          cara de painel genérico. Agora é UMA superfície com filete interno — divisor
+          só onde há vizinho, calculado pelo índice porque `divide-x`/`divide-y` do
+          Tailwind, numa grade de duas colunas, risca também a primeira célula de cada
+          linha. `-m-5` sangra a grade até a borda do painel: filete que morre no meio
+          do padding parece corte inacabado.
+
+          `max-w-none` junto com o `-m-5`, e não por estilo: o index.css tem a guarda
+          global `*, *::before, *::after { max-width: 100% }` contra overflow horizontal,
+          e 100% aqui é a largura do padding do painel. Medido — sem ela a grade ficava
+          travada em 262 px dentro de um painel de 304 px: a margem negativa deslocava a
+          grade para a esquerda e não a alargava, e o filete morria antes da borda
+          direita. É a mesma guarda que já tinha mordido a placa de rua da cena. */}
       <PanelSection padding="sm">
-        <dl className="grid grid-cols-2 gap-1.5">
-          {blocos.map(bloco => (
-            <div key={bloco.rotulo} className="rounded-control border border-edge bg-surface-2 px-2.5 py-2">
+        <dl className="-m-5 grid max-w-none grid-cols-2">
+          {blocos.map((bloco, i) => (
+            <div
+              key={bloco.rotulo}
+              className={`px-5 py-3 ${i % 2 === 1 ? 'border-l border-edge' : ''} ${
+                i >= 2 ? 'border-t border-edge' : ''
+              }`}
+            >
               <dt className="text-[10px] font-medium uppercase tracking-wider text-fg-subtle">
                 {bloco.rotulo}
               </dt>
@@ -283,9 +308,13 @@ export function PainelDetalhe({
                 {onProcurarSku && (
                   <button
                     type="button"
-                    className="mt-1 text-xs text-accent underline-offset-2 hover:underline"
+                    className="mt-1 flex items-center gap-1 text-xs text-accent underline-offset-2 hover:underline"
                     onClick={() => onProcurarSku(linha.sku)}
                   >
+                    {/* Mesma lupa do campo de busca do HUD: é a MESMA ação, e dois
+                        desenhos para uma ação só é o que faz interface parecer montada
+                        por pessoas diferentes. */}
+                    <Search aria-hidden className="h-3 w-3 shrink-0" />
                     Ver onde mais tem este produto
                   </button>
                 )}

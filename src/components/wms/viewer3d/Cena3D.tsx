@@ -16,7 +16,8 @@ import type { ElementRef, MutableRefObject, RefObject } from 'react';
 import type { Theme } from '../../../lib/useTheme';
 import type { Slot } from '../../../lib/wms/warehouse3dSlots';
 import {
-  pecasDaFileira, posicoesDaFileira, LARGURA_DO_PREDIO,
+  equipamentosDaExpedicao, faixasDaExpedicao, faixasDePiso, pecasDaFileira,
+  placasDasFileiras, sapatasDasFileiras, LARGURA_DO_PREDIO,
   type BlocoFisico, type PecaDaFileira,
 } from '../../../lib/wms/warehouse3dPlantaFisica';
 import type { ContextoDeDestaque } from '../../../lib/wms/warehouse3dDestaque';
@@ -26,7 +27,11 @@ import type { Ponto } from '../../../lib/wms/warehouse3dCoordenadas';
 import { grausDeVisao, meiaAberturaHorizontal } from '../../../lib/wms/warehouse3dRadar';
 import type { ParadaDaRota, Ponto3D, SubidaDaRota } from '../../../lib/wms/warehouse3dRota';
 import type { AbcDaVaga } from '../../../lib/wms/warehouse3dAbc';
-import type { PecaDaEstrutura } from '../../../lib/wms/warehouse3dEstrutura';
+import {
+  ESTRUTURA,
+  sapatasDosMontantes,
+  type PecaDaEstrutura, type PecaInclinada,
+} from '../../../lib/wms/warehouse3dEstrutura';
 import { WarehouseEnvironment, type FundoDaCena } from '../WarehouseEnvironment';
 import {
   ALTURA_DOS_OLHOS, ALTURA_DO_PALETE, ALTURA_DO_PISO_DO_VAO, CATALOGO, CORES_DE_ESTANTE,
@@ -38,15 +43,18 @@ import {
 } from './aparencia';
 import {
   CAMADAS_NO_VAO, COR as COR_ESCRATCH, COR_DIVISAO_CAIXA, DESLOCA_CARGA, DESLOCA_PALETE,
-  ESCALA, GEOMETRIA_ARESTAS_CAMADA, GEOMETRIA_ARESTAS_UNITARIAS,
+  ESCALA, GEOMETRIA_ARESTAS_CAMADA, PONTOS_DO_CONTORNO,
   GEOMETRIA_CARGA,
-  GEOMETRIA_COLUNA_RACK, GEOMETRIA_MARCADOR, GEOMETRIA_PALETE, GEOMETRIA_TRAVESSA_RACK,
+  GEOMETRIA_MARCADOR, GEOMETRIA_PALETE, GEOMETRIA_TRAVESSA_RACK,
   GEOMETRIA_UNITARIA, GEOMETRIA_VAGA, GEOMETRIA_VIGA, MATERIAL_ALERTA,
   MATERIAL_CARGA_ATENUADA, MATERIAL_CARGA_PLANTA, MATERIAL_INVISIVEL,
   MATERIAIS_DA_ESTRUTURA, MATERIAL_MARCADOR, MATERIAL_PISO,
-  MATERIAL_PISO_ATENUADO, MATERIAL_PISO_FANTASMA, MATERIAL_RAIOX, MATERIAL_SOLIDO,
+  MATERIAIS_DO_EQUIPAMENTO, MATERIAIS_DO_GALPAO,
+  MATERIAL_DEMARCACAO, MATERIAL_PISO_ATENUADO, MATERIAL_PISO_FANTASMA, MATERIAL_RAIOX,
+  MATERIAL_SOLIDO,
   MATERIAL_VIGA, MATRIZ, SEM_ACAO_APONTAR, SEM_ACAO_SELECIONAR, capacidadeDoLote,
-  useArestasFundidas, type VagaDesenhavel,
+  aplicarPecas, useArestasDeCaixas, useArestasFundidas,
+  type PecaDeQuadro, type VagaDesenhavel,
 } from './recursos3d';
 
 // ── Cena ───────────────────────────────────────────────────────────────────────
@@ -192,41 +200,60 @@ export function Vigas({ colunas }: { colunas: { x: number; z: number; altura: nu
 }
 
 /**
- * A estante em si: montantes verticais e travessas horizontais.
+ * A estante em si: o quadro (montantes e diagonais) e as travessas horizontais.
  *
- * Dois objetos de GPU para o armazém inteiro, não por vaga. A geometria tem 1 m no
- * eixo que varia e a escala por instância dá o resto — é o mesmo recurso que os
- * montantes de elevação já usam.
+ * Dois objetos de GPU para o armazém inteiro, não por vaga. A escala por instância é o
+ * que permite peças de medidas diferentes dividirem um lote só — é o mesmo recurso que
+ * os montantes de elevação já usam.
+ *
+ * ── Por que montante e diagonal moram no MESMO lote ─────────────────────────────
+ * São a mesma peça de aço do ponto de vista do desenho: mesmo material, mesma cor. O
+ * que as separa é só a matriz — a diagonal carrega um giro. Em lotes separados a
+ * treliça custaria um desenho a mais por nada, e é exatamente assim que a planta física
+ * já faz (`EstruturaDaPlanta`, lote `quadro`).
  *
  * Derivada do CONJUNTO de vagas, não de cada uma: o montante é compartilhado entre
  * vãos vizinhos e a travessa corre a rua inteira. Ver `warehouse3dEstrutura`.
  */
 export function EstruturaDeRack({
   montantes,
+  diagonais,
   travessas,
   theme,
 }: {
   montantes: PecaDaEstrutura[];
+  diagonais: PecaInclinada[];
   travessas: PecaDaEstrutura[];
   theme: Theme;
 }) {
-  const refColunas = useRef<InstancedMesh>(null);
+  const refQuadro = useRef<InstancedMesh>(null);
   const refTravessas = useRef<InstancedMesh>(null);
   // Pede o conjunto do tema em vez de pintar um material compartilhado: ninguém aqui pode
   // mais mudar a cor do aço de outro componente.
   const materiais = MATERIAIS_DA_ESTRUTURA[theme];
 
-  useEffect(() => {
-    const malha = refColunas.current;
-    if (!malha) return;
-    montantes.forEach((peca, i) => {
-      MATRIZ.makeScale(1, peca.comprimento, 1);
-      MATRIZ.setPosition(peca.posicao[0], peca.posicao[1], peca.posicao[2]);
-      malha.setMatrixAt(i, MATRIZ);
-    });
-    malha.count = montantes.length;
-    malha.instanceMatrix.needsUpdate = true;
-  }, [montantes]);
+  /**
+   * O quadro na forma que o desenho consome: três medidas e um giro.
+   *
+   * O montante entra convertido — ele é descrito por um comprimento só, porque se
+   * estende num eixo conhecido, e aqui vira a caixa de seção quadrada que ele é.
+   */
+  const quadro = useMemo<PecaDeQuadro[]>(
+    () => [
+      ...montantes.map(peca => ({
+        centro: peca.posicao,
+        tamanho: [ESTRUTURA.montante, peca.comprimento, ESTRUTURA.montante] as Ponto,
+      })),
+      ...diagonais,
+      // Sapata no MESMO lote: é aço da mesma cor do montante que ela sustenta, então ela
+      // entra sem custar uma chamada de desenho. Derivada dos montantes, nunca recalculada
+      // — sapata que não nasce debaixo de um montante é sapata no lugar errado.
+      ...sapatasDosMontantes(montantes),
+    ],
+    [montantes, diagonais],
+  );
+
+  useEffect(() => { aplicarPecas(refQuadro.current, quadro); }, [quadro]);
 
   useEffect(() => {
     const malha = refTravessas.current;
@@ -244,8 +271,8 @@ export function EstruturaDeRack({
   return (
     <>
       <instancedMesh
-        ref={refColunas}
-        args={[GEOMETRIA_COLUNA_RACK, materiais.coluna, capacidadeDoLote(montantes.length)]}
+        ref={refQuadro}
+        args={[GEOMETRIA_UNITARIA, materiais.coluna, capacidadeDoLote(quadro.length)]}
       />
       <instancedMesh
         ref={refTravessas}
@@ -431,10 +458,21 @@ export interface PlacaDeRua {
   x: number;
   y: number;
   z: number;
+  /** Posições de palete da rua, quando a vista souber contá-las. A placa anuncia o
+   *  TAMANHO da rua, não só o nome dela — é o que diz se vale entrar por aqui. */
+  posicoes?: number;
+  /** Rua fora do filtro: a placa continua no lugar, apagada. Sumir com ela faria o
+   *  galpão perder a referência justamente quando se está isolando uma rua. */
+  atenuada?: boolean;
 }
 
 /**
  * Sinalização aérea: a placa que diz em que corredor você está.
+ *
+ * UMA para as duas vistas. A vista da planta tinha a sua, com cor fora do sistema de
+ * tokens e encolhendo com a perspectiva; a vista por código tinha esta. Era a mesma
+ * informação desenhada de dois jeitos — e "duas descrições do mesmo galpão" é
+ * exatamente o que este mapa existe para não ser.
  *
  * `<Html>` em vez do `<Text>` do drei por dois motivos. O `<Text>` desenha a tipografia
  * dentro do WebGL com uma fonte própria, o que significa uma fonte a mais para baixar e
@@ -448,12 +486,55 @@ export interface PlacaDeRua {
  * especificação sugeriu: a placa passa a pertencer ao produto em vez de parecer um
  * componente de biblioteca.
  */
+/**
+ * Distância da câmera ao centro da cena, em metros, a partir da qual a placa encolhe
+ * para só a letra e sobra uma por rua.
+ *
+ * MEDIDO, não estimado. No enquadramento inicial do galpão de 45 m, as oito ruas ocupam
+ * cerca de 110 px de largura na tela — 15 px entre uma placa e a vizinha. Com dezesseis
+ * placas de 95 px nesse espaço deram 22 sobreposições: texto legível, cada um por cima
+ * do outro, que é tão inútil quanto texto pequeno demais.
+ *
+ * A raiz é geométrica e não tem saída por tamanho de fonte: oito rótulos legíveis não
+ * cabem em 110 px. Escalar com a perspectiva (o `distanceFactor` que isto usava antes)
+ * resolve a sobreposição e devolve o borrão de 6 px, porque placa legível de longe é
+ * placa gigante de perto. Então o que muda com a distância é o QUE a placa diz: de longe
+ * a letra basta para situar a rua no galpão; de perto, onde há espaço, ela diz tudo.
+ */
+const DISTANCIA_DA_PLACA_COMPLETA = 28;
+
 export function PlacasDeRua({ placas }: { placas: PlacaDeRua[] }) {
+  const camera = useThree(estado => estado.camera);
+  const [longe, setLonge] = useState(true);
+
+  // `useFrame` em `frameloop="demand"` roda só nos quadros desenhados, e a câmera só se
+  // move em quadro desenhado — então isto não acorda o laço. O `setState` dispara apenas
+  // na TROCA de regime, não a cada quadro: sem essa comparação, orbitar re-renderizaria
+  // as placas sessenta vezes por segundo para desenhar exatamente a mesma coisa.
+  useFrame(() => {
+    const agora = camera.position.length() > DISTANCIA_DA_PLACA_COMPLETA;
+    if (agora !== longe) setLonge(agora);
+  });
+
+  // De longe, UMA por rua. Qual delas é escolhido pela ordem da lista, não pela proximidade
+  // da câmera: "a ponta mais perto" mudaria a cada giro e traria de volta o re-render por
+  // quadro que o parágrafo acima acabou de evitar.
+  const visiveis = useMemo(() => {
+    if (!longe) return placas;
+    const vistas = new Set<string>();
+    return placas.filter(placa => {
+      const rua = `${placa.rotulo}-${placa.x}`;
+      if (vistas.has(rua)) return false;
+      vistas.add(rua);
+      return true;
+    });
+  }, [longe, placas]);
+
   return (
     <>
-      {placas.map(placa => (
+      {visiveis.map(placa => (
         <Html
-          key={`${placa.rotulo}-${placa.z}`}
+          key={`${placa.rotulo}-${placa.x}-${placa.z}`}
           position={[placa.x, placa.y, placa.z]}
           center
           // SEM `distanceFactor`, de propósito. Com ele a placa encolhia junto com a
@@ -476,8 +557,21 @@ export function PlacasDeRua({ placas }: { placas: PlacaDeRua[] }) {
               `w-max` dimensiona pelo conteúdo e `max-w-none` desarma o teto SÓ aqui
               dentro, sem mexer na guarda global. Medido: de 14px para a largura real do
               texto. */}
-          <div className="inline-block w-max max-w-none whitespace-nowrap rounded-control border border-white/25 bg-rail px-1.5 py-0.5 text-code text-[10px] font-semibold leading-none tracking-wide text-rail-fg shadow-panel">
-            RUA {placa.rotulo}
+          <div
+            className="inline-flex w-max max-w-none items-center gap-1.5 whitespace-nowrap rounded-control border border-white/25 bg-rail px-1.5 py-0.5 text-code text-[10px] font-semibold leading-none tracking-wide text-rail-fg shadow-panel"
+            // Fora do filtro a placa recua em vez de sumir: ela é a única coisa na cena
+            // que diz onde a rua isolada está em relação às outras.
+            style={placa.atenuada ? { opacity: 0.35 } : undefined}
+          >
+            {/* De longe só a letra. "RUA" é a mesma palavra nas oito placas e não
+                distingue nada — é justamente o que se corta primeiro quando falta
+                espaço. O `title` segue completo para quem passa o mouse. */}
+            <span title={`Rua ${placa.rotulo}`}>{longe ? placa.rotulo : `RUA ${placa.rotulo}`}</span>
+            {/* Separador e contagem em peso menor: o nome da rua é o assunto, o
+                tamanho dela é o detalhe. */}
+            {!longe && placa.posicoes !== undefined && (
+              <span className="font-normal opacity-70">{placa.posicoes} pos.</span>
+            )}
           </div>
         </Html>
       ))}
@@ -595,6 +689,7 @@ export interface VagasDaCena {
 export interface EstruturaDaCena {
   colunas: { x: number; z: number; altura: number }[];
   montantes: PecaDaEstrutura[];
+  diagonais: PecaInclinada[];
   travessas: PecaDaEstrutura[];
   placas: PlacaDeRua[];
 }
@@ -681,7 +776,7 @@ export const Cena = memo(function Cena({
   theme: Theme;
 }) {
   const { solidas, divergentes, raioX, fiosAtivos, fiosAtenuados, comCarga, achadas } = vagas;
-  const { colunas, montantes, travessas, placas } = estrutura;
+  const { colunas, montantes, diagonais, travessas, placas } = estrutura;
   const { fundo, chaveDeSombra, extensao, deslocamento, deslocamentoAtivo, plantaNoPiso } = cenario;
   const {
     modoVisor, ferramenta, estanteEscolhida, objetos, selecionadoNoBuilder,
@@ -817,7 +912,12 @@ export const Cena = memo(function Cena({
 
         {/* A estante física. Vem antes da carga para o pallet ser desenhado dentro do
             vão que ela delimita. */}
-        <EstruturaDeRack montantes={montantes} travessas={travessas} theme={theme} />
+        <EstruturaDeRack
+          montantes={montantes}
+          diagonais={diagonais}
+          travessas={travessas}
+          theme={theme}
+        />
 
         {/* Paletes de madeira sob toda vaga com carga — inclusive as que estão fora do
             filtro: a estrutura não é filtrada, só o que ela guarda. */}
@@ -942,7 +1042,12 @@ export function EstruturaDaPlanta({ pecas, theme }: { pecas: PecaDaFileira[]; th
   const refQuadro = useRef<InstancedMesh>(null);
   const refLongarinas = useRef<InstancedMesh>(null);
 
-  const quadro = useMemo(() => pecas.filter(p => p.tipo !== 'viga'), [pecas]);
+  // Montante, diagonal E SAPATA no mesmo lote: as três são a mesma peça de aço pintada da
+  // mesma cor, e a sapata entra sem custar uma chamada de desenho nova.
+  const quadro = useMemo<PecaDeQuadro[]>(
+    () => [...pecas.filter(p => p.tipo !== 'viga'), ...sapatasDasFileiras(pecas)],
+    [pecas],
+  );
   const longarinas = useMemo(() => pecas.filter(p => p.tipo === 'viga'), [pecas]);
 
   const materiais = MATERIAIS_DA_ESTRUTURA[theme];
@@ -965,23 +1070,34 @@ export function EstruturaDaPlanta({ pecas, theme }: { pecas: PecaDaFileira[]; th
 }
 
 /**
- * Escreve posição, tamanho e giro de cada peça na matriz da instância.
+ * Um lote de peças de CENÁRIO: tinta no chão, zebrado, sapata, equipamento.
  *
- * A ordem importa: girar DEPOIS de escalar inclinaria a peça já deformada, e a diagonal
- * sairia com a seção torta. Aqui a escala entra na rotação (R × S) e a posição é
- * cravada por último, que é o que `setPosition` faz sem mexer na parte linear.
+ * Um `InstancedMesh` por material, não um `<mesh>` por peça. A demarcação são nove faixas
+ * hoje, o zebrado são trinta e poucos traços e a empilhadeira são oito caixas cada — somadas
+ * seriam dezenas de chamadas de desenho para coisas que não carregam dado nenhum. Como
+ * nada aqui tem cor por instância, cada grupo cabe num objeto de GPU só e o custo para de
+ * crescer junto com o galpão.
+ *
+ * Caixa achatada em vez de `planeGeometry` para a tinta: o plano tem face única e some
+ * visto de baixo, e quem caminha passa com os olhos a 1,65 m — rasante o bastante para a
+ * marcação desaparecer justo no ângulo em que ela é a referência mais útil.
  */
-function aplicarPecas(malha: InstancedMesh | null, pecas: PecaDaFileira[]): void {
-  if (!malha) return;
-  pecas.forEach((p, i) => {
-    if (p.rotacaoZ) MATRIZ.makeRotationZ(p.rotacaoZ);
-    else MATRIZ.identity();
-    MATRIZ.scale(ESCALA.set(p.tamanho[0], p.tamanho[1], p.tamanho[2]));
-    MATRIZ.setPosition(p.centro[0], p.centro[1], p.centro[2]);
-    malha.setMatrixAt(i, MATRIZ);
-  });
-  malha.count = pecas.length;
-  malha.instanceMatrix.needsUpdate = true;
+export function LoteDoCenario({
+  pecas,
+  material,
+}: {
+  pecas: PecaDeQuadro[];
+  material: MeshStandardMaterial;
+}) {
+  const malha = useRef<InstancedMesh>(null);
+  useEffect(() => { aplicarPecas(malha.current, pecas); }, [pecas]);
+
+  return (
+    <instancedMesh
+      ref={malha}
+      args={[GEOMETRIA_UNITARIA, material, capacidadeDoLote(pecas.length)]}
+    />
+  );
 }
 
 /**
@@ -1028,23 +1144,45 @@ export function RealceDaVaga({
   useEffect(() => assinar(setApontada), [assinar]);
 
   const alvo = apontada ?? selecionada;
-  if (!alvo) return null;
-  const contorno = contornoDe(alvo);
-  if (!contorno) return null;
+  const contorno = alvo ? contornoDe(alvo) : null;
 
   return (
     // Arestas de um cubo de 1 m, ESCALADAS: o vão muda de medida por fileira, e um
     // contorno de tamanho fixo desenharia a caixa de uma rua em cima de outra.
-    <lineSegments
-      position={contorno.centro}
-      scale={contorno.tamanho}
-      geometry={GEOMETRIA_ARESTAS_UNITARIAS}
+    //
+    // ── Por que `<Line>` e não `lineSegments` ──────────────────────────────────
+    // O `linewidth` do `lineBasicMaterial` é IGNORADO em WebGL: a linha sai sempre com
+    // 1 pixel físico, qualquer que seja o valor. Num monitor de densidade 2 isso é meio
+    // pixel de tela, e o realce da vaga — que é o que diz "é esta aqui" — ficava mais
+    // fino que as arestas da própria estante. O `<Line>` do drei desenha a linha como
+    // geometria (Line2), então a espessura vale de verdade.
+    //
+    // Largura em PIXELS, não em metros: o contorno é sinalização de interface, não peça
+    // do armazém. Em metros ele engrossaria ao aproximar e sumiria ao afastar, que é o
+    // oposto do que se quer de um indicador.
+    //
+    // ── Por que não desmonta quando não há alvo ────────────────────────────────
+    // `visible` em vez de `return null`: o `<Line>` aloca geometria e material próprios,
+    // e desmontar a cada entrada e saída do mouse faria alocação de GPU a cada
+    // movimento. Invisível, ele não custa desenho nenhum.
+    <Line
+      points={PONTOS_DO_CONTORNO}
+      segments
+      visible={!!contorno}
+      position={contorno?.centro ?? ORIGEM}
+      scale={contorno?.tamanho ?? UNIDADE}
+      color={COR_REALCE[theme]}
+      lineWidth={2}
+      depthTest={false}
       renderOrder={1}
-    >
-      <lineBasicMaterial color={COR_REALCE[theme]} depthTest={false} />
-    </lineSegments>
+    />
   );
 }
+
+/** Pousos do contorno quando não há vaga apontada. Constantes para a referência ser
+ *  estável e não disparar atualização de matriz a cada render. */
+const ORIGEM: Ponto = [0, 0, 0];
+const UNIDADE: Ponto = [1, 1, 1];
 
 /**
  * Um lote de vãos da planta como UM objeto de GPU.
@@ -1203,15 +1341,56 @@ export function PlantaFisica3D({
   // Conjunto do tema, sem mutar material nenhum.
   const materiais = MATERIAIS_DA_ESTRUTURA[theme];
 
+  /** A tinta do pé de cada fileira. Vista de cima, estante e corredor têm o mesmo chão
+   *  cinza e nada diz onde um acaba; com o pé pintado, o corredor passa a ser o que
+   *  sobrou entre duas marcações. Aritmética pura, conferida por teste. */
+  const faixas = useMemo(() => faixasDePiso(fileiras), [fileiras]);
+
+  /** Placas das duas pontas de cada rua, apagadas quando a rua está fora do filtro. */
+  const placas = useMemo<PlacaDeRua[]>(
+    () =>
+      placasDasFileiras(fileiras).map(placa => ({
+        ...placa,
+        atenuada:
+          destaque.ruasSelecionadas.size > 0 && !destaque.ruasSelecionadas.has(placa.rotulo),
+      })),
+    [fileiras, destaque.ruasSelecionadas],
+  );
+
+  /** Contorno em duas camadas das cargas em destaque — escalado por caixa, porque o vão
+   *  muda de medida de fileira para fileira. */
+  const arestasDaCarga = useArestasDeCaixas(lotes.cargaDestaque, 2);
+
+  /** Zebrado de advertência em volta da área de manobra. */
+  const zebrado = useMemo(() => faixasDaExpedicao(blocos), [blocos]);
+
+  /** As duas empilhadeiras estacionadas na doca. Existem para dar ESCALA: um rack de
+   *  4,2 m só parece 4,2 m ao lado de algo cujo tamanho o olho já conhece. */
+  const equipamentos = useMemo(() => equipamentosDaExpedicao(blocos), [blocos]);
+
   return (
     <group position={[-largura / 2, 0, -comprimento / 2]}>
-      {/* Demarcação de solo continua sendo um plano: expedição é tinta no chão. */}
+      {/* A tinta que delimita o pé das fileiras. Um objeto de GPU para todas elas. */}
+      <LoteDoCenario pecas={faixas} material={MATERIAL_DEMARCACAO[theme]} />
+
+      {/* Demarcação de solo continua sendo um plano: expedição é tinta no chão.
+          A opacidade caiu de 0,5 para 0,28 porque o zebrado passou a carregar a leitura
+          da área: com os dois no mesmo peso, 74 m² de âmbar chapado abafavam os traços
+          que de fato dizem "aqui manobra empilhadeira". */}
       {demarcacoes.map(b => (
         <mesh key={b.id} position={b.centro}>
           <boxGeometry args={b.tamanho} />
-          <meshStandardMaterial color={cores.doca} roughness={0.9} metalness={0} transparent opacity={0.5} />
+          <meshStandardMaterial color={cores.doca} roughness={0.9} metalness={0} transparent opacity={0.28} />
         </mesh>
       ))}
+
+      {/* Zebrado de advertência e as duas empilhadeiras da doca: três objetos de GPU para
+          tudo. O amarelo é o de MARCAÇÃO de solo, que esta cena já declara não-semântico —
+          o amarelo de empilhadeira de verdade é vizinho do âmbar de "acima da capacidade",
+          e um equipamento quase da cor do alerta apaga o alerta. */}
+      <LoteDoCenario pecas={zebrado} material={MATERIAIS_DO_GALPAO[theme].zebrado} />
+      <LoteDoCenario pecas={equipamentos.corpo} material={MATERIAIS_DO_EQUIPAMENTO[theme].corpo} />
+      <LoteDoCenario pecas={equipamentos.aco} material={MATERIAIS_DO_EQUIPAMENTO[theme].aco} />
 
       {/* A fileira é DECOMPOSTA em quadro (montantes + diagonais) e longarinas. Caixa
           cheia no lugar disso vira muro: some o vão onde o palete entra e some a leitura
@@ -1282,30 +1461,21 @@ export function PlantaFisica3D({
         onApontarVaga={onApontarVaga}
       />
 
-      {/* Rótulo da rua. Único elemento React por fileira que sobrou: é DOM, não WebGL,
-          e some junto com a fileira quando ela não tem rua cadastrada. */}
-      {fileiras.map(b => {
-        const letra = (/^RUA\s+([A-Z]+)$/.exec(b.rotulo) ?? [])[1];
-        const noFiltro =
-          destaque.ruasSelecionadas.size === 0 || (!!letra && destaque.ruasSelecionadas.has(letra));
-        if (!b.rotulo) return null;
-        return (
-          <Html
-            key={b.id}
-            center
-            distanceFactor={26}
-            position={[b.centro[0], b.tamanho[1] + 0.6, b.centro[2]]}
-          >
-            <span
-              className="whitespace-nowrap rounded-control bg-ink-900/85 px-1.5 py-0.5 text-[10px] font-medium text-white"
-              style={{ opacity: noFiltro ? 1 : 0.35 }}
-            >
-              {b.rotulo}
-              <span className="ml-1 opacity-70">{posicoesDaFileira(b)} pos.</span>
-            </span>
-          </Html>
-        );
-      })}
+      {/* Contorno da carga, em duas camadas.
+          A vista por código sempre teve esta divisão; a da planta, que é o PADRÃO da
+          tela, não tinha nenhuma — o pallet era um bloco de cor chapado, e o mesmo
+          endereço aparecia como duas coisas diferentes conforme a vista. Só as cargas em
+          destaque: dar aresta ao que está fora do filtro devolveria o peso visual que o
+          filtro acabou de tirar. */}
+      <lineSegments geometry={arestasDaCarga}>
+        <lineBasicMaterial color={COR_DIVISAO_CAIXA[theme]} transparent opacity={0.55} />
+      </lineSegments>
+
+      {/* Sinalização aérea: a MESMA placa da vista por código, duas por rua, uma em cada
+          ponta do corredor. Antes esta vista tinha uma placa própria, no meio da fileira,
+          com cor fora do sistema de tokens e encolhendo com a perspectiva — a mesma coisa
+          desenhada de dois jeitos em duas vistas do mesmo galpão. */}
+      <PlacasDeRua placas={placas} />
     </group>
   );
 }

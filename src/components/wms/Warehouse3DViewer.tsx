@@ -49,7 +49,8 @@ import { listarPecas, salvarPecas } from '../../lib/wms/builderObjects';
 import { getPublishedLayout, getFloorPlanSignedUrl } from '../../lib/slottingLayoutService';
 // A planta como geometria: as fileiras vêm das medidas, não do código da vaga.
 import {
-  AZ2027_TERREO, blocosDaPlanta, comprimentoTotal, LARGURA_DO_PREDIO, mesasDaPlanta,
+  AZ2027_TERREO, blocosDaPlanta, comprimentoTotal, equipamentosDaExpedicao, LARGURA_DO_PREDIO,
+  mesasDaPlanta,
 } from '../../lib/wms/warehouse3dPlantaFisica';
 // As medidas da planta vêm do banco; a constante acima fica como retrato e como fallback.
 import {
@@ -80,7 +81,9 @@ import {
 import {
   ALTURA_DA_TARJA, anguloDaCamera, desenharLegenda, legendaDaAuditoria, nomeDoArquivo,
 } from '../../lib/wms/warehouse3dSnapshot';
-import { montantesDoArmazem, vigasDoArmazem } from '../../lib/wms/warehouse3dEstrutura';
+import {
+  diagonaisDoArmazem, montantesDoArmazem, vigasDoArmazem,
+} from '../../lib/wms/warehouse3dEstrutura';
 import { type FundoDaCena } from './WarehouseEnvironment';
 // ── O módulo fatiado ─────────────────────────────────────────────────────────────
 // Cor, catálogo e medidas em `aparencia`; objetos de GPU em `recursos3d`; tudo que vive
@@ -564,6 +567,107 @@ export function Warehouse3DViewer({
    */
   const [voando, setVoando] = useState(false);
 
+  /**
+   * Manda a câmera para um destino, pelo `PanSuave`.
+   *
+   * Todo movimento de câmera comandado por botão passa por aqui. Antes havia dois
+   * caminhos — `set()` direto para o foco e o reset, animado para a rota —, e a diferença
+   * não tinha razão de ser: quem clica em "Ir até" também perde a relação entre a vista
+   * que tinha e a que recebeu, e é justamente ela que o deslizamento preserva.
+   *
+   * `voando` é o que mantém o laço vivo: com `frameloop="demand"`, o destino mora num ref
+   * e ref nenhum faz o fiber desenhar. O `PanSuave` devolve o aviso pelo `aoParar`, por
+   * chegada ou por cancelamento — arrastar o mouse no meio do caminho emite `start` no
+   * OrbitControls, que larga o destino e devolve o comando para a mão.
+   */
+  const voarAte = useCallback((alvo: Vector3, posicao: Vector3) => {
+    if (!controlsRef.current) return;
+    destinoRef.current = { alvo, posicao };
+    setVoando(true);
+  }, []);
+
+  // ── Tela cheia ───────────────────────────────────────────────────────────────
+  //
+  // O elemento em tela cheia é a MOLDURA, não o canvas: HUD, radar e gaveta de detalhe
+  // são irmãos do canvas dentro dela, e pôr o canvas sozinho em tela cheia deixaria os
+  // controles para trás — um mapa que ocupa o monitor inteiro e não se comanda.
+  //
+  // O modal de ajuste também vive dentro dela (`Hud3D` o renderiza), e isso foi
+  // conferido: o `Modal` do projeto não usa portal, é `fixed inset-0` como filho de quem
+  // o chama. Fosse portalado para o `body`, sumiria em tela cheia.
+  const [telaCheia, setTelaCheia] = useState(false);
+
+  /**
+   * A API existe E está permitida aqui.
+   *
+   * `fullscreenEnabled` é falso dentro de um iframe sem `allow="fullscreen"`, e no Safari
+   * do iPhone `Element.requestFullscreen` simplesmente não existe — lá só `<video>` vai a
+   * tela cheia. Sem esta checagem o botão apareceria e não faria nada, que é pior do que
+   * não existir.
+   */
+  const suportaTelaCheia = useMemo(
+    () =>
+      typeof document !== 'undefined' &&
+      !!document.fullscreenEnabled &&
+      typeof Element.prototype.requestFullscreen === 'function',
+    [],
+  );
+
+  /**
+   * O estado vem do EVENTO, nunca do clique.
+   *
+   * Sair por Esc, pelo botão do navegador ou por troca de aba não passa por este
+   * componente. Marcar o estado no clique faria o botão dizer "Sair da tela cheia" com a
+   * tela já restaurada.
+   */
+  useEffect(() => {
+    if (!suportaTelaCheia) return;
+    const sincronizar = () => {
+      const moldura = molduraRef.current;
+      // `!!moldura` não é defensivo, é o bug: nos estados de carregamento e de erro o
+      // componente devolve uma moldura SEM o ref, então `molduraRef.current` é null. E
+      // `null === document.fullscreenElement` é verdadeiro quando nada está em tela
+      // cheia — o botão nascia dizendo "Sair da tela cheia", e ficava assim, porque
+      // montar o canvas depois não dispara `fullscreenchange`.
+      setTelaCheia(!!moldura && document.fullscreenElement === moldura);
+    };
+    document.addEventListener('fullscreenchange', sincronizar);
+    sincronizar();
+    return () => document.removeEventListener('fullscreenchange', sincronizar);
+  }, [suportaTelaCheia]);
+
+  const alternarTelaCheia = useCallback(() => {
+    const moldura = molduraRef.current;
+    if (!moldura || !suportaTelaCheia) return;
+    // As duas promessas podem ser recusadas — por política de permissão, por o gesto não
+    // contar como ativação do usuário, ou por o navegador simplesmente negar. Recusa não
+    // é exceção a tratar: a tela continua como está, e o `fullscreenchange` que não veio
+    // é a confirmação disso. O que não pode é virar rejeição não capturada no console.
+    if (document.fullscreenElement) {
+      void document.exitFullscreen().catch(() => undefined);
+      return;
+    }
+    void moldura.requestFullscreen().catch(() => setTelaCheia(false));
+  }, [suportaTelaCheia]);
+
+  // Atalho F. Mesma guarda do atalho de girar peça: enquanto a pessoa digita na busca,
+  // F é letra, não comando. Modificadores ficam de fora para não roubar Ctrl+F do
+  // navegador.
+  useEffect(() => {
+    if (!suportaTelaCheia) return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      if (e.key !== 'f' && e.key !== 'F') return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)) return;
+      if (alvo?.isContentEditable) return;
+      e.preventDefault();
+      alternarTelaCheia();
+    };
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [suportaTelaCheia, alternarTelaCheia]);
+
   useEffect(() => {
     if (!companyId) {
       setAbc(ABC_VAZIO);
@@ -946,7 +1050,20 @@ export function Warehouse3DViewer({
       const maxNivel = Math.max(...daRua.map(s => s.nivel));
       const y = base + maxNivel * layout.levelHeight + 1;
       const pontas = modulos.length > 1 ? [modulos[0], modulos[modulos.length - 1]] : [modulos[0]];
-      for (const m of pontas) placas.push({ rotulo: letra, x, y, z: (m - 1) * layout.moduleWidth });
+      // `posicoes` e `atenuada` vêm junto para a placa ser a MESMA das duas vistas: a
+      // da planta já anunciava o tamanho da rua e apagava fora do filtro, e esta não —
+      // o mesmo corredor sinalizado de dois jeitos conforme a vista aberta.
+      const atenuada = ruasSelecionadas.size > 0 && !ruasSelecionadas.has(letra);
+      for (const m of pontas) {
+        placas.push({
+          rotulo: letra,
+          x,
+          y,
+          z: (m - 1) * layout.moduleWidth,
+          posicoes: modulos.length,
+          atenuada,
+        });
+      }
     }
 
     return {
@@ -968,7 +1085,7 @@ export function Warehouse3DViewer({
       // Centraliza na origem para o OrbitControls orbitar o armazém, não um canto dele.
       deslocamento: [-larguraTotal / 2, 0, -profundidadeTotal / 2] as [number, number, number],
     };
-  }, [vagas, modo, theme, contextoDeDestaque, achados, layout, abc]);
+  }, [vagas, modo, theme, contextoDeDestaque, ruasSelecionadas, achados, layout, abc]);
 
   // ── Coordenadas da vista ativa ─────────────────────────────────────────────────
   //
@@ -1011,7 +1128,18 @@ export function Warehouse3DViewer({
   const colisao = useMemo<{ caixas: CaixaPlana[]; cerca: CaixaPlana }>(() => {
     if (plantaFisica) {
       return {
-        caixas: caixasDaPlanta(plantaFisica.blocos, plantaFisica.mesas, deslocamentoAtivo),
+        caixas: [
+          ...caixasDaPlanta(plantaFisica.blocos, plantaFisica.mesas, deslocamentoAtivo),
+          // As empilhadeiras estacionadas também barram. Elas são o único objeto sólido
+          // novo da cena, e poder atravessar justamente ele — com as estantes, as mesas e
+          // as paredes já barrando — seria a inconsistência mais visível da caminhada.
+          ...equipamentosDaExpedicao(plantaFisica.blocos).pegadas.map(pegada => ({
+            x0: pegada.centro[0] - pegada.tamanho[0] / 2 + deslocamentoAtivo[0],
+            x1: pegada.centro[0] + pegada.tamanho[0] / 2 + deslocamentoAtivo[0],
+            z0: pegada.centro[2] - pegada.tamanho[2] / 2 + deslocamentoAtivo[2],
+            z1: pegada.centro[2] + pegada.tamanho[2] / 2 + deslocamentoAtivo[2],
+          })),
+        ],
         cerca: cercaDaPlanta(
           LARGURA_DO_PREDIO,
           plantaFisica.comprimento,
@@ -1105,6 +1233,9 @@ export function Warehouse3DViewer({
   // lá. Memos próprios para não refazer a geometria da estrutura a cada troca de modo.
   const montantes = useMemo(() => montantesDoArmazem(vagas, layout), [vagas, layout]);
   const travessas = useMemo(() => vigasDoArmazem(vagas, layout), [vagas, layout]);
+  // Contraventamento do quadro. Desenhado no MESMO lote dos montantes, e por isso não
+  // custa desenho novo — ver `EstruturaDeRack`.
+  const diagonais = useMemo(() => diagonaisDoArmazem(vagas, layout), [vagas, layout]);
 
   /** Escreve a posição e a abertura da câmera direto nos nós do SVG. Chamado por
    *  quadro: nada aqui pode disparar render. */
@@ -1141,10 +1272,9 @@ export function Warehouse3DViewer({
       const [mundoX, mundoZ] = localParaMundo(localX, localZ, deslocamentoAtivo);
       const alvo = new Vector3(mundoX, controls.target.y, mundoZ);
       const afastamento = controls.object.position.clone().sub(controls.target);
-      destinoRef.current = { alvo, posicao: alvo.clone().add(afastamento) };
-      setVoando(true);
+      voarAte(alvo, alvo.clone().add(afastamento));
     },
-    [deslocamentoAtivo],
+    [deslocamentoAtivo, voarAte],
   );
 
   /**
@@ -1268,11 +1398,7 @@ export function Warehouse3DViewer({
   // A MESMA conta do enquadramento inicial: se o reset usasse um valor próprio, o
   // botão devolveria uma vista que a tela nunca mostrou ao abrir.
   const resetarCamera = () => {
-    const controls = controlsRef.current;
-    if (!controls) return;
-    controls.object.position.set(...posicaoCamera);
-    controls.target.set(0, 0, 0);
-    controls.update();
+    voarAte(new Vector3(0, 0, 0), new Vector3(...posicaoCamera));
   };
 
   /**
@@ -1285,17 +1411,17 @@ export function Warehouse3DViewer({
    * suspenso ou com módulos mais largos, uma distância fixa colaria a câmera na vaga.
    */
   const focarVaga = (alvo: Slot | undefined) => {
-    const controls = controlsRef.current;
-    if (!controls || !alvo) return;
+    if (!alvo) return;
     // Resolvido pela vista ATIVA. Antes vinha de `alvo.posicao`, que é sempre a grade por
     // código — com a planta desenhada a câmera voava para onde a vaga NÃO está.
     const mundo = mundoDaVaga(alvo);
     if (!mundo) return;
     const [alvoX, y, alvoZ] = mundo;
     const recuo = recuoDeFoco(layout, !!plantaFisica);
-    controls.target.set(alvoX, y, alvoZ);
-    controls.object.position.set(alvoX + recuo, y + recuo * 0.6, alvoZ + recuo);
-    controls.update();
+    voarAte(
+      new Vector3(alvoX, y, alvoZ),
+      new Vector3(alvoX + recuo, y + recuo * 0.6, alvoZ + recuo),
+    );
   };
 
   /**
@@ -1316,15 +1442,11 @@ export function Warehouse3DViewer({
       const [x, y, z] = emMundo(parada.naVaga, deslocamentoAtivo);
       const alvo = new Vector3(x, y, z);
       const recuo = recuoDeFoco(layout, !!plantaFisica);
-      destinoRef.current = {
-        alvo,
-        posicao: new Vector3(alvo.x + recuo, y + recuo * 0.6, alvo.z + recuo),
-      };
-      setVoando(true);
+      voarAte(alvo, new Vector3(alvo.x + recuo, y + recuo * 0.6, alvo.z + recuo));
     },
     // `plantaFisica` entra porque o RECUO depende da vista ativa: sem ela aqui, trocar de
     // vista manteria o recuo da anterior — 8,8 m num corredor de 2,65 m.
-    [deslocamentoAtivo, layout, plantaFisica],
+    [deslocamentoAtivo, layout, plantaFisica, voarAte],
   );
 
   const trocarLayout = (patch: Partial<Layout3DConfig>) => {
@@ -1419,7 +1541,7 @@ export function Warehouse3DViewer({
           <EnquadramentoResponsivo />
           <Cena
             vagas={{ solidas, divergentes, raioX, fiosAtivos, fiosAtenuados, comCarga, achadas }}
-            estrutura={{ colunas, montantes, travessas, placas }}
+            estrutura={{ colunas, montantes, diagonais, travessas, placas }}
             cenario={{
               fundo,
               chaveDeSombra,
@@ -1498,6 +1620,8 @@ export function Warehouse3DViewer({
           andar,
           caminhando,
           fundo,
+          telaCheia,
+          suportaTelaCheia,
         }}
         busca={{ busca, buscando, achados, achadas, rota, rotaAberta, paradaAtual }}
         filtros={{
@@ -1533,6 +1657,7 @@ export function Warehouse3DViewer({
           setParadaAtual,
           setCaminhando,
           setFundo,
+          alternarTelaCheia,
           setAjustando,
           setFerramenta,
           setEstanteEscolhida,
@@ -1552,37 +1677,50 @@ export function Warehouse3DViewer({
       />
 
 
-      {/* Antes do painel de detalhe DE PROPÓSITO: quando os dois ficam altos e se
-          sobrepõem, quem vence é o detalhe da vaga selecionada. O radar ajuda a chegar
-          lá; depois de chegar, o conteúdo da vaga é a tarefa. */}
-      {celulasRadar.length > 0 && (
-        <Radar
-          celulas={celulasRadar}
-          area={areaRadar}
-          theme={theme}
-          aberto={radarAberto}
-          onAlternar={() => setRadarAberto(a => !a)}
-          onIrPara={irParaNoRadar}
-          grupoRef={radarGrupoRef}
-          coneRef={radarConeRef}
-        />
-      )}
+      {/* A coluna da direita: gaveta de detalhe em cima, radar embaixo.
+          Antes os dois se posicionavam sozinhos — a gaveta em `top-3` podendo crescer
+          até quase a moldura inteira, o radar cravado em `bottom-3` — e quando a vaga
+          tinha muitos SKUs a gaveta simplesmente passava por cima do radar. Quem vencia
+          era a ordem de pintura, não uma decisão.
+          Numa coluna flex o navegador faz a conta: a gaveta recebe o espaço que sobra
+          (`flex-1 min-h-0`, então ela rola por dentro), o radar guarda o dele
+          (`shrink-0`). Sobrepor deixa de ser possível em vez de ser improvável.
+          `pointer-events-none` na coluna para o espaço vazio entre os dois não roubar o
+          arrasto da câmera; cada painel devolve `pointer-events-auto` para si. */}
+      <div className="pointer-events-none absolute bottom-3 right-3 top-3 flex w-[19rem] max-w-[calc(100%-1.5rem)] flex-col items-end gap-2">
+        {selecionada && (
+          <PainelDetalhe
+            slot={selecionada}
+            abc={abc.porVaga.get(selecionada.id)}
+            onFechar={() => setSelecionada(null)}
+            onScanRequest={onScanRequest}
+            // Esquece o conteúdo ao mandar a vaga para a movimentação: a pessoa vai mexer
+            // no saldo justamente dela, e voltar encontrando o número antigo seria o cache
+            // mentindo sobre o que acabou de acontecer.
+            onOperate={onOperate ? slot => { esquecerConteudoDaVaga(slot.id); onOperate(slot); } : undefined}
+            // Fecha a gaveta ao procurar: o resultado da busca é a CENA acendendo vários
+            // endereços, e o painel aberto por cima esconderia metade deles.
+            onProcurarSku={sku => { setBusca(sku); setSelecionada(null); }}
+          />
+        )}
 
-      {selecionada && (
-        <PainelDetalhe
-          slot={selecionada}
-          abc={abc.porVaga.get(selecionada.id)}
-          onFechar={() => setSelecionada(null)}
-          onScanRequest={onScanRequest}
-          // Esquece o conteúdo ao mandar a vaga para a movimentação: a pessoa vai mexer
-          // no saldo justamente dela, e voltar encontrando o número antigo seria o cache
-          // mentindo sobre o que acabou de acontecer.
-          onOperate={onOperate ? slot => { esquecerConteudoDaVaga(slot.id); onOperate(slot); } : undefined}
-          // Fecha a gaveta ao procurar: o resultado da busca é a CENA acendendo vários
-          // endereços, e o painel aberto por cima esconderia metade deles.
-          onProcurarSku={sku => { setBusca(sku); setSelecionada(null); }}
-        />
-      )}
+        {/* `mt-auto`: sem a gaveta, o radar continua colado embaixo, que é onde ele
+            sempre esteve. */}
+        {celulasRadar.length > 0 && (
+          <div className="mt-auto">
+            <Radar
+              celulas={celulasRadar}
+              area={areaRadar}
+              theme={theme}
+              aberto={radarAberto}
+              onAlternar={() => setRadarAberto(a => !a)}
+              onIrPara={irParaNoRadar}
+              grupoRef={radarGrupoRef}
+              coneRef={radarConeRef}
+            />
+          </div>
+        )}
+      </div>
     </div>
   );
 }

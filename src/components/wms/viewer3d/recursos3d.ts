@@ -11,12 +11,17 @@ import { useEffect, useMemo } from 'react';
 import {
   BoxGeometry, BufferAttribute, BufferGeometry, Color, EdgesGeometry, Matrix4,
   MeshBasicMaterial, MeshStandardMaterial, OctahedronGeometry, Vector3,
+  type InstancedMesh,
 } from 'three';
 import { VAGA } from '../../../lib/wms/warehouse3dLayout';
 import { CARGA, ESTRUTURA, PALETE } from '../../../lib/wms/warehouse3dEstrutura';
 import type { Slot } from '../../../lib/wms/warehouse3dSlots';
+import type { Ponto } from '../../../lib/wms/warehouse3dCoordenadas';
 import type { Theme } from '../../../lib/useTheme';
-import { COR_ALERTA_GIRO, COR_COLUNA, COR_PALETE, COR_TRAVESSA } from './aparencia';
+import {
+  COR_ALERTA_GIRO, COR_COBERTURA, COR_COLUNA, COR_DEMARCACAO, COR_JANELA, COR_MARCACAO,
+  COR_PALETE, COR_TRAVESSA,
+} from './aparencia';
 
 export const GEOMETRIA_VAGA = new BoxGeometry(VAGA.largura, VAGA.altura, VAGA.profundidade);
 export const GEOMETRIA_ARESTAS = new EdgesGeometry(GEOMETRIA_VAGA);
@@ -92,16 +97,11 @@ export const MATERIAL_SOLIDO = new MeshStandardMaterial({ roughness: 0.72, metal
 export const MATERIAL_INVISIVEL = new MeshBasicMaterial({ transparent: true, opacity: 0, depthWrite: false });
 
 /**
- * Materiais da estrutura física. A cor é UNIFORME (não vem por instância), então muda
- * por `.color.set()` num efeito em vez de materiais por tema — trocar o objeto
- * recompilaria o shader a cada alternância de tema, por uma cor.
- *
- * Aço e madeira NÃO são semânticos: montante, travessa e palete têm a mesma cor em
- * todo o armazém, sempre. Quem carrega significado é a CARGA. Se a estrutura mudasse
- * de cor junto, o operador teria dois sinais concorrentes no mesmo lugar.
- */
-/**
  * Os materiais da estrutura, UM CONJUNTO POR TEMA — e nenhum deles é mutado.
+ *
+ * Aço e madeira NÃO são semânticos: montante, travessa e palete têm a mesma cor em todo
+ * o armazém, sempre. Quem carrega significado é a CARGA. Se a estrutura mudasse de cor
+ * junto, o operador teria dois sinais concorrentes no mesmo lugar.
  *
  * Antes era um singleton por material, com a cor trocada por `.color.set()` em efeitos de
  * três componentes diferentes (`EstruturaDeRack`, `EstruturaDaPlanta`, `PlantaFisica3D`).
@@ -182,6 +182,19 @@ export const MATERIAL_CARGA_ATENUADA = new MeshStandardMaterial({
  * vaga em destaque dentro da estante, não o sombreado do contexto.
  */
 export const MATERIAL_RAIOX = new MeshBasicMaterial({ transparent: true, opacity: 0.15, depthWrite: false });
+/**
+ * Tinta no chão da demarcação de fileira.
+ *
+ * Fosca e sem metal: demarcação pintada não reflete. Um conjunto POR TEMA pelo mesmo
+ * motivo dos materiais da estrutura — um material só, repintado por quem desenha, é
+ * estado global disfarçado: basta uma segunda vista na tela para um componente repintar
+ * a cena do outro.
+ */
+export const MATERIAL_DEMARCACAO: Record<Theme, MeshStandardMaterial> = {
+  light: new MeshStandardMaterial({ color: COR_DEMARCACAO.light, roughness: 0.95, metalness: 0 }),
+  dark: new MeshStandardMaterial({ color: COR_DEMARCACAO.dark, roughness: 0.95, metalness: 0 }),
+};
+
 /** Viga de sustentação do pulmão suspenso. Cinza de estrutura, nunca semântico. */
 export const MATERIAL_VIGA = new MeshStandardMaterial({ color: '#475569', roughness: 0.9, metalness: 0.1 });
 /** 1 m de altura de propósito: escalar em Y passa a dar a altura direto em metros. */
@@ -305,3 +318,177 @@ export function capacidadeDoLote(quantidade: number, bloco = BLOCO_DE_CAPACIDADE
   if (quantidade <= bloco) return bloco;
   return Math.ceil(quantidade / bloco) * bloco;
 }
+
+/**
+ * Os 24 vértices das 12 arestas do cubo unitário, como lista de pontos.
+ *
+ * Mesma forma de `GEOMETRIA_ARESTAS_UNITARIAS`, só que no formato que o `<Line>` do drei
+ * consome. Derivada dela, e não digitada à mão, para as duas nunca divergirem.
+ *
+ * No escopo do módulo porque a referência precisa ser ESTÁVEL: o `<Line>` memoiza a
+ * geometria por `points`, e um array novo a cada render reconstruiria o buffer a cada
+ * movimento do mouse — exatamente o custo que o realce não pode ter.
+ */
+export const PONTOS_DO_CONTORNO: [number, number, number][] = (() => {
+  const base = GEOMETRIA_ARESTAS_UNITARIAS.getAttribute('position').array as Float32Array;
+  const pontos: [number, number, number][] = [];
+  for (let i = 0; i < base.length; i += 3) pontos.push([base[i], base[i + 1], base[i + 2]]);
+  return pontos;
+})();
+
+/**
+ * Funde as arestas de N caixas de TAMANHOS DIFERENTES numa única geometria de linhas.
+ *
+ * `fundirArestas` não serve aqui: ela repete um contorno de medida fixa, que é o que a
+ * grade por código tem — toda vaga mede 1,2 × 1,4 × 1,2. Na planta o vão muda de fileira
+ * para fileira (a rua A tem 13 posições em 15,6 m, a E tem 12 em 15 m), então a carga de
+ * cada rua tem medida própria e o contorno precisa ser escalado por caixa.
+ *
+ * `divisoes` empilha o contorno em camadas dentro da MESMA caixa. Com 2, sai o contorno
+ * externo mais a linha do meio — que é o que faz o bloco de cor ser lido como duas
+ * camadas de caixas sobre um palete em vez de um volume maciço. Por que isso importa:
+ * a vista da planta é o padrão da tela e a carga lá era uma caixa colorida sem nenhuma
+ * aresta, enquanto a vista por código já tinha a divisão. O mesmo pallet aparecia como
+ * duas coisas diferentes conforme a vista.
+ *
+ * Continua sendo UM objeto de GPU: 215 endereços custam o mesmo desenho que um.
+ */
+export function fundirArestasDeCaixas(
+  caixas: readonly { centro: Ponto; tamanho: Ponto }[],
+  divisoes = 1,
+): BufferGeometry {
+  const base = GEOMETRIA_ARESTAS_UNITARIAS.getAttribute('position').array as Float32Array;
+  const camadas = Math.max(1, Math.trunc(divisoes));
+  const porCaixa = base.length * camadas;
+  const destino = new Float32Array(porCaixa * caixas.length);
+
+  caixas.forEach((caixa, indice) => {
+    const [cx, cy, cz] = caixa.centro;
+    const [largura, altura, profundidade] = caixa.tamanho;
+    const alturaDaCamada = altura / camadas;
+
+    for (let camada = 0; camada < camadas; camada += 1) {
+      // Centro vertical desta camada, medido da BASE da caixa para cima.
+      const y = cy - altura / 2 + alturaDaCamada * (camada + 0.5);
+      const salto = indice * porCaixa + camada * base.length;
+      for (let k = 0; k < base.length; k += 3) {
+        destino[salto + k] = base[k] * largura + cx;
+        destino[salto + k + 1] = base[k + 1] * alturaDaCamada + y;
+        destino[salto + k + 2] = base[k + 2] * profundidade + cz;
+      }
+    }
+  });
+
+  const geometria = new BufferGeometry();
+  geometria.setAttribute('position', new BufferAttribute(destino, 3));
+  return geometria;
+}
+
+/** Mesma fusão, com descarte automático. Sem o dispose, cada troca de filtro deixaria um
+ *  buffer órfão na GPU — o three não recolhe isso sozinho. */
+export function useArestasDeCaixas(
+  caixas: readonly { centro: Ponto; tamanho: Ponto }[],
+  divisoes = 1,
+): BufferGeometry {
+  const geometria = useMemo(() => fundirArestasDeCaixas(caixas, divisoes), [caixas, divisoes]);
+  useEffect(() => () => geometria.dispose(), [geometria]);
+  return geometria;
+}
+
+// ── Escrita das matrizes de instância ──────────────────────────────────────────
+//
+// Mora aqui, e não no componente de cena, porque é concern de GPU e porque o CENÁRIO
+// também instancia agora: janela, treliça de cobertura e sapata de montante usam a mesma
+// escrita de matriz que a estante. Deixá-la em `Cena3D.tsx` obrigaria
+// `WarehouseEnvironment` a importar do componente que o importa — dependência circular.
+
+/**
+ * Uma peça de estrutura como a matriz de instância a descreve: onde, quanto mede nos
+ * três eixos e quanto gira.
+ *
+ * Estrutural de propósito — `PecaDaFileira` (planta física), `PecaInclinada` (vista por
+ * código), `FaixaDePiso` e `PecaNoChao` se encaixam aqui sem conversão. Todas descrevem
+ * a mesma coisa: uma caixa em algum lugar, e o desenho não deveria precisar saber de
+ * qual módulo ela veio.
+ */
+export interface PecaDeQuadro {
+  centro: [number, number, number];
+  tamanho: [number, number, number];
+  rotacaoZ?: number;
+}
+
+/**
+ * Escreve as peças nas matrizes de um `InstancedMesh`.
+ *
+ * `MATRIZ` e `ESCALA` são escratch do módulo: alocar um `Matrix4` por peça encheria o
+ * coletor a cada troca de filtro, e são centenas de peças por vista.
+ */
+export function aplicarPecas(malha: InstancedMesh | null, pecas: readonly PecaDeQuadro[]): void {
+  if (!malha) return;
+  pecas.forEach((p, i) => {
+    if (p.rotacaoZ) MATRIZ.makeRotationZ(p.rotacaoZ);
+    else MATRIZ.identity();
+    MATRIZ.scale(ESCALA.set(p.tamanho[0], p.tamanho[1], p.tamanho[2]));
+    MATRIZ.setPosition(p.centro[0], p.centro[1], p.centro[2]);
+    malha.setMatrixAt(i, MATRIZ);
+  });
+  malha.count = pecas.length;
+  malha.instanceMatrix.needsUpdate = true;
+}
+
+// ── Materiais do galpão e do equipamento ───────────────────────────────────────
+//
+// Um conjunto POR TEMA, como os da estante e pelo mesmo motivo: material compartilhado e
+// repintado por quem desenha é estado global disfarçado.
+
+export interface MateriaisDoGalpao {
+  /** Vidro das janelas altas. Emissivo — ver `COR_JANELA`. */
+  janela: MeshStandardMaterial;
+  /** Treliça e terças da cobertura. */
+  cobertura: MeshStandardMaterial;
+  /** Zebrado de advertência da área de manobra. Fosco: tinta no chão não reflete. */
+  zebrado: MeshStandardMaterial;
+}
+
+const vidro = (theme: Theme) =>
+  new MeshStandardMaterial({
+    color: COR_JANELA[theme].vidro,
+    emissive: new Color(COR_JANELA[theme].vidro),
+    emissiveIntensity: COR_JANELA[theme].brilho,
+    roughness: 0.18,
+    metalness: 0.1,
+  });
+
+export const MATERIAIS_DO_GALPAO: Record<Theme, MateriaisDoGalpao> = {
+  light: {
+    janela: vidro('light'),
+    cobertura: new MeshStandardMaterial({ color: COR_COBERTURA.light, roughness: 0.62, metalness: 0.3 }),
+    zebrado: new MeshStandardMaterial({ color: COR_MARCACAO.light, roughness: 0.92, metalness: 0 }),
+  },
+  dark: {
+    janela: vidro('dark'),
+    cobertura: new MeshStandardMaterial({ color: COR_COBERTURA.dark, roughness: 0.62, metalness: 0.3 }),
+    zebrado: new MeshStandardMaterial({ color: COR_MARCACAO.dark, roughness: 0.92, metalness: 0 }),
+  },
+};
+
+export interface MateriaisDoEquipamento {
+  /** Corpo e teto de proteção: o amarelo de marcação, que esta cena já declara
+   *  não-semântico. Amarelo de empilhadeira de verdade seria vizinho do âmbar de "acima da
+   *  capacidade" e faria o alerta perder força dentro do próprio galpão. */
+  corpo: MeshStandardMaterial;
+  /** Mastro, colunas e garfos. Aço escuro: é a silhueta que faz o equipamento ser lido
+   *  como empilhadeira em vez de caixote amarelo. */
+  aco: MeshStandardMaterial;
+}
+
+export const MATERIAIS_DO_EQUIPAMENTO: Record<Theme, MateriaisDoEquipamento> = {
+  light: {
+    corpo: new MeshStandardMaterial({ color: COR_MARCACAO.light, roughness: 0.55, metalness: 0.15 }),
+    aco: new MeshStandardMaterial({ color: '#3C4654', roughness: 0.45, metalness: 0.55 }),
+  },
+  dark: {
+    corpo: new MeshStandardMaterial({ color: COR_MARCACAO.dark, roughness: 0.55, metalness: 0.15 }),
+    aco: new MeshStandardMaterial({ color: '#2A313C', roughness: 0.45, metalness: 0.55 }),
+  },
+};

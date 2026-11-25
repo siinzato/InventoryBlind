@@ -8,6 +8,7 @@
 // Aqui o hex é inevitável: material de WebGL não lê variável CSS. Então este módulo é o
 // ponto único de verdade da paleta da cena — o equivalente a um token.
 
+import { Activity, BarChart3, Eye, Hammer, TrendingUp } from 'lucide-react';
 import type { SegmentedOption } from '../../ui';
 import type { Theme } from '../../../lib/useTheme';
 import type { Slot, SlotStatus } from '../../../lib/wms/warehouse3dSlots';
@@ -91,6 +92,48 @@ export const COR_COLUNA: Record<Theme, string> = { light: '#27497F', dark: '#2E5
 export const COR_TRAVESSA: Record<Theme, string> = { light: '#A8521C', dark: '#8A4418' };
 export const COR_PALETE: Record<Theme, string> = { light: '#8A5A2B', dark: '#6B4522' };
 
+/**
+ * Demarcação do pé da fileira — a tinta que no galpão delimita onde a estante fica.
+ *
+ * NEUTRA de propósito. Rua não tem cor semântica, e dar uma a ela inventaria
+ * significado onde não há. O amarelo do cenário já quer dizer "circulação"; isto é o
+ * contrário — é a área onde não se circula, porque ali está a estante. Pintar as duas
+ * da mesma cor faria o galpão parecer todo corredor.
+ */
+export const COR_DEMARCACAO: Record<Theme, string> = { light: '#9FAABA', dark: '#2C3747' };
+
+/**
+ * Amarelo de marcação de solo — o mesmo papel do amarelo pintado no chão do galpão:
+ * sinalizar circulação e equipamento de movimentação.
+ *
+ * NÃO é cor semântica do produto e não entra em nenhuma legenda; por isso pode ser
+ * literal sem disputar com o âmbar do alerta. Mora aqui, e não no componente de cenário
+ * onde nasceu, porque três lugares passaram a precisar dela — faixas de circulação,
+ * zebrado da expedição e o corpo da empilhadeira — e este módulo é declaradamente o ponto
+ * único de verdade da paleta da cena.
+ */
+export const COR_MARCACAO: Record<Theme, string> = { light: '#D9A514', dark: '#7A5E12' };
+
+/**
+ * O galpão em volta: vidro das janelas altas e aço da cobertura.
+ *
+ * A janela é EMISSIVA de propósito. Ela está a nove metros do chão, virada para dentro, e
+ * as três luzes da cena vêm de cima — iluminada só por elas, a abertura sairia mais escura
+ * que a parede, que é o oposto do que uma janela faz. Emissiva, ela lê como entrada de luz
+ * sem custar uma quarta fonte de iluminação no orçamento.
+ *
+ * No escuro a emissão cai para um terço: janela de galpão à noite tem a luz vazando de
+ * dentro, fraca, e não o dia inteiro atrás do vidro.
+ */
+export const COR_JANELA: Record<Theme, { vidro: string; brilho: number }> = {
+  light: { vidro: '#E8F1FB', brilho: 0.9 },
+  dark: { vidro: '#2A3C56', brilho: 0.3 },
+};
+
+/** Aço da treliça de cobertura. Mais claro que o montante no claro e mais escuro no
+ *  escuro: a cobertura é fundo, e fundo nunca pode competir com a estante. */
+export const COR_COBERTURA: Record<Theme, string> = { light: '#B9C2CE', dark: '#222936' };
+
 export const COR_GRADE: Record<Theme, [string, string]> = {
   light: ['#CBD5E1', '#E2E8F0'],
   dark: ['#2A3140', '#1C212B'],
@@ -135,8 +178,8 @@ export const FILTROS: ReadonlyArray<{ value: FiltroStatus; rotulo: string }> = [
 export type ModoVisor = 'operacional' | 'edicao';
 
 export const MODOS_VISOR: SegmentedOption<ModoVisor>[] = [
-  { value: 'operacional', label: 'Operacional' },
-  { value: 'edicao', label: 'Edição' },
+  { value: 'operacional', label: 'Operacional', icon: Eye },
+  { value: 'edicao', label: 'Edição', icon: Hammer },
 ];
 
 /** Divisão da grade de construção, em metros. Um metro é a unidade em que se fala de
@@ -265,9 +308,9 @@ export type ModoCor = 'status' | 'ocupacao' | 'abc';
 // Mutável de propósito: `SegmentedControl` recebe `SegmentedOption<T>[]`, não
 // ReadonlyArray. Anotar como readonly aqui só obrigaria a copiar no ponto de uso.
 export const MODOS: SegmentedOption<ModoCor>[] = [
-  { value: 'status', label: 'Status' },
-  { value: 'ocupacao', label: 'Ocupação' },
-  { value: 'abc', label: 'Curva ABC' },
+  { value: 'status', label: 'Status', icon: Activity },
+  { value: 'ocupacao', label: 'Ocupação', icon: BarChart3 },
+  { value: 'abc', label: 'Curva ABC', icon: TrendingUp },
 ];
 
 export const LEGENDA_ABC: ReadonlyArray<{ classe: AbcClasse; rotulo: string }> = [

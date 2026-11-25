@@ -36,6 +36,13 @@ export const ESTRUTURA = {
   folgaCarga: 0.14,
   /** Folga no topo, para a carga não encostar na viga do nível de cima. */
   folgaTopo: 0.1,
+  /**
+   * Seção da diagonal de contraventamento. Mais fina que o montante, como no galpão:
+   * ela trava o quadro, não sustenta carga. Mesmo valor da planta física — as duas
+   * vistas desenham a MESMA estante, e uma diferença aqui apareceria como a estante
+   * mudando de construção conforme a aba aberta.
+   */
+  diagonal: 0.04,
 } as const;
 
 export type Ponto = [number, number, number];
@@ -185,4 +192,114 @@ export function vigasDoArmazem(slots: readonly Slot[], cfg: Layout3DConfig): Pec
   }
 
   return pecas;
+}
+
+/**
+ * Peça do quadro que não é ortogonal — hoje só a diagonal.
+ *
+ * Tem as três medidas e um giro, diferente de `PecaDaEstrutura`, que carrega um
+ * comprimento só porque montante e longarina se estendem num eixo conhecido. A
+ * diagonal não: ela é comprida numa direção inclinada, e descrevê-la por "comprimento"
+ * obrigaria quem desenha a saber de que peça se trata para reconstruir o resto.
+ *
+ * Mesma forma da `PecaDaFileira` da planta física, de propósito: as duas alimentam o
+ * mesmo desenho de instância, com a escala e o giro na matriz.
+ */
+export interface PecaInclinada {
+  centro: Ponto;
+  tamanho: Ponto;
+  /** Giro em torno de Z, em radianos. */
+  rotacaoZ: number;
+}
+
+/**
+ * Diagonais de contraventamento da vista por CÓDIGO.
+ *
+ * Existiam só na planta física, e isso aparecia: a mesma estante tinha treliça numa aba
+ * e um par de barras lisas na outra. Como as duas vistas desenham o mesmo porta-pallets,
+ * a diferença lia como mudança de construção, não como mudança de ponto de vista.
+ *
+ * ── Onde a diagonal fica ────────────────────────────────────────────────────────
+ * No QUADRO: o plano vertical que contém os dois montantes de uma mesma divisa de
+ * módulo, atravessando a profundidade do vão. É o sentido em que o pallet entra e para
+ * onde a estante tomba — por isso é ali que ela é travada, e não ao longo do corredor.
+ *
+ * Uma por nível em cada divisa, alternando o sentido por `(divisa + nível)`: o
+ * zigue-zague da estante real, em vez de um feixe de riscos paralelos.
+ *
+ * ── Por que a subida é um nível MENOS a seção ───────────────────────────────────
+ * Inclinada, a caixa ocupa em Y a subida mais a projeção da própria seção. Com a subida
+ * cheia, a diagonal do último nível furaria o topo da estante — o mesmo erro já medido
+ * na planta física, e a mesma correção. Com o desconto, a extensão vertical fecha em
+ * exatamente um nível e o topo da última diagonal coincide com o topo do montante.
+ */
+export function diagonaisDoArmazem(
+  slots: readonly Slot[],
+  cfg: Layout3DConfig,
+): PecaInclinada[] {
+  const pecas: PecaInclinada[] = [];
+  // Vão LIVRE entre os montantes: de centro a centro é a profundidade do vão, e a
+  // diagonal encosta na face interna de cada um.
+  const vao = VAGA.profundidade - ESTRUTURA.montante;
+  const subida = cfg.levelHeight - ESTRUTURA.diagonal;
+  if (vao <= 0 || subida <= 0) return pecas;
+
+  const comprimento = Math.hypot(vao, subida);
+  const angulo = Math.atan2(subida, vao);
+
+  for (const rua of resumirRuas(slots, cfg)) {
+    // As MESMAS divisas dos montantes: a diagonal nasce entre o par que ela trava, e
+    // uma contagem própria aqui soltaria a treliça das colunas.
+    for (let m = rua.minModulo; m <= rua.maxModulo + 1; m += 1) {
+      const z = (m - 1) * cfg.moduleWidth - cfg.moduleWidth / 2;
+      for (let nivel = 1; nivel <= rua.maxNivel; nivel += 1) {
+        pecas.push({
+          centro: [rua.x, rua.base + (nivel - 1) * cfg.levelHeight + cfg.levelHeight / 2, z],
+          // Comprida em X antes do giro: girada em torno de Z, ela se inclina no plano
+          // X–Y, que é o plano em que os dois montantes vivem.
+          tamanho: [comprimento, ESTRUTURA.diagonal, ESTRUTURA.diagonal],
+          rotacaoZ: (m + nivel) % 2 === 0 ? angulo : -angulo,
+        });
+      }
+    }
+  }
+
+  return pecas;
+}
+
+/**
+ * Sapata: a chapa de base aparafusada no piso sob cada montante.
+ *
+ * Existe no galpão por motivo estrutural — distribui a carga da coluna na laje — e
+ * existe aqui por motivo de leitura: vista de cima, a demarcação do pé da fileira fica
+ * coberta pelas chapas de piso dos vãos, e a estante perde o contato com o chão. A
+ * sapata é mais larga que o montante e cai FORA dessa cobertura, então ela é o que
+ * assenta a estrutura no piso na vista aérea.
+ *
+ * 26 cm contra os 9 do montante: é a proporção de uma placa de base real, e é o mínimo
+ * que ainda sobra para fora da chapa do vão.
+ */
+export const SAPATA = { lado: 0.26, espessura: 0.02 } as const;
+
+/** Uma peça apoiada no piso, descrita pelo centro e pelas três medidas. */
+export interface PecaNoChao {
+  centro: Ponto;
+  tamanho: Ponto;
+}
+
+/**
+ * As sapatas dos montantes informados.
+ *
+ * Derivada dos montantes em vez de recalculada a partir das vagas, e isso é o ponto:
+ * sapata que não nasce debaixo de um montante é sapata no lugar errado. Com a derivação,
+ * mudar a geometria da estante move as duas juntas, sempre.
+ *
+ * O `- comprimento / 2` desce do centro do montante até o PÉ dele; a chapa é então
+ * apoiada sobre o piso daquele ponto, não centrada nele.
+ */
+export function sapatasDosMontantes(montantes: readonly PecaDaEstrutura[]): PecaNoChao[] {
+  return montantes.map(peca => ({
+    centro: [peca.posicao[0], peca.posicao[1] - peca.comprimento / 2 + SAPATA.espessura / 2, peca.posicao[2]],
+    tamanho: [SAPATA.lado, SAPATA.espessura, SAPATA.lado],
+  }));
 }

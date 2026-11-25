@@ -6,7 +6,9 @@
 // destaque, ou um vão sem endereço parecendo endereço disponível.
 
 import { describe, expect, it } from 'vitest';
-import { lotesDaPlanta, totalDeInstancias, type PaletaDosLotes } from '../warehouse3dLotesDaPlanta';
+import {
+  lotesDaPlanta, totalDeInstancias, variacaoDaCarga, type PaletaDosLotes,
+} from '../warehouse3dLotesDaPlanta';
 import { SEM_DESTAQUE, type ContextoDeDestaque } from '../warehouse3dDestaque';
 import { blocosDaPlanta, vaosDaFileira } from '../warehouse3dPlantaFisica';
 import type { Slot } from '../warehouse3dSlots';
@@ -198,5 +200,71 @@ describe('lotesDaPlanta — conservação', () => {
     const naoFileiras = blocos.filter(b => b.tipo !== 'fileira');
     expect(naoFileiras.length).toBeGreaterThan(0);
     expect(totalDeInstancias(lotesDaPlanta(naoFileiras, new Map(), SEM_DESTAQUE, PALETA, corDaVaga, MEDIDAS))).toBe(0);
+  });
+});
+
+describe('variacaoDaCarga — a altura que quebra a uniformidade artificial', () => {
+  const DA_RUA_A = ['PP-A01-N1', 'PP-A02-N1', 'PP-A03-N1', 'PP-A04-N1', 'PP-A05-N1'];
+
+  it('é determinística: o mesmo endereço dá sempre a mesma altura', () => {
+    for (const codigo of DA_RUA_A) {
+      expect(variacaoDaCarga(codigo)).toBe(variacaoDaCarga(codigo));
+    }
+  });
+
+  it('só encolhe, nunca cresce', () => {
+    // Variar para cima faria a carga atravessar a longarina do nível de cima em algumas
+    // vagas e não em outras — um bug que só apareceria nos códigos de hash alto.
+    for (const codigo of [...DA_RUA_A, 'PP-E03-N2', 'PP-H12-N1', 'PP-D16-N3']) {
+      expect(variacaoDaCarga(codigo)).toBeLessThanOrEqual(1);
+      expect(variacaoDaCarga(codigo)).toBeGreaterThan(0.85);
+    }
+  });
+
+  it('endereços VIZINHOS recebem alturas diferentes', () => {
+    // É por isso que o hash é FNV e não uma soma de charCodes: somando, PP-A01 até
+    // PP-A13 sairiam quase idênticos e a variação sumiria justamente onde precisa
+    // aparecer — entre vagas da mesma rua, lado a lado.
+    const alturas = DA_RUA_A.map(variacaoDaCarga);
+    expect(new Set(alturas).size).toBe(alturas.length);
+    expect(Math.max(...alturas) - Math.min(...alturas)).toBeGreaterThan(0.02);
+  });
+
+  it('as alturas desenhadas de fato DIFEREM entre as vagas', () => {
+    const lotes = montar(mapa(...codigos.map(c => vaga(c, 10))));
+    const alturas = new Set(lotes.cargaDestaque.map(c => c.tamanho[1].toFixed(6)));
+    expect(lotes.cargaDestaque.length).toBeGreaterThan(10);
+    expect(alturas.size).toBeGreaterThan(10);
+  });
+
+  it('a carga continua apoiada NO palete, sem flutuar nem afundar', () => {
+    const lotes = montar(mapa(...codigos.map(c => vaga(c, 10))));
+    for (const carga of lotes.cargaDestaque) {
+      const apoiada = lotes.paleteDestaque.some(
+        p =>
+          Math.abs(p.centro[0] - carga.centro[0]) < 1e-9 &&
+          Math.abs(p.centro[2] - carga.centro[2]) < 1e-9 &&
+          Math.abs(p.centro[1] + p.tamanho[1] / 2 - (carga.centro[1] - carga.tamanho[1] / 2)) < 1e-9,
+      );
+      expect(apoiada).toBe(true);
+    }
+  });
+
+  it('nenhuma carga passa do vão que a contém, com variação ou sem', () => {
+    const lotes = montar(mapa(...codigos.map(c => vaga(c, 10))));
+    const vaos = todosOsVaos.filter(v => v.codigo !== null);
+    for (const carga of lotes.cargaDestaque) {
+      const vao = vaos.find(
+        v =>
+          Math.abs(v.centro[0] - carga.centro[0]) < 1e-9 &&
+          Math.abs(v.centro[2] - carga.centro[2]) < 1e-9 &&
+          carga.centro[1] >= v.centro[1] - v.tamanho[1] / 2 &&
+          carga.centro[1] <= v.centro[1] + v.tamanho[1] / 2,
+      );
+      expect(vao).toBeDefined();
+      expect(carga.centro[1] + carga.tamanho[1] / 2).toBeLessThanOrEqual(
+        vao!.centro[1] + vao!.tamanho[1] / 2 + 1e-9,
+      );
+    }
   });
 });

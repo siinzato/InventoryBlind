@@ -7,8 +7,9 @@
 
 import { describe, it, expect } from 'vitest';
 import {
-  CARGA, ESTRUTURA, PALETE,
-  montantesDoArmazem, pisoDoVao, posicaoDaCarga, posicaoDoPalete, vigasDoArmazem,
+  CARGA, ESTRUTURA, PALETE, SAPATA,
+  diagonaisDoArmazem, montantesDoArmazem, pisoDoVao, posicaoDaCarga, posicaoDoPalete,
+  sapatasDosMontantes, vigasDoArmazem,
 } from '../warehouse3dEstrutura';
 import { LAYOUT_PADRAO, VAGA, posicaoDaVaga } from '../warehouse3dLayout';
 import type { Slot } from '../warehouse3dSlots';
@@ -213,5 +214,140 @@ describe('vigasDoArmazem', () => {
 
   it('armazém vazio não produz viga', () => {
     expect(vigasDoArmazem([], cfg)).toEqual([]);
+  });
+});
+
+describe('diagonaisDoArmazem', () => {
+  it('uma por nível em cada divisa — as MESMAS divisas dos montantes', () => {
+    const slots = [1, 2, 3].map(m => vaga({ id: 'm' + m, modulo: m }));
+    const diagonais = diagonaisDoArmazem(slots, cfg);
+    const montantes = montantesDoArmazem(slots, cfg);
+    const zDiagonais = [...new Set(diagonais.map(d => d.centro[2]))].sort((a, b) => a - b);
+    const zMontantes = [...new Set(montantes.map(p => p.posicao[2]))].sort((a, b) => a - b);
+    // Solta das colunas, a treliça viraria um risco flutuando entre dois vãos.
+    expect(zDiagonais).toEqual(zMontantes);
+    expect(diagonais).toHaveLength(4); // 4 divisas x 1 nível
+  });
+
+  it('cruza a PROFUNDIDADE, no eixo dos dois montantes que trava', () => {
+    const [d] = diagonaisDoArmazem([vaga()], cfg);
+    // Centrada entre as duas fileiras de montante, não numa delas.
+    expect(d.centro[0]).toBeCloseTo(0, 10);
+    // Comprimento igual à hipotenusa do vão livre com a subida de um nível.
+    const vao = VAGA.profundidade - ESTRUTURA.montante;
+    expect(d.tamanho[0]).toBeCloseTo(
+      Math.hypot(vao, cfg.levelHeight - ESTRUTURA.diagonal),
+      10,
+    );
+    expect(d.tamanho[1]).toBe(ESTRUTURA.diagonal);
+    expect(d.tamanho[2]).toBe(ESTRUTURA.diagonal);
+  });
+
+  it('NÃO fura o topo da estante — a seção inclinada ocupa Y além da subida', () => {
+    // O erro que já aconteceu na planta física: com a subida cheia, a peça do último
+    // nível passava do topo. Aqui a conta é feita como o desenho faz, com o giro.
+    const slots = [1, 2, 3].map(n => vaga({ id: 'n' + n, nivel: n }));
+    const topoDaEstante = 3 * cfg.levelHeight;
+    for (const d of diagonaisDoArmazem(slots, cfg)) {
+      const [comprimento, secao] = d.tamanho;
+      const extensaoY =
+        Math.abs(comprimento * Math.sin(d.rotacaoZ)) + Math.abs(secao * Math.cos(d.rotacaoZ));
+      expect(d.centro[1] + extensaoY / 2).toBeLessThanOrEqual(topoDaEstante + 1e-9);
+      expect(d.centro[1] - extensaoY / 2).toBeGreaterThanOrEqual(-1e-9);
+    }
+  });
+
+  it('a extensão vertical cabe no nível, com a folga da própria seção', () => {
+    // Não fecha EXATAMENTE em um nível, e a conta diz por quê: a extensão é
+    // `subida + seção·cos θ`, e a subida já desconta a seção inteira. Sobra
+    // `seção·(1 − cos θ)` — 1,9 cm no layout padrão. A folga é de propósito: descontar
+    // a seção cheia é a forma conservadora, e é ela que garante a peça nunca furar o
+    // topo, qualquer que seja o ângulo.
+    const [d] = diagonaisDoArmazem([vaga()], cfg);
+    const [comprimento, secao] = d.tamanho;
+    const extensaoY =
+      Math.abs(comprimento * Math.sin(d.rotacaoZ)) + Math.abs(secao * Math.cos(d.rotacaoZ));
+    const folga = secao * (1 - Math.cos(Math.abs(d.rotacaoZ)));
+    expect(extensaoY).toBeCloseTo(cfg.levelHeight - folga, 10);
+    expect(folga).toBeLessThan(secao);
+  });
+
+  it('alterna o sentido — zigue-zague, não um feixe de riscos paralelos', () => {
+    const slots = [1, 2].map(m => vaga({ id: 'm' + m, modulo: m }));
+    const sentidos = new Set(diagonaisDoArmazem(slots, cfg).map(d => Math.sign(d.rotacaoZ)));
+    expect([...sentidos].sort()).toEqual([-1, 1]);
+  });
+
+  it('rua elevada leva a treliça junto', () => {
+    const elevado = { ...cfg, baseByStreet: { A: 2.5 } };
+    const [d] = diagonaisDoArmazem([vaga()], elevado);
+    expect(d.centro[1]).toBeCloseTo(2.5 + cfg.levelHeight / 2, 10);
+  });
+
+  it('cada rua tem a própria contagem — uma rua baixa não ganha nível da alta', () => {
+    const slots = [
+      vaga({ id: 'a', rua: 1, ruaCodigo: 'A', nivel: 1 }),
+      vaga({ id: 'b', rua: 2, ruaCodigo: 'B', nivel: 3 }),
+    ];
+    const porRua = new Map<number, number>();
+    for (const d of diagonaisDoArmazem(slots, cfg)) {
+      porRua.set(d.centro[0], (porRua.get(d.centro[0]) ?? 0) + 1);
+    }
+    // 2 divisas x 1 nível na rua A, 2 divisas x 3 níveis na rua B.
+    expect([...porRua.values()].sort((a, b) => a - b)).toEqual([2, 6]);
+  });
+
+  it('armazém vazio não produz diagonal', () => {
+    expect(diagonaisDoArmazem([], cfg)).toEqual([]);
+  });
+
+  it('nível mais baixo que a própria seção não produz peça torta', () => {
+    // Guarda de borda: com `levelHeight` degenerado a hipotenusa inverteria o sinal da
+    // subida e a diagonal desceria em vez de subir.
+    expect(diagonaisDoArmazem([vaga()], { ...cfg, levelHeight: ESTRUTURA.diagonal })).toEqual([]);
+  });
+});
+
+describe('sapatasDosMontantes - a chapa de base na vista por codigo', () => {
+  const slots = [1, 2, 3].map(m => vaga({ id: 'm' + m, modulo: m, nivel: 3 }));
+
+  it('uma sapata por montante', () => {
+    const montantes = montantesDoArmazem(slots, cfg);
+    expect(montantes.length).toBeGreaterThan(0);
+    expect(sapatasDosMontantes(montantes)).toHaveLength(montantes.length);
+  });
+
+  it('cada sapata nasce no PE do seu montante, apoiada no piso da rua', () => {
+    const montantes = montantesDoArmazem(slots, cfg);
+    const sapatas = sapatasDosMontantes(montantes);
+    montantes.forEach((m, i) => {
+      expect(sapatas[i].centro[0]).toBeCloseTo(m.posicao[0], 9);
+      expect(sapatas[i].centro[2]).toBeCloseTo(m.posicao[2], 9);
+      const peDoMontante = m.posicao[1] - m.comprimento / 2;
+      expect(sapatas[i].centro[1] - sapatas[i].tamanho[1] / 2).toBeCloseTo(peDoMontante, 9);
+    });
+  });
+
+  it('acompanha a rua SUSPENSA: sapata no ar e sapata que nao sustenta nada', () => {
+    // Numa rua elevada o montante comeca acima do piso, e a chapa de base vai junto com
+    // ele. Fixar a sapata em Y=0 poria a chapa no chao com a coluna flutuando tres
+    // metros acima dela.
+    const suspenso = { ...cfg, baseByStreet: { A: 3 } };
+    const montantes = montantesDoArmazem(slots, suspenso);
+    for (const s of sapatasDosMontantes(montantes)) {
+      expect(s.centro[1]).toBeGreaterThan(3);
+    }
+  });
+
+  it('a sapata e mais larga que o montante nos dois eixos do piso', () => {
+    const s = sapatasDosMontantes(montantesDoArmazem(slots, cfg))[0];
+    expect(s.tamanho[0]).toBeGreaterThan(ESTRUTURA.montante);
+    expect(s.tamanho[2]).toBeGreaterThan(ESTRUTURA.montante);
+    expect(s.tamanho[0]).toBe(SAPATA.lado);
+  });
+
+  it('a chapa e FINA: nao levanta a estante nem rouba altura do nivel 1', () => {
+    const s = sapatasDosMontantes(montantesDoArmazem(slots, cfg))[0];
+    expect(s.tamanho[1]).toBeLessThan(ESTRUTURA.palete);
   });
 });

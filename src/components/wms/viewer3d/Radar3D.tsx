@@ -78,7 +78,10 @@ export function Radar({
   };
 
   return (
-    <Panel className="pointer-events-auto absolute bottom-3 right-3 w-[12rem] max-w-[calc(100%-1.5rem)]">
+    // Sem posição própria: quem posiciona é a coluna da direita, em `Warehouse3DViewer`.
+    // `shrink-0` para a gaveta encolher antes do radar — o radar tem altura de conteúdo,
+    // a gaveta rola.
+    <Panel className="pointer-events-auto w-[12rem] max-w-full shrink-0">
       <PanelSection padding="sm" className="space-y-2">
         <div className="flex items-center justify-between gap-2">
           {/* `aria-hidden`: o ícone repete o rótulo ao lado, e um leitor de tela que

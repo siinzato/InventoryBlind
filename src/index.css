@@ -219,6 +219,32 @@ html, body {
   font-family: 'JetBrains Mono', 'SF Mono', ui-monospace, SFMono-Regular, Menlo, monospace;
 }
 
+/* Mapa 3D em tela cheia.
+   Em fullscreen a moldura vai para a top layer e passa a SER a tela, entao o raio de
+   canto e a altura minima deixam de descrever qualquer coisa. O ::backdrop importa
+   tanto quanto: o navegador pinta preto por padrao, e com os cantos arredondados
+   sobrava um preto do tema nenhum nas quinas. Pintado com o token, ele some.
+   Regras SEPARADAS de proposito: numa lista de seletores, um seletor que o navegador
+   nao entende invalida a regra inteira, e o prefixo -webkit- derrubaria a versao sem
+   prefixo junto. */
+.hud-3d:fullscreen {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background-color: rgb(var(--surface-2));
+}
+
+.hud-3d:fullscreen::backdrop {
+  background-color: rgb(var(--surface-2));
+}
+
+.hud-3d:-webkit-full-screen {
+  width: 100%;
+  height: 100%;
+  border-radius: 0;
+  background-color: rgb(var(--surface-2));
+}
+
 /* Proper scroll containers */
 .scroll-y {
   overflow-y: auto;

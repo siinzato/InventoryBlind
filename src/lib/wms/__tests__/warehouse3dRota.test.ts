@@ -181,3 +181,57 @@ describe('subidasAteAVaga', () => {
     expect(alta.ate[1]).toBeGreaterThan(media.ate[1]);
   });
 });
+
+// ── Resolvedor de posição e cabeceira por vista ──────────────────────────────────
+//
+// A MESMA rota precisa ser desenhada na planta física, onde a vaga está em outro lugar.
+// Sem estes dois parâmetros, o traçado na planta sairia atravessado no galpão.
+
+describe('posicao injetada', () => {
+  it('usa o resolvedor recebido em vez da grade do codigo', () => {
+    const paradas = paradasDaRota(['A-m1-n1'], acervo, cfg, () => [7, 3, 9]);
+    expect(paradas[0].naVaga).toEqual([7, 3, 9]);
+    expect(paradas[0].noPiso).toEqual([7, ALTURA_DA_ROTA, 9]);
+  });
+
+  it('sem resolvedor, continua sendo a grade do codigo', () => {
+    const paradas = paradasDaRota(['A-m5-n2'], acervo, cfg);
+    expect(paradas[0].naVaga).toEqual(posicaoDaVaga(acervo[1], cfg));
+  });
+
+  it('parada que a vista nao desenha e DESCARTADA, nao vira ponto na origem', () => {
+    // Mesmo motivo de endereco desconhecido: ponto em (0,0,0) poe o operador num canto
+    // do armazem onde nao ha nada.
+    const paradas = paradasDaRota(
+      ['A-m1-n1', 'B-m3-n1'],
+      acervo,
+      cfg,
+      slot => (slot.id === 'B-m3-n1' ? null : posicaoDaVaga(slot, cfg)),
+    );
+    expect(paradas.map(p => p.slot.id)).toEqual(['A-m1-n1']);
+  });
+
+  it('a ordem 1-based ignora quem foi descartado', () => {
+    const paradas = paradasDaRota(
+      ['A-m1-n1', 'B-m3-n1', 'C-m2-n3'],
+      acervo,
+      cfg,
+      slot => (slot.id === 'A-m1-n1' ? null : posicaoDaVaga(slot, cfg)),
+    );
+    expect(paradas.map(p => p.ordem)).toEqual([1, 2]);
+  });
+});
+
+describe('cabeceira por vista', () => {
+  it('a travessia usa o Z informado em vez do da grade', () => {
+    const paradas = paradasDaRota(['A-m1-n1', 'B-m3-n1'], acervo, cfg);
+    const naPlanta = caminhoNoPiso(paradas, cfg, 0.7);
+    expect(naPlanta.some(p => p[2] === 0.7)).toBe(true);
+    expect(naPlanta.some(p => p[2] === cabeceiraZ(cfg))).toBe(false);
+  });
+
+  it('sem o parametro, a cabeceira continua a da grade', () => {
+    const paradas = paradasDaRota(['A-m1-n1', 'B-m3-n1'], acervo, cfg);
+    expect(caminhoNoPiso(paradas, cfg).some(p => p[2] === cabeceiraZ(cfg))).toBe(true);
+  });
+});

@@ -2,8 +2,24 @@ import { describe, expect, it } from 'vitest';
 import {
   AZ2027_TERREO, EXPEDICAO, LARGURA_DO_PREDIO, PROFUNDIDADE_DA_FILEIRA,
   blocosDaPlanta, comprimentoTotal, posicoesEmX, pecasDaFileira, posicoesDaFileira, NIVEIS_POR_FILEIRA,
-  vaosDaFileira, mesasDaPlanta,
+  vaosDaFileira, mesasDaPlanta, type PecaDaFileira,
 } from '../warehouse3dPlantaFisica';
+
+/**
+ * Extensão REAL da peça nos eixos X e Y, já contando o giro.
+ *
+ * A diagonal mede o comprimento inteiro em X antes de girar — comparar `tamanho[0]` cru
+ * com a profundidade da fileira acusaria uma peça fora da estante que na verdade está
+ * dentro, e um teste que acusa errado é um teste que se desliga. Girada em θ, a caixa
+ * ocupa |sx·cos| + |sy·sen| em X, e o simétrico em Y.
+ */
+const extensao = (p: PecaDaFileira): [number, number] => {
+  const t = p.rotacaoZ ?? 0;
+  const [sx, sy] = p.tamanho;
+  const c = Math.abs(Math.cos(t));
+  const s = Math.abs(Math.sin(t));
+  return [sx * c + sy * s, sx * s + sy * c];
+};
 
 describe('warehouse3dPlantaFisica - geometria lida da planta AZ 2027', () => {
   it('o conjunto tem os 45,2 m da planta', () => {
@@ -111,15 +127,59 @@ describe('pecasDaFileira - a estante decomposta', () => {
   it('nenhuma peca sai da profundidade declarada da fileira', () => {
     const b = fileira();
     for (const p of pecasDaFileira(b)) {
-      expect(p.centro[0] - p.tamanho[0] / 2).toBeGreaterThanOrEqual(b.centro[0] - b.tamanho[0] / 2 - 1e-9);
-      expect(p.centro[0] + p.tamanho[0] / 2).toBeLessThanOrEqual(b.centro[0] + b.tamanho[0] / 2 + 1e-9);
+      const [ex] = extensao(p);
+      expect(p.centro[0] - ex / 2).toBeGreaterThanOrEqual(b.centro[0] - b.tamanho[0] / 2 - 1e-9);
+      expect(p.centro[0] + ex / 2).toBeLessThanOrEqual(b.centro[0] + b.tamanho[0] / 2 + 1e-9);
     }
   });
 
   it('nenhuma peca passa da altura da fileira', () => {
     const b = fileira();
     for (const p of pecasDaFileira(b)) {
-      expect(p.centro[1] + p.tamanho[1] / 2).toBeLessThanOrEqual(b.tamanho[1] + 1e-9);
+      const [, ey] = extensao(p);
+      expect(p.centro[1] + ey / 2).toBeLessThanOrEqual(b.tamanho[1] + 1e-9);
+    }
+  });
+
+  it('a diagonal liga os DOIS montantes do quadro, de ponta a ponta', () => {
+    const b = fileira();
+    const diagonais = pecasDaFileira(b).filter(p => p.tipo === 'diagonal');
+    expect(diagonais.length).toBeGreaterThan(0);
+
+    // Travar o alcance em X é o que impede a diagonal virar enfeite: curta demais ela
+    // some entre as colunas; comprida demais, fura a lateral da estante.
+    const vaoEntreMontantes = PROFUNDIDADE_DA_FILEIRA - 0.09;
+    const nivel = b.tamanho[1] / NIVEIS_POR_FILEIRA;
+    // A caixa girada ocupa o vão MAIS a projeção da própria seção (uns 3 cm), então o
+    // alcance é uma faixa, não um ponto: tem de chegar ao outro montante sem passar dele
+    // por mais do que a espessura da peça.
+    for (const d of diagonais) {
+      const [ex, ey] = extensao(d);
+      expect(ex).toBeGreaterThanOrEqual(vaoEntreMontantes);
+      expect(ex).toBeLessThanOrEqual(vaoEntreMontantes + 0.05);
+      // E em Y ela vence um nível, que é o passo do zigue-zague, sem NUNCA passar dele:
+      // passando, a diagonal do último nível fura o topo da estante.
+      expect(ey).toBeGreaterThanOrEqual(nivel - 0.05);
+      expect(ey).toBeLessThanOrEqual(nivel);
+    }
+  });
+
+  it('o contraventamento alterna de sentido — feixe paralelo nao e trelica', () => {
+    const diagonais = pecasDaFileira(fileira()).filter(p => p.tipo === 'diagonal');
+    const sentidos = new Set(diagonais.map(d => Math.sign(d.rotacaoZ ?? 0)));
+    expect(sentidos).toEqual(new Set([1, -1]));
+  });
+
+  it('uma diagonal por nivel em cada divisa de posicao', () => {
+    const b = fileira();
+    const diagonais = pecasDaFileira(b).filter(p => p.tipo === 'diagonal');
+    expect(diagonais).toHaveLength((posicoesDaFileira(b) + 1) * NIVEIS_POR_FILEIRA);
+  });
+
+  it('so a diagonal gira: montante e longarina sao ortogonais', () => {
+    for (const p of pecasDaFileira(fileira())) {
+      if (p.tipo === 'diagonal') expect(p.rotacaoZ).toBeTruthy();
+      else expect(p.rotacaoZ ?? 0).toBe(0);
     }
   });
 

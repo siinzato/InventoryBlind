@@ -219,6 +219,26 @@ export async function boxesByBin(): Promise<Map<string, number>> {
   return map;
 }
 
+/**
+ * Quantas caixas há em UM endereço.
+ *
+ * Existe para o tempo real do mapa 3D não recarregar o armazém inteiro a cada movimento:
+ * medido em produção, `listBins()` mais `boxesByBin()` custam ~1,5 s e trazem 215 linhas
+ * para redesenhar uma vaga que mudou. Aqui vem uma.
+ *
+ * Devolve 0 para endereço sem saldo — que é o estado de uma vaga esvaziada, e é
+ * justamente o evento mais comum. `null` significaria "não sei", e a tela trataria um
+ * esvaziamento como falha de leitura.
+ */
+export async function boxesForBin(binCode: string): Promise<number> {
+  const { data, error } = await supabase
+    .from('wms_product_stock_v')
+    .select('boxes')
+    .eq('bin_code', binCode);
+  if (error) throw error;
+  return ((data ?? []) as { boxes: number }[]).reduce((total, row) => total + row.boxes, 0);
+}
+
 /** Uma linha de saldo por (endereço, SKU) — sem nome de produto, sem pack, sem data.
  *
  *  Existe separada de `boxesByBin` porque a pergunta é outra: aquela responde "quanto

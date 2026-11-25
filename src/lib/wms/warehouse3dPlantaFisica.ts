@@ -213,11 +213,22 @@ export const NIVEIS_POR_FILEIRA = 3;
 const SECAO_MONTANTE = 0.09;
 const ALTURA_DA_VIGA = 0.07;
 
+/**
+ * Seção da diagonal de contraventamento. Mais fina que o montante, como no galpão: ela
+ * trava o quadro, não sustenta carga.
+ */
+const SECAO_DA_DIAGONAL = 0.04;
+
 export interface PecaDaFileira {
-  tipo: 'montante' | 'viga';
+  tipo: 'montante' | 'viga' | 'diagonal';
   /** Centro em metros, no mesmo referencial dos blocos (origem no canto da planta). */
   centro: [number, number, number];
   tamanho: [number, number, number];
+  /**
+   * Giro em torno de Z, em radianos. Só a diagonal usa — montante e longarina são
+   * ortogonais. Ausente significa zero.
+   */
+  rotacaoZ?: number;
 }
 
 /**
@@ -255,6 +266,38 @@ export function pecasDaFileira(bloco: BlocoFisico): PecaDaFileira[] {
         tipo: 'montante',
         centro: [x, altura / 2, z],
         tamanho: [SECAO_MONTANTE, altura, SECAO_MONTANTE],
+      });
+    }
+  }
+
+  // Diagonais de contraventamento: o que faz dois montantes virarem um QUADRO.
+  //
+  // É o detalhe que distingue porta-pallets de andaime, e por muito tempo faltou aqui:
+  // sem a treliça, o par de colunas lê como duas barras soltas ligadas por prateleira.
+  // No galpão a diagonal cruza a PROFUNDIDADE — ela trava o quadro no sentido em que o
+  // pallet entra, que é para onde a estante tomba.
+  //
+  // Alternando o sentido a cada nível e a cada divisa sai o zigue-zague da estante real,
+  // em vez de um feixe de riscos paralelos.
+  const vaoDaDiagonal = profundidade - SECAO_MONTANTE;
+  const alturaDoNivelDaDiagonal = altura / NIVEIS_POR_FILEIRA;
+  // A subida é um nível MENOS a espessura da própria peça, e isso foi medido, não
+  // estimado: inclinada, a caixa ocupa em Y a subida mais a projeção da seção, e com a
+  // subida cheia a diagonal do último nível furava 1,2 cm acima do topo da estante.
+  const subidaDaDiagonal = alturaDoNivelDaDiagonal - SECAO_DA_DIAGONAL;
+  const comprimentoDaDiagonal = Math.hypot(vaoDaDiagonal, subidaDaDiagonal);
+  const anguloDaDiagonal = Math.atan2(subidaDaDiagonal, vaoDaDiagonal);
+
+  for (let i = 0; i <= posicoes; i++) {
+    const z = zInicio + i * passo;
+    for (let n = 1; n <= NIVEIS_POR_FILEIRA; n++) {
+      pecas.push({
+        tipo: 'diagonal',
+        centro: [cx, (n - 1) * alturaDoNivelDaDiagonal + alturaDoNivelDaDiagonal / 2, z],
+        // Comprida em X antes do giro: girada em torno de Z, ela se inclina no plano do
+        // quadro (X–Y), que é o plano em que os dois montantes vivem.
+        tamanho: [comprimentoDaDiagonal, SECAO_DA_DIAGONAL, SECAO_DA_DIAGONAL],
+        rotacaoZ: (i + n) % 2 === 0 ? anguloDaDiagonal : -anguloDaDiagonal,
       });
     }
   }

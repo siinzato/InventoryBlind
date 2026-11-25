@@ -5,7 +5,7 @@
 // interditada. Por isso a regra mora fora do `<Canvas>` e é conferida aqui.
 
 import { describe, it, expect } from 'vitest';
-import { buildSlots, statusDaVaga } from '../warehouse3dSlots';
+import { aplicarSaldo, buildSlots, statusDaVaga } from '../warehouse3dSlots';
 import type { StorageBin } from '../wmsService';
 
 const vaga = (over: Partial<StorageBin> = {}): StorageBin => ({
@@ -116,5 +116,70 @@ describe('buildSlots', () => {
     );
     expect(codigoPorBinId.get('id-PP-A01-N1')).toBe('PP-A01-N1');
     expect(codigoPorBinId.get('id-FORA-DO-PADRAO')).toBe('FORA-DO-PADRAO');
+  });
+});
+
+// ── Atualizacao incremental do saldo ─────────────────────────────────────────────────
+//
+// O tempo real recarregava o armazem inteiro a cada movimento: medido em producao, ~1,5 s
+// e 215 enderecos para refletir a mudanca de um. `aplicarSaldo` troca uma vaga e devolve
+// um conjunto novo — e o que importa conferir e que o STATUS acompanha o saldo, senao o
+// numero fica certo e a cor mentindo.
+
+describe('aplicarSaldo', () => {
+  const conjunto = buildSlots(
+    [
+      vaga({ code: 'PP-A01-N1' }),
+      vaga({ code: 'PP-A02-N1', capacityBoxes: 10 }),
+      vaga({ code: 'PP-A03-N1', blocked: true }),
+    ],
+    new Map([['PP-A01-N1', 5]]),
+  );
+
+  it('troca o saldo da vaga pedida e nao mexe nas outras', () => {
+    const novo = aplicarSaldo(conjunto, 'PP-A01-N1', 9);
+    expect(novo.slots.find(s => s.id === 'PP-A01-N1')?.caixas).toBe(9);
+    expect(novo.slots.find(s => s.id === 'PP-A02-N1')).toEqual(
+      conjunto.slots.find(s => s.id === 'PP-A02-N1'),
+    );
+  });
+
+  it('RECALCULA o status: vaga esvaziada vira livre', () => {
+    // Sem recalcular, ela continuaria pintada de ocupada — saldo certo, cor mentindo.
+    const novo = aplicarSaldo(conjunto, 'PP-A01-N1', 0);
+    expect(novo.slots.find(s => s.id === 'PP-A01-N1')?.status).toBe('empty');
+  });
+
+  it('estourar a capacidade acende o alerta', () => {
+    const novo = aplicarSaldo(conjunto, 'PP-A02-N1', 11);
+    expect(novo.slots.find(s => s.id === 'PP-A02-N1')?.status).toBe('divergence');
+  });
+
+  it('ocupar a capacidade inteira NAO e alerta', () => {
+    const novo = aplicarSaldo(conjunto, 'PP-A02-N1', 10);
+    expect(novo.slots.find(s => s.id === 'PP-A02-N1')?.status).toBe('occupied');
+  });
+
+  it('vaga BLOQUEADA continua bloqueada mesmo recebendo saldo', () => {
+    // Bloqueio e decisao humana na tabela de enderecos; movimento de estoque nao o altera.
+    const novo = aplicarSaldo(conjunto, 'PP-A03-N1', 4);
+    expect(novo.slots.find(s => s.id === 'PP-A03-N1')?.status).toBe('blocked');
+    expect(novo.slots.find(s => s.id === 'PP-A03-N1')?.caixas).toBe(4);
+  });
+
+  it('codigo desconhecido devolve o MESMO objeto — quem chama recarrega', () => {
+    // Pode ser vaga criada por outro operador: a tela precisa distinguir "atualizei" de
+    // "nao sei quem e".
+    expect(aplicarSaldo(conjunto, 'PP-Z99-N9', 3)).toBe(conjunto);
+  });
+
+  it('saldo igual devolve o mesmo objeto, sem render a toa', () => {
+    expect(aplicarSaldo(conjunto, 'PP-A01-N1', 5)).toBe(conjunto);
+  });
+
+  it('preserva o mapa de UUID -> codigo que o tempo real usa', () => {
+    const novo = aplicarSaldo(conjunto, 'PP-A01-N1', 2);
+    expect(novo.codigoPorBinId).toBe(conjunto.codigoPorBinId);
+    expect(novo.naoPosicionaveis).toBe(conjunto.naoPosicionaveis);
   });
 });

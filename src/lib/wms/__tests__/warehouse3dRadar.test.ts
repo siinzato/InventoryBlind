@@ -217,3 +217,96 @@ describe('caminhoDoCone', () => {
     expect(curto).not.toBe(longo);
   });
 });
+
+// ── Posicao por vista ativa ──────────────────────────────────────────────────────
+//
+// O radar e a planta de QUEM ESTA NA TELA. Com a planta fisica desenhada ele precisa
+// descrever a planta fisica, senao o "voce esta aqui" aponta para outra geometria.
+
+describe('celulasDoRadar com posicao injetada', () => {
+  const acervo = [
+    vaga({ id: 'PP-A01-N1', rua: 1, ruaCodigo: 'A', modulo: 1, nivel: 1 }),
+    vaga({ id: 'PP-B02-N1', rua: 2, ruaCodigo: 'B', modulo: 2, nivel: 1 }),
+  ];
+
+  it('usa o resolvedor recebido em vez da grade do codigo', () => {
+    const celulas = celulasDoRadar(acervo, LAYOUT_PADRAO, new Set(), s =>
+      s.id === 'PP-A01-N1' ? [1, 0, 2] : [3, 0, 4],
+    );
+    expect(celulas.map(c => [c.x, c.z])).toEqual([[1, 2], [3, 4]]);
+  });
+
+  it('sem resolvedor, continua sendo a grade do codigo', () => {
+    const celulas = celulasDoRadar(acervo, LAYOUT_PADRAO, new Set());
+    expect(celulas[0].x).toBe(0);
+    expect(celulas[1].x).toBe(LAYOUT_PADRAO.rowSpacing);
+  });
+
+  it('vaga que a vista nao desenha fica FORA do radar', () => {
+    // Melhor ausente do que desenhada na origem: um ponto no canto seria lido como
+    // posicao real, e o clique levaria a camera para la.
+    const celulas = celulasDoRadar(acervo, LAYOUT_PADRAO, new Set(), s =>
+      s.id === 'PP-A01-N1' ? null : [3, 0, 4],
+    );
+    expect(celulas).toHaveLength(1);
+    expect(celulas[0].ruaCodigo).toBe('B');
+  });
+
+  it('continua agrupando os niveis de uma mesma coluna', () => {
+    const comNiveis = [...acervo, vaga({ id: 'PP-A01-N2', rua: 1, ruaCodigo: 'A', modulo: 1, nivel: 2 })];
+    const celulas = celulasDoRadar(comNiveis, LAYOUT_PADRAO, new Set(), () => [0, 0, 0]);
+    expect(celulas.find(c => c.ruaCodigo === 'A')?.niveis).toBe(2);
+  });
+});
+
+// ── Agregacao por coluna: o alerta nao pode depender do PRIMEIRO nivel ──────────────
+//
+// A versao anterior decidia a existencia da coluna pelo primeiro nivel e agregava os
+// demais sem consultar a posicao. Os dois casos abaixo sao as duas direcoes do defeito.
+
+describe('celulasDoRadar — agregacao em duas passadas', () => {
+  const coluna = [
+    vaga({ id: 'PP-A01-N1', rua: 1, ruaCodigo: 'A', modulo: 1, nivel: 1 }),
+    vaga({ id: 'PP-A01-N2', rua: 1, ruaCodigo: 'A', modulo: 1, nivel: 2 }),
+    vaga({ id: 'PP-A01-N3', rua: 1, ruaCodigo: 'A', modulo: 1, nivel: 3, status: 'divergence' }),
+  ];
+
+  it('primeiro nivel sem posicao NAO esconde a coluna nem o alerta do nivel 3', () => {
+    const celulas = celulasDoRadar(coluna, LAYOUT_PADRAO, new Set(), s =>
+      s.nivel === 1 ? null : [2, 0, 3],
+    );
+    expect(celulas).toHaveLength(1);
+    expect(celulas[0].divergencia).toBe(true);
+    // A posicao vem do primeiro nivel QUE RESOLVE, nao do primeiro da lista.
+    expect([celulas[0].x, celulas[0].z]).toEqual([2, 3]);
+  });
+
+  it('nivel que a vista nao desenha NAO empresta o alerta dele a coluna', () => {
+    const celulas = celulasDoRadar(coluna, LAYOUT_PADRAO, new Set(), s =>
+      s.nivel === 3 ? null : [2, 0, 3],
+    );
+    expect(celulas).toHaveLength(1);
+    expect(celulas[0].divergencia).toBe(false);
+  });
+
+  it('niveis conta so o que e desenhavel', () => {
+    const celulas = celulasDoRadar(coluna, LAYOUT_PADRAO, new Set(), s =>
+      s.nivel === 2 ? null : [2, 0, 3],
+    );
+    expect(celulas[0].niveis).toBe(2);
+  });
+
+  it('o alto giro segue a mesma regra', () => {
+    const soNivel3 = new Set(['PP-A01-N3']);
+    const comN3 = celulasDoRadar(coluna, LAYOUT_PADRAO, soNivel3, () => [2, 0, 3]);
+    expect(comN3[0].altoGiro).toBe(true);
+    const semN3 = celulasDoRadar(coluna, LAYOUT_PADRAO, soNivel3, s =>
+      s.nivel === 3 ? null : [2, 0, 3],
+    );
+    expect(semN3[0].altoGiro).toBe(false);
+  });
+
+  it('coluna inteira sem posicao fica fora do radar', () => {
+    expect(celulasDoRadar(coluna, LAYOUT_PADRAO, new Set(), () => null)).toHaveLength(0);
+  });
+});

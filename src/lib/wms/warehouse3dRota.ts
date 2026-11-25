@@ -58,6 +58,16 @@ export function paradasDaRota(
   codigosEmOrdem: readonly string[],
   slots: readonly Slot[],
   cfg: Layout3DConfig,
+  /**
+   * De onde sai a posição de cada parada. Omitido, é a grade do código — que era a única
+   * geometria quando esta função nasceu.
+   *
+   * O parâmetro existe porque a MESMA rota precisa ser desenhada na planta física, onde a
+   * vaga fica em outro lugar. Devolver `null` descarta a parada, pelo mesmo motivo que
+   * endereço desconhecido é descartado: ponto de rota em (0,0,0) põe o operador num canto
+   * do armazém onde não há nada.
+   */
+  posicaoDe: (slot: Slot) => [number, number, number] | null = slot => posicaoDaVaga(slot, cfg),
 ): ParadaDaRota[] {
   const porId = new Map(slots.map(s => [s.id, s]));
   const vistos = new Set<string>();
@@ -67,8 +77,10 @@ export function paradasDaRota(
     if (vistos.has(codigo)) continue;
     const slot = porId.get(codigo);
     if (!slot) continue;
+    const posicao = posicaoDe(slot);
+    if (!posicao) continue;
     vistos.add(codigo);
-    const [x, y, z] = posicaoDaVaga(slot, cfg);
+    const [x, y, z] = posicao;
     paradas.push({
       ordem: paradas.length + 1,
       slot,
@@ -99,10 +111,21 @@ export function cabeceiraZ(cfg: Layout3DConfig): number {
  * Menos de duas paradas devolve vazio: uma linha precisa de dois pontos, e devolver um
  * ponto só faria a geometria da `<Line>` quebrar em silêncio.
  */
-export function caminhoNoPiso(paradas: readonly ParadaDaRota[], cfg: Layout3DConfig): Ponto3D[] {
+export function caminhoNoPiso(
+  paradas: readonly ParadaDaRota[],
+  cfg: Layout3DConfig,
+  /**
+   * Z da cabeceira. Omitido, é a da grade do código.
+   *
+   * Na planta física a cabeceira não é `-moduleWidth * 0,9`: as fileiras começam depois
+   * do corredor transversal de entrada do trecho, e é ali que se atravessa. Sem este
+   * parâmetro a rota desenhada na planta sairia do prédio para trocar de rua.
+   */
+  zDaCabeceira?: number,
+): Ponto3D[] {
   if (paradas.length < 2) return [];
 
-  const z0 = cabeceiraZ(cfg);
+  const z0 = zDaCabeceira ?? cabeceiraZ(cfg);
   const pontos: Ponto3D[] = [paradas[0].noPiso];
 
   for (let i = 1; i < paradas.length; i += 1) {

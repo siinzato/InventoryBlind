@@ -20,6 +20,41 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-25-mapa-3d-realce-na-planta',
+    date: '2026-11-25',
+    category: 'melhoria',
+    title: 'O endereço que você procura agora acende também na planta do galpão',
+    description: 'Quando você buscava um produto ou abria uma vaga, o destaque só existia na vista por endereço. Ao mudar para a vista da planta, que é justamente a que mostra onde aquilo fica dentro do prédio, o realce sumia e era preciso voltar atrás. Agora o endereço apontado acende nas duas vistas, com um contorno desenhado no tamanho daquela posição — então ele se enxerga de longe, mesmo com o galpão inteiro na tela. Os endereços que ficaram de fora do filtro de rua continuam desenhados e apagados, e os que não têm lugar na planta aparecem de forma diferente de quem só está fora da seleção: são duas situações distintas e agora dá para distinguir uma da outra no desenho.',
+  },
+  {
+    id: '2026-11-25-mapa-3d-caminhada-com-paredes',
+    date: '2026-11-25',
+    category: 'melhoria',
+    title: 'Caminhando no galpão, agora as estantes e as paredes te barram',
+    description: 'No modo "Caminhar no galpão" dava para atravessar uma estante como se ela não estivesse lá, e andando reto o bastante você saía pela parede e continuava caminhando no vazio, fora do prédio. Era fácil se perder e difícil julgar se um corredor era mesmo largo. Agora o galpão tem paredes e as estantes ocupam espaço: ao encostar numa, você desliza ao longo dela em vez de parar seco, que é o que acontece quando alguém raspa num porta-pallets de verdade. Você também entra sempre num ponto livre do galpão, nunca preso entre duas estantes. O resultado é que a distância percorrida passou a valer alguma coisa: se você não passa, o empilhador também não passa.',
+  },
+  {
+    id: '2026-11-25-mapa-3d-seletor-de-pavimento',
+    date: '2026-11-25',
+    category: 'novidade',
+    title: 'O mapa 3D ganhou seletor de pavimento',
+    description: 'O mapa 3D sempre mostrava o térreo, e só. Quem tem mais de um pavimento desenhado na planta não tinha como vê-los no 3D. Agora há um seletor de pavimento no mapa, e ele é honesto: se o andar escolhido ainda não tem planta publicada, o mapa diz isso em vez de repetir o desenho do térreo com outro nome. Ver um andar vazio e saber que ele está vazio é melhor do que ver o andar errado achando que é o certo.',
+  },
+  {
+    id: '2026-11-25-mapa-3d-painel-no-celular',
+    date: '2026-11-25',
+    category: 'melhoria',
+    title: 'O mapa 3D ficou utilizável no celular',
+    description: 'Na tela do celular, os controles do mapa 3D — busca, filtro de rua, legenda, botões de vista — ocupavam quase tudo e sobrava uma faixa de galpão. Agora esses controles ficam recolhidos por padrão nas telas estreitas: o mapa aparece inteiro e você abre o painel quando precisar dele, fechando em seguida. Nas telas grandes nada muda, continua tudo à vista.',
+  },
+  {
+    id: '2026-11-24-mapa-3d-estante-de-verdade',
+    date: '2026-11-24',
+    category: 'melhoria',
+    title: 'As estantes do mapa 3D agora parecem porta-pallets de verdade',
+    description: 'Na vista da planta, a estante era desenhada com colunas e travessas lisas, todas da mesma cor cinza — de longe lembrava mais um andaime do que um porta-pallets. Agora o quadro da estante tem as diagonais de travamento que ele tem no galpão, as colunas são azuis e as longarinas laranja, como na estante real, e as cores são as mesmas da vista por endereço, para a estante não mudar de aparência conforme a aba aberta. A posição vazia também mudou: em vez de um bloco preenchendo o vão, aparece o piso onde o palete apoiaria — é assim que uma estante vazia se vê de verdade, e é o que deixa à mostra a estrutura por trás. A cor da situação continua ali, agora no piso da posição, então a leitura de livre, ocupada e bloqueada não se perde. Vale a pena entrar no modo "Caminhar no galpão" para ver de perto.',
+  },
+  {
     id: '2026-11-24-mapa-3d-caminhar-no-galpao',
     date: '2026-11-24',
     category: 'novidade',

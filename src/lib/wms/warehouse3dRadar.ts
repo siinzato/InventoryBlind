@@ -44,10 +44,35 @@ export function celulasDoRadar(
   slots: readonly Slot[],
   layout: Layout3DConfig,
   idsAltoGiro: ReadonlySet<string>,
+  /**
+   * De onde sai a coordenada local de cada vaga. Omitido, é a grade do código.
+   *
+   * O radar é a planta de QUEM ESTÁ NA TELA. Com a planta física desenhada ele precisa
+   * descrever a planta física, senão o "você está aqui" aponta para uma geometria que não
+   * está sendo mostrada. `null` exclui a vaga do radar — ela não tem lugar nesta vista.
+   */
+  posicaoDe: (slot: Slot) => [number, number, number] | null = slot => posicaoDaVaga(slot, layout),
 ): CelulaRadar[] {
   const porColuna = new Map<string, CelulaRadar>();
 
+  // DUAS passadas por coluna, e a razão é um defeito que a versão anterior tinha nas duas
+  // direções:
+  //
+  //   mascarava — o primeiro nível decidia se a coluna existia. Sem posição nele, o laço
+  //   saía antes de criar a célula e o alerta se perdia; se nenhum nível posterior
+  //   resolvesse, a coluna inteira sumia do radar. Um problema no nível 3 ficava invisível
+  //   justamente no instrumento que existe para localizar problema.
+  //
+  //   super-relatava — os níveis seguintes agregavam `divergencia` e `altoGiro` SEM passar
+  //   pela resolução de posição. O radar podia acusar alerta de um nível que a vista ativa
+  //   não desenha.
+  //
+  // Agregando só sobre os níveis DESENHÁVEIS, a célula passa a descrever exatamente o que
+  // está na tela.
   for (const slot of slots) {
+    const posicao = posicaoDe(slot);
+    if (!posicao) continue;
+
     const chave = `${slot.rua}|${slot.modulo}`;
     const existente = porColuna.get(chave);
     if (existente) {
@@ -56,7 +81,8 @@ export function celulasDoRadar(
       existente.niveis += 1;
       continue;
     }
-    const [x, , z] = posicaoDaVaga(slot, layout);
+
+    const [x, , z] = posicao;
     porColuna.set(chave, {
       rua: slot.rua,
       ruaCodigo: slot.ruaCodigo,

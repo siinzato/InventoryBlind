@@ -131,3 +131,38 @@ export async function loadWarehouseSlots(): Promise<WarehouseSlots> {
   const [bins, caixas] = await Promise.all([listBins(), boxesByBin()]);
   return buildSlots(bins, caixas);
 }
+
+/**
+ * Atualiza o saldo de UMA vaga, devolvendo um conjunto novo.
+ *
+ * Existe para o tempo real não recarregar o armazém inteiro: medido em produção, a recarga
+ * completa custa ~1,5 s e traz 215 endereços para refletir a movimentação de um.
+ *
+ * ── O status é RECALCULADO, não copiado ─────────────────────────────────────────
+ * Passa pela mesma `statusDaVaga` da carga completa. Sem isso, uma vaga esvaziada
+ * continuaria pintada de "ocupada" e uma que estourou a capacidade não acenderia o alerta
+ * — o saldo estaria certo e a cor mentindo, que é pior do que o número velho.
+ *
+ * `blocked` e `capacidade` NÃO vêm do evento de saldo: bloqueio é decisão humana gravada
+ * na tabela de endereços, e um movimento de estoque não o altera. Por isso são lidos da
+ * vaga que já está na tela, e mudança neles continua exigindo recarga completa.
+ *
+ * Código desconhecido devolve o MESMO objeto, sem cópia: pode ser vaga criada por outro
+ * operador, e quem chama precisa distinguir "atualizei" de "não sei quem é" para então
+ * recarregar.
+ */
+export function aplicarSaldo(dados: WarehouseSlots, codigo: string, caixas: number): WarehouseSlots {
+  const indice = dados.slots.findIndex(s => s.id === codigo);
+  if (indice < 0) return dados;
+
+  const atual = dados.slots[indice];
+  if (atual.caixas === caixas) return dados;
+
+  const slots = [...dados.slots];
+  slots[indice] = {
+    ...atual,
+    caixas,
+    status: statusDaVaga({ blocked: atual.status === 'blocked', capacityBoxes: atual.capacidade }, caixas),
+  };
+  return { ...dados, slots };
+}

@@ -47,6 +47,10 @@ export const APP_ROUTE_BY_TAB: Record<string, string> = {
   abcxyz: '/app/operacoes/classificacao-abc-xyz',
   slotting: '/app/operacoes/warehouse-digital-twin',
   'wms-pulmao': '/app/operacoes/pulmao',
+  // Mesma TELA do pulmão, aberta direto na seção de ondas. Rota própria porque montar
+  // onda é outro trabalho (o que precisa sair) do que operar endereço (onde a caixa
+  // está) — e porque assim o link é compartilhável com quem só monta separação.
+  'wms-ondas': '/app/operacoes/ondas',
   rca: '/app/operacoes/root-cause-analysis',
   audit: '/app/operacoes/auditoria-de-estoque',
 

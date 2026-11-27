@@ -11,7 +11,7 @@
 // campo de local do Tiny continuam sendo daquele fluxo e não são lidos nem escritos aqui.
 
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
-import { BarChart3, Boxes, ChevronDown, ChevronUp, LayoutGrid, Lock, PackagePlus, Plus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
+import { BarChart3, Boxes, ChevronDown, ChevronUp, Layers, LayoutGrid, Lock, PackagePlus, Plus, Printer, Search, Trash2, Unlock, Warehouse } from 'lucide-react';
 import {
   Badge, BrandLoader, Button, Input, Notice, Page, PageHeader, Panel, PanelSection,
   SegmentedControl, Select, Stat, StatCell, StatRow, Table, Td, Th, Thead, Tr,
@@ -26,6 +26,7 @@ import {
 } from '../../lib/wms/labelLayout';
 import { useAuth } from '../../lib/auth';
 import { WmsBinOperations } from './WmsBinOperations';
+import { WmsPickingWaves } from './WmsPickingWaves';
 import { WmsAnalytics } from './WmsAnalytics';
 import { WmsStockInsights } from './WmsStockInsights';
 import { WmsStorageMap } from './WmsStorageMap';
@@ -46,12 +47,13 @@ import {
   type BinMovement, type BinStreetSpec, type StorageBin,
 } from '../../lib/wms/wmsService';
 
-type Mode = 'mapa' | 'mapa3d' | 'movimentar' | 'enderecos' | 'consulta' | 'movimentos' | 'gestao';
+type Mode = 'mapa' | 'mapa3d' | 'movimentar' | 'ondas' | 'enderecos' | 'consulta' | 'movimentos' | 'gestao';
 
 const MODES: SegmentedOption<Mode>[] = [
   { value: 'mapa', label: 'Mapa', icon: LayoutGrid },
   { value: 'mapa3d', label: 'Mapa 3D', icon: Boxes },
   { value: 'movimentar', label: 'Movimentar', icon: PackagePlus },
+  { value: 'ondas', label: 'Ondas', icon: Layers },
   { value: 'enderecos', label: 'Endereços', icon: Warehouse },
   { value: 'consulta', label: 'Consultar SKU', icon: Search },
   { value: 'movimentos', label: 'Movimentos', icon: Printer },
@@ -130,7 +132,23 @@ const MOVEMENT_LABEL: Record<BinMovement['movementType'], string> = {
 const formatDate = (iso: string): string => new Date(iso).toLocaleDateString('pt-BR');
 
 
-export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
+export function WmsPulmaoPage({
+  canManage,
+  initialMode,
+  onSectionChange,
+}: {
+  canManage: boolean;
+  /** Seção em que a tela abre. Vem da rota: `/operacoes/ondas` entra direto em Ondas. */
+  initialMode?: Mode;
+  /**
+   * Avisa a navegação de que a seção mudou.
+   *
+   * Sem isto, entrar por `/operacoes/ondas` e clicar em "Mapa" deixaria a URL e o item
+   * aceso no menu descrevendo uma tela que não está mais na frente — e o link copiado
+   * dali levaria a pessoa para o lugar errado.
+   */
+  onSectionChange?: (secao: Mode) => void;
+}) {
   const { companyId } = useAuth();
   // Veio de um QR de vaga? Abre direto em Movimentar com o endereco preenchido — e a
   // query e lida uma vez so, no primeiro render, para nao reabrir ao trocar de secao.
@@ -140,7 +158,15 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
   });
   // Escaneou um QR? Vai direto operar. Senão, o mapa e a visao que responde a pergunta
   // do dia a dia — onde tem vaga, o que esta cheio.
-  const [mode, setMode] = useState<Mode>(scannedBin ? 'movimentar' : 'mapa');
+  const [mode, setModeInterno] = useState<Mode>(initialMode ?? (scannedBin ? 'movimentar' : 'mapa'));
+
+  // Trocar de seção e avisar a navegação é UM gesto: separar os dois deixaria a URL
+  // atrasada em relação à tela sempre que alguém mudasse de seção por um atalho interno
+  // (abrir a vaga pelo mapa, por exemplo), e não só pelo seletor.
+  const setMode = useCallback((secao: Mode) => {
+    setModeInterno(secao);
+    onSectionChange?.(secao);
+  }, [onSectionChange]);
   // Vaga escolhida no mapa 3D para conferência por QR. `null` mantém o leitor fechado.
   const [scanSlot, setScanSlot] = useState<Slot | null>(null);
   // Vaga escolhida no mapa e levada para a aba Movimentar.
@@ -480,6 +506,8 @@ export function WmsPulmaoPage({ canManage }: { canManage: boolean }) {
       {mode === 'movimentar' && (
         <WmsBinOperations bins={bins} initialBinCode={operateBin || scannedBin} onMoved={load} />
       )}
+
+      {mode === 'ondas' && <WmsPickingWaves />}
 
       {mode === 'enderecos' && (
         <>

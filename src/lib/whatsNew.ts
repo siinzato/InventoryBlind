@@ -20,6 +20,20 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-27-ondas-importar-planilha-e-pdf',
+    date: '2026-11-27',
+    category: 'melhoria',
+    title: 'A lista da onda agora também entra por planilha e por PDF',
+    description: 'Na montagem da onda, além de colar a lista, dá para enviar uma planilha (.xlsx, .xls ou .csv) ou um PDF. A planilha mostra quais colunas o sistema entendeu como código e como quantidade, já preenchidas e com a primeira linha de exemplo ao lado — quando o palpite não veio do cabeçalho, aparece um aviso de "confira" para você ajustar em dois cliques. O PDF é lido na ordem da página, linha por linha. Qualquer que seja a origem, a conferência é a mesma de sempre: você vê o que entra e o que precisa de ajuste antes de gravar, corrige a linha ali mesmo pelo número dela, e nada vai para a onda sem passar por essa tela. PDF que é só imagem escaneada avisa que não tem texto para ler, em vez de ficar em silêncio. A importação automática por integração aparece como "Em breve".',
+  },
+  {
+    id: '2026-11-27-pulmao-ondas-de-separacao',
+    date: '2026-11-27',
+    category: 'novidade',
+    title: 'Ondas de separação: monte a lista, reserve o estoque e receba a rota pronta',
+    description: 'Nova aba "Ondas" no Pulmão. Cole a lista do que precisa sair — código e quantidade de caixas, no formato que vier da planilha ou da conversa — e o sistema confere linha por linha antes de gravar qualquer coisa, apontando o que precisa de ajuste com o número da linha. Quando um código de barras bate com mais de um produto do cadastro, a tela pergunta qual é, em vez de escolher sozinha. Ao reservar, o estoque é separado para esta onda (ninguém mais consegue levar aquelas caixas) e a rota já vem na ordem de caminhada do galpão: rua, módulo e nível. Se faltar saldo, a onda mostra exatamente quantas caixas ficaram descobertas e permite reservar o restante depois, quando a mercadoria chegar.',
+  },
+  {
     id: '2026-11-26-mapa-3d-mesas-editaveis',
     date: '2026-11-26',
     category: 'melhoria',

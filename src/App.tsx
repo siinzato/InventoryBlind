@@ -902,6 +902,9 @@ function AppContent() {
         { id: 'abcxyz',         label: 'Classificação ABC/XYZ', icon: <LayoutGrid />, onClick: () => { setActiveTab('abcxyz'); setMobileOpen(false); },   active: activeTab === 'abcxyz' },
         { id: 'slotting',       label: 'Warehouse Digital Twin', icon: <Warehouse />, onClick: () => { setActiveTab('slotting'); setMobileOpen(false); },     active: activeTab === 'slotting' },
         { id: 'wms-pulmao',     label: 'Pulmão (Porta-Pallet)', icon: <Boxes />,     onClick: () => { setActiveTab('wms-pulmao'); setMobileOpen(false); },   active: activeTab === 'wms-pulmao' },
+        // Atalho para a MESMA tela do Pulmão, aberta na seção de Ondas. Quem monta a
+        // separação não precisa passar pelo mapa para chegar onde trabalha.
+        { id: 'wms-ondas',      label: 'Ondas de Separação',   icon: <Layers />,    onClick: () => { setActiveTab('wms-ondas'); setMobileOpen(false); },    active: activeTab === 'wms-ondas' },
         { id: 'rca',            label: 'Root Cause Analysis',  icon: <GitBranch />, onClick: () => { setActiveTab('rca'); setMobileOpen(false); },        active: activeTab === 'rca' },
         { id: 'audit',          label: 'Auditoria de Estoque', icon: <SearchCheck />, onClick: () => { setActiveTab('audit'); setMobileOpen(false); },   active: activeTab === 'audit' },
       ],
@@ -2069,12 +2072,19 @@ function AppContent() {
         )}
 
         {/* ABA PULMÃO — PORTA-PALLET (endereçamento do excesso) */}
-        {activeTab === 'wms-pulmao' && profile && (
+        {(activeTab === 'wms-pulmao' || activeTab === 'wms-ondas') && profile && (
           <React.Suspense fallback={<PageLoader />}>
             {/* 'counting.approve' é detida por exatamente owner/admin/manager — a mesma
                 lista que as policies de INSERT/UPDATE de warehouse_storage_bins exigem.
                 A UI não oferece um botão que o banco recusaria. */}
-            <WmsPulmaoPage canManage={hasPermission(profile.role, 'counting.approve')} />
+            {/* As duas rotas caem no MESMO elemento, de propósito: dois ramos irmãos
+                fariam o React desmontar a tela a cada troca de seção, e com ela iriam
+                embora a lista de endereços carregada e a onda em montagem. */}
+            <WmsPulmaoPage
+              canManage={hasPermission(profile.role, 'counting.approve')}
+              initialMode={activeTab === 'wms-ondas' ? 'ondas' : undefined}
+              onSectionChange={secao => setActiveTab(secao === 'ondas' ? 'wms-ondas' : 'wms-pulmao')}
+            />
           </React.Suspense>
         )}
 

@@ -471,3 +471,196 @@ describe('137 — motivo padronizado e endereço desativado', () => {
   });
 });
 
+// ── Ondas de separação ────────────────────────────────────────────────────────────────
+
+const M138 = migracao('138_picking_waves');
+const M139 = migracao('139_picking_waves_rpcs');
+
+describe('138 — o domínio da onda', () => {
+  it('existe e é aditiva', () => {
+    expect(M138.length).toBeGreaterThan(0);
+    expect(M138).not.toMatch(/\bDROP\s+TABLE\b/i);
+    expect(M138).not.toMatch(/\bDROP\s+FUNCTION\b/i);
+    expect(M138).not.toMatch(/DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
+    // Não encosta no motor de saldo da Etapa 1.
+    const executavel = M138.replace(/--.*/g, ' ');
+    for (const proibido of ['FUNCTION public.wms_', 'ALTER TABLE warehouse_bin_stock', 'ALTER TABLE warehouse_bin_movements']) {
+      expect(executavel.includes(proibido)).toBe(false);
+    }
+  });
+
+  it('demanda e plano são tabelas SEPARADAS', () => {
+    // Um pedido de 10 caixas vira três paradas quando o saldo está espalhado. Juntar as
+    // duas obrigaria a reescrever a demanda toda vez que o alocador mudasse de ideia —
+    // e aí ninguém mais sabe o que foi pedido.
+    expect(M138).toContain('CREATE TABLE IF NOT EXISTS picking_wave_items');
+    expect(M138).toContain('CREATE TABLE IF NOT EXISTS picking_allocations');
+    const alloc = M138.slice(
+      M138.indexOf('CREATE TABLE IF NOT EXISTS picking_allocations'),
+      M138.indexOf('CREATE INDEX IF NOT EXISTS picking_allocations_rota_idx'),
+    );
+    expect(alloc).toContain('item_id');
+    expect(alloc).toContain('bin_id');
+    expect(alloc).toContain('reservation_id');
+  });
+
+  it('uma alocação por item e endereço', () => {
+    // `wms_pick_for_wave` consome a reserva do dono pela mais antiga: duas alocações do
+    // mesmo item no mesmo endereço gerariam reservas indistinguíveis, e a baixa de uma
+    // consumiria a outra.
+    expect(M138).toContain('CONSTRAINT picking_allocations_unique UNIQUE (item_id, bin_id)');
+  });
+
+  it('não dá para separar mais do que foi alocado', () => {
+    expect(M138).toContain('CHECK (boxes_separadas <= boxes)');
+  });
+
+  it('onda encerrada tem data de encerramento, e onda aberta não tem', () => {
+    expect(M138).toContain("CHECK ((status IN ('concluida','parcial','cancelada')) = (finished_at IS NOT NULL))");
+  });
+
+  it('a bipagem é ledger: chave de idempotência obrigatória e única', () => {
+    const eventos = M138.slice(M138.indexOf('CREATE TABLE IF NOT EXISTS picking_scan_events'));
+    expect(eventos).toContain('idempotency_key uuid NOT NULL UNIQUE');
+    // A recusa também é evento: sem ela, divergência é palavra contra palavra.
+    for (const motivo of ['endereco_errado', 'produto_errado', 'quantidade_divergente', 'ruptura']) {
+      expect(eventos).toContain(motivo);
+    }
+  });
+
+  it('escrever é só por RPC, nas quatro tabelas', () => {
+    for (const t of ['picking_waves', 'picking_wave_items', 'picking_allocations', 'picking_scan_events']) {
+      expect(M138).toMatch(new RegExp(`ALTER TABLE ${t}\\s+ENABLE ROW LEVEL SECURITY`));
+    }
+    const policies = M138.match(/CREATE POLICY \w+ ON picking_\w+\s+FOR (\w+)/g) ?? [];
+    expect(policies.length).toBe(4);
+    for (const policy of policies) expect(policy).toMatch(/FOR SELECT/);
+    expect(M138).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE[\s\S]{0,200}FROM public, anon, authenticated/);
+  });
+
+  it('a view da rota respeita a RLS de quem pergunta', () => {
+    const view = M138.slice(M138.indexOf('CREATE OR REPLACE VIEW picking_wave_route_v'));
+    expect(view.slice(0, view.indexOf('AS'))).toContain('security_invoker = true');
+  });
+});
+
+describe('139 — o comportamento da onda', () => {
+  it('fecha a escrita que a 138 deixou aberta na view', () => {
+    // Medido: o REVOKE da 138 nomeou as tabelas e esqueceu a view criada abaixo.
+    expect(M139).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE\s+ON picking_wave_route_v FROM public, anon, authenticated/);
+  });
+
+  it('a chave de caminhada é rua, módulo, nível — nessa ordem', () => {
+    const corpo = fnBody('wms_bin_route_key');
+    expect(corpo).toContain('IMMUTABLE');
+    expect(corpo).toContain("v_rua || lpad(v_modulo::text, 4, '0') || lpad(v_nivel::text, 3, '0')");
+    // Código ilegível vai para o FIM, nunca para o começo: uma parada que o sistema não
+    // sabe localizar não pode abrir a caminhada do operador.
+    expect(corpo).toContain("RETURN 'ZZZZ'");
+  });
+
+  it('serpentina existe e vem DESLIGADA', () => {
+    expect(fnBody('wms_bin_route_key')).toContain('p_serpentina boolean DEFAULT false');
+    expect(fnBody('picking_wave_reserve')).toContain('p_serpentina boolean DEFAULT false');
+  });
+
+  it('o resolvedor devolve CANDIDATOS, no plural', () => {
+    // Foram medidos 199 EANs repetidos entre produtos: escolher o primeiro em silêncio é
+    // separar o produto errado com a bênção do sistema.
+    expect(fnBody('picking_resolve_product')).toContain('candidatos');
+    expect(fnBody('picking_resolve_product')).toContain('jsonb_agg');
+  });
+
+  it('o alocador segue FIFO e pula endereço bloqueado ou desativado', () => {
+    const corpo = fnBody('picking_alocar_item');
+    expect(corpo).toContain('ORDER BY v.first_stored_at');
+    expect(corpo).toContain('NOT v.bin_blocked');
+    expect(corpo).toContain('v.bin_is_active');
+    // SECURITY DEFINER não herda RLS, e a view de disponibilidade é security_invoker:
+    // dentro da função o usuário efetivo é o dono, que não sofre RLS.
+    expect(corpo).toContain('v.company_id = v_company');
+  });
+
+  it('reservar usa o motor da Etapa 1, não um caminho paralelo', () => {
+    expect(fnBody('picking_alocar_item')).toContain('wms_reserve_stock(');
+    expect(fnBody('picking_wave_pick')).toContain('wms_pick_for_wave(');
+    expect(fnBody('picking_wave_finish')).toContain("wms_release_reservation('onda'");
+    expect(fnBody('picking_wave_cancel')).toContain("wms_release_reservation('onda'");
+    // Nada de mexer no saldo por fora.
+    for (const fn of ['picking_alocar_item', 'picking_wave_pick', 'picking_wave_finish', 'picking_wave_cancel']) {
+      expect(fnBody(fn)).not.toContain('UPDATE warehouse_bin_stock');
+      expect(fnBody(fn)).not.toContain('INSERT INTO warehouse_bin_movements');
+    }
+  });
+
+  it('recusa é RETORNO, nunca exceção', () => {
+    // RAISE desfaria o INSERT do evento que registra a própria recusa — o log de
+    // divergência nunca chegaria ao banco, que é o motivo de ele existir.
+    const corpo = fnBody('picking_wave_pick');
+    for (const motivo of ['endereco_errado', 'produto_errado', 'quantidade_divergente']) {
+      const trecho = corpo.slice(corpo.indexOf(`'${motivo}', p_idempotency_key`));
+      const ate = trecho.slice(0, trecho.indexOf('END IF;'));
+      expect(ate).toContain('RETURN jsonb_build_object');
+      expect(ate).not.toContain('RAISE EXCEPTION');
+    }
+  });
+
+  it('a recusa não entrega o gabarito', () => {
+    // Cegueira de identidade: dizer "o esperado era X" transforma a conferência em
+    // tentativa e erro.
+    const corpo = fnBody('picking_wave_pick');
+    expect(corpo).toContain("'O produto bipado não é o desta parada'");
+    expect(corpo).not.toMatch(/mensagem[^)]*v_a\.(sku|product_id)/);
+  });
+
+  it('idempotência vem antes de qualquer escrita', () => {
+    const corpo = fnBody('picking_wave_pick');
+    const checagem = corpo.indexOf('FROM picking_scan_events WHERE idempotency_key');
+    const primeiraEscrita = corpo.indexOf('INSERT INTO picking_scan_events');
+    expect(checagem).toBeGreaterThan(-1);
+    expect(primeiraEscrita).toBeGreaterThan(checagem);
+  });
+
+  it('ruptura devolve a reserva e tenta outro endereço', () => {
+    const corpo = fnBody('picking_wave_pick');
+    expect(corpo).toContain("wms_release_reservation_line(v_a.reservation_id, 'ruptura')");
+    expect(corpo).toContain('picking_alocar_item(v_a.item_id)');
+    expect(corpo).toContain('picking_resequenciar(v_a.wave_id)');
+  });
+
+  it('fechar e cancelar não deixam reserva aberta para trás', () => {
+    // Saldo prometido a uma onda que acabou é saldo preso que nenhuma tela explica.
+    for (const fn of ['picking_wave_finish', 'picking_wave_cancel']) {
+      expect(fnBody(fn)).toContain('wms_release_reservation');
+    }
+  });
+
+  it('toda RPC passa pela guarda de papel e fixa o search_path', () => {
+    for (const fn of ['picking_resolve_product','picking_wave_create','picking_wave_add_item',
+                      'picking_wave_remove_item','picking_wave_reserve','picking_wave_pick',
+                      'picking_wave_finish','picking_wave_cancel']) {
+      const corpo = fnBody(fn);
+      expect(corpo).toContain('SECURITY DEFINER');
+      expect(corpo).toContain("SET search_path TO 'public'");
+      expect(corpo).toContain('wms_require_operator()');
+    }
+  });
+
+  it('as peças internas não são RPC', () => {
+    // Expor o alocador seria deixar reservar saldo sem onda que responda por ele.
+    for (const fn of ['wms_bin_route_key(text, boolean)', 'picking_alocar_item(uuid)', 'picking_resequenciar(uuid, boolean)']) {
+      const revoke = M139.split('\n').find(l => l.includes(`REVOKE ALL ON FUNCTION public.${fn}`)) ?? '';
+      expect(revoke).toContain('FROM public, anon, authenticated;');
+      expect(M139).not.toMatch(new RegExp(`GRANT EXECUTE ON FUNCTION public\\.${fn.replace(/[().,*+?^$|[\]\\]/g, '\\$&')}`));
+    }
+  });
+
+  it('nenhuma RPC é concedida a anon', () => {
+    expect(M139).not.toMatch(/GRANT[^;]*\bTO\b[^;]*\banon\b/i);
+    // E todo REVOKE nomeia authenticated: revogar só de `public` não tira o privilégio
+    // que o ALTER DEFAULT PRIVILEGES do Supabase concede a toda função nova.
+    const revokes = M139.match(/REVOKE ALL ON FUNCTION[^;]+;/g) ?? [];
+    expect(revokes.length).toBeGreaterThan(0);
+    for (const revoke of revokes) expect(revoke).toContain('authenticated');
+  });
+});

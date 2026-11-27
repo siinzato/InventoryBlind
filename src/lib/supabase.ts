@@ -1,4 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from './database.types';
 import type {
   BrandData, RcaSourceModule, RcaProcessArea, RcaCauseCategory, RcaSeverity, RcaClassificationStatus,
   RcaFiveWhysTriggerType, RcaFiveWhysStatus, RcaRecord,
@@ -26,6 +28,24 @@ if (!supabaseUrl || !supabaseAnonKey) {
 }
 
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
+
+/**
+ * O MESMO client, com o schema REAL do banco anexado.
+ *
+ * ── Por que dois exports e não um client tipado ────────────────────────────────
+ * Ligar o genérico em `supabase` acende 201 erros de tipo em 30 módulos — medido, não
+ * estimado. Nenhum deles é "coluna não existe": são tipos escritos à mão que dizem
+ * não-nulo onde a coluna aceita nulo, e `jsonb` lido como interface. É dívida real, com
+ * dono, e corrigi-la não é pré-requisito para o estoque endereçado.
+ *
+ * Então o código NOVO (WMS, picking, reserva) importa `db` e tem o schema conferido pelo
+ * compilador; o legado segue em `supabase` até ser migrado módulo a módulo. É o mesmo
+ * objeto em runtime — não há segunda conexão, segunda sessão nem segundo cache.
+ *
+ * Em saldo de estoque, coluna renomeada que vira `undefined` silencioso não é tela
+ * quebrada: é furo de inventário.
+ */
+export const db = supabase as SupabaseClient<Database>;
 
 // Types
 

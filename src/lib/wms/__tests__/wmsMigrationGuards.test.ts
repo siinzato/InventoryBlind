@@ -18,11 +18,27 @@ const M116 = (
   MIGRATIONS[Object.keys(MIGRATIONS).find(p => p.includes('116_wms_pulmao_enderecado')) ?? ''] ?? ''
 ).replace(/\r\n/g, '\n');
 
+/**
+ * O corpo da função como ela está declarada POR ÚLTIMO.
+ *
+ * Lia só a 116, e isso era uma armadilha: no dia em que uma migration posterior
+ * redeclarasse `wms_bin_pick` — e a 136 redeclara — as guardas continuariam passando
+ * contra um texto morto. Teste que afirma sobre uma declaração substituída não protege
+ * nada, e passa verde enquanto a função viva faz outra coisa.
+ *
+ * Varre as migrations em ordem de nome (= ordem de versão) e devolve a ÚLTIMA.
+ */
+const ARQUIVOS_EM_ORDEM = Object.keys(MIGRATIONS).sort();
+
 const fnBody = (name: string): string => {
-  const start = M116.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
-  if (start < 0) return '';
-  const end = M116.indexOf('$function$;', start);
-  return M116.slice(start, end < 0 ? undefined : end);
+  for (const caminho of [...ARQUIVOS_EM_ORDEM].reverse()) {
+    const sql = MIGRATIONS[caminho].replace(/\r\n/g, '\n');
+    const start = sql.indexOf(`CREATE OR REPLACE FUNCTION public.${name}`);
+    if (start < 0) continue;
+    const end = sql.indexOf('$function$;', start);
+    return sql.slice(start, end < 0 ? undefined : end);
+  }
+  return '';
 };
 
 describe('116 — existe e é aditiva', () => {
@@ -210,3 +226,248 @@ describe('118 — capacidade não cai abaixo do que já está guardado', () => {
     expect(executavel).not.toContain('wms_bin_transfer');
   });
 });
+
+// ── Reserva de estoque ────────────────────────────────────────────────────────────────
+
+const migracao = (trecho: string): string =>
+  (MIGRATIONS[Object.keys(MIGRATIONS).find(p => p.includes(trecho)) ?? ''] ?? '').replace(/\r\n/g, '\n');
+
+const M134 = migracao('134_wms_reserva_disponibilidade');
+const M135 = migracao('135_wms_revoke_expire_reservations');
+const M136 = migracao('136_wms_pick_ciente_de_reserva');
+
+describe('134 — reserva e disponibilidade', () => {
+  it('existe e é aditiva', () => {
+    expect(M134.length).toBeGreaterThan(0);
+    expect(M134).not.toMatch(/\bDROP\s+TABLE\b/i);
+    expect(M134).not.toMatch(/DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
+    // TRUNCATE só pode aparecer como privilégio REVOGADO. A 116 proíbe a palavra inteira,
+    // e aqui isso acusaria justamente a linha que TIRA o privilégio de esvaziar a tabela —
+    // guarda que reprova a correção é guarda que acaba desligada.
+    const semConcessoes = M134.replace(/^\s*(REVOKE|GRANT)[\s\S]*?;$/gim, ' ');
+    expect(semConcessoes).not.toMatch(/\bTRUNCATE\b/i);
+    // Não redeclara as RPCs de produção: isso é assunto da 136, sozinha.
+    const executavel = M134.replace(/--.*/g, ' ');
+    expect(executavel).not.toContain('FUNCTION public.wms_bin_pick');
+    expect(executavel).not.toContain('FUNCTION public.wms_bin_putaway');
+  });
+
+  it('reserva tem sempre endereço e dono', () => {
+    const tabela = M134.slice(
+      M134.indexOf('CREATE TABLE IF NOT EXISTS warehouse_stock_reservations'),
+      M134.indexOf('COMMENT ON TABLE'),
+    );
+    expect(tabela).toMatch(/bin_id\s+uuid NOT NULL/);
+    expect(tabela).toMatch(/owner_id\s+uuid NOT NULL/);
+    expect(tabela).toMatch(/owner_kind\s+text NOT NULL/);
+    // Reserva liquidada sem data (ou aberta com data) é estado que não se audita.
+    expect(tabela).toContain("CHECK ((status = 'aberta') = (settled_at IS NULL))");
+  });
+
+  it('escrever reserva é só por RPC, como o saldo', () => {
+    expect(M134).toContain('ALTER TABLE warehouse_stock_reservations ENABLE ROW LEVEL SECURITY');
+    const policies = M134.match(/CREATE POLICY \w+ ON warehouse_stock_reservations\s+FOR (\w+)/g) ?? [];
+    expect(policies.length).toBeGreaterThan(0);
+    for (const policy of policies) expect(policy).toMatch(/FOR SELECT/);
+    expect(M134).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE\s+ON warehouse_stock_reservations FROM anon, authenticated/);
+  });
+
+  it('fecha a escrita direta que estava aberta no saldo', () => {
+    expect(M134).toMatch(/REVOKE INSERT, UPDATE, DELETE, TRUNCATE\s+ON warehouse_bin_stock, warehouse_bin_movements FROM anon, authenticated/);
+  });
+
+  it('disponível é derivado, e a view respeita a RLS de quem pergunta', () => {
+    for (const view of ['wms_bin_availability_v', 'wms_product_availability_v']) {
+      const corpo = M134.slice(M134.indexOf('CREATE OR REPLACE VIEW ' + view));
+      expect(corpo.slice(0, corpo.indexOf('AS'))).toContain('security_invoker = true');
+    }
+    // Disponível NÃO pode existir como coluna em lugar nenhum.
+    expect(M134).not.toMatch(/ADD COLUMN\s+boxes_(reservado|disponivel)/i);
+  });
+
+  it('reservar trava o saldo antes de decidir', () => {
+    const corpo = fnBody('wms_reserve_stock');
+    expect(corpo).toContain('v_company := wms_require_operator();');
+    expect(corpo).toContain('FOR UPDATE');
+    expect(corpo).toContain('v_reservado + p_boxes > v_boxes');
+    // Endereço bloqueado não vira promessa de separação.
+    expect(corpo).toContain('wms_resolve_bin(v_company, p_bin_code, true)');
+  });
+});
+
+describe('135 — a varredura não é ação de tela', () => {
+  it('revoga de authenticated por nome, não só de public', () => {
+    // O ALTER DEFAULT PRIVILEGES do Supabase concede EXECUTE a anon e authenticated em
+    // toda função nova: revogar de `public` deixa authenticated com o privilégio. Isto
+    // foi MEDIDO chamando a função pela sessão do app, não deduzido.
+    expect(M135).toMatch(/REVOKE ALL ON FUNCTION public\.wms_expire_reservations\(\) FROM public, anon, authenticated/);
+    expect(M135).toMatch(/GRANT EXECUTE ON FUNCTION public\.wms_expire_reservations\(\) TO service_role/);
+    expect(M135).not.toMatch(/GRANT[^;]*wms_expire_reservations[^;]*TO[^;]*authenticated/);
+  });
+});
+
+describe('136 — separação ciente de reserva', () => {
+  it('não cria sobrecarga do pick: a assinatura continua a de quatro argumentos', () => {
+    // CREATE OR REPLACE com outro número de argumentos não substitui, cria sobrecarga —
+    // e aí TODA chamada de quatro argumentos passa a falhar com "function is not unique".
+    const assinatura = M136.slice(
+      M136.indexOf('CREATE OR REPLACE FUNCTION public.wms_bin_pick'),
+      M136.indexOf('RETURNS uuid'),
+    );
+    expect(assinatura).toContain('p_bin_code');
+    expect(assinatura).toContain('p_product_id');
+    expect(assinatura).toContain('p_boxes');
+    expect(assinatura).toContain('p_reason');
+    expect(assinatura).not.toContain('p_owner');
+    expect(M136).not.toMatch(/\bDROP\s+FUNCTION\b/i);
+  });
+
+  it('a regra é uma só, e vale nos dois caminhos', () => {
+    // físico restante >= reservado aberto. É ela que impede tanto a retirada avulsa de
+    // comer reserva quanto o endereço de zerar deixando reserva órfã.
+    expect(fnBody('wms_bin_pick')).toContain('v_boxes - p_boxes < v_abertas');
+  });
+
+  it('o pick continua honrando as invariantes antigas', () => {
+    // A 116 já exigia isto; como a 136 redeclara a função, a exigência tem de sobreviver
+    // à nova declaração — é exatamente o que se perde em silêncio numa redeclaração.
+    const pick = fnBody('wms_bin_pick');
+    expect(pick).toContain('v_company := wms_require_operator();');
+    expect(pick).toContain('SECURITY DEFINER');
+    expect(pick).toContain("SET search_path TO 'public'");
+    expect(pick).toContain('FOR UPDATE');
+    expect(pick).toContain('wms_resolve_bin(v_company, p_bin_code, false)');
+    // A baixa registra uma SAÍDA do endereço, com quem fez. Asserção por partes e não
+    // pela linha inteira: a 137 acrescentou `movement_reason` no mesmo INSERT, e travar
+    // o texto exato transformaria qualquer acréscimo legítimo em falha — guarda que
+    // reprova a evolução acaba desligada.
+    expect(pick).toContain("INSERT INTO warehouse_bin_movements");
+    expect(pick).toContain("'saida'");
+    expect(pick).toContain('from_bin_id');
+    expect(pick).toContain('auth.uid()');
+  });
+
+  it('consumo parcial divide a linha em vez de marcar a reserva inteira', () => {
+    const onda = fnBody('wms_pick_for_wave');
+    expect(onda).toContain("status = 'consumida'");
+    expect(onda).toContain('SET boxes = boxes - v_restante');
+    expect(onda).toContain('INSERT INTO warehouse_stock_reservations');
+    // Mais antiga primeiro: consumir a mais nova deixaria a velha envelhecendo presa.
+    expect(onda).toContain('ORDER BY created_at, id');
+  });
+
+  it('a onda trava o saldo antes das reservas', () => {
+    const onda = fnBody('wms_pick_for_wave');
+    const saldo = onda.indexOf('FROM warehouse_bin_stock');
+    const reservas = onda.indexOf('FROM warehouse_stock_reservations');
+    expect(saldo).toBeGreaterThan(-1);
+    expect(reservas).toBeGreaterThan(saldo);
+  });
+
+  it('a baixa continua existindo em um lugar só', () => {
+    const onda = fnBody('wms_pick_for_wave');
+    expect(onda).toContain('wms_bin_pick(p_bin_code, p_product_id, p_boxes, p_reason)');
+    // Nada de DELETE/UPDATE de saldo nem INSERT de movimento duplicado aqui dentro.
+    expect(onda).not.toContain('DELETE FROM warehouse_bin_stock');
+    expect(onda).not.toContain('INSERT INTO warehouse_bin_movements');
+  });
+
+  it('endereço que zera não deixa reserva órfã passar calada', () => {
+    expect(fnBody('wms_pick_for_wave')).toContain('estado inconsistente, operação desfeita');
+  });
+
+  it('a RPC nova revoga de authenticated por nome antes de conceder', () => {
+    expect(M136).toMatch(/REVOKE ALL ON FUNCTION public\.wms_pick_for_wave\([^)]*\) FROM public, anon, authenticated/);
+    expect(M136).toMatch(/GRANT EXECUTE ON FUNCTION public\.wms_pick_for_wave\([^)]*\) TO authenticated/);
+  });
+});
+
+const M137 = migracao('137_wms_motivo_padrao_e_endereco_inativo');
+
+describe('137 — motivo padronizado e endereço desativado', () => {
+  it('existe e é aditiva', () => {
+    expect(M137.length).toBeGreaterThan(0);
+    expect(M137).not.toMatch(/\bDROP\s+TABLE\b/i);
+    expect(M137).not.toMatch(/\bDROP\s+FUNCTION\b/i);
+    expect(M137).not.toMatch(/DISABLE\s+ROW\s+LEVEL\s+SECURITY/i);
+  });
+
+  it('NÃO trava a nota humana em lista fechada', () => {
+    // `wms_nfe_putaway` grava 'Recebimento NF-e <numero>' em `reason`. Um CHECK ali
+    // recusaria todo recebimento de nota fiscal — o módulo parado para padronizar um
+    // rótulo. A lista fechada vive em `movement_reason`, que é outro eixo.
+    const checks = M137.match(/CHECK \([^;]*\)/g) ?? [];
+    expect(checks.length).toBeGreaterThan(0);
+    for (const check of checks) {
+      expect(check).not.toMatch(/\breason\b(?!_)/);
+    }
+  });
+
+  it('a coluna nasce anulável, é preenchida, e só então trava', () => {
+    const add = M137.indexOf('ADD COLUMN IF NOT EXISTS movement_reason');
+    const backfill = M137.indexOf('SET movement_reason = CASE');
+    const notNull = M137.indexOf('ALTER COLUMN movement_reason SET NOT NULL');
+    expect(add).toBeGreaterThan(-1);
+    expect(backfill).toBeGreaterThan(add);
+    expect(notNull).toBeGreaterThan(backfill);
+    // Sem DEFAULT: INSERT que esqueça de classificar tem de FALHAR, não herdar um
+    // motivo plausível.
+    expect(M137.slice(add, backfill)).not.toMatch(/DEFAULT/i);
+  });
+
+  it('o motivo tem de combinar com a forma do movimento', () => {
+    const shape = M137.slice(M137.indexOf('warehouse_bin_movements_reason_shape'));
+    expect(shape).toContain("movement_type = 'entrada'");
+    expect(shape).toContain("movement_type = 'saida'");
+    expect(shape).toContain("movement_type = 'transferencia'");
+    // Uma entrada classificada como separação somaria caixa que entrou dentro do que saiu.
+    expect(shape).not.toMatch(/'entrada'[^)]*'separacao'/);
+  });
+
+  it('quem escreve classifica, e a onda reclassifica', () => {
+    expect(fnBody('wms_bin_putaway')).toContain("'entrada', 'recebimento'");
+    expect(fnBody('wms_bin_pick')).toContain("'saida', 'abastecimento'");
+    expect(fnBody('wms_bin_transfer')).toContain("'transferencia', 'transferencia'");
+    // Classificar pelo texto de p_reason deixaria a estatística depender de como o
+    // operador escreveu a observação. Quem sabe que é onda é a função da onda.
+    expect(fnBody('wms_pick_for_wave')).toContain("SET movement_reason = 'separacao'");
+  });
+
+  it('endereço desativado recusa ENTRAR e nunca recusa SAIR', () => {
+    // Travar a saída prenderia o saldo residual dentro do endereço desativado — o
+    // oposto do que desativar significa.
+    expect(fnBody('wms_bin_putaway')).toContain('AND is_active');
+    expect(fnBody('wms_bin_transfer')).toContain('AND is_active');
+    expect(fnBody('wms_bin_pick')).not.toContain('AND is_active');
+    // Na transferência a exigência é do DESTINO, nunca da origem.
+    const transfer = fnBody('wms_bin_transfer');
+    const guarda = transfer.slice(transfer.indexOf('AND is_active') - 200, transfer.indexOf('AND is_active') + 120);
+    expect(guarda).toContain('v_to');
+    expect(guarda).not.toContain('WHERE id = v_from AND is_active');
+  });
+
+  it('a reserva também não some pela porta da transferência', () => {
+    // A reserva aponta para um endereço. Sem esta guarda, mover a mercadoria seria o
+    // caminho aberto para esvaziar o que uma onda já prometeu.
+    expect(fnBody('wms_bin_transfer')).toContain('libere a reserva antes de transferir');
+  });
+
+  it('as invariantes antigas sobrevivem à redeclaração', () => {
+    for (const fn of ['wms_bin_putaway', 'wms_bin_pick', 'wms_bin_transfer']) {
+      const corpo = fnBody(fn);
+      expect(corpo).toContain('v_company := wms_require_operator();');
+      expect(corpo).toContain('SECURITY DEFINER');
+      expect(corpo).toContain("SET search_path TO 'public'");
+    }
+    // A idade do lote continua sem rejuvenescer.
+    expect(fnBody('wms_bin_transfer')).toContain('LEAST(warehouse_bin_stock.first_stored_at, EXCLUDED.first_stored_at)');
+    const putaway = fnBody('wms_bin_putaway');
+    const doUpdate = putaway.slice(putaway.indexOf('ON CONFLICT (company_id, bin_id, product_id) DO UPDATE'));
+    expect(doUpdate.slice(0, doUpdate.indexOf(';'))).not.toContain('first_stored_at');
+    // E o pack misto continua recusado.
+    for (const fn of ['wms_bin_putaway', 'wms_bin_transfer']) {
+      expect(fnBody(fn)).toContain('units_per_box IS DISTINCT FROM');
+    }
+  });
+});
+

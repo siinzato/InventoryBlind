@@ -42,15 +42,15 @@ import { assinarMudancasDoPulmao } from '../../lib/wms/warehouse3dRealtime';
 import {
   VAGA, baseDaRua, carregarLayout, posicaoDaVaga, salvarLayout, type Layout3DConfig,
 } from '../../lib/wms/warehouse3dLayout';
-import { boxesForBin, searchStock } from '../../lib/wms/wmsService';
+import { boxesForBin, deleteBins, searchStock } from '../../lib/wms/wmsService';
 import { listarPecas, salvarPecas } from '../../lib/wms/builderObjects';
 // A ponte com o Slotting: a planta do armazém é UMA só, e quem a edita é o configurador
 // 2D. O 3D lê a publicada em vez de manter uma segunda verdade sobre o mesmo galpão.
 import { getPublishedLayout, getFloorPlanSignedUrl } from '../../lib/slottingLayoutService';
 // A planta como geometria: as fileiras vêm das medidas, não do código da vaga.
 import {
-  AZ2027_TERREO, blocosDaPlanta, comprimentoTotal, equipamentosDaExpedicao, LARGURA_DO_PREDIO,
-  mesasDaPlanta,
+  AZ2027_TERREO, blocosDaPlanta, comprimentoTotal, LARGURA_DO_PREDIO, mesasDaPlanta,
+  type BlocoFisico,
 } from '../../lib/wms/warehouse3dPlantaFisica';
 // As medidas da planta vêm do banco; a constante acima fica como retrato e como fallback.
 import {
@@ -64,6 +64,13 @@ import {
 } from '../../lib/wms/warehouse3dCoordenadas';
 // A regra de destaque, compartilhada pelas duas vistas.
 import { destaqueDaVaga, type ContextoDeDestaque } from '../../lib/wms/warehouse3dDestaque';
+// A aritmetica do Modo Construcao: pegada, encaixe e colisao. Fora do componente porque
+// e o que decide se um clique constroi, e isso nao se confere por screenshot.
+import {
+  QUARTO_DE_VOLTA, alvoDeExclusao, codigosDaMesmaPosicao, deLado, encaixar, lugarLivre,
+  normalizarRotacao, pegadaDaPeca, posicaoDoCodigo,
+  type Pegada, type PecaComPegada,
+} from '../../lib/wms/warehouse3dBuilder';
 // Cerca do prédio e colisão da caminhada. As paredes da cena são cenário, não o galpão.
 import {
   caixasDaPlanta, cercaDaPlanta, cercaDeContorno, type CaixaPlana,
@@ -89,7 +96,8 @@ import { type FundoDaCena } from './WarehouseEnvironment';
 // Cor, catálogo e medidas em `aparencia`; objetos de GPU em `recursos3d`; tudo que vive
 // dentro do `<Canvas>` em `Cena3D`. Este arquivo ficou com estado, carregamento e HUD.
 import {
-  ANDAR_INICIAL, CORES_DE_ESTANTE, COR_ATENUADA, COR_BUSCA, COR_PULSO, DURACAO_PULSO,
+  ANDAR_INICIAL, CATALOGO, CORES_DE_ESTANTE, COR_ATENUADA, COR_BUSCA, COR_PULSO,
+  DURACAO_PULSO, ESTANTES,
   LARGURA_ESTREITA,
   MARGEM_DA_CERCA,
   corDaVaga,
@@ -361,6 +369,14 @@ export function Warehouse3DViewer({
   const [ferramenta, setFerramenta] = useState<FerramentaBuilder>('navegar');
   const [objetos, setObjetos] = useState<ObjetoConstruido[]>([]);
   const [selecionadoNoBuilder, setSelecionadoNoBuilder] = useState<string | null>(null);
+  /**
+   * Id da peça sendo arrastada.
+   *
+   * Enquanto existe, a órbita fica DESLIGADA: girar a câmera e mover a peça com o mesmo
+   * botão do mouse é uma disputa que a peça perde — o OrbitControls escuta no canvas e
+   * não vê o `stopPropagation` do objeto.
+   */
+  const [arrastando, setArrastando] = useState<string | null>(null);
   // Tipo e cor valem para a PRÓXIMA peça e para a selecionada: escolher antes de colocar
   // e corrigir depois de colocar são as duas formas de usar isto, e as duas precisam
   // funcionar sem obrigar a excluir e refazer.
@@ -380,7 +396,32 @@ export function Warehouse3DViewer({
     setObjetos([]);
     setSelecionadoNoBuilder(null);
     listarPecas(andar).then(salvas => {
-      if (cancelado || salvas.length === 0) return;
+      if (cancelado) return;
+      // ── As bancadas da planta nascem como PEÇA, não como cenário ───────────────
+      //
+      // Elas eram desenho fixo: clicar não selecionava, o gerenciador dizia "0 peças"
+      // com quatro mesas na tela, e excluir era impossível porque não havia o que
+      // excluir. Agora o pavimento sem esboço salvo começa COM elas na lista — mesmo id,
+      // mesmo lugar, mesma medida — e dali em diante elas movem, giram e saem como
+      // qualquer outra peça. Salvar fixa o estado; sair sem salvar devolve as quatro.
+      if (salvas.length === 0) {
+        const [dx, , dz] = offsetDaPlanta(LARGURA_DO_PREDIO, comprimentoTotal(plantaMedida.trechos));
+        setObjetos(
+          mesasDaPlanta(plantaMedida.trechos).map(m => ({
+            id: m.id,
+            tipo: 'mesa' as TipoConstruido,
+            // Mesa ignora variante e cor de estante; ficam no padrão.
+            estante: 'simples' as TipoDeEstante,
+            cor: CORES_DE_ESTANTE[0].chave,
+            // A camada de construção vive em coordenada de MUNDO; a planta, na sua
+            // própria. Sem o deslocamento, a mesa nasceria fora do galpão.
+            x: m.centro[0] + dx,
+            z: m.centro[2] + dz,
+            rotacaoY: 0,
+          })),
+        );
+        return;
+      }
       setObjetos(salvas.map(p => ({
         id: p.id,
         tipo: p.tipo as TipoConstruido,
@@ -392,7 +433,9 @@ export function Warehouse3DViewer({
       })));
     });
     return () => { cancelado = true; };
-  }, [andar]);
+    // `plantaMedida` entra porque a semente das bancadas sai dela: a planta chega depois
+    // da primeira pintura, e sem a dependência o pavimento ficaria sem as quatro mesas.
+  }, [andar, plantaMedida]);
 
   const salvarConstrucao = useCallback(async () => {
     setErroAoSalvar(null);
@@ -411,72 +454,6 @@ export function Warehouse3DViewer({
   // e um contador é reproduzível quando se está depurando o que foi colocado onde.
   const proximoIdDoObjeto = useRef(1);
 
-  const construirObjeto = useCallback(
-    (x: number, z: number) => {
-      setFerramenta(atual => {
-        if (atual === 'navegar') return atual;
-        const id = `obj-${proximoIdDoObjeto.current++}`;
-        setObjetos(lista => [
-          ...lista,
-          { id, tipo: atual, estante: estanteEscolhida, cor: corEscolhida, x, z, rotacaoY: 0 },
-        ]);
-        setSelecionadoNoBuilder(id);
-        return atual;
-      });
-    },
-    [estanteEscolhida, corEscolhida],
-  );
-
-  /** Troca tipo ou cor da peça selecionada, para corrigir sem excluir e refazer. */
-  const ajustarObjeto = useCallback((id: string, patch: Partial<Pick<ObjetoConstruido, 'estante' | 'cor'>>) => {
-    setObjetos(lista => lista.map(o => (o.id === id ? { ...o, ...patch } : o)));
-  }, []);
-
-  /** Id da peça selecionada SE ela for porta-pallets — tipo e cor só valem para estante. */
-  const selecionadoDoTipoEstante = useMemo(() => {
-    const alvo = objetos.find(o => o.id === selecionadoNoBuilder);
-    return alvo?.tipo === 'porta-pallets' ? alvo.id : null;
-  }, [objetos, selecionadoNoBuilder]);
-
-  const girarObjeto = useCallback((id: string) => {
-    setObjetos(lista =>
-      lista.map(o => (o.id === id ? { ...o, rotacaoY: o.rotacaoY + Math.PI / 2 } : o)),
-    );
-  }, []);
-
-  const excluirObjeto = useCallback((id: string) => {
-    setObjetos(lista => lista.filter(o => o.id !== id));
-    setSelecionadoNoBuilder(atual => (atual === id ? null : atual));
-  }, []);
-
-  // Sair do Modo Edição desarma a ferramenta. Sem isto, voltar para cá traria o fantasma
-  // já colado no cursor e o primeiro clique construiria sem intenção.
-  useEffect(() => {
-    if (modoVisor === 'operacional') {
-      setFerramenta('navegar');
-      setSelecionadoNoBuilder(null);
-    }
-  }, [modoVisor]);
-
-  // Atalhos R e Del, só com peça selecionada no Modo Edição.
-  useEffect(() => {
-    if (modoVisor !== 'edicao' || !selecionadoNoBuilder) return;
-    const aoTeclar = (e: KeyboardEvent) => {
-      // Enquanto a pessoa digita na busca, R é letra, não atalho.
-      const alvo = e.target as HTMLElement | null;
-      if (alvo && /^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName)) return;
-      if (e.key === 'r' || e.key === 'R') {
-        e.preventDefault();
-        girarObjeto(selecionadoNoBuilder);
-      }
-      if (e.key === 'Delete') {
-        e.preventDefault();
-        excluirObjeto(selecionadoNoBuilder);
-      }
-    };
-    window.addEventListener('keydown', aoTeclar);
-    return () => window.removeEventListener('keydown', aoTeclar);
-  }, [modoVisor, selecionadoNoBuilder, girarObjeto, excluirObjeto]);
 
   const [modo, setModo] = useState<ModoCor>('status');
   const [filtro, setFiltro] = useState<FiltroStatus>('todas');
@@ -973,7 +950,11 @@ export function Warehouse3DViewer({
 
     return {
       blocos: blocosDaPlanta(plantaMedida.trechos, plantaMedida.rotulos, posicoesPorRua),
-      mesas: mesasDaPlanta(plantaMedida.trechos),
+      // Vazio DE PROPÓSITO: as bancadas não são mais desenho da planta, são peças do
+      // esboço. Quem preenche este campo é `plantaParaCena`, a partir da lista de peças —
+      // e o lugar onde a mesa nasce é a semente do carregamento, não aqui. Recalcular as
+      // bancadas neste memo faria a mesa excluída voltar à tela.
+      mesas: [] as BlocoFisico[],
       // Vai junto para a cena não precisar recalcular a medida por conta própria: duas
       // contas do mesmo comprimento é como o desenho e o enquadramento se desalinham.
       comprimento: comprimentoTotal(plantaMedida.trechos),
@@ -1106,6 +1087,389 @@ export function Warehouse3DViewer({
     [plantaFisica, deslocamento],
   );
 
+  // ── Modo Construção: pegada, colisão e as ações sobre a peça ─────────────────
+  //
+  // Mora AQUI, e não junto do resto do estado do builder, porque depende de
+  // `plantaFisica` e `deslocamentoAtivo` — e um `const` referenciado antes da própria
+  // declaração lança ReferenceError em tempo de render, que o lint não acusa.
+  /** Medida no piso de uma peça, levando a variante quando ela for porta-pallets. */
+  const medidaNoPiso = useCallback((tipo: TipoConstruido, estante: TipoDeEstante) => {
+    const [largura, , profundidade] =
+      tipo === 'porta-pallets' ? ESTANTES[estante].tamanho : CATALOGO[tipo].tamanho;
+    return { largura, profundidade };
+  }, []);
+
+  /** As pegadas de tudo que já está colocado — a entrada da colisão. */
+  const pegadasColocadas = useMemo<PecaComPegada[]>(
+    () =>
+      objetos.map(o => {
+        const { largura, profundidade } = medidaNoPiso(o.tipo, o.estante);
+        return { id: o.id, pegada: pegadaDaPeca(o, largura, profundidade) };
+      }),
+    [objetos, medidaNoPiso],
+  );
+
+  /**
+   * As pegadas do armazém CADASTRADO: fileiras e bancadas da planta.
+   *
+   * Construir em cima delas é pior que construir em cima de outra peça do esboço — a
+   * fileira existe de verdade, e um porta-pallets desenhado dentro dela faria o mapa
+   * prometer posição onde já há estante.
+   */
+  const obstaculosDoPiso = useMemo<Pegada[]>(() => {
+    if (!plantaFisica) return [];
+    const [dx, , dz] = deslocamentoAtivo;
+    // As bancadas NÃO entram aqui. Elas viraram peça de esboço, e peça já é contada em
+    // `pegadasColocadas` — somar as duas faria cada mesa colidir consigo mesma e
+    // recusar o próprio lugar no primeiro arrasto.
+    return plantaFisica.blocos
+      .filter(b => b.tipo !== 'expedicao')
+      .map(b => ({
+        x0: b.centro[0] - b.tamanho[0] / 2 + dx,
+        x1: b.centro[0] + b.tamanho[0] / 2 + dx,
+        z0: b.centro[2] - b.tamanho[2] / 2 + dz,
+        z1: b.centro[2] + b.tamanho[2] / 2 + dz,
+      }));
+  }, [plantaFisica, deslocamentoAtivo]);
+
+  /**
+   * O lugar aceita a peça?
+   *
+   * Uma função só, usada pelo fantasma (para pintar de vermelho) e pelo clique (para
+   * recusar). Duas regras separadas divergiriam, e aí o fantasma diria verde num lugar
+   * em que o clique não constrói — que é o pior dos dois mundos.
+   */
+  const lugarAceita = useCallback(
+    (tipo: TipoConstruido, estante: TipoDeEstante, x: number, z: number, rotacaoY: number, ignorar: string | null = null) => {
+      const { largura, profundidade } = medidaNoPiso(tipo, estante);
+      const pegada = pegadaDaPeca({ id: ignorar ?? '', x, z, rotacaoY }, largura, profundidade);
+      return lugarLivre(pegada, pegadasColocadas, obstaculosDoPiso, ignorar);
+    },
+    [medidaNoPiso, pegadasColocadas, obstaculosDoPiso],
+  );
+
+  const construirObjeto = useCallback(
+    (x: number, z: number) => {
+      if (ferramenta === 'navegar') return;
+      // A validação é a MESMA que pinta o fantasma. Recusar aqui sem recusar lá produziria
+      // o clique que não faz nada e não diz por quê.
+      if (!lugarAceita(ferramenta, estanteEscolhida, x, z, 0)) return;
+      const id = `obj-${proximoIdDoObjeto.current++}`;
+      setObjetos(lista => [
+        ...lista,
+        { id, tipo: ferramenta, estante: estanteEscolhida, cor: corEscolhida, x, z, rotacaoY: 0 },
+      ]);
+      // Seleciona a recém-colocada, mas NÃO desarma a ferramenta: construir em sequência
+      // é o gesto do modo construção, e obrigar a rearmar a cada peça é o que torna
+      // montar um galpão inteiro insuportável.
+      setSelecionadoNoBuilder(id);
+    },
+    [ferramenta, estanteEscolhida, corEscolhida, lugarAceita],
+  );
+
+  /** Move uma peça no piso, já encaixada na grade. Recusa o destino ocupado. */
+  const moverObjeto = useCallback(
+    (id: string, x: number, z: number) => {
+      setObjetos(lista => {
+        const alvo = lista.find(o => o.id === id);
+        if (!alvo) return lista;
+        const destinoX = encaixar(x);
+        const destinoZ = encaixar(z);
+        if (alvo.x === destinoX && alvo.z === destinoZ) return lista;
+        if (!lugarAceita(alvo.tipo, alvo.estante, destinoX, destinoZ, alvo.rotacaoY, id)) return lista;
+        return lista.map(o => (o.id === id ? { ...o, x: destinoX, z: destinoZ } : o));
+      });
+    },
+    [lugarAceita],
+  );
+
+  /** Troca tipo ou cor da peça selecionada, para corrigir sem excluir e refazer. */
+  const ajustarObjeto = useCallback((id: string, patch: Partial<Pick<ObjetoConstruido, 'estante' | 'cor'>>) => {
+    setObjetos(lista => lista.map(o => (o.id === id ? { ...o, ...patch } : o)));
+  }, []);
+
+  /** Id da peça selecionada SE ela for porta-pallets — tipo e cor só valem para estante. */
+  const selecionadoDoTipoEstante = useMemo(() => {
+    const alvo = objetos.find(o => o.id === selecionadoNoBuilder);
+    return alvo?.tipo === 'porta-pallets' ? alvo.id : null;
+  }, [objetos, selecionadoNoBuilder]);
+
+  /**
+   * Gira em quartos de volta, nos dois sentidos.
+   *
+   * Recusa o giro que faz a peça invadir outra: um porta-pallets de 3,6 m girado passa a
+   * ocupar 3,6 m no outro eixo, e girar é tão capaz de produzir sobreposição quanto
+   * mover. Normaliza porque girar cinquenta vezes guardaria 78 radianos no banco.
+   */
+  const girarObjeto = useCallback(
+    (id: string, sentido: 1 | -1 = 1) => {
+      setObjetos(lista => {
+        const alvo = lista.find(o => o.id === id);
+        if (!alvo) return lista;
+        const rotacaoY = normalizarRotacao(alvo.rotacaoY + sentido * QUARTO_DE_VOLTA);
+        if (!lugarAceita(alvo.tipo, alvo.estante, alvo.x, alvo.z, rotacaoY, id)) return lista;
+        return lista.map(o => (o.id === id ? { ...o, rotacaoY } : o));
+      });
+    },
+    [lugarAceita],
+  );
+
+  /**
+   * ── Excluir o que já existe: o ENDEREÇO ────────────────────────────────────
+   *
+   * Clicar num porta-pallets desenhado pela planta seleciona um `PP-D16-N1`, que é linha
+   * de `warehouse_storage_bins` — não peça de esboço. Por isso o botão do builder ficava
+   * apagado: ele só olhava para `objetos`.
+   *
+   * ── Por que isto NÃO é uma regra nova ──────────────────────────────────────
+   * `deleteBins` já existe e é o mesmo caminho que a aba Endereços usa. As três FKs de
+   * saldo e de movimentação são `ON DELETE RESTRICT`, então o BANCO recusa apagar
+   * endereço com mercadoria ou histórico — a garantia fica onde não dá para contornar, e
+   * o cliente só traduz o 23503. A policy de DELETE é limitada a owner/admin/manager, e
+   * quem não tem o papel recebe o erro do banco em vez de um botão que mente.
+   *
+   * ── O que continua fora, de propósito ──────────────────────────────────────
+   * Apagar a FILEIRA inteira. Ela não é linha de tabela nenhuma: é o enésimo retângulo
+   * gerado de `fileiras: 5` num trecho de `warehouse_plan_sections`. Removê-la é editar a
+   * planta publicada e deixar os 16 endereços da rua órfãos — mudança do plano do galpão,
+   * não exclusão do que está sob o cursor.
+   */
+  const [excluindoEndereco, setExcluindoEndereco] = useState(false);
+  const [erroAoExcluir, setErroAoExcluir] = useState<string | null>(null);
+  /**
+   * O que acabou de ser apagado.
+   *
+   * ── Por que isto é obrigatório ─────────────────────────────────────────────
+   * Sem aviso de sucesso, apagar um endereço era: a ficha fechava, o botão apagava e a
+   * contagem caía de 215 para 214 — sozinha, sem nada dizer que foi você. É a diferença
+   * entre uma ação confirmada e uma tela que mudou de ideia. Numa operação destrutiva e
+   * irreversível, ficar calado é o pior retorno possível.
+   */
+  const [enderecoExcluido, setEnderecoExcluido] = useState<string | null>(null);
+
+  /** Código → id do endereço. O mapa carregado é o inverso, e apagar precisa do id. */
+  const binIdPorCodigo = useMemo(() => {
+    const mapa = new Map<string, string>();
+    if (dados) for (const [id, codigo] of dados.codigoPorBinId) mapa.set(codigo, id);
+    return mapa;
+  }, [dados]);
+
+  const excluirEndereco = useCallback(
+    async (codigos: string[]) => {
+      const ids = codigos.map(c => binIdPorCodigo.get(c)).filter((v): v is string => !!v);
+      if (ids.length !== codigos.length) {
+        setErroAoExcluir('Não foi possível identificar este endereço. Recarregue o mapa.');
+        return;
+      }
+      setErroAoExcluir(null);
+      setEnderecoExcluido(null);
+      setExcluindoEndereco(true);
+      try {
+        // Uma chamada só para a posição inteira: o DELETE é uma transação, então um
+        // nível com saldo recusa a posição toda em vez de apagar metade da estante.
+        await deleteBins(ids);
+        // Solta a seleção ANTES de recarregar: a ficha ficaria aberta sobre um endereço
+        // que deixou de existir.
+        setSelecionada(null);
+        setEnderecoExcluido(codigos.length === 1 ? codigos[0] : `${posicaoDoCodigo(codigos[0]) ?? 'posição'} (${codigos.length} níveis)`);
+        recarregarSilencioso();
+      } catch (e) {
+        setErroAoExcluir(e instanceof Error ? e.message : String(e));
+      } finally {
+        setExcluindoEndereco(false);
+      }
+    },
+    [binIdPorCodigo, recarregarSilencioso],
+  );
+
+  /** Esvazia o pavimento NA TELA. Não toca no banco: quem grava é o "Salvar construção",
+   *  e é isso que torna limpar reversível — basta sair sem salvar. */
+  const limparObjetos = useCallback(() => {
+    setObjetos([]);
+    setSelecionadoNoBuilder(null);
+  }, []);
+
+  const excluirObjeto = useCallback((id: string) => {
+    setObjetos(lista => lista.filter(o => o.id !== id));
+    setSelecionadoNoBuilder(atual => (atual === id ? null : atual));
+  }, []);
+
+  /**
+   * ── As bancadas, uma vez só na tela ────────────────────────────────────────
+   *
+   * A mesa agora existe em UM lugar: a lista de peças. Quem desenha muda com o modo —
+   * no Modo Construção é a camada de construção, que responde ao cursor; fora dele é o
+   * lote do cenário, que é barato. Por isso a planta recebe as bancadas DO ESBOÇO, e
+   * recebe lista vazia na edição: desenhar as duas mostraria cada mesa em dobro, e
+   * mandar as da planta faria a mesa excluída reaparecer ao sair do modo.
+   */
+  const bancadasDoEsboco = useMemo<BlocoFisico[]>(() => {
+    const [dx, , dz] = deslocamentoAtivo;
+    const [largura, altura, profundidade] = CATALOGO.mesa.tamanho;
+    return objetos
+      .filter(o => o.tipo === 'mesa')
+      .map(o => ({
+        id: o.id,
+        tipo: 'bancada' as const,
+        // De volta à coordenada da planta: a peça vive em mundo, o lote vive no grupo
+        // deslocado da planta.
+        centro: [o.x - dx, altura / 2, o.z - dz] as [number, number, number],
+        // Girada, a mesa troca o que mede em X pelo que mede em Z.
+        tamanho: (deLado(o.rotacaoY)
+          ? [profundidade, altura, largura]
+          : [largura, altura, profundidade]) as [number, number, number],
+        rotulo: '',
+      }));
+  }, [objetos, deslocamentoAtivo]);
+
+  /** A planta com as bancadas do esboço. Memo próprio: o cálculo pesado da planta não
+   *  pode refazer a cada arrasto de mesa. */
+  const plantaParaCena = useMemo(
+    () =>
+      plantaFisica
+        ? { ...plantaFisica, mesas: modoVisor === 'edicao' ? [] : bancadasDoEsboco }
+        : null,
+    [plantaFisica, bancadasDoEsboco, modoVisor],
+  );
+
+  // Sair do Modo Edição desarma a ferramenta. Sem isto, voltar para cá traria o fantasma
+  // já colado no cursor e o primeiro clique construiria sem intenção.
+  useEffect(() => {
+    if (modoVisor === 'operacional') {
+      setFerramenta('navegar');
+      setSelecionadoNoBuilder(null);
+    }
+  }, [modoVisor]);
+
+  /**
+   * Atalhos do Modo Construção, só com peça selecionada.
+   *
+   * `Backspace` junto de `Delete` porque num teclado de notebook a tecla que a mão
+   * encontra é a primeira — e quem está montando planta aperta a tecla de apagar, não a
+   * que o manual diz.
+   *
+   * As setas giram nos dois sentidos: ← desfaz o que → fez, e "girei demais" é o erro
+   * mais comum de quem encaixa peça. Elas também são o atalho que não exige lembrar que
+   * R existe.
+   */
+  /** O que o comando de excluir está mirando: peça de esboço ou endereço. */
+  const alvoParaExcluir = alvoDeExclusao(modoVisor, selecionadoNoBuilder, selecionada);
+
+  /**
+   * Aviso de exclusão dura até a próxima ESCOLHA.
+   *
+   * Tanto o sucesso quanto a recusa falam de um endereço específico; mantê-los depois que
+   * a pessoa selecionou outra coisa faria a tela afirmar sobre o alvo errado.
+   *
+   * A chave é o alvo, e NÃO `selecionada` direto — isso não é detalhe. Uma exclusão
+   * bem-sucedida solta a seleção, então um efeito que escutasse `selecionada` dispararia
+   * no mesmo render e apagaria o aviso de sucesso antes de alguém o ler: o aviso nunca
+   * apareceria. Sem alvo, o efeito sai sem mexer em nada e a confirmação fica na tela até
+   * a próxima escolha.
+   */
+  const chaveDoAlvo = alvoParaExcluir
+    ? `${alvoParaExcluir.tipo}:${alvoParaExcluir.tipo === 'peca' ? alvoParaExcluir.id : alvoParaExcluir.codigo}`
+    : null;
+
+  useEffect(() => {
+    if (!chaveDoAlvo) return;
+    setEnderecoExcluido(null);
+    setErroAoExcluir(null);
+  }, [chaveDoAlvo]);
+
+  /**
+   * O comando de excluir, para o botão e para a tecla.
+   *
+   * Os dois caminhos são deliberadamente ASSIMÉTRICOS: peça de esboço some na hora,
+   * porque desfazer é sair sem salvar; endereço pede confirmação nomeando o código,
+   * porque vai ao banco e não volta. Confirmar os dois igual treinaria a pessoa a
+   * confirmar sem ler — que é exatamente como se apaga endereço sem querer.
+   */
+  /**
+   * A confirmação, uma só para os dois caminhos de endereço.
+   *
+   * Ela NOMEIA o que vai sumir — um código, ou a lista inteira de níveis. Confirmação que
+   * não diz o alvo é um botão de "sim" treinando a pessoa a clicar sem ler.
+   */
+  const confirmarEExcluir = useCallback(
+    (codigos: string[]) => {
+      if (codigos.length === 0) return;
+      const titulo =
+        codigos.length === 1
+          ? `Excluir o endereço ${codigos[0]}?`
+          : `Excluir a posição ${posicaoDoCodigo(codigos[0]) ?? ''} inteira — ${codigos.length} endereços?`;
+      const texto = [
+        titulo,
+        '',
+        ...(codigos.length > 1 ? [codigos.join(', '), ''] : []),
+        'Deixa de existir para a equipe inteira e isto não pode ser desfeito.',
+        'Endereço com mercadoria ou com histórico de movimentação é recusado pelo sistema —',
+        'nesse caso, bloqueie em vez de apagar.',
+      ].join('\n');
+      if (!window.confirm(texto)) return;
+      void excluirEndereco(codigos);
+    },
+    [excluirEndereco],
+  );
+
+  const executarExclusao = useCallback(() => {
+    if (!alvoParaExcluir) return;
+    if (alvoParaExcluir.tipo === 'peca') {
+      excluirObjeto(alvoParaExcluir.id);
+      return;
+    }
+    confirmarEExcluir([alvoParaExcluir.codigo]);
+  }, [alvoParaExcluir, excluirObjeto, confirmarEExcluir]);
+
+  /**
+   * Excluir a POSIÇÃO inteira: todos os níveis daquele ponto da rua.
+   *
+   * É o que a pessoa aponta quando aponta "aquele porta-pallets". Apagar só o nível
+   * clicado deixava os de cima no ar — a estante continuava lá, um vão a menos, e o
+   * comando parecia não ter feito nada.
+   */
+  const excluirPosicao = useCallback(() => {
+    if (!alvoParaExcluir || alvoParaExcluir.tipo !== 'endereco') return;
+    confirmarEExcluir(codigosDaMesmaPosicao(alvoParaExcluir.codigo, [...binIdPorCodigo.keys()]));
+  }, [alvoParaExcluir, binIdPorCodigo, confirmarEExcluir]);
+
+  /** Quantos níveis a posição selecionada tem. 0 quando o alvo não é endereço. */
+  const niveisDaPosicao =
+    alvoParaExcluir?.tipo === 'endereco'
+      ? codigosDaMesmaPosicao(alvoParaExcluir.codigo, [...binIdPorCodigo.keys()]).length
+      : 0;
+
+  useEffect(() => {
+    // Roda com peça de esboço OU com endereço selecionado: Delete precisa valer para as
+    // duas coisas que a cena deixa escolher no Modo Edição.
+    if (modoVisor !== 'edicao') return;
+    const aoTeclar = (e: KeyboardEvent) => {
+      // Enquanto a pessoa digita na busca, R é letra e a seta move o cursor.
+      const alvo = e.target as HTMLElement | null;
+      if (alvo && (/^(INPUT|TEXTAREA|SELECT)$/.test(alvo.tagName) || alvo.isContentEditable)) return;
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
+
+      // Girar só existe para peça de esboço: endereço não tem rotação — ele é definido
+      // pelo código, e a fileira que o desenha vem da planta.
+      if (selecionadoNoBuilder && (e.key === 'r' || e.key === 'R' || e.key === 'ArrowRight')) {
+        e.preventDefault();
+        girarObjeto(selecionadoNoBuilder, 1);
+      } else if (selecionadoNoBuilder && e.key === 'ArrowLeft') {
+        e.preventDefault();
+        girarObjeto(selecionadoNoBuilder, -1);
+      } else if (alvoParaExcluir && (e.key === 'Delete' || e.key === 'Backspace')) {
+        e.preventDefault();
+        executarExclusao();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setSelecionadoNoBuilder(null);
+        setSelecionada(null);
+      }
+    };
+    window.addEventListener('keydown', aoTeclar);
+    return () => window.removeEventListener('keydown', aoTeclar);
+  }, [modoVisor, selecionadoNoBuilder, girarObjeto, alvoParaExcluir, executarExclusao]);
+
   /** Posição LOCAL da vaga na vista ativa, ou `null` quando esta vista não a desenha. */
   const localDaVaga = useMemo<ResolvedorLocal>(
     () =>
@@ -1125,20 +1489,27 @@ export function Warehouse3DViewer({
    * Na vista por código não existe prédio: ali a cerca vem do contorno das vagas e cada
    * rua vira uma caixa.
    */
+  /**
+   * As peças MONTADAS também barram quem caminha.
+   *
+   * Sem isto, o esboço era uma camada que só existia para o olho: dava para atravessar o
+   * porta-pallets que acabou de ser colocado enquanto a estante cadastrada ao lado
+   * barrava. A pegada já está calculada para a colisão de construção — aqui ela só muda
+   * de formato, de `Pegada` para `CaixaPlana`.
+   */
+  const caixasDasPecas = useMemo<CaixaPlana[]>(
+    () => pegadasColocadas.map(p => ({ x0: p.pegada.x0, x1: p.pegada.x1, z0: p.pegada.z0, z1: p.pegada.z1 })),
+    [pegadasColocadas],
+  );
+
   const colisao = useMemo<{ caixas: CaixaPlana[]; cerca: CaixaPlana }>(() => {
     if (plantaFisica) {
       return {
         caixas: [
-          ...caixasDaPlanta(plantaFisica.blocos, plantaFisica.mesas, deslocamentoAtivo),
-          // As empilhadeiras estacionadas também barram. Elas são o único objeto sólido
-          // novo da cena, e poder atravessar justamente ele — com as estantes, as mesas e
-          // as paredes já barrando — seria a inconsistência mais visível da caminhada.
-          ...equipamentosDaExpedicao(plantaFisica.blocos).pegadas.map(pegada => ({
-            x0: pegada.centro[0] - pegada.tamanho[0] / 2 + deslocamentoAtivo[0],
-            x1: pegada.centro[0] + pegada.tamanho[0] / 2 + deslocamentoAtivo[0],
-            z0: pegada.centro[2] - pegada.tamanho[2] / 2 + deslocamentoAtivo[2],
-            z1: pegada.centro[2] + pegada.tamanho[2] / 2 + deslocamentoAtivo[2],
-          })),
+          // Bancadas do ESBOÇO: mesa excluída não pode continuar barrando a caminhada,
+          // e mesa movida tem de barrar onde ela está agora.
+          ...caixasDaPlanta(plantaFisica.blocos, bancadasDoEsboco, deslocamentoAtivo),
+          ...caixasDasPecas,
         ],
         cerca: cercaDaPlanta(
           LARGURA_DO_PREDIO,
@@ -1169,8 +1540,11 @@ export function Warehouse3DViewer({
     }
     // Folga de 2 m em volta: sem prédio desenhado, prender a câmera rente à última rua
     // tiraria o corredor de manobra por onde se anda.
-    return { caixas, cerca: cercaDeContorno(larguraTotal, profundidadeTotal, deslocamentoAtivo, 2) };
-  }, [plantaFisica, deslocamentoAtivo, vagas, layout]);
+    return {
+      caixas: [...caixas, ...caixasDasPecas],
+      cerca: cercaDeContorno(larguraTotal, profundidadeTotal, deslocamentoAtivo, 2),
+    };
+  }, [plantaFisica, deslocamentoAtivo, vagas, layout, caixasDasPecas, bancadasDoEsboco]);
 
   /**
    * Contorno da vaga na vista ativa: onde ela está e quanto mede, em coordenada local.
@@ -1536,7 +1910,16 @@ export function Warehouse3DViewer({
           // OrbitControls do drei emite `change` a cada passo do amortecimento, e cada
           // `change` pede um quadro — o amortecimento se auto-sustenta até assentar.
           frameloop={temAnimacao ? 'always' : 'demand'}
-          onPointerMissed={() => setSelecionada(null)}
+          onPointerMissed={() => {
+            setSelecionada(null);
+            // E SOLTA A PEÇA do builder. Sem isto a seleção ficava presa: clicar no vazio
+            // fechava a ficha da vaga mas deixava a barra de Girar/Excluir pairando sobre
+            // uma peça que já não era o assunto, e a única forma de sair dela era
+            // selecionar outra. Era metade do "parece travado" na edição.
+            // Só com a ferramenta de navegar: com uma armada, o clique no piso constrói e
+            // nem chega aqui.
+            if (modoVisor === 'edicao' && ferramenta === 'navegar') setSelecionadoNoBuilder(null);
+          }}
         >
           <EnquadramentoResponsivo />
           <Cena
@@ -1557,9 +1940,19 @@ export function Warehouse3DViewer({
               objetos,
               selecionadoNoBuilder,
               onConstruir: construirObjeto,
-              onSelecionarObjeto: setSelecionadoNoBuilder,
+              // Soltar tem de soltar TUDO. Clicar no piso vazio no Modo Edição limpava
+              // só a peça de esboço, e o endereço continuava selecionado por trás — com a
+              // ficha aberta e o botão de excluir aceso mirando um endereço que a pessoa
+              // achava que tinha largado.
+              onSelecionarObjeto: (id: string | null) => {
+                setSelecionadoNoBuilder(id);
+                if (id === null) setSelecionada(null);
+              },
               onGirarObjeto: girarObjeto,
               onExcluirObjeto: excluirObjeto,
+              onMoverObjeto: moverObjeto,
+              onArrastarObjeto: setArrastando,
+              lugarAceita,
             }}
             interacao={{
               assinarHover,
@@ -1569,7 +1962,7 @@ export function Warehouse3DViewer({
               onHover: apontar,
               onSelect: selecionar,
             }}
-            plantaFisica={plantaFisica}
+            plantaFisica={plantaParaCena}
             rota={rota}
             marcadores={marcadores}
             theme={theme}
@@ -1584,6 +1977,8 @@ export function Warehouse3DViewer({
           ) : (
             <OrbitControls
               ref={controlsRef}
+              // Desligada durante o arraste — ver `arrastando`.
+              enabled={!arrastando}
               enableDamping
               dampingFactor={0.08}
               // Também proporcionais: um teto fixo prenderia a câmera dentro de um
@@ -1608,8 +2003,22 @@ export function Warehouse3DViewer({
         </Canvas>
       </FronteiraDeErro>
 
-      {/* O HUD inteiro — legenda, modo, pavimento, busca, rota, filtros, builder e o modal
+      {/* ── A camada do HUD ──────────────────────────────────────────────────────
+          Existe por causa de um empilhamento, não de layout. As placas de rua da cena são
+          DOM: o `<Html>` do drei as portala para dentro da moldura, e por padrão ele
+          carimba `z-index: 16777271` em cada uma. Com isso elas passavam POR CIMA da
+          legenda, da busca e da gaveta de Controles — a cena invadindo o painel.
+
+          A correção é nos dois lados: as placas descem para `zIndexRange={[1, 0]}` e todo
+          o HUD sobe para esta camada. Sem a camada, bastaria um painel novo sem `z` para
+          o problema voltar.
+
+          `pointer-events-none` aqui e `auto` em cada painel: a camada cobre a cena
+          inteira e não pode roubar o clique que vai para o armazém.
+
+          O HUD inteiro — legenda, modo, pavimento, busca, rota, filtros, builder e o modal
           de ajuste — vive em `viewer3d/Hud3D`. As props vão agrupadas por assunto. */}
+      <div className="pointer-events-none absolute inset-0 z-10">
       <Hud3D
         legenda={{ modo, contagem, contagemAbc, abc, abcFalhou }}
         visao={{
@@ -1640,6 +2049,12 @@ export function Warehouse3DViewer({
           corEscolhida,
           objetos,
           selecionadoDoTipoEstante,
+          selecionadoNoBuilder,
+          alvoDeExclusao: alvoParaExcluir,
+          excluindoEndereco,
+          erroAoExcluir,
+          enderecoExcluido,
+          niveisDaPosicao,
           salvandoPecas,
           erroAoSalvar,
           salvoEm,
@@ -1665,6 +2080,11 @@ export function Warehouse3DViewer({
           setSelecionadoNoBuilder,
           ajustarObjeto,
           salvarConstrucao,
+          onExcluirAlvo: executarExclusao,
+          onExcluirPosicao: excluirPosicao,
+          onExcluirPeca: excluirObjeto,
+          onLimparPecas: limparObjetos,
+          onGirarPeca: girarObjeto,
           focarVaga,
           voarAteParada,
           resetarCamera,
@@ -1675,7 +2095,7 @@ export function Warehouse3DViewer({
         ajustando={ajustando}
         theme={theme}
       />
-
+      </div>
 
       {/* A coluna da direita: gaveta de detalhe em cima, radar embaixo.
           Antes os dois se posicionavam sozinhos — a gaveta em `top-3` podendo crescer
@@ -1687,7 +2107,7 @@ export function Warehouse3DViewer({
           (`shrink-0`). Sobrepor deixa de ser possível em vez de ser improvável.
           `pointer-events-none` na coluna para o espaço vazio entre os dois não roubar o
           arrasto da câmera; cada painel devolve `pointer-events-auto` para si. */}
-      <div className="pointer-events-none absolute bottom-3 right-3 top-3 flex w-[19rem] max-w-[calc(100%-1.5rem)] flex-col items-end gap-2">
+      <div className="pointer-events-none absolute bottom-3 right-3 top-14 z-10 flex w-[19rem] max-w-[calc(100%-1.5rem)] flex-col items-end gap-2">
         {selecionada && (
           <PainelDetalhe
             slot={selecionada}

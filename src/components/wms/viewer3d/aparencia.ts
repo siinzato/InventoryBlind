@@ -8,7 +8,8 @@
 // Aqui o hex é inevitável: material de WebGL não lê variável CSS. Então este módulo é o
 // ponto único de verdade da paleta da cena — o equivalente a um token.
 
-import { Activity, BarChart3, Eye, Hammer, TrendingUp } from 'lucide-react';
+import { Activity, BarChart3, TrendingUp } from 'lucide-react';
+import { IconeCodigoDeVaga, IconePlantaDoGalpao, IconePortaPallets, IconeSelecionar } from './icones3d';
 import type { SegmentedOption } from '../../ui';
 import type { Theme } from '../../../lib/useTheme';
 import type { Slot, SlotStatus } from '../../../lib/wms/warehouse3dSlots';
@@ -108,9 +109,9 @@ export const COR_DEMARCACAO: Record<Theme, string> = { light: '#9FAABA', dark: '
  *
  * NÃO é cor semântica do produto e não entra em nenhuma legenda; por isso pode ser
  * literal sem disputar com o âmbar do alerta. Mora aqui, e não no componente de cenário
- * onde nasceu, porque três lugares passaram a precisar dela — faixas de circulação,
- * zebrado da expedição e o corpo da empilhadeira — e este módulo é declaradamente o ponto
- * único de verdade da paleta da cena.
+ * onde nasceu, porque dois lugares passaram a precisar dela — as faixas de circulação e o
+ * zebrado da expedição — e este módulo é declaradamente o ponto único de verdade da
+ * paleta da cena.
  */
 export const COR_MARCACAO: Record<Theme, string> = { light: '#D9A514', dark: '#7A5E12' };
 
@@ -177,9 +178,24 @@ export const FILTROS: ReadonlyArray<{ value: FiltroStatus; rotulo: string }> = [
  */
 export type ModoVisor = 'operacional' | 'edicao';
 
+/**
+ * De onde vem a geometria desenhada: das medidas da planta ou do código do endereço.
+ *
+ * É ESCOLHA entre duas coisas, não um interruptor — e era desenhada como um botão de
+ * largura cheia que trocava de rótulo a cada clique. Botão que muda de nome ao ser clicado
+ * não diz se o nome mostrado é o estado atual ou o destino do clique; num segmentado as
+ * duas opções ficam na tela e a selecionada é óbvia.
+ */
+export type OrigemDoDesenho = 'planta' | 'codigo';
+
+export const ORIGENS_DO_DESENHO: SegmentedOption<OrigemDoDesenho>[] = [
+  { value: 'planta', label: 'Planta', icon: IconePlantaDoGalpao },
+  { value: 'codigo', label: 'Código', icon: IconeCodigoDeVaga },
+];
+
 export const MODOS_VISOR: SegmentedOption<ModoVisor>[] = [
-  { value: 'operacional', label: 'Operacional', icon: Eye },
-  { value: 'edicao', label: 'Edição', icon: Hammer },
+  { value: 'operacional', label: 'Operacional', icon: IconeSelecionar },
+  { value: 'edicao', label: 'Edição', icon: IconePortaPallets },
 ];
 
 /** Divisão da grade de construção, em metros. Um metro é a unidade em que se fala de
@@ -225,7 +241,7 @@ export const MARGEM_DA_CERCA = 0.2;
 // é imediato e reversível, sem ida ao banco. Gravar é etapa própria — e misturar as duas
 // faria cada clique de teste virar uma linha em produção.
 
-export type FerramentaBuilder = 'navegar' | 'porta-pallets' | 'mesa' | 'doca';
+export type FerramentaBuilder = 'navegar' | 'porta-pallets' | 'mesa' | 'doca' | 'pallet';
 
 export type TipoConstruido = Exclude<FerramentaBuilder, 'navegar'>;
 
@@ -250,6 +266,10 @@ export const CATALOGO: Record<TipoConstruido, PecaDoCatalogo> = {
   'porta-pallets': { rotulo: 'Porta-Pallets', tamanho: [1.1, 4.2, 3.6], noChao: false },
   mesa: { rotulo: 'Mesa de expedição', tamanho: [1.6, 0.9, 0.8], noChao: false },
   doca: { rotulo: 'Área de doca', tamanho: [3, 0.04, 3], noChao: true },
+  // Pallet no chão: estrado PBR mais a carga em cima. É a peça que faltava para
+  // desenhar o que de fato ocupa corredor num galpão — mercadoria fora da estante,
+  // esperando conferência ou carregamento. Medida real: 1,20 x 1,00 de estrado.
+  pallet: { rotulo: 'Pallet no chão', tamanho: [1.2, 1.15, 1.0], noChao: false },
 };
 
 /** Cores do builder. Hex porque é WebGL, no mesmo padrão de COR_VAGA e COR_GRADE. */

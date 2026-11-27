@@ -12,17 +12,19 @@ import {
 } from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html, Line, OrbitControls } from '@react-three/drei';
+import { RotateCw, Trash2 } from 'lucide-react';
 import type { ElementRef, MutableRefObject, RefObject } from 'react';
 import type { Theme } from '../../../lib/useTheme';
 import type { Slot } from '../../../lib/wms/warehouse3dSlots';
 import {
-  equipamentosDaExpedicao, faixasDaExpedicao, faixasDePiso, pecasDaFileira,
+  faixasDaExpedicao, faixasDePiso, pecasDaBancada, pecasDaFileira, pecasDaMesa,
   placasDasFileiras, sapatasDasFileiras, LARGURA_DO_PREDIO,
   type BlocoFisico, type PecaDaFileira,
 } from '../../../lib/wms/warehouse3dPlantaFisica';
 import type { ContextoDeDestaque } from '../../../lib/wms/warehouse3dDestaque';
 import { lotesDaPlanta, type InstanciaDeVao } from '../../../lib/wms/warehouse3dLotesDaPlanta';
 import { deslizar, pontoDeEntrada, type CaixaPlana } from '../../../lib/wms/warehouse3dColisao';
+import { encaixar } from '../../../lib/wms/warehouse3dBuilder';
 import type { Ponto } from '../../../lib/wms/warehouse3dCoordenadas';
 import { grausDeVisao, meiaAberturaHorizontal } from '../../../lib/wms/warehouse3dRadar';
 import type { ParadaDaRota, Ponto3D, SubidaDaRota } from '../../../lib/wms/warehouse3dRota';
@@ -49,7 +51,7 @@ import {
   GEOMETRIA_UNITARIA, GEOMETRIA_VAGA, GEOMETRIA_VIGA, MATERIAL_ALERTA,
   MATERIAL_CARGA_ATENUADA, MATERIAL_CARGA_PLANTA, MATERIAL_INVISIVEL,
   MATERIAIS_DA_ESTRUTURA, MATERIAL_MARCADOR, MATERIAL_PISO,
-  MATERIAIS_DO_EQUIPAMENTO, MATERIAIS_DO_GALPAO,
+  MATERIAIS_DO_GALPAO,
   MATERIAL_DEMARCACAO, MATERIAL_PISO_ATENUADO, MATERIAL_PISO_FANTASMA, MATERIAL_RAIOX,
   MATERIAL_SOLIDO,
   MATERIAL_VIGA, MATRIZ, SEM_ACAO_APONTAR, SEM_ACAO_SELECIONAR, capacidadeDoLote,
@@ -516,16 +518,34 @@ export function PlacasDeRua({ placas }: { placas: PlacaDeRua[] }) {
     if (agora !== longe) setLonge(agora);
   });
 
-  // De longe, UMA por rua. Qual delas é escolhido pela ordem da lista, não pela proximidade
-  // da câmera: "a ponta mais perto" mudaria a cada giro e traria de volta o re-render por
-  // quadro que o parágrafo acima acabou de evitar.
+  /**
+   * Quantas placas desenhar.
+   *
+   * ── O que deu errado com "duas por rua" ────────────────────────────────────
+   * Oito ruas com placa nas duas pontas são dezesseis rótulos de tamanho fixo. De perto
+   * eles se encavalam, e visto de dentro do galpão vários caem no mesmo canto da tela —
+   * foi esse amontoado que apareceu por cima da legenda.
+   *
+   * Agora a regra é UMA por rua, sempre. A segunda ponta só volta quando o filtro já
+   * reduziu a duas ruas ou menos: aí não há com o que competir, e quem isolou uma rua é
+   * justamente quem quer encontrá-la pelas duas entradas do corredor.
+   *
+   * Qual das pontas fica é decidido pela ordem da lista, não pela proximidade da câmera:
+   * "a mais perto" mudaria a cada giro e traria de volta o re-render por quadro que o
+   * `useFrame` acima existe para evitar.
+   */
   const visiveis = useMemo(() => {
-    if (!longe) return placas;
+    const ruas = new Set(placas.map(p => p.rotulo));
+    const emDestaque = placas.filter(p => !p.atenuada);
+    const ruasEmDestaque = new Set(emDestaque.map(p => p.rotulo));
+    const isolouPoucasRuas =
+      ruasEmDestaque.size > 0 && ruasEmDestaque.size <= 2 && ruasEmDestaque.size < ruas.size;
+    if (isolouPoucasRuas && !longe) return emDestaque;
+
     const vistas = new Set<string>();
     return placas.filter(placa => {
-      const rua = `${placa.rotulo}-${placa.x}`;
-      if (vistas.has(rua)) return false;
-      vistas.add(rua);
+      if (vistas.has(placa.rotulo)) return false;
+      vistas.add(placa.rotulo);
       return true;
     });
   }, [longe, placas]);
@@ -537,6 +557,11 @@ export function PlacasDeRua({ placas }: { placas: PlacaDeRua[] }) {
           key={`${placa.rotulo}-${placa.x}-${placa.z}`}
           position={[placa.x, placa.y, placa.z]}
           center
+          // ABAIXO do HUD. O `<Html>` do drei carimba `z-index: 16777271` em cada rótulo
+          // por padrão — era por isso que a placa da cena passava por cima da legenda, da
+          // busca e da gaveta de Controles. Com 1 aqui e a camada `z-10` no HUD, a ordem
+          // deixa de depender de quem foi pintado por último.
+          zIndexRange={[1, 0]}
           // SEM `distanceFactor`, de propósito. Com ele a placa encolhia junto com a
           // perspectiva e, na vista geral, era pintada em 6x9 PIXELS — um borrão escuro
           // que no tema claro parecia sujeira na tela, não sinalização. Placa de
@@ -717,9 +742,15 @@ export interface BuilderDaCena {
   objetos: ObjetoConstruido[];
   selecionadoNoBuilder: string | null;
   onConstruir: (x: number, z: number) => void;
-  onSelecionarObjeto: (id: string) => void;
-  onGirarObjeto: (id: string) => void;
+  onSelecionarObjeto: (id: string | null) => void;
+  onGirarObjeto: (id: string, sentido?: 1 | -1) => void;
   onExcluirObjeto: (id: string) => void;
+  /** Arrasta a peça para outro ponto do piso, já encaixado na grade. */
+  onMoverObjeto: (id: string, x: number, z: number) => void;
+  /** Quem está arrastando. Desliga a órbita enquanto a peça se move. */
+  onArrastarObjeto: (id: string | null) => void;
+  /** O lugar aceita a peça? A mesma regra do fantasma e do clique. */
+  lugarAceita: (tipo: TipoConstruido, estante: TipoDeEstante, x: number, z: number, rotacaoY: number, ignorar?: string | null) => boolean;
 }
 
 /** Quem aponta, quem clica e quem está caminhando. */
@@ -780,7 +811,8 @@ export const Cena = memo(function Cena({
   const { fundo, chaveDeSombra, extensao, deslocamento, deslocamentoAtivo, plantaNoPiso } = cenario;
   const {
     modoVisor, ferramenta, estanteEscolhida, objetos, selecionadoNoBuilder,
-    onConstruir, onSelecionarObjeto, onGirarObjeto, onExcluirObjeto,
+    onConstruir, onSelecionarObjeto, onGirarObjeto, onExcluirObjeto, onMoverObjeto,
+    onArrastarObjeto, lugarAceita,
   } = builder;
   const { assinarHover, selecionada, contornoDaVaga, caminhando, onHover, onSelect } = interacao;
   const [centro, linha] = COR_GRADE[theme];
@@ -895,6 +927,9 @@ export const Cena = memo(function Cena({
             onSelecionar={onSelecionarObjeto}
             onGirar={onGirarObjeto}
             onExcluir={onExcluirObjeto}
+            onMover={onMoverObjeto}
+            onArrastar={onArrastarObjeto}
+            lugarAceita={lugarAceita}
           />
         </>
       )}
@@ -1070,13 +1105,12 @@ export function EstruturaDaPlanta({ pecas, theme }: { pecas: PecaDaFileira[]; th
 }
 
 /**
- * Um lote de peças de CENÁRIO: tinta no chão, zebrado, sapata, equipamento.
+ * Um lote de peças de CENÁRIO: tinta no chão, zebrado, demarcação.
  *
  * Um `InstancedMesh` por material, não um `<mesh>` por peça. A demarcação são nove faixas
- * hoje, o zebrado são trinta e poucos traços e a empilhadeira são oito caixas cada — somadas
- * seriam dezenas de chamadas de desenho para coisas que não carregam dado nenhum. Como
- * nada aqui tem cor por instância, cada grupo cabe num objeto de GPU só e o custo para de
- * crescer junto com o galpão.
+ * hoje e o zebrado são trinta e dois traços — somados seriam dezenas de chamadas de
+ * desenho para coisas que não carregam dado nenhum. Como nada aqui tem cor por instância,
+ * cada grupo cabe num objeto de GPU só e o custo para de crescer junto com o galpão.
  *
  * Caixa achatada em vez de `planeGeometry` para a tinta: o plano tem face única e some
  * visto de baixo, e quem caminha passa com os olhos a 1,65 m — rasante o bastante para a
@@ -1181,6 +1215,10 @@ export function RealceDaVaga({
 
 /** Pousos do contorno quando não há vaga apontada. Constantes para a referência ser
  *  estável e não disparar atualização de matriz a cada render. */
+/** Vermelho da recusa no fantasma. É o `--danger` do produto resolvido em hex, porque
+ *  material de WebGL não lê variável CSS — mesma razão de toda a paleta de `aparencia`. */
+const COR_RECUSA = '#B42318';
+
 const ORIGEM: Ponto = [0, 0, 0];
 const UNIDADE: Ponto = [1, 1, 1];
 
@@ -1361,12 +1399,19 @@ export function PlantaFisica3D({
    *  muda de medida de fileira para fileira. */
   const arestasDaCarga = useArestasDeCaixas(lotes.cargaDestaque, 2);
 
+  /**
+   * Tampo e pés de cada bancada, num lote só.
+   *
+   * `mesas` chega VAZIA no Modo Construção: lá as bancadas são peças de esboço de
+   * verdade, desenhadas pela camada de construção, que é onde elas podem ser movidas,
+   * giradas e excluídas. Desenhar as duas ao mesmo tempo mostraria cada mesa em dobro —
+   * a peça que obedece ao cursor e o desenho fixo que não obedece.
+   */
+  const pecasDasBancadas = useMemo(() => mesas.flatMap(m => pecasDaBancada(m)), [mesas]);
+
   /** Zebrado de advertência em volta da área de manobra. */
   const zebrado = useMemo(() => faixasDaExpedicao(blocos), [blocos]);
 
-  /** As duas empilhadeiras estacionadas na doca. Existem para dar ESCALA: um rack de
-   *  4,2 m só parece 4,2 m ao lado de algo cujo tamanho o olho já conhece. */
-  const equipamentos = useMemo(() => equipamentosDaExpedicao(blocos), [blocos]);
 
   return (
     <group position={[-largura / 2, 0, -comprimento / 2]}>
@@ -1384,27 +1429,23 @@ export function PlantaFisica3D({
         </mesh>
       ))}
 
-      {/* Zebrado de advertência e as duas empilhadeiras da doca: três objetos de GPU para
-          tudo. O amarelo é o de MARCAÇÃO de solo, que esta cena já declara não-semântico —
-          o amarelo de empilhadeira de verdade é vizinho do âmbar de "acima da capacidade",
-          e um equipamento quase da cor do alerta apaga o alerta. */}
+      {/* Zebrado de advertência da área de manobra, num objeto de GPU só. O amarelo é o de
+          MARCAÇÃO de solo, que esta cena já declara não-semântico: é o mesmo papel do
+          amarelo pintado no chão de um galpão, e por isso não disputa com o âmbar que
+          significa "acima da capacidade". */}
       <LoteDoCenario pecas={zebrado} material={MATERIAIS_DO_GALPAO[theme].zebrado} />
-      <LoteDoCenario pecas={equipamentos.corpo} material={MATERIAIS_DO_EQUIPAMENTO[theme].corpo} />
-      <LoteDoCenario pecas={equipamentos.aco} material={MATERIAIS_DO_EQUIPAMENTO[theme].aco} />
 
       {/* A fileira é DECOMPOSTA em quadro (montantes + diagonais) e longarinas. Caixa
           cheia no lugar disso vira muro: some o vão onde o palete entra e some a leitura
           de quantas posições a rua tem. Porta-pallets vazio é quase todo ar. */}
       <EstruturaDaPlanta pecas={pecasDaEstrutura} theme={theme} />
 
-      {/* Mesas de embalagem e baias de expedição. Não guardam endereço: são superfície
-          de trabalho, e contá-las como estante inventaria posição que não existe. */}
-      {mesas.map(m => (
-        <mesh key={m.id} position={m.centro}>
-          <boxGeometry args={m.tamanho} />
-          <meshStandardMaterial color={cores.fantasma} roughness={0.8} metalness={0} />
-        </mesh>
-      ))}
+      {/* Bancadas de embalagem, decompostas em tampo e pés num lote só.
+          Eram quatro malhas desenhando quatro CAIXAS CHEIAS de 1,6 x 0,9 x 0,8 — sem vão
+          por baixo e sem tampo, o mesmo defeito de bloco que tirou a empilhadeira da
+          cena. Decompostas, elas leem como bancada; instanciadas, as quatro custam uma
+          chamada de desenho em vez de quatro. */}
+      <LoteDoCenario pecas={pecasDasBancadas} material={materiais.palete} />
 
       {/* Os VÃOS, em sete lotes instanciados.
           Antes era um `<mesh>` por vão — 311 malhas e ~1.245 elementos React para 215
@@ -1578,6 +1619,9 @@ export function Construcao({
   onSelecionar,
   onGirar,
   onExcluir,
+  onMover,
+  onArrastar,
+  lugarAceita,
 }: {
   ferramenta: FerramentaBuilder;
   /** Variante que o fantasma deve mostrar — a mesma que a próxima peça vai nascer. */
@@ -1587,20 +1631,48 @@ export function Construcao({
   extensao: number;
   theme: Theme;
   onConstruir: (x: number, z: number) => void;
-  onSelecionar: (id: string) => void;
-  onGirar: (id: string) => void;
+  onSelecionar: (id: string | null) => void;
+  onGirar: (id: string, sentido?: 1 | -1) => void;
   onExcluir: (id: string) => void;
+  /** Arrasta uma peça para um novo ponto do piso, já encaixado na grade. */
+  onMover: (id: string, x: number, z: number) => void;
+  /** Avisa quem está arrastando: é o que desliga a órbita enquanto a peça se move. */
+  onArrastar: (id: string | null) => void;
+  /**
+   * O lugar aceita a peça? A MESMA função que o clique usa para recusar — fantasma
+   * verde onde o clique não constrói seria o pior dos dois mundos.
+   */
+  lugarAceita: (tipo: TipoConstruido, estante: TipoDeEstante, x: number, z: number, rotacaoY: number, ignorar?: string | null) => boolean;
 }) {
   const [alvo, setAlvo] = useState<[number, number] | null>(null);
+  /** Id da peça que o ponteiro está arrastando. Local: quem precisa saber lá fora é só
+   *  a órbita, e ela recebe pelo `onArrastar`. */
+  const [arrastando, setArrastando] = useState<string | null>(null);
   const cores = COR_BUILDER[theme];
   const construindo = ferramenta !== 'navegar';
+
+  const encerrarArraste = () => {
+    if (!arrastando) return;
+    setArrastando(null);
+    onArrastar(null);
+  };
 
   /** Tamanho da peça: porta-pallets segue a VARIANTE escolhida, o resto segue o catálogo. */
   const tamanhoDe = (tipo: TipoConstruido, estante: TipoDeEstante): [number, number, number] =>
     tipo === 'porta-pallets' ? ESTANTES[estante].tamanho : CATALOGO[tipo].tamanho;
 
+  /** A madeira do estrado vem do MESMO conjunto da estante: pallet construído e pallet
+   *  do cadastro têm de ser a mesma madeira, senão a cena tem dois tipos de pallet. */
+  const materiaisDaCena = MATERIAIS_DA_ESTRUTURA[theme];
+
   const hexDe = (chave: string) =>
     CORES_DE_ESTANTE.find(c => c.chave === chave)?.hex ?? cores.peca;
+
+  /** O lugar sob o cursor aceita a peça armada? É o que decide a cor do fantasma. */
+  const cabeNoLugar =
+    !construindo || !alvo
+      ? true
+      : lugarAceita(ferramenta as TipoConstruido, estanteEscolhida, alvo[0], alvo[1], 0);
 
   const tamanhoAtivo = construindo
     ? tamanhoDe(ferramenta as TipoConstruido, estanteEscolhida)
@@ -1612,17 +1684,26 @@ export function Construcao({
         rotation={[-Math.PI / 2, 0, 0]}
         position={[0, 0, 0]}
         onPointerMove={e => {
-          if (!construindo) return;
+          if (!construindo && !arrastando) return;
           e.stopPropagation();
           // Snap: o metro é a unidade da grade desenhada, então arredondar para inteiro
           // é literalmente encaixar na linha que a pessoa está vendo.
-          setAlvo([Math.round(e.point.x), Math.round(e.point.z)]);
+          const x = encaixar(e.point.x);
+          const z = encaixar(e.point.z);
+          setAlvo([x, z]);
+          // Arrastando, o MESMO ponto que moveria o fantasma move a peça.
+          if (arrastando) onMover(arrastando, x, z);
         }}
-        onPointerLeave={() => setAlvo(null)}
+        onPointerLeave={() => { setAlvo(null); encerrarArraste(); }}
+        onPointerUp={() => encerrarArraste()}
         onClick={e => {
-          if (!construindo || !alvo) return;
+          if (arrastando) return;
           e.stopPropagation();
-          onConstruir(alvo[0], alvo[1]);
+          // Com ferramenta armada, o clique no piso constrói — em sequência, sem
+          // desarmar. Com a de navegar, ele SOLTA a seleção: clicar no vazio precisa
+          // limpar sem quebrar a próxima ação.
+          if (construindo && alvo) onConstruir(alvo[0], alvo[1]);
+          else if (!construindo && selecionado) onSelecionar(null);
         }}
       >
         {/* Maior que a cena: construir fora do contorno atual do armazém é justamente o
@@ -1631,8 +1712,16 @@ export function Construcao({
         <meshBasicMaterial transparent opacity={0} depthWrite={false} />
       </mesh>
 
-      {tamanhoAtivo && alvo && (
-        <mesh
+      {/* O FANTASMA.
+          Segue o cursor encaixado na grade e diz, pela cor, se o clique vai construir:
+          accent quando o lugar aceita, vermelho de perigo quando há peça ou estante
+          embaixo. A validação é a mesma função que o clique usa — fantasma verde num
+          lugar onde o clique não faz nada seria pior que não ter fantasma.
+
+          A caixa de contorno junto do volume: translúcido sozinho some contra a estante,
+          e é justamente em cima de outra peça que o fantasma precisa ser lido. */}
+      {tamanhoAtivo && alvo && !arrastando && (
+        <group
           position={[
             alvo[0],
             CATALOGO[ferramenta as TipoConstruido].noChao
@@ -1641,9 +1730,43 @@ export function Construcao({
             alvo[1],
           ]}
         >
-          <boxGeometry args={tamanhoAtivo} />
-          <meshStandardMaterial color={cores.fantasma} transparent opacity={0.45} depthWrite={false} />
-        </mesh>
+          {/* O fantasma tem a MESMA forma que vai ser construída.
+              Um bloco translúcido do tamanho da mesa prometia um caixote e entregava uma
+              mesa — e o inverso também: quem via o bloco julgava que ia tapar o corredor
+              inteiro e não colocava. Previsão errada é pior que previsão feia. */}
+          {ferramenta === 'mesa' ? (
+            pecasDaMesa(tamanhoAtivo[0], tamanhoAtivo[1], tamanhoAtivo[2]).map((pc, i) => (
+              <mesh key={i} position={pc.centro}>
+                <boxGeometry args={pc.tamanho} />
+                <meshStandardMaterial
+                  color={cabeNoLugar ? cores.fantasma : COR_RECUSA}
+                  transparent
+                  opacity={cabeNoLugar ? 0.4 : 0.3}
+                  depthWrite={false}
+                />
+              </mesh>
+            ))
+          ) : (
+            <mesh>
+              <boxGeometry args={tamanhoAtivo} />
+              <meshStandardMaterial
+                color={cabeNoLugar ? cores.fantasma : COR_RECUSA}
+                transparent
+                opacity={cabeNoLugar ? 0.4 : 0.3}
+                depthWrite={false}
+              />
+            </mesh>
+          )}
+          <Line
+            points={PONTOS_DO_CONTORNO}
+            segments
+            scale={tamanhoAtivo}
+            color={cabeNoLugar ? cores.fantasma : COR_RECUSA}
+            lineWidth={2}
+            depthTest={false}
+            renderOrder={2}
+          />
+        </group>
       )}
 
       {objetos.map(obj => {
@@ -1665,7 +1788,16 @@ export function Construcao({
                 longarinas, a mesma decomposição da planta. Caixa cheia faria o builder
                 construir uma coisa e o mapa mostrar outra. */}
             {obj.tipo === 'porta-pallets' ? (
-              <group onClick={e => { e.stopPropagation(); onSelecionar(obj.id); }}>
+              <group
+                onPointerDown={e => {
+                  if (construindo) return;
+                  e.stopPropagation();
+                  onSelecionar(obj.id);
+                  setArrastando(obj.id);
+                  onArrastar(obj.id);
+                }}
+                onPointerUp={e => { e.stopPropagation(); encerrarArraste(); }}
+              >
                 {pecasDaFileira({
                   id: obj.id,
                   tipo: 'fileira',
@@ -1679,33 +1811,128 @@ export function Construcao({
                   </mesh>
                 ))}
               </group>
-            ) : (
-              <mesh
-                onClick={e => {
+            ) : obj.tipo === "pallet" ? (
+              /* Pallet no chão: estrado e carga, não um cubo.
+                 É a peça que representa mercadoria FORA da estante, e desenhá-la como
+                 bloco único faria o mapa dizer "tem volume aqui" sem dizer o que é. Com o
+                 estrado separado da carga, ela lê como pallet — a mesma leitura que a
+                 carga dentro do vão já tem. */
+              <group
+                onPointerDown={e => {
+                  if (construindo) return;
                   e.stopPropagation();
                   onSelecionar(obj.id);
+                  setArrastando(obj.id);
+                  onArrastar(obj.id);
                 }}
+                onPointerUp={e => { e.stopPropagation(); encerrarArraste(); }}
+              >
+                <mesh position={[0, -peca.tamanho[1] / 2 + ALTURA_DO_PALETE / 2, 0]}>
+                  <boxGeometry args={[peca.tamanho[0], ALTURA_DO_PALETE, peca.tamanho[2]]} />
+                  <meshStandardMaterial color={materiaisDaCena.palete.color} roughness={0.92} metalness={0} />
+                </mesh>
+                <mesh
+                  position={[0, -peca.tamanho[1] / 2 + ALTURA_DO_PALETE + (peca.tamanho[1] - ALTURA_DO_PALETE) / 2, 0]}
+                >
+                  <boxGeometry
+                    args={[peca.tamanho[0] * 0.94, peca.tamanho[1] - ALTURA_DO_PALETE, peca.tamanho[2] * 0.94]}
+                  />
+                  <meshStandardMaterial color={cor} roughness={0.72} metalness={0.05} />
+                </mesh>
+              </group>
+            ) : obj.tipo === 'mesa' ? (
+              /* Mesa de expedição: tampo e pernas, pela MESMA função que desenha a
+                 bancada da planta. Antes era um `boxGeometry` do tamanho inteiro — um
+                 caixote de 1,6 x 0,9 x 0,8 no meio do corredor, que lia como volume
+                 maciço e não como superfície de trabalho. O vão por baixo é o que
+                 distingue um móvel de um bloco. */
+              <group
+                onPointerDown={e => {
+                  if (construindo) return;
+                  e.stopPropagation();
+                  onSelecionar(obj.id);
+                  setArrastando(obj.id);
+                  onArrastar(obj.id);
+                }}
+                onPointerUp={e => { e.stopPropagation(); encerrarArraste(); }}
+              >
+                {pecasDaMesa(peca.tamanho[0], peca.tamanho[1], peca.tamanho[2]).map((pc, i) => (
+                  <mesh key={i} position={pc.centro}>
+                    <boxGeometry args={pc.tamanho} />
+                    <meshStandardMaterial color={cor} roughness={0.55} metalness={0.1} />
+                  </mesh>
+                ))}
+              </group>
+            ) : (
+              <mesh
+                onPointerDown={e => {
+                  if (construindo) return;
+                  e.stopPropagation();
+                  onSelecionar(obj.id);
+                  setArrastando(obj.id);
+                  onArrastar(obj.id);
+                }}
+                onPointerUp={e => { e.stopPropagation(); encerrarArraste(); }}
               >
                 <boxGeometry args={peca.tamanho} />
                 <meshStandardMaterial color={cor} />
               </mesh>
             )}
 
+            {/* Barra de ação da peça selecionada.
+                SEM `distanceFactor`, e isso foi MEDIDO, não estilo: com ele, o botão
+                "Excluir" era pintado em 16 x 27 px — abaixo do mínimo de 24 px para
+                clicar e muito abaixo dos 44 px de alvo de toque que a Design Constitution
+                exige. Era a razão de excluir uma peça parecer não funcionar: o alvo
+                existia, cabia num palito, e encolhia mais a cada passo de afastamento da
+                câmera. É o mesmo defeito que já tinha deixado a placa de rua ilegível, e a
+                correção é a mesma: rótulo de mapa tem tamanho de TELA, não de cena.
+
+                `w-max max-w-none` pelo motivo documentado em `PlacasDeRua`: o wrapper do
+                `<Html>` tem largura zero e a guarda global `* { max-width: 100% }` faria a
+                barra colapsar. */}
+            {/* Contorno da selecionada. A troca de cor sozinha era fraca: num
+                porta-pallets, que é desenhado como dezenas de peças finas, mudar o tom do
+                aço quase não se enxerga de longe. O contorno é uma caixa só, por cima de
+                tudo. */}
             {ativo && (
-              <Html center distanceFactor={22} position={[0, peca.tamanho[1] / 2 + 0.8, 0]}>
-                <div className="flex gap-1 whitespace-nowrap rounded-control border border-edge bg-surface px-1.5 py-1 shadow-control">
+              <Line
+                points={PONTOS_DO_CONTORNO}
+                segments
+                position={[0, 0, 0]}
+                scale={peca.tamanho}
+                color={cores.selecionada}
+                lineWidth={2.5}
+                depthTest={false}
+                renderOrder={2}
+              />
+            )}
+
+            {ativo && (
+              <Html
+                center
+                position={[0, peca.tamanho[1] / 2 + 0.8, 0]}
+                // Acima das placas de rua (1) e abaixo da camada do HUD (10): a barra é
+                // controle, então ganha das etiquetas, mas não pode cobrir um painel.
+                zIndexRange={[5, 0]}
+              >
+                <div className="inline-flex w-max max-w-none gap-1 whitespace-nowrap rounded-control border border-edge bg-surface p-1 shadow-panel">
                   <button
                     type="button"
-                    className="rounded-control px-2 py-1 text-xs text-fg hover:bg-surface-3"
+                    title="Girar a peça 90° (R ou seta →)"
+                    className="flex h-8 items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-fg-muted transition-colors hover:bg-surface-3 hover:text-fg"
                     onClick={() => onGirar(obj.id)}
                   >
-                    Girar 90°
+                    <RotateCw aria-hidden className="h-3.5 w-3.5 shrink-0" />
+                    Girar
                   </button>
                   <button
                     type="button"
-                    className="rounded-control px-2 py-1 text-xs text-red-600 hover:bg-surface-3 dark:text-red-400"
+                    title="Excluir esta peça (Del)"
+                    className="flex h-8 items-center gap-1.5 rounded-control px-2.5 text-xs font-medium text-danger transition-colors hover:bg-danger/10"
                     onClick={() => onExcluir(obj.id)}
                   >
+                    <Trash2 aria-hidden className="h-3.5 w-3.5 shrink-0" />
                     Excluir
                   </button>
                 </div>

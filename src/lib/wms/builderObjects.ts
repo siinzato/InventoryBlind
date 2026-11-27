@@ -11,7 +11,7 @@
 
 import { supabase } from '../supabase';
 
-export type TipoDaPeca = 'porta-pallets' | 'mesa' | 'doca';
+export type TipoDaPeca = 'porta-pallets' | 'mesa' | 'doca' | 'pallet';
 export type VarianteDeEstante = 'simples' | 'duplo' | 'picking';
 
 export interface PecaSalva {

@@ -471,24 +471,3 @@ export const MATERIAIS_DO_GALPAO: Record<Theme, MateriaisDoGalpao> = {
     zebrado: new MeshStandardMaterial({ color: COR_MARCACAO.dark, roughness: 0.92, metalness: 0 }),
   },
 };
-
-export interface MateriaisDoEquipamento {
-  /** Corpo e teto de proteção: o amarelo de marcação, que esta cena já declara
-   *  não-semântico. Amarelo de empilhadeira de verdade seria vizinho do âmbar de "acima da
-   *  capacidade" e faria o alerta perder força dentro do próprio galpão. */
-  corpo: MeshStandardMaterial;
-  /** Mastro, colunas e garfos. Aço escuro: é a silhueta que faz o equipamento ser lido
-   *  como empilhadeira em vez de caixote amarelo. */
-  aco: MeshStandardMaterial;
-}
-
-export const MATERIAIS_DO_EQUIPAMENTO: Record<Theme, MateriaisDoEquipamento> = {
-  light: {
-    corpo: new MeshStandardMaterial({ color: COR_MARCACAO.light, roughness: 0.55, metalness: 0.15 }),
-    aco: new MeshStandardMaterial({ color: '#3C4654', roughness: 0.45, metalness: 0.55 }),
-  },
-  dark: {
-    corpo: new MeshStandardMaterial({ color: COR_MARCACAO.dark, roughness: 0.55, metalness: 0.15 }),
-    aco: new MeshStandardMaterial({ color: '#2A313C', roughness: 0.45, metalness: 0.55 }),
-  },
-};

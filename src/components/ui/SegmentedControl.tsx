@@ -1,11 +1,15 @@
+import type { ComponentType } from 'react';
 import type { LucideIcon } from 'lucide-react';
 
 export interface SegmentedOption<T extends string> {
   value: T;
   label: string;
-  /** Optional lucide icon. Icon-only segments are not supported on purpose —
-   *  an operational tool should never make the user decode a glyph. */
-  icon?: LucideIcon;
+  /** Optional icon: a lucide icon, or any pictogram with the same call shape. The WMS
+   *  3D map draws its own for porta-pallets, floor plan and bin code, because lucide has
+   *  none of them — and an approximate icon is worse than no icon.
+   *  Icon-only segments are not supported on purpose — an operational tool should never
+   *  make the user decode a glyph. */
+  icon?: LucideIcon | ComponentType<{ size?: number; className?: string }>;
 }
 
 interface SegmentedControlProps<T extends string> {

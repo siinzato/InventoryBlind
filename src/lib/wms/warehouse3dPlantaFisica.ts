@@ -401,10 +401,16 @@ export function vaosDaFileira(bloco: BlocoFisico, prefixo = 'PP'): VaoDaFileira[
 }
 
 /**
- * Mesas e bancadas da planta.
+ * Bancadas de embalagem da planta.
  *
  * Separadas das fileiras porque não armazenam endereço: são superfície de trabalho, e
  * tratá-las como estante faria o mapa contar posição que não existe.
+ *
+ * ── Por que as cinco baias saíram ──────────────────────────────────────────────
+ * Elas desenhavam "pallets prontos" na expedição: cinco cubos de 1,2 × 0,9 × 1,2 que não
+ * correspondiam a dado nenhum. Mercadoria desenhada sem lastro é pior que área vazia —
+ * quem planeja carregamento olhando o mapa contaria cinco pallets que ninguém separou. A
+ * expedição agora mostra a área e o zebrado, que são verdade, e nada dentro dela.
  */
 export function mesasDaPlanta(trechos: TrechoDaPlanta[] = AZ2027_TERREO): BlocoFisico[] {
   const mesas: BlocoFisico[] = [];
@@ -423,25 +429,6 @@ export function mesasDaPlanta(trechos: TrechoDaPlanta[] = AZ2027_TERREO): BlocoF
         centro: [x, TAMPO.altura / 2, z],
         tamanho: [TAMPO.largura, TAMPO.altura, TAMPO.profundidade],
         rotulo: i === 0 ? 'EMBALAGEM' : '',
-      });
-    }
-  }
-
-  // 5 baias de pallets prontos, dentro da expedição.
-  const ultimo = trechos[trechos.length - 1];
-  if (ultimo) {
-    const fim = ultimo.zInicio + ultimo.comprimento;
-    const z = fim - EXPEDICAO.comprimento + 2.4;
-    const vaoEntre = (EXPEDICAO.largura - 5 * 1.2) / 6;
-    const borda = (LARGURA_DO_PREDIO - EXPEDICAO.largura) / 2;
-    for (let i = 0; i < 5; i++) {
-      const x = borda + vaoEntre * (i + 1) + 1.2 * (i + 0.5);
-      mesas.push({
-        id: `baia-${i + 1}`,
-        tipo: 'bancada',
-        centro: [x, 0.45, z],
-        tamanho: [1.2, 0.9, 1.2],
-        rotulo: i === 0 ? 'BAIAS' : '',
       });
     }
   }
@@ -591,13 +578,11 @@ export function faixasDePiso(
   });
 }
 
-// ── Acabamento do cenário: sapata, zebrado e equipamento ─────────────────────────────
+// ── Acabamento do cenário: sapata e zebrado ──────────────────────────────────────────
 //
-// Nada aqui carrega dado. São as coisas que um galpão tem e que o desenho não tinha, e
-// cada uma existe por um motivo de LEITURA, não de enfeite: a sapata devolve o contato da
-// estante com o piso na vista de cima, o zebrado diz onde é área de manobra e a
-// empilhadeira dá a escala — um rack de 4,2 m só parece 4,2 m ao lado de algo cujo
-// tamanho se conhece.
+// Nada aqui carrega dado. São as duas coisas que um galpão tem e que o desenho não tinha,
+// e cada uma existe por um motivo de LEITURA, não de enfeite: a sapata devolve o contato
+// da estante com o piso na vista de cima, e o zebrado diz onde é área de manobra.
 
 /** Medidas da sapata — as mesmas da vista por código, para a estante não mudar de
  *  construção conforme a aba aberta. */
@@ -686,113 +671,75 @@ export function faixasDaExpedicao(blocos: readonly BlocoFisico[]): FaixaDePiso[]
 }
 
 /**
- * Medidas da empilhadeira contrabalançada, em metros.
+ * Seção do pé e espessura do tampo da bancada, em metros.
  *
- * São as de um equipamento real de 2,5 t, e isso é o ponto do item: a empilhadeira não
- * está na cena para enfeitar, está para dar ESCALA. Um rack de 4,2 m só parece 4,2 m
- * quando há ao lado algo cujo tamanho o olho já conhece — e quem trabalha num galpão
- * conhece o tamanho de uma empilhadeira. Medida errada aqui mentiria sobre o tamanho do
- * galpão inteiro, que é justo o que ela veio consertar.
+ * Uma bancada desenhada como caixa cheia de 1,6 × 0,9 × 0,8 é um BLOCO: não tem vão por
+ * baixo, não tem tampo, e lida de perto parece um caixote abandonado no meio do galpão.
+ * Era o mesmo defeito da empilhadeira em bloco, na mesma área da planta — e a correção é
+ * a mesma que a estante já recebeu: decompor na peça que a coisa de fato tem.
  */
-export const EMPILHADEIRA = {
-  largura: 1.1,
-  comprimentoDoCorpo: 1.9,
-  alturaDoCorpo: 1.0,
-  alturaDoTeto: 2.1,
-  alturaDoMastro: 2.3,
-  secaoDoMastro: 0.11,
-  comprimentoDoGarfo: 1.1,
-} as const;
-
-/** As duas malhas de uma frota, mais a pegada de cada equipamento no piso. */
-export interface EquipamentosDaCena {
-  /** Corpo e teto de proteção. */
-  corpo: FaixaDePiso[];
-  /** Mastro, colunas do teto e garfos. */
-  aco: FaixaDePiso[];
-  /** Pegada no piso, para a caminhada não atravessar o equipamento. */
-  pegadas: FaixaDePiso[];
-}
-
-const semEquipamento = (): EquipamentosDaCena => ({ corpo: [], aco: [], pegadas: [] });
+const BANCADA = { tampo: 0.06, pe: 0.07 } as const;
 
 /**
- * Duas empilhadeiras ESTACIONADAS na expedição.
+ * As peças de uma mesa de expedição, em coordenada LOCAL — centro da mesa na origem.
  *
- * ── Por que ali, e não num corredor ────────────────────────────────────────────
- * Expedição é a única área grande sem endereço. Pôr equipamento num corredor de manobra
- * faria o desenho afirmar que aquele corredor está bloqueado, e quem planeja separação
- * olhando o mapa acreditaria. Encostadas nas duas laterais da doca, atrás da fileira de
- * baias, elas ficam onde uma empilhadeira de fato para no fim do turno.
+ * ── Por que existe separada de `pecasDaBancada` ────────────────────────────────
+ * A bancada da planta e a mesa que se coloca no Modo Construção são o MESMO móvel, e
+ * estavam desenhadas por dois caminhos: a da planta já era tampo e pés, a do builder
+ * continuava um `boxGeometry` do tamanho inteiro — um caixote. Duas definições do mesmo
+ * objeto divergem no dia em que alguém mexe numa delas, e foi exatamente o que aconteceu.
+ * Aqui a forma é definida UMA vez, em torno da origem, e cada chamador a posiciona.
  *
- * ── Por que a cor não é amarela de empilhadeira ────────────────────────────────
- * A cor é decidida fora daqui, mas o motivo vive junto da geometria: o amarelo de
- * equipamento é vizinho do âmbar que significa "acima da capacidade" nesta mesma cena. A
- * escolhida é o amarelo de MARCAÇÃO de solo, que a cena já declara como não-semântico —
- * então o equipamento entra na família de "sinalização e circulação" em vez de inventar um
- * segundo alerta.
+ * ── Por que tampo e pés, e não uma caixa ──────────────────────────────────────
+ * O vão por baixo é o que distingue mesa de caixote. Sem ele não há onde encostar um
+ * carrinho nem onde guardar caixa vazia, e no desenho a mesa vira um bloco maciço no meio
+ * do corredor — que é a leitura oposta da verdadeira: mesa é superfície, não volume.
+ *
+ * Os pés ficam recuados meia seção para dentro do tampo, como num móvel real: rente à
+ * borda o pé lê como quina de caixa e o vão por baixo desaparece.
  */
-export function equipamentosDaExpedicao(blocos: readonly BlocoFisico[]): EquipamentosDaCena {
-  const area = blocos.find(b => b.tipo === 'expedicao');
-  if (!area) return semEquipamento();
+export function pecasDaMesa(
+  largura: number,
+  altura: number,
+  profundidade: number,
+): FaixaDePiso[] {
+  const alturaDosPes = Math.max(0, altura - BANCADA.tampo);
+  const recuo = BANCADA.pe;
+  const base = -altura / 2;
 
-  const e = EMPILHADEIRA;
-  const [cx, , cz] = area.centro;
-  const [largura, , comprimento] = area.tamanho;
+  const pecas: FaixaDePiso[] = [
+    {
+      centro: [0, altura / 2 - BANCADA.tampo / 2, 0],
+      tamanho: [largura, BANCADA.tampo, profundidade],
+    },
+  ];
 
-  // Encostadas na borda da doca, a um quinto e a quatro quintos da largura: fora da
-  // fileira de baias, que ocupa o meio da área.
-  const z = cz + comprimento / 2 - e.comprimentoDoCorpo / 2 - ZEBRADO.faixa - 0.4;
-  const xs = [cx - largura / 2 + largura * 0.2, cx + largura / 2 - largura * 0.2];
-
-  const resultado = semEquipamento();
-
-  for (const x of xs) {
-    const fundo = z + e.comprimentoDoCorpo / 2;
-    const frente = z - e.comprimentoDoCorpo / 2;
-
-    // Corpo: a massa, do chão ao banco.
-    resultado.corpo.push({
-      centro: [x, e.alturaDoCorpo / 2, z],
-      tamanho: [e.largura, e.alturaDoCorpo, e.comprimentoDoCorpo],
-    });
-    // Teto de proteção: a chapa sobre a cabeça do operador.
-    resultado.corpo.push({
-      centro: [x, e.alturaDoTeto, z + 0.15],
-      tamanho: [e.largura, 0.06, e.comprimentoDoCorpo * 0.62],
-    });
-
-    // Colunas do teto, nos dois cantos de trás.
-    for (const dx of [-e.largura / 2 + 0.07, e.largura / 2 - 0.07]) {
-      resultado.aco.push({
-        centro: [x + dx, (e.alturaDoCorpo + e.alturaDoTeto) / 2, fundo - 0.12],
-        tamanho: [0.07, e.alturaDoTeto - e.alturaDoCorpo, 0.07],
+  for (const dx of [-largura / 2 + recuo, largura / 2 - recuo]) {
+    for (const dz of [-profundidade / 2 + recuo, profundidade / 2 - recuo]) {
+      pecas.push({
+        centro: [dx, base + alturaDosPes / 2, dz],
+        tamanho: [BANCADA.pe, alturaDosPes, BANCADA.pe],
       });
     }
-    // Mastro: dois trilhos na frente. É a peça que faz a silhueta ser lida como
-    // empilhadeira em vez de caixote.
-    for (const dx of [-0.3, 0.3]) {
-      resultado.aco.push({
-        centro: [x + dx, e.alturaDoMastro / 2, frente - e.secaoDoMastro / 2],
-        tamanho: [e.secaoDoMastro, e.alturaDoMastro, e.secaoDoMastro],
-      });
-    }
-    // Garfos: rentes ao piso, à frente do mastro.
-    for (const dx of [-0.3, 0.3]) {
-      resultado.aco.push({
-        centro: [x + dx, 0.06, frente - e.secaoDoMastro - e.comprimentoDoGarfo / 2],
-        tamanho: [0.12, 0.05, e.comprimentoDoGarfo],
-      });
-    }
-
-    // A pegada inclui os garfos: quem caminha esbarra no garfo antes de esbarrar no
-    // corpo, e é exatamente assim que se machuca o pé num galpão de verdade.
-    const comprimentoTotal = e.comprimentoDoCorpo + e.secaoDoMastro + e.comprimentoDoGarfo;
-    resultado.pegadas.push({
-      centro: [x, 0, fundo - comprimentoTotal / 2],
-      tamanho: [e.largura, 0, comprimentoTotal],
-    });
   }
 
-  return resultado;
+  return pecas;
+}
+
+/**
+ * Tampo e quatro pés de uma bancada da planta, já no referencial do galpão.
+ *
+ * Delega a FORMA para `pecasDaMesa` e só translada: a bancada da planta e a mesa do
+ * builder não podem ser dois móveis diferentes.
+ */
+export function pecasDaBancada(bloco: BlocoFisico): FaixaDePiso[] {
+  if (bloco.tipo !== 'bancada') return [];
+
+  const [cx, , cz] = bloco.centro;
+  const [largura, altura, profundidade] = bloco.tamanho;
+
+  return pecasDaMesa(largura, altura, profundidade).map(peca => ({
+    centro: [cx + peca.centro[0], altura / 2 + peca.centro[1], cz + peca.centro[2]],
+    tamanho: peca.tamanho,
+  }));
 }

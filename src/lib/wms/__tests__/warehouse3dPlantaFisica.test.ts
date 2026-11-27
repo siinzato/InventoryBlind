@@ -3,8 +3,7 @@ import {
   AZ2027_TERREO, EXPEDICAO, LARGURA_DO_PREDIO, PROFUNDIDADE_DA_FILEIRA,
   blocosDaPlanta, comprimentoTotal, posicoesEmX, pecasDaFileira, posicoesDaFileira, NIVEIS_POR_FILEIRA,
   vaosDaFileira, mesasDaPlanta, placasDasFileiras, faixasDePiso, ALTURA_DA_FILEIRA,
-  sapatasDasFileiras, faixasDaExpedicao, equipamentosDaExpedicao, EMPILHADEIRA,
-  PASSO_DA_POSICAO,
+  sapatasDasFileiras, faixasDaExpedicao, pecasDaBancada, pecasDaMesa, PASSO_DA_POSICAO,
   type PecaDaFileira, type FaixaDePiso,
 } from '../warehouse3dPlantaFisica';
 
@@ -242,9 +241,12 @@ describe('vaosDaFileira e mesasDaPlanta', () => {
     expect(vaosDaFileira(exp)).toHaveLength(0);
   });
 
-  it('entrega 4 bancadas de embalagem e 5 baias, todas dentro do predio', () => {
+  it('entrega 4 bancadas de embalagem, todas dentro do predio', () => {
+    // Eram 9: as 4 bancadas mais 5 "baias de pallets prontos" na expedicao. As baias
+    // sairam por afirmarem mercadoria que nao existe em dado nenhum — ver o describe
+    // 'mesasDaPlanta - o que a expedicao deixou de afirmar' no fim do arquivo.
     const mesas = mesasDaPlanta();
-    expect(mesas).toHaveLength(9);
+    expect(mesas).toHaveLength(4);
     for (const m of mesas) {
       expect(m.tipo).toBe('bancada');
       expect(m.centro[0] - m.tamanho[0] / 2).toBeGreaterThanOrEqual(0);
@@ -532,84 +534,146 @@ describe('faixasDaExpedicao - o zebrado da area de manobra', () => {
   });
 });
 
-describe('equipamentosDaExpedicao - as empilhadeiras da doca', () => {
-  const blocos = () => blocosDaPlanta();
-
-  it('sem expedicao, nenhum equipamento', () => {
-    const r = equipamentosDaExpedicao(blocos().filter(b => b.tipo === 'fileira'));
-    expect(r.corpo).toHaveLength(0);
-    expect(r.aco).toHaveLength(0);
-    expect(r.pegadas).toHaveLength(0);
-  });
-
-  it('sao duas, com corpo, aco e pegada cada', () => {
-    const r = equipamentosDaExpedicao(blocos());
-    expect(r.pegadas).toHaveLength(2);
-    expect(r.corpo).toHaveLength(4); // corpo + teto, por empilhadeira
-    expect(r.aco).toHaveLength(12); // 2 colunas + 2 mastros + 2 garfos, por empilhadeira
-  });
-
-  it('nenhuma peca atravessa uma fileira de porta-pallets', () => {
-    const fileiras = blocos().filter(b => b.tipo === 'fileira');
-    const r = equipamentosDaExpedicao(blocos());
-    for (const peca of [...r.corpo, ...r.aco]) {
-      for (const f of fileiras) {
-        const cruzaX = Math.abs(peca.centro[0] - f.centro[0]) < (peca.tamanho[0] + f.tamanho[0]) / 2;
-        const cruzaZ = Math.abs(peca.centro[2] - f.centro[2]) < (peca.tamanho[2] + f.tamanho[2]) / 2;
-        expect(cruzaX && cruzaZ).toBe(false);
-      }
-    }
-  });
-
-  it('nenhuma peca atravessa uma baia ou bancada', () => {
+describe('mesasDaPlanta — o que a expedicao deixou de afirmar', () => {
+  it('sobraram as 4 bancadas de embalagem, e nada dentro da expedicao', () => {
     const mesas = mesasDaPlanta();
-    const r = equipamentosDaExpedicao(blocos());
-    for (const peca of [...r.corpo, ...r.aco]) {
-      for (const m of mesas) {
-        const cruzaX = Math.abs(peca.centro[0] - m.centro[0]) < (peca.tamanho[0] + m.tamanho[0]) / 2;
-        const cruzaZ = Math.abs(peca.centro[2] - m.centro[2]) < (peca.tamanho[2] + m.tamanho[2]) / 2;
-        expect(cruzaX && cruzaZ).toBe(false);
-      }
+    expect(mesas).toHaveLength(4);
+    expect(mesas.every(m => m.id.startsWith('bancada-'))).toBe(true);
+  });
+
+  it('nenhuma peca desenha mercadoria na area de expedicao', () => {
+    // As 5 "baias de pallets prontos" eram cubos que nao correspondiam a dado nenhum.
+    // Mercadoria desenhada sem lastro faz quem planeja carregamento contar pallets que
+    // ninguem separou — e isso e pior que area vazia.
+    const area = blocosDaPlanta().find(b => b.tipo === 'expedicao')!;
+    for (const m of mesasDaPlanta()) {
+      const dentro =
+        Math.abs(m.centro[0] - area.centro[0]) < area.tamanho[0] / 2 &&
+        Math.abs(m.centro[2] - area.centro[2]) < area.tamanho[2] / 2;
+      expect(dentro).toBe(false);
+    }
+  });
+});
+
+describe('pecasDaBancada — a bancada que deixou de ser bloco', () => {
+  const bancada = () => mesasDaPlanta()[0];
+
+  it('ignora o que nao e bancada', () => {
+    for (const b of blocosDaPlanta()) expect(pecasDaBancada(b)).toHaveLength(0);
+  });
+
+  it('da um tampo e quatro pes', () => {
+    const pecas = pecasDaBancada(bancada());
+    expect(pecas).toHaveLength(5);
+    const tampos = pecas.filter(p => p.tamanho[0] > 1);
+    expect(tampos).toHaveLength(1);
+  });
+
+  it('o tampo fecha exatamente no topo declarado da bancada', () => {
+    const b = bancada();
+    const [tampo] = pecasDaBancada(b);
+    expect(tampo.centro[1] + tampo.tamanho[1] / 2).toBeCloseTo(b.tamanho[1], 9);
+  });
+
+  it('existe VAO por baixo: e isso que distingue bancada de caixote', () => {
+    const b = bancada();
+    const pecas = pecasDaBancada(b);
+    const [tampo, ...pes] = pecas;
+    // Os pes ocupam uma fracao pequena da planta do tampo; o resto e ar.
+    const areaDoTampo = tampo.tamanho[0] * tampo.tamanho[2];
+    const areaDosPes = pes.reduce((s, p) => s + p.tamanho[0] * p.tamanho[2], 0);
+    expect(areaDosPes / areaDoTampo).toBeLessThan(0.05);
+  });
+
+  it('os quatro pes apoiam no piso e nenhum atravessa a borda do tampo', () => {
+    const b = bancada();
+    const [tampo, ...pes] = pecasDaBancada(b);
+    expect(pes).toHaveLength(4);
+    for (const pe of pes) {
+      expect(pe.centro[1] - pe.tamanho[1] / 2).toBeCloseTo(0, 9);
+      expect(Math.abs(pe.centro[0] - tampo.centro[0]) + pe.tamanho[0] / 2)
+        .toBeLessThanOrEqual(tampo.tamanho[0] / 2 + 1e-9);
+      expect(Math.abs(pe.centro[2] - tampo.centro[2]) + pe.tamanho[2] / 2)
+        .toBeLessThanOrEqual(tampo.tamanho[2] / 2 + 1e-9);
     }
   });
 
-  it('as duas ficam dentro do predio e dentro da propria expedicao', () => {
-    const area = blocos().find(b => b.tipo === 'expedicao')!;
-    const r = equipamentosDaExpedicao(blocos());
-    for (const peca of [...r.corpo, ...r.aco]) {
-      expect(peca.centro[0] - peca.tamanho[0] / 2).toBeGreaterThanOrEqual(0);
-      expect(peca.centro[0] + peca.tamanho[0] / 2).toBeLessThanOrEqual(LARGURA_DO_PREDIO);
-      expect(peca.centro[2]).toBeGreaterThan(area.centro[2] - area.tamanho[2] / 2);
-      expect(peca.centro[2]).toBeLessThan(area.centro[2] + area.tamanho[2] / 2);
+  it('tampo mais pe somam a altura da bancada, sem sobra nem buraco', () => {
+    const b = bancada();
+    const [tampo, pe] = pecasDaBancada(b);
+    expect(pe.tamanho[1] + tampo.tamanho[1]).toBeCloseTo(b.tamanho[1], 9);
+  });
+});
+
+
+describe('pecasDaMesa — a mesa de expedicao nao e um caixote', () => {
+  // Em jogo: a mesa colocada no Modo Construcao era desenhada como um `boxGeometry` do
+  // tamanho inteiro. 1,6 x 0,9 x 0,8 de bloco macico no meio do corredor le como volume
+  // intransponivel, que e a leitura OPOSTA da verdadeira: mesa e superficie, tem vao por
+  // baixo. A forma agora e uma so, aqui, e tanto a bancada da planta quanto a peca do
+  // builder a usam.
+  const L = 1.6, A = 0.9, P = 0.8;
+  const mesa = pecasDaMesa(L, A, P);
+
+  it('e um tampo e quatro pes, nao uma caixa', () => {
+    expect(mesa).toHaveLength(5);
+  });
+
+  it('o tampo cobre a mesa inteira e fica no alto', () => {
+    const tampo = mesa[0];
+    expect(tampo.tamanho[0]).toBe(L);
+    expect(tampo.tamanho[2]).toBe(P);
+    // Fino: tampo com a altura da mesa seria a caixa de volta.
+    expect(tampo.tamanho[1]).toBeLessThan(A / 5);
+    // Topo do tampo rente ao topo da mesa.
+    expect(tampo.centro[1] + tampo.tamanho[1] / 2).toBeCloseTo(A / 2, 10);
+  });
+
+  it('ha vao por baixo: nenhum pe ocupa mais que uma fracao da planta do tampo', () => {
+    const pes = mesa.slice(1);
+    const areaDosPes = pes.reduce((soma, pe) => soma + pe.tamanho[0] * pe.tamanho[2], 0);
+    // O que distingue mesa de bloco: o chao sob ela continua quase todo livre.
+    expect(areaDosPes).toBeLessThan(L * P * 0.05);
+  });
+
+  it('os quatro pes vao do chao ate o tampo, sem flutuar nem furar o piso', () => {
+    for (const pe of mesa.slice(1)) {
+      expect(pe.centro[1] - pe.tamanho[1] / 2).toBeCloseTo(-A / 2, 10);
+      expect(pe.centro[1] + pe.tamanho[1] / 2).toBeCloseTo(A / 2 - mesa[0].tamanho[1], 10);
     }
   });
 
-  it('nenhuma peca fica enterrada no piso', () => {
-    const r = equipamentosDaExpedicao(blocos());
-    for (const peca of [...r.corpo, ...r.aco]) {
-      expect(peca.centro[1] - peca.tamanho[1] / 2).toBeGreaterThanOrEqual(-1e-9);
+  it('os pes ficam DENTRO do tampo, recuados da borda', () => {
+    // Pe rente a borda le como quina de caixa e come o vao.
+    for (const pe of mesa.slice(1)) {
+      expect(Math.abs(pe.centro[0]) + pe.tamanho[0] / 2).toBeLessThanOrEqual(L / 2 + 1e-9);
+      expect(Math.abs(pe.centro[2]) + pe.tamanho[2] / 2).toBeLessThanOrEqual(P / 2 + 1e-9);
+      expect(Math.abs(pe.centro[0])).toBeLessThan(L / 2);
+      expect(Math.abs(pe.centro[2])).toBeLessThan(P / 2);
     }
   });
 
-  it('a empilhadeira cabe no pe-direito, muito abaixo do topo da estante', () => {
-    const r = equipamentosDaExpedicao(blocos());
-    const topo = Math.max(...[...r.corpo, ...r.aco].map(p => p.centro[1] + p.tamanho[1] / 2));
-    expect(topo).toBeCloseTo(EMPILHADEIRA.alturaDoMastro, 2);
-    expect(topo).toBeLessThan(ALTURA_DA_FILEIRA);
+  it('a bancada da planta e a MESMA mesa, so transladada', () => {
+    // A divergencia e que custa caro: duas definicoes do mesmo movel acabam diferentes no
+    // dia em que alguem mexe numa so.
+    const bancada = mesasDaPlanta()[0];
+    const naPlanta = pecasDaBancada(bancada);
+    const [cx, , cz] = bancada.centro;
+    const [bl, ba, bp] = bancada.tamanho;
+    const local = pecasDaMesa(bl, ba, bp);
+
+    expect(naPlanta).toHaveLength(local.length);
+    naPlanta.forEach((pc, i) => {
+      expect(pc.tamanho).toEqual(local[i].tamanho);
+      expect(pc.centro[0]).toBeCloseTo(cx + local[i].centro[0], 10);
+      expect(pc.centro[1]).toBeCloseTo(ba / 2 + local[i].centro[1], 10);
+      expect(pc.centro[2]).toBeCloseTo(cz + local[i].centro[2], 10);
+    });
   });
 
-  it('a pegada cobre o corpo E os garfos - esbarra-se no garfo primeiro', () => {
-    const r = equipamentosDaExpedicao(blocos());
-    const garfos = r.aco.filter(p => p.tamanho[1] < 0.1);
-    expect(garfos.length).toBe(4);
-    for (const garfo of garfos) {
-      const dentro = r.pegadas.some(
-        p =>
-          Math.abs(garfo.centro[0] - p.centro[0]) <= p.tamanho[0] / 2 + 1e-9 &&
-          garfo.centro[2] - garfo.tamanho[2] / 2 >= p.centro[2] - p.tamanho[2] / 2 - 1e-9 &&
-          garfo.centro[2] + garfo.tamanho[2] / 2 <= p.centro[2] + p.tamanho[2] / 2 + 1e-9,
-      );
-      expect(dentro).toBe(true);
+  it('nenhuma peca da bancada da planta fura o chao', () => {
+    for (const pc of pecasDaBancada(mesasDaPlanta()[0])) {
+      expect(pc.centro[1] - pc.tamanho[1] / 2).toBeGreaterThanOrEqual(-1e-9);
     }
   });
 });

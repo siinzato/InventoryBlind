@@ -252,6 +252,19 @@ interface Warehouse3DViewerProps {
   onScanRequest?: (slot: Slot) => void;
   /** Omitido, o botão de movimentação não aparece. */
   onOperate?: (slot: Slot) => void;
+  /**
+   * Endereços de uma rota vinda de FORA, na ordem em que devem ser visitados.
+   *
+   * Hoje quem desenha rota é a busca, e a ordem dela é o FIFO que `searchStock`
+   * devolve. Uma onda de separação já traz a própria ordem — rua, módulo e nível,
+   * calculada no banco quando a reserva foi feita — e reordenar aqui desalinharia o
+   * traçado da lista que o separador tem na mão.
+   *
+   * Por isso a prop entrega só a SEQUÊNCIA: o motor geométrico (`paradasDaRota`,
+   * `caminhoNoPiso`, `subidasAteAVaga`) continua exatamente o mesmo, e ele já preserva
+   * a ordem recebida de propósito.
+   */
+  rotaExterna?: readonly string[] | null;
   className?: string;
 }
 
@@ -270,6 +283,7 @@ export function Warehouse3DViewer({
   onSelectSlot,
   onScanRequest,
   onOperate,
+  rotaExterna,
   className = '',
 }: Warehouse3DViewerProps) {
   const { theme } = useTheme();
@@ -1663,10 +1677,14 @@ export function Warehouse3DViewer({
    * "Ir até".
    */
   const rota = useMemo<RotaDesenhavel | null>(() => {
-    if (ordemFifo.length < 2) return null;
+    // A rota da onda tem precedência sobre a da busca: quem abriu o mapa vindo de uma
+    // onda quer ver AQUELA rota, e deixar a busca sobrescrevê-la trocaria o caminho do
+    // separador por outro no meio da conferência.
+    const ordem = rotaExterna && rotaExterna.length > 0 ? rotaExterna : ordemFifo;
+    if (ordem.length < 2) return null;
     // Resolvida pela vista ATIVA: na planta a vaga está em outro lugar, e a rota
     // desenhada com a coordenada da grade apareceria atravessada no galpão.
-    const paradas = paradasDaRota(ordemFifo, vagas, layout, localDaVaga);
+    const paradas = paradasDaRota(ordem, vagas, layout, localDaVaga);
     if (paradas.length < 2) return null;
     // Na planta, a travessia entre ruas é o corredor transversal de entrada do trecho —
     // as fileiras começam depois dele. Com a cabeceira da grade (−1,17 m) o traçado
@@ -1677,7 +1695,7 @@ export function Warehouse3DViewer({
       caminho: caminhoNoPiso(paradas, layout, cabeceira),
       subidas: subidasAteAVaga(paradas),
     };
-  }, [ordemFifo, vagas, layout, localDaVaga, plantaFisica]);
+  }, [rotaExterna, ordemFifo, vagas, layout, localDaVaga, plantaFisica]);
 
   /**
    * Extensão que dimensiona o cenário e a câmera.

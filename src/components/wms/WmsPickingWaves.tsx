@@ -14,7 +14,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
-  AlertTriangle, ArrowLeft, Check, ClipboardPaste, FileText, Layers, Plug,
+  AlertTriangle, ArrowLeft, Check, ClipboardPaste, FileText, Layers, Map, PlayCircle, Plug,
   Plus, RotateCcw, Table2, Trash2, X,
 } from 'lucide-react';
 import {
@@ -26,6 +26,7 @@ import {
   aplicarAjustes, lerPdf, lerPlanilha, linhasDaPlanilha, linhasDoPdf, PdfSemTexto,
   type OrigemDaColuna, type PlanilhaLida,
 } from '../../lib/wms/pickingImport';
+import { WmsWavePicking } from './WmsWavePicking';
 import { searchProducts, type ProductOption } from '../../lib/wms/wmsService';
 import {
   ROTULO_DO_ESTADO, adicionarItem, adicionarPorCodigo, cancelarOnda, criarOnda,
@@ -64,7 +65,15 @@ const MOTIVO_DA_RECUSA: Record<LinhaRecusada['motivo'], string> = {
 const dataCurta = (iso: string): string =>
   new Date(iso).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', year: '2-digit' });
 
-export function WmsPickingWaves() {
+export function WmsPickingWaves({ onVerNoMapa }: {
+  /**
+   * Leva a rota da onda para o Mapa 3D.
+   *
+   * Prop, e não navegação interna: o mapa é uma seção IRMÃ desta, e nenhuma renderiza a
+   * outra. Quem conhece as duas é a página do Pulmão, e é ela quem troca de seção.
+   */
+  onVerNoMapa?: (codigo: string, enderecos: string[]) => void;
+} = {}) {
   const [ondas, setOndas] = useState<Onda[] | null>(null);
   const [abertaId, setAbertaId] = useState<string | null>(null);
   const [erro, setErro] = useState<string | null>(null);
@@ -94,6 +103,7 @@ export function WmsPickingWaves() {
       <OndaAberta
         ondaId={abertaId}
         onVoltar={() => { setAbertaId(null); void carregar(); }}
+        onVerNoMapa={onVerNoMapa}
       />
     );
   }
@@ -166,7 +176,11 @@ interface Ambigua {
   candidatos: CandidatoDeProduto[];
 }
 
-function OndaAberta({ ondaId, onVoltar }: { ondaId: string; onVoltar: () => void }) {
+function OndaAberta({ ondaId, onVoltar, onVerNoMapa }: {
+  ondaId: string;
+  onVoltar: () => void;
+  onVerNoMapa?: (codigo: string, enderecos: string[]) => void;
+}) {
   const [detalhe, setDetalhe] = useState<DetalheDaOnda | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [ocupado, setOcupado] = useState(false);
@@ -174,6 +188,7 @@ function OndaAberta({ ondaId, onVoltar }: { ondaId: string; onVoltar: () => void
   const [fila, setFila] = useState<Ambigua[]>([]);
   const [naoEncontrados, setNaoEncontrados] = useState<string[]>([]);
   const [resumo, setResumo] = useState<ResumoDaReserva | null>(null);
+  const [separando, setSeparando] = useState(false);
 
   // ── De onde a lista vem ───────────────────────────────────────────────────
   //
@@ -384,6 +399,13 @@ function OndaAberta({ ondaId, onVoltar }: { ondaId: string; onVoltar: () => void
     }
   }, [ondaId, recarregar]);
 
+  if (separando) {
+    // A separação é uma tela inteira, não um painel a mais: quem está no corredor
+    // precisa de um assunto por vez, e o montador não deve ver os controles de edição
+    // enquanto confere.
+    return <WmsWavePicking ondaId={ondaId} onSair={() => { setSeparando(false); void recarregar(); }} />;
+  }
+
   if (!detalhe) {
     return (
       <Panel>
@@ -416,6 +438,23 @@ function OndaAberta({ ondaId, onVoltar }: { ondaId: string; onVoltar: () => void
                 <Button variant="secondary" size="sm" onClick={() => void cancelar()} disabled={ocupado}>
                   <X aria-hidden className="h-4 w-4" />
                   Cancelar onda
+                </Button>
+              )}
+              {/* Duas paradas é o mínimo para haver CAMINHO: com uma, há um destino, e
+                  para isso o mapa já tem a busca. */}
+              {onVerNoMapa && rota.length > 1 && (
+                <Button
+                  variant="secondary"
+                  onClick={() => onVerNoMapa(onda.codigo, rota.map(p => p.endereco))}
+                >
+                  <Map aria-hidden className="h-4 w-4" />
+                  Ver no mapa 3D
+                </Button>
+              )}
+              {!encerrada && !rascunho && rota.length > 0 && (
+                <Button onClick={() => setSeparando(true)}>
+                  <PlayCircle aria-hidden className="h-4 w-4" />
+                  Separar
                 </Button>
               )}
               {!encerrada && (

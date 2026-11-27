@@ -13,6 +13,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Keyboard } from 'lucide-react';
 import { Button, Modal, Notice } from '../ui';
 import { binCodeFromScan } from '../../lib/wms/binScan';
+import { createBarcodeDecoder } from '../../lib/wms/barcodeDecoder';
 import { createQrDecoder, type QrDecoder } from '../../lib/wms/qrDecoder';
 
 /** ~8 leituras por segundo. Acompanha a mão do operador e deixa o celular respirar;
@@ -65,11 +66,24 @@ export function WmsBinScanner({
   onClose,
   onDetected,
   expectCode,
+  modo = 'endereco',
 }: {
   open: boolean;
   title: string;
   onClose: () => void;
   onDetected: (code: string) => void;
+  /**
+   * O que a câmera está lendo.
+   *
+   * `endereco`: QR nosso, e o texto passa por `binCodeFromScan` — a etiqueta carrega
+   * uma URL para a câmera nativa do celular abrir o sistema, e o que interessa é só o
+   * código de dentro dela.
+   *
+   * `produto`: código de barras da caixa (EAN-13 e companhia), que vai cru para quem
+   * pediu. Troca o decodificador: o de QR não lê 1D, e insistir nele faria a câmera
+   * abrir e nunca reconhecer a etiqueta do produto.
+   */
+  modo?: 'endereco' | 'produto';
   /**
    * Modo conferência: o operador já escolheu o endereço e aponta a câmera para a
    * etiqueta para PROVAR que está na vaga certa. Lendo outra, o leitor recusa e continua
@@ -128,6 +142,17 @@ export function WmsBinScanner({
         .decode(video)
         .then(text => {
           if (cancelled || done || !text) return;
+
+          // Produto: o texto do código de barras é o próprio dado. Não há endereço para
+          // extrair nem vaga esperada para conferir — quem compara com o item da parada
+          // é o banco, e é ele que mantém a conferência cega.
+          if (modo === 'produto') {
+            done = true;
+            signalRead();
+            detectedRef.current(text.trim());
+            return;
+          }
+
           const code = binCodeFromScan(text);
           if (!code) {
             // Segue lendo: o operador pode ter pego a etiqueta errada de raspão.
@@ -180,9 +205,15 @@ export function WmsBinScanner({
       }
 
       try {
-        decoder = await createQrDecoder();
+        // O leitor de 1D entra por `import()` dinâmico lá dentro: ~900 KB de WASM que
+        // só quem separa paga, e só ao abrir a câmera de produto.
+        decoder = modo === 'produto' ? await createBarcodeDecoder() : await createQrDecoder();
       } catch {
-        fail('Não foi possível iniciar a leitura neste aparelho. Digite o endereço.');
+        fail(
+          modo === 'produto'
+            ? 'Não foi possível iniciar a leitura de código de barras neste aparelho. Digite o código.'
+            : 'Não foi possível iniciar a leitura neste aparelho. Digite o endereço.',
+        );
         return;
       }
       if (cancelled) return;
@@ -198,7 +229,7 @@ export function WmsBinScanner({
       stream?.getTracks().forEach(track => track.stop());
       video.srcObject = null;
     };
-  }, [open]);
+  }, [open, modo]);
 
   return (
     <Modal open={open} onClose={onClose} title={title} maxWidth="max-w-md">

@@ -20,11 +20,25 @@ export const WHATS_NEW_CATEGORY_LABEL: Record<WhatsNewCategory, string> = {
 
 export const WHATS_NEW_ENTRIES: WhatsNewEntry[] = [
   {
+    id: '2026-11-27-onda-rota-no-mapa-3d',
+    date: '2026-11-27',
+    category: 'melhoria',
+    title: 'A rota da onda agora aparece desenhada no Mapa 3D',
+    description: 'Na onda reservada, o botão "Ver no mapa 3D" leva o caminho da separação para o mapa: as paradas aparecem numeradas na ordem de caminhada do galpão, com o traçado entre elas. Uma faixa no topo diz de qual onda é a rota e permite limpá-la com um clique. Também corrigimos a contagem de caixas quando uma parada sem mercadoria é realocada para outro endereço — antes a mesma caixa era contada duas vezes no progresso da separação.',
+  },
+  {
     id: '2026-11-27-ondas-importar-planilha-e-pdf',
     date: '2026-11-27',
     category: 'melhoria',
     title: 'A lista da onda agora também entra por planilha e por PDF',
     description: 'Na montagem da onda, além de colar a lista, dá para enviar uma planilha (.xlsx, .xls ou .csv) ou um PDF. A planilha mostra quais colunas o sistema entendeu como código e como quantidade, já preenchidas e com a primeira linha de exemplo ao lado — quando o palpite não veio do cabeçalho, aparece um aviso de "confira" para você ajustar em dois cliques. O PDF é lido na ordem da página, linha por linha. Qualquer que seja a origem, a conferência é a mesma de sempre: você vê o que entra e o que precisa de ajuste antes de gravar, corrige a linha ali mesmo pelo número dela, e nada vai para a onda sem passar por essa tela. PDF que é só imagem escaneada avisa que não tem texto para ler, em vez de ficar em silêncio. A importação automática por integração aparece como "Em breve".',
+  },
+  {
+    id: '2026-11-27-pulmao-tela-do-separador',
+    date: '2026-11-27',
+    category: 'novidade',
+    title: 'Separação guiada: a onda vira uma tela só, feita para quem está no corredor',
+    description: 'Com a onda reservada, o botão "Separar" abre a tela de execução: endereço e quantidade em letra grande, uma parada por vez, as próximas logo abaixo e uma barra mostrando quanto já saiu. A conferência tem três passos na ordem certa — bipar a vaga, bipar o produto, informar a quantidade — e o produto errado é recusado na hora, antes de contar caixa. Funciona com o leitor do coletor (bipe e o campo recebe sozinho) e com a câmera do celular, que agora também lê código de barras de produto, não só o QR do endereço. Separação parcial mantém a parada aberta com o que falta; "Não tem mercadoria aqui" pede confirmação antes de registrar a falta e procura outro endereço com saldo. Se a rede falhar no meio, pode tocar de novo: a mesma leitura não dá baixa duas vezes.',
   },
   {
     id: '2026-11-27-pulmao-ondas-de-separacao',

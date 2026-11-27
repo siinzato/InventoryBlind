@@ -160,6 +160,15 @@ export function WmsPulmaoPage({
   // do dia a dia — onde tem vaga, o que esta cheio.
   const [mode, setModeInterno] = useState<Mode>(initialMode ?? (scannedBin ? 'movimentar' : 'mapa'));
 
+  /**
+   * Rota de uma onda, para o Mapa 3D desenhar.
+   *
+   * Mora AQUI porque as duas seções são irmãs: Ondas monta e o Mapa 3D desenha, e uma
+   * não renderiza a outra. Guardar isto dentro de qualquer uma delas obrigaria a outra a
+   * existir montada para receber o dado.
+   */
+  const [rotaDaOnda, setRotaDaOnda] = useState<{ codigo: string; enderecos: string[] } | null>(null);
+
   // Trocar de seção e avisar a navegação é UM gesto: separar os dois deixaria a URL
   // atrasada em relação à tela sempre que alguém mudasse de seção por um atalho interno
   // (abrir a vaga pelo mapa, por exemplo), e não só pelo seletor.
@@ -483,6 +492,20 @@ export function WmsPulmaoPage({
         />
       )}
 
+      {mode === 'mapa3d' && rotaDaOnda && (
+        // De onde veio o traçado. Sem esta linha, o mapa mostraria uma rota que a pessoa
+        // não pediu ali e não teria como desfazer.
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2 rounded-container border border-edge bg-surface-2 px-4 py-3">
+          <span className="text-sm text-fg-muted">
+            Rota da onda <span className="text-code text-fg">{rotaDaOnda.codigo}</span> —{" "}
+            {rotaDaOnda.enderecos.length} {plural(rotaDaOnda.enderecos.length, 'parada', 'paradas')}.
+          </span>
+          <Button variant="ghost" size="sm" onClick={() => setRotaDaOnda(null)}>
+            Limpar rota
+          </Button>
+        </div>
+      )}
+
       {mode === 'mapa3d' && (
         // Altura explicita: o Canvas colapsa em zero dentro de um pai sem altura, e
         // esta pagina empilha cabecalho e seletor de secao acima dele.
@@ -498,6 +521,7 @@ export function WmsPulmaoPage({
               // atalho que o mapa 2D ja oferece em onOperate.
               onOperate={slot => { setOperateBin(slot.id); setMode('movimentar'); }}
               onScanRequest={setScanSlot}
+              rotaExterna={rotaDaOnda?.enderecos ?? null}
             />
           </Suspense>
         </div>
@@ -507,7 +531,14 @@ export function WmsPulmaoPage({
         <WmsBinOperations bins={bins} initialBinCode={operateBin || scannedBin} onMoved={load} />
       )}
 
-      {mode === 'ondas' && <WmsPickingWaves />}
+      {mode === 'ondas' && (
+        <WmsPickingWaves
+          onVerNoMapa={(codigo, enderecos) => {
+            setRotaDaOnda({ codigo, enderecos });
+            setMode('mapa3d');
+          }}
+        />
+      )}
 
       {mode === 'enderecos' && (
         <>
